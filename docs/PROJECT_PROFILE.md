@@ -32,6 +32,9 @@
 - Step 10 `PKG-002` 세분화 문서: docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md
 - Step 11 `PKG-003` 세분화 문서: docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md
 - Step 12 `PKG-004` 세분화 문서: docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md
+- SDLC 리뷰 문서: docs/review/01-sdlc-review.md
+- 과제 계획안: docs/report/01-assignment-plan.md
+- 보고용 자료: docs/report/02-sdlc-review-report.html
 - 공통 계약 기준 문서: docs/sdlc/contracts/01-shared-build-contract-baseline.md
 - Step 05 baseline decisions: docs/sdlc/decisions/
 - 설계 문서 1: docs/sdlc/design/01-system-context-and-responsibilities.md
@@ -58,7 +61,7 @@
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
 - 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
 - 제약: 애플리케이션 코드와 실행 명령이 아직 없으며 문서 기반 설계 상태다
-- 기타: 현재 다음 단계는 shared package 또는 API 스캐폴드 진입이다
+- 기타: 현재 다음 단계는 문서 정합성 보정 후 shared package 또는 API 스캐폴드 진입이다
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)

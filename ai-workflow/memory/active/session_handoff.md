@@ -25,6 +25,7 @@
 - Step 10 문서에서 `PKG-002` request intake를 구현 태스크 수준으로 분해했다.
 - Step 11 문서에서 `PKG-003` persistence를 schema/migration/repository/query 수준으로 분해했다.
 - Step 12 문서에서 `PKG-004` query API를 status/log/response assembly 수준으로 분해했다.
+- SDLC 리뷰 문서, 과제 계획안, 보고용 HTML 자료 초안을 추가했다.
 
 ## Work Status
 
@@ -42,7 +43,9 @@
 - TASK-011 `PKG-002` Build Server request intake 세부 태스크 정리: done
 - TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단: done
 - TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단: done
-- TASK-014 shared package 또는 API 스캐폴드 진입 판단: in_progress
+- TASK-014 shared package 또는 API 스캐폴드 진입 판단: done
+- TASK-015 SDLC 리뷰 및 보고 패키지 작성: done
+- TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비: in_progress
 
 ## Key Changes
 
@@ -72,12 +75,16 @@
 - `docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md` 추가
 - `docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md` 추가
 - `docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md` 추가
+- `docs/review/01-sdlc-review.md` 추가
+- `docs/report/01-assignment-plan.md` 추가
+- `docs/report/02-sdlc-review-report.html` 추가
 - `README.md`, `docs/PROJECT_PROFILE.md`를 제품 컨셉 기준으로 정렬
 - `ai-workflow/memory/active/repository_assessment.md` 추가
 
 ## Next Actions
 
-- [ ] shared package 또는 API 스캐폴드 진입 판단
+- [ ] 리뷰에서 확인된 문서 정합성 이슈 보정
+- [ ] shared package 또는 API 스캐폴드 진입
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
 
 ## Risks & Blockers

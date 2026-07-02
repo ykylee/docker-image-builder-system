@@ -31,4 +31,6 @@
 - [x] TASK-011: `PKG-002` Build Server request intake 세부 태스크 정리
 - [x] TASK-012: `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단
 - [x] TASK-013: shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단
-- [~] TASK-014: shared package 또는 API 스캐폴드 진입 판단
+- [x] TASK-014: shared package 또는 API 스캐폴드 진입 판단
+- [x] TASK-015: SDLC 리뷰 및 보고 패키지 작성
+- [~] TASK-016: 문서 정합성 보정 및 스캐폴드 진입 준비

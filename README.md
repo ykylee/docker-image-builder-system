@@ -19,6 +19,9 @@
 - SDLC Step 10: `docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md`
 - SDLC Step 11: `docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md`
 - SDLC Step 12: `docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md`
+- SDLC Review: `docs/review/01-sdlc-review.md`
+- Assignment Plan: `docs/report/01-assignment-plan.md`
+- Review Report: `docs/report/02-sdlc-review-report.html`
 - Step 04 Design 01: `docs/sdlc/design/01-system-context-and-responsibilities.md`
 - Step 04 Design 02: `docs/sdlc/design/02-domain-model-and-state-transitions.md`
 - Step 04 Design 03: `docs/sdlc/design/03-api-contract-design.md`
@@ -48,4 +51,4 @@
 - 외부 컨셉 문서를 저장소 기준 문서로 흡수
 - SDLC Step 04 설계 문서 6종과 Step 05 진입 기준 문서를 정리
 - build queue와 preview service queue를 분리하는 운영 모델 반영
-- `PKG-004` 조회 계층 세분화까지 반영했고, 다음 단계는 shared package 또는 API 스캐폴드 진입이다
+- SDLC 리뷰, 과제 계획안, 보고용 자료 초안까지 반영했고, 다음 단계는 shared package 또는 API 스캐폴드 진입이다

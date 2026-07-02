@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-02",
-  "purpose_digest": "PKG-004 query API 세분화를 닫고 다음 shared package 또는 API 스캐폴드 진입 결정을 준비한다.",
-  "purpose_digest_rev": "16",
+  "purpose_digest": "SDLC 리뷰와 보고 패키지를 정리하고 다음 문서 정합성 보정 및 스캐폴드 진입 준비를 진행한다.",
+  "purpose_digest_rev": "17",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -24,11 +24,11 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06 구현 축, Step 07 package backlog, PKG-001 shared contract baseline, Step 08 기술 스택 baseline, Step 09 저장소 구조 baseline, Step 10 PKG-002 세분화, Step 11 PKG-003 세분화, Step 12 PKG-004 세분화가 정리되었다.",
-    "current_axis": "다음 착수점은 shared package 스캐폴드와 API 스캐폴드 중 우선순위 선택이다.",
-    "current_focus": "TASK-014 shared package 또는 API 스캐폴드 진입 판단",
+    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06~12 구현 세분화 문서, SDLC 리뷰, 과제 계획안, 보고용 자료 초안이 정리되었다.",
+    "current_axis": "다음 착수점은 문서 정합성 보정과 shared package 또는 API 스캐폴드 진입 준비다.",
+    "current_focus": "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비",
     "in_progress_items": [
-      "TASK-014 shared package 또는 API 스캐폴드 진입 판단"
+      "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비"
     ],
     "blocked_items": [],
     "recent_done_items": [
@@ -44,15 +44,17 @@
       "TASK-010 저장소 패키지 구조 초안 정리",
       "TASK-011 `PKG-002` Build Server request intake 세부 태스크 정리",
       "TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단",
-      "TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단"
+      "TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단",
+      "TASK-014 shared package 또는 API 스캐폴드 진입 판단",
+      "TASK-015 SDLC 리뷰 및 보고 패키지 작성"
     ],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
-    "task_count": 14,
+    "task_count": 16,
     "in_progress_items": [
-      "TASK-014 shared package 또는 API 스캐폴드 진입 판단"
+      "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비"
     ],
     "blocked_items": [],
     "done_items": [
@@ -68,7 +70,9 @@
       "TASK-010 저장소 패키지 구조 초안 정리",
       "TASK-011 `PKG-002` Build Server request intake 세부 태스크 정리",
       "TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단",
-      "TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단"
+      "TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단",
+      "TASK-014 shared package 또는 API 스캐폴드 진입 판단",
+      "TASK-015 SDLC 리뷰 및 보고 패키지 작성"
     ]
   },
   "next_documents": [
@@ -95,6 +99,9 @@
     "docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md",
     "docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md",
     "docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md",
+    "docs/review/01-sdlc-review.md",
+    "docs/report/01-assignment-plan.md",
+    "docs/report/02-sdlc-review-report.html",
     "docs/sdlc/contracts/01-shared-build-contract-baseline.md",
     "docs/sdlc/design/01-system-context-and-responsibilities.md",
     "docs/sdlc/design/02-domain-model-and-state-transitions.md",
