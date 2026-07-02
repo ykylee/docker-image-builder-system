@@ -7,6 +7,13 @@
 - 최종 수정일: 2026-07-02
 - 관련 문서: `docs/sdlc/design/01-system-context-and-responsibilities.md`, `docs/sdlc/design/02-domain-model-and-state-transitions.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`, `docs/sdlc/SRS/04-policy-and-constraints.md`
 
+## Traceability
+
+- Functional: `MVP-FR-007` ~ `MVP-FR-013`, `MVP-FR-021` ~ `MVP-FR-024`
+- Non-Functional: `MVP-NFR-003`, `MVP-NFR-006`, `MVP-NFR-008`
+- Policy/Data: `MVP-PR-002`, `MVP-PR-005`
+- Open Issues: `OI-001`, `OI-004`, `OI-005`, `OI-010`
+
 ## 1. 문서 목표
 
 이 문서는 Build Server가 외부에 노출하는 MVP API 계약을 고정하기 위한 설계 문서다.

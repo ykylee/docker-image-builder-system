@@ -7,6 +7,13 @@
 - 최종 수정일: 2026-07-02
 - 관련 문서: `docs/sdlc/04-design-structure.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`, `docs/sdlc/SRS/05-open-issues-and-decisions.md`
 
+## Traceability
+
+- Functional: `MVP-FR-001` ~ `MVP-FR-024`
+- Non-Functional: `MVP-NFR-001`, `MVP-NFR-002`, `MVP-NFR-005`, `MVP-NFR-006`, `MVP-NFR-007`, `MVP-NFR-008`
+- Policy/Data: `MVP-PR-005`
+- Open Issues: `OI-001`, `OI-004`, `OI-009`, `OI-010`
+
 ## 1. 문서 목표
 
 이 문서는 MVP에서 어떤 컴포넌트가 어떤 책임을 가지는지 먼저 고정하기 위한 설계 문서다.
@@ -299,24 +306,7 @@ Preview Runtime
 
 이 가정은 후속 의사결정에 따라 조정될 수 있다.
 
-## 9. 요구사항 추적 메모
-
-이 문서가 직접 대응하는 요구사항 묶음:
-
-- `MVP-FR-001` ~ `MVP-FR-024`
-- `MVP-NFR-001`
-- `MVP-NFR-002`
-
-특히 강하게 연결되는 항목:
-
-- `MVP-FR-007` ~ `MVP-FR-019`
-- `MVP-FR-020` ~ `MVP-FR-024`
-- `MVP-NFR-005`
-- `MVP-NFR-006`
-- `MVP-NFR-007`
-- `MVP-NFR-008`
-
-## 10. 후속 설계 문서로 넘길 포인트
+## 9. 후속 설계 문서로 넘길 포인트
 
 - 도메인 엔티티와 상태 전이 세부는 `02-domain-model-and-state-transitions.md`
 - API request/response 구조는 `03-api-contract-design.md`
@@ -324,7 +314,7 @@ Preview Runtime
 - Runner 단계별 실행 시퀀스는 `05-build-and-preview-execution-flow.md`
 - 상태/실패 메시지 규칙은 `06-user-messaging-and-failure-handling.md`
 
-## 11. 현 단계 결론
+## 10. 현 단계 결론
 
 - MVP에서 가장 중요한 경계는 `AI 에이전트/Skill`과 `Build Server`, 그리고 `Build Server`와 `Runner` 사이의 분리다.
 - 이 경계가 먼저 닫혀야 이후 도메인, API, 데이터 설계가 흔들리지 않는다.

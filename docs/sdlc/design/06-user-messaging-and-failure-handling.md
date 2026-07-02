@@ -7,6 +7,13 @@
 - 최종 수정일: 2026-07-02
 - 관련 문서: `docs/sdlc/design/03-api-contract-design.md`, `docs/sdlc/design/05-build-and-preview-execution-flow.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`, `docs/sdlc/SRS/04-policy-and-constraints.md`
 
+## Traceability
+
+- Functional: `MVP-FR-020` ~ `MVP-FR-024`
+- Non-Functional: `MVP-NFR-001`, `MVP-NFR-002`, `MVP-NFR-008`
+- Policy/Data: `MVP-PR-003`, `MVP-PR-004`, `MVP-PR-005`, `MVP-DR-003`, `MVP-DR-004`
+- Open Issues: `OI-005`, `OI-008`, `OI-009`, `OI-010`
+
 ## 1. 문서 목표
 
 이 문서는 Build Server와 Runner가 기록한 상태/오류 정보를 사용자와 AI 에이전트가 어떻게 해석하고 전달해야 하는지 고정하기 위한 설계 문서다.

@@ -24,7 +24,7 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 진입 기준 문서가 정리되었고 build queue와 preview service queue 분리 방향까지 반영되었다.",
+    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 진입 기준 문서가 정리되었고 design 01~06의 Traceability 포맷까지 통일되었다.",
     "current_axis": "Step 05 착수 전에 식별자/preview 운영 및 service queue 관련 미결정 항목을 baseline decision으로 닫고 구현 축을 정한다.",
     "current_focus": "TASK-005 Step 05 진입 기준 및 baseline decision 정리",
     "in_progress_items": [

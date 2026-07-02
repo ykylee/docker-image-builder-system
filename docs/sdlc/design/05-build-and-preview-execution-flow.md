@@ -7,6 +7,13 @@
 - 최종 수정일: 2026-07-02
 - 관련 문서: `docs/sdlc/design/02-domain-model-and-state-transitions.md`, `docs/sdlc/design/03-api-contract-design.md`, `docs/sdlc/design/04-data-model-design.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`
 
+## Traceability
+
+- Functional: `MVP-FR-014` ~ `MVP-FR-024`
+- Non-Functional: `MVP-NFR-004`, `MVP-NFR-007`, `MVP-NFR-008`
+- Policy/Data: `MVP-PR-001`, `MVP-PR-004`, `MVP-PR-005`, `MVP-DR-003`, `MVP-DR-004`
+- Open Issues: `OI-004`, `OI-005`, `OI-007`, `OI-008`, `OI-010`
+
 ## 1. 문서 목표
 
 이 문서는 Runner가 `QUEUED` build를 실제 preview URL 제공 상태까지 어떻게 처리할지 실행 순서 기준으로 고정하기 위한 설계 문서다.

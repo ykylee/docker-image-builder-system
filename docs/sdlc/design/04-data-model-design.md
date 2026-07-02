@@ -7,6 +7,13 @@
 - 최종 수정일: 2026-07-02
 - 관련 문서: `docs/sdlc/design/02-domain-model-and-state-transitions.md`, `docs/sdlc/design/03-api-contract-design.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`
 
+## Traceability
+
+- Functional: `MVP-FR-008` ~ `MVP-FR-024`
+- Non-Functional: `MVP-NFR-003`, `MVP-NFR-004`, `MVP-NFR-005`, `MVP-NFR-006`, `MVP-NFR-007`, `MVP-NFR-008`
+- Policy/Data: `MVP-PR-004`, `MVP-PR-005`, `MVP-DR-001`, `MVP-DR-002`, `MVP-DR-003`, `MVP-DR-004`
+- Open Issues: `OI-001`, `OI-007`, `OI-010`
+
 ## 1. 문서 목표
 
 이 문서는 MVP의 핵심 도메인 엔티티를 실제 저장 구조로 어떻게 표현할지 정의한다.

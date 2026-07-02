@@ -7,6 +7,13 @@
 - 최종 수정일: 2026-07-02
 - 관련 문서: `docs/sdlc/design/01-system-context-and-responsibilities.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`, `docs/sdlc/SRS/04-policy-and-constraints.md`, `docs/sdlc/SRS/05-open-issues-and-decisions.md`
 
+## Traceability
+
+- Functional: `MVP-FR-009` ~ `MVP-FR-024`
+- Non-Functional: `MVP-NFR-003`, `MVP-NFR-004`, `MVP-NFR-005`, `MVP-NFR-006`, `MVP-NFR-007`, `MVP-NFR-008`
+- Policy/Data: `MVP-PR-001`, `MVP-PR-002`, `MVP-PR-003`, `MVP-DR-001`, `MVP-DR-002`, `MVP-DR-003`, `MVP-DR-004`
+- Open Issues: `OI-001`, `OI-007`, `OI-010`
+
 ## 1. 문서 목표
 
 이 문서는 MVP에서 다뤄야 하는 핵심 도메인 엔티티와 그 상태 모델을 고정하기 위한 설계 문서다.
@@ -340,31 +347,13 @@ CANCELLED
 - `buildId`는 사람이 복사 가능한 문자열 형식을 사용한다.
 - preview는 `host + port` 기반 URL을 사용한다고 가정한다.
 
-## 10. 요구사항 추적 메모
-
-직접 대응 요구사항:
-
-- `MVP-FR-009` ~ `MVP-FR-019`
-- `MVP-FR-023`
-- `MVP-FR-024`
-- `MVP-NFR-003` ~ `MVP-NFR-006`
-- `MVP-NFR-007`
-- `MVP-NFR-008`
-- `MVP-DR-001` ~ `MVP-DR-004`
-
-강하게 연결되는 정책:
-
-- `MVP-PR-001`
-- `MVP-PR-002`
-- `MVP-PR-003`
-
-## 11. 후속 설계 문서로 넘길 포인트
+## 10. 후속 설계 문서로 넘길 포인트
 
 - API request/response의 상태 필드 구조는 `03-api-contract-design.md`
 - 실제 저장 필드와 인덱스는 `04-data-model-design.md`
 - Runner 관점의 상태 전이 시퀀스는 `05-build-and-preview-execution-flow.md`
 
-## 12. 현 단계 결론
+## 11. 현 단계 결론
 
 - 이 플랫폼의 핵심 도메인 포인트는 `BuildRequest`와 `TestDeployment`를 분리하고, `TEST_READY`를 success handoff 뒤 `COMPLETED`로 닫는 것이다.
 - 이 결정이 이후 API, 데이터 모델, preview 교체 정책의 안정성을 좌우한다.
