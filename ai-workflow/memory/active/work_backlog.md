@@ -22,4 +22,5 @@
 - [x] TASK-002: 컨셉 고도화 및 정책 문서 정리
 - [x] TASK-003: 요구사항 도출 및 정제
 - [x] TASK-004: Step 04 설계 문서 구조화
-- [~] TASK-005: Step 05 진입 기준 및 baseline decision 정리
+- [x] TASK-005: Step 05 진입 기준 및 baseline decision 정리
+- [~] TASK-006: Step 06 구현 축 및 workstream 정리

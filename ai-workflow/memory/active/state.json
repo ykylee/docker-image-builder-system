@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-02",
-  "purpose_digest": "Step 04 설계 문서 초안을 종료 가능 상태로 정리하고 Step 05 진입 기준과 baseline decision 순서를 확정한다.",
-  "purpose_digest_rev": "7",
+  "purpose_digest": "Step 05 baseline decision을 닫고 Step 06 구현 축과 workstream 분해 기준을 정리한다.",
+  "purpose_digest_rev": "8",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -24,33 +24,35 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 진입 기준 문서가 정리되었고 design 01~06의 Traceability 포맷까지 통일되었다.",
-    "current_axis": "Step 05 착수 전에 식별자/preview 운영 및 service queue 관련 미결정 항목을 baseline decision으로 닫고 구현 축을 정한다.",
-    "current_focus": "TASK-005 Step 05 진입 기준 및 baseline decision 정리",
+    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06 구현 축 문서가 정리되었다.",
+    "current_axis": "Build Server 우선 구현 축을 기준으로 backlog를 분해하고 medium priority decision 착수 순서를 정한다.",
+    "current_focus": "TASK-006 Step 06 구현 축 및 workstream 정리",
     "in_progress_items": [
-      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
+      "TASK-006 Step 06 구현 축 및 workstream 정리"
     ],
     "blocked_items": [],
     "recent_done_items": [
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
       "TASK-002 컨셉 고도화 및 정책 문서 정리",
       "TASK-003 요구사항 도출 및 정제",
-      "TASK-004 Step 04 설계 문서 구조화"
+      "TASK-004 Step 04 설계 문서 구조화",
+      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
     ],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
-    "task_count": 5,
+    "task_count": 6,
     "in_progress_items": [
-      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
+      "TASK-006 Step 06 구현 축 및 workstream 정리"
     ],
     "blocked_items": [],
     "done_items": [
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
       "TASK-002 컨셉 고도화 및 정책 문서 정리",
       "TASK-003 요구사항 도출 및 정제",
-      "TASK-004 Step 04 설계 문서 구조화"
+      "TASK-004 Step 04 설계 문서 구조화",
+      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
     ]
   },
   "next_documents": [
@@ -70,6 +72,7 @@
     "docs/sdlc/03-requirements-baseline.md",
     "docs/sdlc/04-design-structure.md",
     "docs/sdlc/05-design-closure-and-step-05-entry.md",
+    "docs/sdlc/06-implementation-axis-and-workstreams.md",
     "docs/sdlc/design/01-system-context-and-responsibilities.md",
     "docs/sdlc/design/02-domain-model-and-state-transitions.md",
     "docs/sdlc/design/03-api-contract-design.md",
@@ -81,7 +84,8 @@
     "docs/sdlc/SRS/03-non-functional-requirements.md",
     "docs/sdlc/SRS/04-policy-and-constraints.md",
     "docs/sdlc/SRS/05-open-issues-and-decisions.md",
-    "docs/sdlc/SRS/06-mvp-must-requirements.md"
+    "docs/sdlc/SRS/06-mvp-must-requirements.md",
+    "docs/sdlc/decisions/"
   ],
   "repository_assessment": {
     "path": "ai-workflow/memory/active/repository_assessment.md",

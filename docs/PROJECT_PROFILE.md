@@ -25,6 +25,8 @@
 - 요구사항 기준선: docs/sdlc/03-requirements-baseline.md
 - 설계 구조 문서: docs/sdlc/04-design-structure.md
 - Step 05 진입 문서: docs/sdlc/05-design-closure-and-step-05-entry.md
+- Step 06 구현 축 문서: docs/sdlc/06-implementation-axis-and-workstreams.md
+- Step 05 baseline decisions: docs/sdlc/decisions/
 - 설계 문서 1: docs/sdlc/design/01-system-context-and-responsibilities.md
 - 설계 문서 2: docs/sdlc/design/02-domain-model-and-state-transitions.md
 - 설계 문서 3: docs/sdlc/design/03-api-contract-design.md
@@ -48,8 +50,8 @@
 ## 5. 예외 규칙 (Policy)
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
 - 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
-- 제약: 저장소는 Git 미초기화 상태이며 애플리케이션 코드와 실행 명령이 아직 없다
-- 기타: 현재 다음 단계는 Step 05 진입 전 baseline decision 정리와 구현 backlog 분해다
+- 제약: 애플리케이션 코드와 실행 명령이 아직 없으며 문서 기반 설계 상태다
+- 기타: 현재 다음 단계는 Build Server 우선의 Step 06 구현 backlog 분해와 medium priority decision 정리다
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)

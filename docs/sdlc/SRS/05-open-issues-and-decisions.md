@@ -50,3 +50,17 @@
 
 - 현재 요구사항 단계에서 가장 먼저 줄여야 할 불확실성은 preview 운영 모델, service queue 정책, 식별자 source system이다.
 - 이 문서의 항목들은 다음 설계 단계의 pre-checklist로 사용한다.
+
+## 6. Step 05 Baseline Decisions
+
+- `OI-001` -> `docs/sdlc/decisions/01-user-id-source-system.md`
+- `OI-004` -> `docs/sdlc/decisions/02-preview-host-structure.md`
+- `OI-005` -> `docs/sdlc/decisions/03-preview-auth-policy.md`
+- `OI-007` -> `docs/sdlc/decisions/04-preview-cleanup-ownership.md`
+- `OI-010` -> `docs/sdlc/decisions/05-preview-service-queue-policy.md`
+
+상태 메모:
+
+- 위 5개 항목은 Step 05 baseline 수준으로 1차 결정되었다.
+- 구현 전 추가 확정이 필요한 세부 운영값은 각 decision 문서의 후속 보류 항목으로 남긴다.
+- 구현 축 우선순위와 workstream 분해 기준은 `docs/sdlc/06-implementation-axis-and-workstreams.md`에서 관리한다.

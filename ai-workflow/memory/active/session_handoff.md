@@ -13,9 +13,11 @@
 
 - 외부 컨셉 문서를 저장소 기준 문서로 정리했다.
 - MVP 범위는 Build Server 트랙과 Skill/MCP 트랙으로 구분한다.
-- Step 04는 종료 가능 상태로 정리되었고, 다음은 Step 05 진입 전 baseline decision 확정이다.
+- Step 04와 Step 05 baseline decision 정리가 완료되었고, 현재는 Step 06 구현 축 정리 단계다.
 - 최근 요구사항/설계는 build queue와 preview service queue를 분리하는 방향으로 갱신되었다.
 - design 01~06 문서 상단에 공통 `Traceability` 섹션 포맷을 반영했다.
+- `OI-001`, `OI-004`, `OI-005`, `OI-007`, `OI-010`에 대한 Step 05 baseline decision 문서를 추가했다.
+- Step 06 문서에서 Build Server 우선 구현 축과 초기 workstream 기준을 정리했다.
 
 ## Work Status
 
@@ -24,7 +26,8 @@
 - TASK-002 컨셉 고도화 및 정책 문서 정리: done
 - TASK-003 요구사항 도출 및 정제: done
 - TASK-004 Step 04 설계 문서 구조화: done
-- TASK-005 Step 05 진입 기준 및 baseline decision 정리: in_progress
+- TASK-005 Step 05 진입 기준 및 baseline decision 정리: done
+- TASK-006 Step 06 구현 축 및 workstream 정리: in_progress
 
 ## Key Changes
 
@@ -45,15 +48,17 @@
 - `docs/sdlc/SRS/04-policy-and-constraints.md` 추가
 - `docs/sdlc/SRS/05-open-issues-and-decisions.md` 추가
 - `docs/sdlc/SRS/06-mvp-must-requirements.md` 추가
+- `docs/sdlc/decisions/` 추가
+- `docs/sdlc/06-implementation-axis-and-workstreams.md` 추가
 - `README.md`, `docs/PROJECT_PROFILE.md`를 제품 컨셉 기준으로 정렬
 - `ai-workflow/memory/active/repository_assessment.md` 추가
 
 ## Next Actions
 
-- [ ] `OI-001`, `OI-004`, `OI-005`, `OI-007`, `OI-010` baseline decision 정리
-- [ ] 구현 시작 축(Build Server / Runner / Skill-MCP) 우선순위 확정
-- [ ] baseline decision 문서 형식과 저장 위치 확정
+- [ ] `TASK-006` 구현 backlog 초안 문서 추가
+- [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
+- [ ] Build Server 기준 기술 스택 및 패키지 구조 초안 정리
 
 ## Risks & Blockers
 
-- 저장소가 아직 Git 저장소가 아니며, 애플리케이션 코드와 실행 명령이 없다.
+- 애플리케이션 코드와 실행 명령이 아직 없어서 구현 backlog가 문서 수준 추정치에 머물러 있다.
