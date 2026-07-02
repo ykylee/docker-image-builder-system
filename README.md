@@ -15,6 +15,8 @@
 - SDLC Step 07: `docs/sdlc/07-implementation-backlog-baseline.md`
 - Shared Contract Baseline: `docs/sdlc/contracts/01-shared-build-contract-baseline.md`
 - SDLC Step 08: `docs/sdlc/08-build-server-tech-stack-baseline.md`
+- SDLC Step 09: `docs/sdlc/09-repository-package-structure-baseline.md`
+- SDLC Step 10: `docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md`
 - Step 04 Design 01: `docs/sdlc/design/01-system-context-and-responsibilities.md`
 - Step 04 Design 02: `docs/sdlc/design/02-domain-model-and-state-transitions.md`
 - Step 04 Design 03: `docs/sdlc/design/03-api-contract-design.md`
@@ -44,4 +46,4 @@
 - 외부 컨셉 문서를 저장소 기준 문서로 흡수
 - SDLC Step 04 설계 문서 6종과 Step 05 진입 기준 문서를 정리
 - build queue와 preview service queue를 분리하는 운영 모델 반영
-- Build Server 기술 스택 baseline까지 반영했고, 다음 단계는 저장소 패키지 구조 초안과 `PKG-002` 분해를 여는 것이다
+- `PKG-002` request intake 세분화까지 반영했고, 다음 단계는 `PKG-003` persistence 세분화 또는 코드 스캐폴드 진입이다

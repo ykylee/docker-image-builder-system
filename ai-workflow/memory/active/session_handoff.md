@@ -21,6 +21,8 @@
 - Step 07 문서에서 workstream을 구현 backlog package 단위로 분해했다.
 - `PKG-001` 공통 계약 기준 문서를 추가해 request/status/error baseline을 고정했다.
 - Step 08 문서에서 Build Server 기술 스택 baseline recommendation을 정리했다.
+- Step 09 문서에서 monorepo package structure baseline을 정리했다.
+- Step 10 문서에서 `PKG-002` request intake를 구현 태스크 수준으로 분해했다.
 
 ## Work Status
 
@@ -34,7 +36,9 @@
 - TASK-007 Step 07 구현 backlog baseline 정리: done
 - TASK-008 PKG-001 공통 계약 기준선 정리: done
 - TASK-009 Build Server 기술 스택 baseline 정리: done
-- TASK-010 저장소 패키지 구조 초안 정리: in_progress
+- TASK-010 저장소 패키지 구조 초안 정리: done
+- TASK-011 `PKG-002` Build Server request intake 세부 태스크 정리: done
+- TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단: in_progress
 
 ## Key Changes
 
@@ -60,13 +64,14 @@
 - `docs/sdlc/07-implementation-backlog-baseline.md` 추가
 - `docs/sdlc/contracts/01-shared-build-contract-baseline.md` 추가
 - `docs/sdlc/08-build-server-tech-stack-baseline.md` 추가
+- `docs/sdlc/09-repository-package-structure-baseline.md` 추가
+- `docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md` 추가
 - `README.md`, `docs/PROJECT_PROFILE.md`를 제품 컨셉 기준으로 정렬
 - `ai-workflow/memory/active/repository_assessment.md` 추가
 
 ## Next Actions
 
-- [ ] 저장소 패키지 구조 기준 초안 정리
-- [ ] `PKG-002` Build Server request intake 세부 태스크 정리
+- [ ] `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
 
 ## Risks & Blockers

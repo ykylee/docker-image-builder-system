@@ -27,4 +27,6 @@
 - [x] TASK-007: Step 07 구현 backlog baseline 정리
 - [x] TASK-008: PKG-001 공통 계약 기준선 정리
 - [x] TASK-009: Build Server 기술 스택 baseline 정리
-- [~] TASK-010: 저장소 패키지 구조 초안 정리
+- [x] TASK-010: 저장소 패키지 구조 초안 정리
+- [x] TASK-011: `PKG-002` Build Server request intake 세부 태스크 정리
+- [~] TASK-012: `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단

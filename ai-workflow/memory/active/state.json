@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-02",
-  "purpose_digest": "Build Server 기술 스택 baseline을 닫고 다음 저장소 패키지 구조 초안을 준비한다.",
-  "purpose_digest_rev": "12",
+  "purpose_digest": "PKG-002 request intake 세분화를 닫고 다음 PKG-003 persistence 또는 코드 스캐폴드 진입 결정을 준비한다.",
+  "purpose_digest_rev": "14",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -24,11 +24,11 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06 구현 축, Step 07 package backlog, PKG-001 shared contract baseline, Step 08 기술 스택 baseline이 정리되었다.",
-    "current_axis": "다음 착수점은 저장소 패키지 구조 초안 정리와 `PKG-002` Build Server request intake 세분화다.",
-    "current_focus": "TASK-010 저장소 패키지 구조 초안 정리",
+    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06 구현 축, Step 07 package backlog, PKG-001 shared contract baseline, Step 08 기술 스택 baseline, Step 09 저장소 구조 baseline, Step 10 PKG-002 세분화가 정리되었다.",
+    "current_axis": "다음 착수점은 `PKG-003` persistence 세분화와 코드 스캐폴드 진입 판단이다.",
+    "current_focus": "TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단",
     "in_progress_items": [
-      "TASK-010 저장소 패키지 구조 초안 정리"
+      "TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단"
     ],
     "blocked_items": [],
     "recent_done_items": [
@@ -40,15 +40,17 @@
       "TASK-006 Step 06 구현 축 및 workstream 정리",
       "TASK-007 Step 07 구현 backlog baseline 정리",
       "TASK-008 PKG-001 공통 계약 기준선 정리",
-      "TASK-009 Build Server 기술 스택 baseline 정리"
+      "TASK-009 Build Server 기술 스택 baseline 정리",
+      "TASK-010 저장소 패키지 구조 초안 정리",
+      "TASK-011 `PKG-002` Build Server request intake 세부 태스크 정리"
     ],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
-    "task_count": 10,
+    "task_count": 12,
     "in_progress_items": [
-      "TASK-010 저장소 패키지 구조 초안 정리"
+      "TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단"
     ],
     "blocked_items": [],
     "done_items": [
@@ -60,7 +62,9 @@
       "TASK-006 Step 06 구현 축 및 workstream 정리",
       "TASK-007 Step 07 구현 backlog baseline 정리",
       "TASK-008 PKG-001 공통 계약 기준선 정리",
-      "TASK-009 Build Server 기술 스택 baseline 정리"
+      "TASK-009 Build Server 기술 스택 baseline 정리",
+      "TASK-010 저장소 패키지 구조 초안 정리",
+      "TASK-011 `PKG-002` Build Server request intake 세부 태스크 정리"
     ]
   },
   "next_documents": [
@@ -83,6 +87,8 @@
     "docs/sdlc/06-implementation-axis-and-workstreams.md",
     "docs/sdlc/07-implementation-backlog-baseline.md",
     "docs/sdlc/08-build-server-tech-stack-baseline.md",
+    "docs/sdlc/09-repository-package-structure-baseline.md",
+    "docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md",
     "docs/sdlc/contracts/01-shared-build-contract-baseline.md",
     "docs/sdlc/design/01-system-context-and-responsibilities.md",
     "docs/sdlc/design/02-domain-model-and-state-transitions.md",
