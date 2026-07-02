@@ -1,0 +1,90 @@
+{
+  "schema_version": "1",
+  "generated_at": "2026-07-02",
+  "purpose_digest": "Step 04 설계 문서 초안을 종료 가능 상태로 정리하고 Step 05 진입 기준과 baseline decision 순서를 확정한다.",
+  "purpose_digest_rev": "7",
+  "source_of_truth": {
+    "project_profile_path": "docs/PROJECT_PROFILE.md",
+    "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
+    "work_backlog_index_path": "ai-workflow/memory/active/work_backlog.md",
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
+    "repository_assessment_path": "ai-workflow/memory/active/repository_assessment.md"
+  },
+  "project": {
+    "project_name": "Docker Image Builder System",
+    "document_home": "README.md",
+    "operations_path": null,
+    "backlog_path": "ai-workflow/memory/active/backlog/",
+    "handoff_path": null,
+    "environment_path": "ai-workflow/memory/active/repository_assessment.md"
+  },
+  "commands": {
+    "quick_tests": "미정 - 구현 전 단계",
+    "isolated_tests": "미정 - 구현 전 단계",
+    "runtime_checks": null
+  },
+  "session": {
+    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 진입 기준 문서가 정리되었고 build queue와 preview service queue 분리 방향까지 반영되었다.",
+    "current_axis": "Step 05 착수 전에 식별자/preview 운영 및 service queue 관련 미결정 항목을 baseline decision으로 닫고 구현 축을 정한다.",
+    "current_focus": "TASK-005 Step 05 진입 기준 및 baseline decision 정리",
+    "in_progress_items": [
+      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
+    ],
+    "blocked_items": [],
+    "recent_done_items": [
+      "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
+      "TASK-002 컨셉 고도화 및 정책 문서 정리",
+      "TASK-003 요구사항 도출 및 정제",
+      "TASK-004 Step 04 설계 문서 구조화"
+    ],
+    "environment_constraints": []
+  },
+  "backlog": {
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
+    "task_count": 5,
+    "in_progress_items": [
+      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
+    ],
+    "blocked_items": [],
+    "done_items": [
+      "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
+      "TASK-002 컨셉 고도화 및 정책 문서 정리",
+      "TASK-003 요구사항 도출 및 정제",
+      "TASK-004 Step 04 설계 문서 구조화"
+    ]
+  },
+  "next_documents": [
+    "docs/PROJECT_PROFILE.md",
+    "ai-workflow/memory/active/session_handoff.md",
+    "ai-workflow/memory/active/work_backlog.md",
+    "ai-workflow/memory/active/backlog/2026-07-02.md",
+    "ai-workflow/memory/active/repository_assessment.md",
+    "docs/MVP_ONBOARDING.md",
+    "docs/CONCEPT_REFINEMENT.md",
+    "docs/PREVIEW_POLICY.md",
+    "docs/IDENTITY_MODEL.md",
+    "docs/GLOSSARY_AND_STATE_MODEL.md",
+    "docs/REQUIREMENTS_BASELINE.md",
+    "docs/sdlc/01-mvp-onboarding.md",
+    "docs/sdlc/02-concept-refinement.md",
+    "docs/sdlc/03-requirements-baseline.md",
+    "docs/sdlc/04-design-structure.md",
+    "docs/sdlc/05-design-closure-and-step-05-entry.md",
+    "docs/sdlc/design/01-system-context-and-responsibilities.md",
+    "docs/sdlc/design/02-domain-model-and-state-transitions.md",
+    "docs/sdlc/design/03-api-contract-design.md",
+    "docs/sdlc/design/04-data-model-design.md",
+    "docs/sdlc/design/05-build-and-preview-execution-flow.md",
+    "docs/sdlc/design/06-user-messaging-and-failure-handling.md",
+    "docs/sdlc/SRS/01-priority-matrix.md",
+    "docs/sdlc/SRS/02-functional-requirements.md",
+    "docs/sdlc/SRS/03-non-functional-requirements.md",
+    "docs/sdlc/SRS/04-policy-and-constraints.md",
+    "docs/sdlc/SRS/05-open-issues-and-decisions.md",
+    "docs/sdlc/SRS/06-mvp-must-requirements.md"
+  ],
+  "repository_assessment": {
+    "path": "ai-workflow/memory/active/repository_assessment.md",
+    "present": true
+  }
+}
