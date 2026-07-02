@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03
+- Updated: 2026-07-03 (rev 2: workflow 메타 정합성 보강 반영)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -92,6 +92,13 @@
 - `README.md`, `docs/PROJECT_PROFILE.md`를 제품 컨셉 기준으로 정렬
 - `ai-workflow/memory/active/repository_assessment.md` 추가
 
+- `docs/PROJECT_PROFILE.md` §3 명령 placeholder를 Step 08/09 baseline 기준으로 좁힘
+- `ai-workflow/memory/active/state.json` `commands` 5종과 `next_documents`를 그룹 코멘트와 함께 갱신
+- `ai-workflow/memory/active/project_status_assessment.md` 진단 요약/매트릭스/로드맵 본문 작성
+- `docs/report/README.md` 신규 추가 (산출물 정체와 진화 이력 인덱스)
+- `docs/MVP_ONBOARDING.md`, `docs/CONCEPT_REFINEMENT.md` 상단에 superseded 배너 추가
+- `ai-workflow/memory/active/backlog/2026-07-02.md` TASK-013/014/016 본문 done 봉인 + 후속 세션 노트 추가
+- `ai-workflow/memory/active/work_backlog.md` TASK-022 추가
 ## Next Actions
 
 - [ ] shared package 또는 API 스캐폴드 진입
@@ -100,3 +107,5 @@
 ## Risks & Blockers
 
 - 애플리케이션 코드와 실행 명령이 아직 없어서 구현 backlog가 문서 수준 추정치에 머물러 있다.
+- `docs/MVP_ONBOARDING.md`, `docs/CONCEPT_REFINEMENT.md`는 superseded 배너를 부착했지만 실제로는 archive로 이동하지는 않았다. archive 이동은 본 브랜치 범위에서 제외했고, 후속 TASK에서 처리한다.
+- `.git`이 read-only로 마운트된 환경에서 작업해 writable clone(`/home/yklee/repos/docker-image-builder-system.work`)으로 커밋을 작성했다. 사용자 측에서 원본 저장소로 옮기는 절차가 필요하다.

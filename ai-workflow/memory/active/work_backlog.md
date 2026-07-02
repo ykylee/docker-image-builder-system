@@ -35,6 +35,7 @@
 - [x] TASK-014: shared package 또는 API 스캐폴드 진입 판단
 - [x] TASK-015: SDLC 리뷰 및 보고 패키지 작성
 - [x] TASK-016: 문서 정합성 보정 및 스캐폴드 진입 준비
+- [x] TASK-022: workflow 메타 정합성 보강 (commands placeholder, status assessment, report 인덱스, legacy 배너, 2026-07-02 백로그 봉인)
 - [ ] TASK-017: shared package 또는 API 스캐폴드 착수
 - [x] TASK-018: 보고자료 재구성 및 기획안 재작성
 - [x] TASK-019: 리더 소개용 HTML 보고자료 시각화 재작성

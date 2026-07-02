@@ -45,11 +45,12 @@
 - 설계 문서 6: docs/sdlc/design/06-user-messaging-and-failure-handling.md
 
 ## 3. 기본 명령 (Commands)
-- 설치: 미정 - 애플리케이션 코드 미구현
-- 로컬 실행: 미정 - 컨셉과 구조 정리 후 확정
-- 빠른 테스트: 미정 - 구현 착수 이후 확정
-- 격리 테스트: 미정 - Docker/Runner 통합 설계 이후 확정
-- 실행 확인: 문서 간 현재 focus, 작업 상태, 참조 경로 정합성 점검
+- 설치: `pnpm install` (스캐폴드 생성 후 채움; 현 단계는 placeholder)
+- 로컬 실행: `pnpm --filter build-server dev` (Fastify + Node worker baseline 기준; 스캐폴드 후 확정)
+- 빠른 테스트: `pnpm -w test` (TypeScript 유닛 테스트 baseline; 스캐폴드 후 확정)
+- 격리 테스트: `docker compose -f compose.dev.yaml up --abort-on-container-exit` (Build Server + Postgres 통합, 결정 후 확정)
+- 실행 확인: `docs/PROJECT_PROFILE.md`, `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus, 작업 상태, 참조 경로 정합성 점검
+- 출처: `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`
 
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
@@ -61,7 +62,7 @@
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
 - 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
 - 제약: 애플리케이션 코드와 실행 명령이 아직 없으며 문서 기반 설계 상태다
-- 기타: 현재 다음 단계는 shared package 또는 API 스캐폴드 진입이다
+- 기타: 현재 다음 단계는 shared package(`packages/shared-contract`, `packages/shared-config`, `packages/db`) 또는 `apps/build-server` API 스캐폴드 진입이다
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
