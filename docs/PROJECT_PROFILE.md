@@ -26,6 +26,9 @@
 - 설계 구조 문서: docs/sdlc/04-design-structure.md
 - Step 05 진입 문서: docs/sdlc/05-design-closure-and-step-05-entry.md
 - Step 06 구현 축 문서: docs/sdlc/06-implementation-axis-and-workstreams.md
+- Step 07 구현 backlog 문서: docs/sdlc/07-implementation-backlog-baseline.md
+- Step 08 기술 스택 문서: docs/sdlc/08-build-server-tech-stack-baseline.md
+- 공통 계약 기준 문서: docs/sdlc/contracts/01-shared-build-contract-baseline.md
 - Step 05 baseline decisions: docs/sdlc/decisions/
 - 설계 문서 1: docs/sdlc/design/01-system-context-and-responsibilities.md
 - 설계 문서 2: docs/sdlc/design/02-domain-model-and-state-transitions.md
@@ -51,7 +54,7 @@
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
 - 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
 - 제약: 애플리케이션 코드와 실행 명령이 아직 없으며 문서 기반 설계 상태다
-- 기타: 현재 다음 단계는 Build Server 우선의 Step 06 구현 backlog 분해와 medium priority decision 정리다
+- 기타: 현재 다음 단계는 저장소 패키지 구조 초안과 `PKG-002` Build Server request intake 세분화다
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)

@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-02",
-  "purpose_digest": "Step 05 baseline decision을 닫고 Step 06 구현 축과 workstream 분해 기준을 정리한다.",
-  "purpose_digest_rev": "8",
+  "purpose_digest": "Build Server 기술 스택 baseline을 닫고 다음 저장소 패키지 구조 초안을 준비한다.",
+  "purpose_digest_rev": "12",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -24,11 +24,11 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06 구현 축 문서가 정리되었다.",
-    "current_axis": "Build Server 우선 구현 축을 기준으로 backlog를 분해하고 medium priority decision 착수 순서를 정한다.",
-    "current_focus": "TASK-006 Step 06 구현 축 및 workstream 정리",
+    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06 구현 축, Step 07 package backlog, PKG-001 shared contract baseline, Step 08 기술 스택 baseline이 정리되었다.",
+    "current_axis": "다음 착수점은 저장소 패키지 구조 초안 정리와 `PKG-002` Build Server request intake 세분화다.",
+    "current_focus": "TASK-010 저장소 패키지 구조 초안 정리",
     "in_progress_items": [
-      "TASK-006 Step 06 구현 축 및 workstream 정리"
+      "TASK-010 저장소 패키지 구조 초안 정리"
     ],
     "blocked_items": [],
     "recent_done_items": [
@@ -36,15 +36,19 @@
       "TASK-002 컨셉 고도화 및 정책 문서 정리",
       "TASK-003 요구사항 도출 및 정제",
       "TASK-004 Step 04 설계 문서 구조화",
-      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
+      "TASK-005 Step 05 진입 기준 및 baseline decision 정리",
+      "TASK-006 Step 06 구현 축 및 workstream 정리",
+      "TASK-007 Step 07 구현 backlog baseline 정리",
+      "TASK-008 PKG-001 공통 계약 기준선 정리",
+      "TASK-009 Build Server 기술 스택 baseline 정리"
     ],
     "environment_constraints": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
-    "task_count": 6,
+    "task_count": 10,
     "in_progress_items": [
-      "TASK-006 Step 06 구현 축 및 workstream 정리"
+      "TASK-010 저장소 패키지 구조 초안 정리"
     ],
     "blocked_items": [],
     "done_items": [
@@ -52,7 +56,11 @@
       "TASK-002 컨셉 고도화 및 정책 문서 정리",
       "TASK-003 요구사항 도출 및 정제",
       "TASK-004 Step 04 설계 문서 구조화",
-      "TASK-005 Step 05 진입 기준 및 baseline decision 정리"
+      "TASK-005 Step 05 진입 기준 및 baseline decision 정리",
+      "TASK-006 Step 06 구현 축 및 workstream 정리",
+      "TASK-007 Step 07 구현 backlog baseline 정리",
+      "TASK-008 PKG-001 공통 계약 기준선 정리",
+      "TASK-009 Build Server 기술 스택 baseline 정리"
     ]
   },
   "next_documents": [
@@ -73,6 +81,9 @@
     "docs/sdlc/04-design-structure.md",
     "docs/sdlc/05-design-closure-and-step-05-entry.md",
     "docs/sdlc/06-implementation-axis-and-workstreams.md",
+    "docs/sdlc/07-implementation-backlog-baseline.md",
+    "docs/sdlc/08-build-server-tech-stack-baseline.md",
+    "docs/sdlc/contracts/01-shared-build-contract-baseline.md",
     "docs/sdlc/design/01-system-context-and-responsibilities.md",
     "docs/sdlc/design/02-domain-model-and-state-transitions.md",
     "docs/sdlc/design/03-api-contract-design.md",

@@ -18,6 +18,9 @@
 - design 01~06 문서 상단에 공통 `Traceability` 섹션 포맷을 반영했다.
 - `OI-001`, `OI-004`, `OI-005`, `OI-007`, `OI-010`에 대한 Step 05 baseline decision 문서를 추가했다.
 - Step 06 문서에서 Build Server 우선 구현 축과 초기 workstream 기준을 정리했다.
+- Step 07 문서에서 workstream을 구현 backlog package 단위로 분해했다.
+- `PKG-001` 공통 계약 기준 문서를 추가해 request/status/error baseline을 고정했다.
+- Step 08 문서에서 Build Server 기술 스택 baseline recommendation을 정리했다.
 
 ## Work Status
 
@@ -27,7 +30,11 @@
 - TASK-003 요구사항 도출 및 정제: done
 - TASK-004 Step 04 설계 문서 구조화: done
 - TASK-005 Step 05 진입 기준 및 baseline decision 정리: done
-- TASK-006 Step 06 구현 축 및 workstream 정리: in_progress
+- TASK-006 Step 06 구현 축 및 workstream 정리: done
+- TASK-007 Step 07 구현 backlog baseline 정리: done
+- TASK-008 PKG-001 공통 계약 기준선 정리: done
+- TASK-009 Build Server 기술 스택 baseline 정리: done
+- TASK-010 저장소 패키지 구조 초안 정리: in_progress
 
 ## Key Changes
 
@@ -50,14 +57,17 @@
 - `docs/sdlc/SRS/06-mvp-must-requirements.md` 추가
 - `docs/sdlc/decisions/` 추가
 - `docs/sdlc/06-implementation-axis-and-workstreams.md` 추가
+- `docs/sdlc/07-implementation-backlog-baseline.md` 추가
+- `docs/sdlc/contracts/01-shared-build-contract-baseline.md` 추가
+- `docs/sdlc/08-build-server-tech-stack-baseline.md` 추가
 - `README.md`, `docs/PROJECT_PROFILE.md`를 제품 컨셉 기준으로 정렬
 - `ai-workflow/memory/active/repository_assessment.md` 추가
 
 ## Next Actions
 
-- [ ] `TASK-006` 구현 backlog 초안 문서 추가
+- [ ] 저장소 패키지 구조 기준 초안 정리
+- [ ] `PKG-002` Build Server request intake 세부 태스크 정리
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
-- [ ] Build Server 기준 기술 스택 및 패키지 구조 초안 정리
 
 ## Risks & Blockers
 
