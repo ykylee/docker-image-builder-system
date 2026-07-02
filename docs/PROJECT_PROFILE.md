@@ -30,6 +30,7 @@
 - Step 08 기술 스택 문서: docs/sdlc/08-build-server-tech-stack-baseline.md
 - Step 09 저장소 구조 문서: docs/sdlc/09-repository-package-structure-baseline.md
 - Step 10 `PKG-002` 세분화 문서: docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md
+- Step 11 `PKG-003` 세분화 문서: docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md
 - 공통 계약 기준 문서: docs/sdlc/contracts/01-shared-build-contract-baseline.md
 - Step 05 baseline decisions: docs/sdlc/decisions/
 - 설계 문서 1: docs/sdlc/design/01-system-context-and-responsibilities.md
@@ -56,7 +57,7 @@
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
 - 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
 - 제약: 애플리케이션 코드와 실행 명령이 아직 없으며 문서 기반 설계 상태다
-- 기타: 현재 다음 단계는 `PKG-003` persistence 세분화 또는 코드 스캐폴드 진입 여부 결정이다
+- 기타: 현재 다음 단계는 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화다
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
