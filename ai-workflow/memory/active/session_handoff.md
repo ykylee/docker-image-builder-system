@@ -6,26 +6,17 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-02
+- Updated: 2026-07-03
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
 
-- 외부 컨셉 문서를 저장소 기준 문서로 정리했다.
-- MVP 범위는 Build Server 트랙과 Skill/MCP 트랙으로 구분한다.
-- Step 04와 Step 05 baseline decision 정리가 완료되었고, 현재는 Step 06 구현 축 정리 단계다.
-- 최근 요구사항/설계는 build queue와 preview service queue를 분리하는 방향으로 갱신되었다.
-- design 01~06 문서 상단에 공통 `Traceability` 섹션 포맷을 반영했다.
-- `OI-001`, `OI-004`, `OI-005`, `OI-007`, `OI-010`에 대한 Step 05 baseline decision 문서를 추가했다.
-- Step 06 문서에서 Build Server 우선 구현 축과 초기 workstream 기준을 정리했다.
-- Step 07 문서에서 workstream을 구현 backlog package 단위로 분해했다.
-- `PKG-001` 공통 계약 기준 문서를 추가해 request/status/error baseline을 고정했다.
-- Step 08 문서에서 Build Server 기술 스택 baseline recommendation을 정리했다.
-- Step 09 문서에서 monorepo package structure baseline을 정리했다.
-- Step 10 문서에서 `PKG-002` request intake를 구현 태스크 수준으로 분해했다.
-- Step 11 문서에서 `PKG-003` persistence를 schema/migration/repository/query 수준으로 분해했다.
-- Step 12 문서에서 `PKG-004` query API를 status/log/response assembly 수준으로 분해했다.
-- SDLC 리뷰 문서, 과제 계획안, 보고용 HTML 자료 초안을 추가했다.
+- 요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06~12 구현 세분화 문서가 모두 정리되었다.
+- Build Server P0 범위는 `PKG-001`~`PKG-004` 기준으로 구현 착수 가능한 수준까지 분해되었다.
+- SDLC 리뷰 문서, 과제 계획안, 보고용 HTML 자료가 추가되었다.
+- root 개념 문서와 workflow 메타 문서를 `docs/sdlc/` 및 shared contract canonical source 기준으로 정합성 보정했다.
+- 보고용 HTML 자료를 검토 결과 보고서가 아니라 구현 착수 기획안 톤으로 재작성했다.
+- 현재 다음 착수점은 shared package 또는 API 스캐폴드다.
 
 ## Work Status
 
@@ -45,7 +36,8 @@
 - TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단: done
 - TASK-014 shared package 또는 API 스캐폴드 진입 판단: done
 - TASK-015 SDLC 리뷰 및 보고 패키지 작성: done
-- TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비: in_progress
+- TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비: done
+- TASK-017 shared package 또는 API 스캐폴드 착수: planned
 
 ## Key Changes
 
@@ -78,12 +70,18 @@
 - `docs/review/01-sdlc-review.md` 추가
 - `docs/report/01-assignment-plan.md` 추가
 - `docs/report/02-sdlc-review-report.html` 추가
+- `docs/report/01-assignment-plan.md` 기획안 톤 정리
+- `docs/report/02-sdlc-review-report.html` 기획안형 전면 재작성
+- `docs/GLOSSARY_AND_STATE_MODEL.md` 정합성 보정
+- `docs/IDENTITY_MODEL.md` 정합성 보정
+- `docs/sdlc/SRS/04-policy-and-constraints.md` stale 제약 보정
+- `ai-workflow/memory/active/repository_assessment.md` 최신화
+- `docs/PROJECT_PROFILE.md` 최신화
 - `README.md`, `docs/PROJECT_PROFILE.md`를 제품 컨셉 기준으로 정렬
 - `ai-workflow/memory/active/repository_assessment.md` 추가
 
 ## Next Actions
 
-- [ ] 리뷰에서 확인된 문서 정합성 이슈 보정
 - [ ] shared package 또는 API 스캐폴드 진입
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
 

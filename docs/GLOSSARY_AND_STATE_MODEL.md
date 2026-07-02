@@ -4,8 +4,8 @@
 - 범위: 핵심 용어, build 상태, preview 상태, 사용자 친화 메시지 원칙
 - 대상 독자: 프로젝트 리드, AI 에이전트, API/도메인 설계자
 - 상태: draft
-- 최종 수정일: 2026-07-02
-- 관련 문서: `docs/MVP_ONBOARDING.md`, `docs/CONCEPT_REFINEMENT.md`, `docs/IDENTITY_MODEL.md`
+- 최종 수정일: 2026-07-03
+- 관련 문서: `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, `docs/IDENTITY_MODEL.md`
 
 ## 1. 용어집
 
@@ -27,7 +27,7 @@ MVP에서는 "테스트 가능한 URL을 제공하는 실행 결과"를 의미�
 ### active build
 
 아직 같은 앱의 새 빌드를 받지 않도록 막아야 하는 진행 중 작업이다.  
-MVP에서는 `TEST_READY`도 active build에 포함한다.
+MVP에서는 build queue를 점유하는 상태만 active build에 포함하고, `TEST_READY`는 성공 handoff 상태로 본다.
 
 ### completed build
 
@@ -67,7 +67,7 @@ CANCELLED
 - `BUILDING`: Docker 이미지 생성 단계
 - `IMAGE_BUILT`: 이미지 생성 성공, 아직 preview 미기동
 - `TEST_DEPLOYING`: 테스트 컨테이너 실행 단계
-- `TEST_READY`: preview 접속 URL 제공 가능 상태
+- `TEST_READY`: preview 접속 URL 제공 가능 상태이며 build queue 점유는 종료된 handoff 단계
 - `PUSHING`: 향후 registry 업로드 단계
 - `REGISTERING`: 향후 배포 시스템 등록 단계
 - `COMPLETED`: 전체 작업 종료
@@ -84,6 +84,7 @@ RECEIVED -> QUEUED -> PREPARING -> VALIDATING -> BUILDING -> IMAGE_BUILT -> TEST
 
 - 상태는 Runner 내부 구현이 아니라 사용자 가치 변화를 반영해야 한다.
 - `IMAGE_BUILT`와 `TEST_READY`를 분리해 "이미지 성공"과 "실행 가능"을 구분한다.
+- `TEST_READY` 이후에는 build를 `COMPLETED`로 마감하고, preview lifecycle은 별도 queue와 상태로 운영한다.
 - 향후 단계인 `PUSHING`, `REGISTERING`은 미리 예약하지만 MVP 필수 경로로 강제하지 않는다.
 
 ## 3. Preview 상태 모델
@@ -91,6 +92,7 @@ RECEIVED -> QUEUED -> PREPARING -> VALIDATING -> BUILDING -> IMAGE_BUILT -> TEST
 ### 3.1 상태 목록
 
 ```text
+QUEUED
 RESERVED
 STARTING
 READY
@@ -101,6 +103,7 @@ EXPIRED
 
 ### 3.2 상태 의미
 
+- `QUEUED`: preview service slot을 기다리는 상태
 - `RESERVED`: 포트 또는 실행 슬롯을 예약한 상태
 - `STARTING`: 컨테이너 시작 중
 - `READY`: 사용자 접속 가능
@@ -142,4 +145,5 @@ preview status = FAILED
 
 - 용어집과 상태 모델을 먼저 고정하면 이후 API 문서와 DB 모델 초안이 안정된다.
 - Build 상태와 preview 상태를 분리하는 것이 이 플랫폼의 핵심 설계 포인트다.
-- `TEST_READY`를 active build에 포함하는 정책은 사용자 경험과 운영 모델 양쪽에서 일관성이 있다.
+- canonical source는 `docs/sdlc/contracts/01-shared-build-contract-baseline.md`와 `docs/sdlc/` 문서군을 우선한다.
+- `TEST_READY`는 성공 handoff 상태로 두고 build queue와 preview service queue를 분리하는 정책이 현재 MVP 운영 모델과 일치한다.

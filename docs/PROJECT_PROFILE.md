@@ -6,7 +6,7 @@
 - 범위: 프로젝트 개요, 문서 구조, 기본 명령, 검증 포인트, 예외 규칙
 - 대상 독자: 개발자, 운영자, AI agent, 프로젝트 온보딩 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-02
+- 최종 수정일: 2026-07-03
 - 관련 문서: [공통 표준](../ai-workflow/core/global_workflow_standard.md)
 
 ## 1. 프로젝트 개요
@@ -53,7 +53,7 @@
 
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
-- 문서 변경: README, MVP_ONBOARDING, CONCEPT_REFINEMENT, handoff, backlog, state가 같은 현재 focus를 가리켜야 함
+- 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함
 - UI 변경: 해당 사항 없음. Preview portal 논의가 생기면 별도 기준 정의
 - 배포/운영: Docker 실행 권한, preview URL 노출 정책, 컨테이너 수명 정책이 문서로 합의되기 전에는 운영 판단 금지
 
@@ -61,7 +61,7 @@
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
 - 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
 - 제약: 애플리케이션 코드와 실행 명령이 아직 없으며 문서 기반 설계 상태다
-- 기타: 현재 다음 단계는 문서 정합성 보정 후 shared package 또는 API 스캐폴드 진입이다
+- 기타: 현재 다음 단계는 shared package 또는 API 스캐폴드 진입이다
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)

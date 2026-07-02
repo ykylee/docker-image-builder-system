@@ -1,13 +1,13 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-02",
-  "purpose_digest": "SDLC 리뷰와 보고 패키지를 정리하고 다음 문서 정합성 보정 및 스캐폴드 진입 준비를 진행한다.",
-  "purpose_digest_rev": "17",
+  "generated_at": "2026-07-03",
+  "purpose_digest": "문서 정합성 보정을 마감했고 다음 shared package 또는 API 스캐폴드 착수를 준비한다.",
+  "purpose_digest_rev": "18",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
     "work_backlog_index_path": "ai-workflow/memory/active/work_backlog.md",
-    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
     "repository_assessment_path": "ai-workflow/memory/active/repository_assessment.md"
   },
   "project": {
@@ -24,12 +24,10 @@
     "runtime_checks": null
   },
   "session": {
-    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06~12 구현 세분화 문서, SDLC 리뷰, 과제 계획안, 보고용 자료 초안이 정리되었다.",
-    "current_axis": "다음 착수점은 문서 정합성 보정과 shared package 또는 API 스캐폴드 진입 준비다.",
-    "current_focus": "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비",
-    "in_progress_items": [
-      "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비"
-    ],
+    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06~12 구현 세분화 문서, SDLC 리뷰/계획/보고 패키지, 문서 정합성 보정까지 정리되었다.",
+    "current_axis": "다음 착수점은 shared package 또는 API 스캐폴드다.",
+    "current_focus": "TASK-017 shared package 또는 API 스캐폴드 착수",
+    "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
@@ -46,16 +44,15 @@
       "TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단",
       "TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단",
       "TASK-014 shared package 또는 API 스캐폴드 진입 판단",
-      "TASK-015 SDLC 리뷰 및 보고 패키지 작성"
+      "TASK-015 SDLC 리뷰 및 보고 패키지 작성",
+      "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비"
     ],
     "environment_constraints": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-02.md",
-    "task_count": 16,
-    "in_progress_items": [
-      "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비"
-    ],
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
+    "task_count": 17,
+    "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
@@ -72,17 +69,16 @@
       "TASK-012 `PKG-003` persistence 세부 태스크 정리 또는 코드 스캐폴드 진입 판단",
       "TASK-013 shared package 코드 스캐폴드 또는 `PKG-004` 조회 계층 세분화 판단",
       "TASK-014 shared package 또는 API 스캐폴드 진입 판단",
-      "TASK-015 SDLC 리뷰 및 보고 패키지 작성"
+      "TASK-015 SDLC 리뷰 및 보고 패키지 작성",
+      "TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비"
     ]
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
     "ai-workflow/memory/active/session_handoff.md",
     "ai-workflow/memory/active/work_backlog.md",
-    "ai-workflow/memory/active/backlog/2026-07-02.md",
+    "ai-workflow/memory/active/backlog/2026-07-03.md",
     "ai-workflow/memory/active/repository_assessment.md",
-    "docs/MVP_ONBOARDING.md",
-    "docs/CONCEPT_REFINEMENT.md",
     "docs/PREVIEW_POLICY.md",
     "docs/IDENTITY_MODEL.md",
     "docs/GLOSSARY_AND_STATE_MODEL.md",

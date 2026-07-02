@@ -4,8 +4,8 @@
 - 범위: URL 노출 방식, lifecycle, 사용자 경험, 운영 제약
 - 대상 독자: 프로젝트 리드, AI 에이전트, Build Server/Runner 설계자
 - 상태: draft
-- 최종 수정일: 2026-07-02
-- 관련 문서: `docs/CONCEPT_REFINEMENT.md`, `docs/MVP_ONBOARDING.md`
+- 최종 수정일: 2026-07-03
+- 관련 문서: `docs/sdlc/SRS/04-policy-and-constraints.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`
 
 ## 1. 정책 목표
 
@@ -64,7 +64,7 @@ https://{appName}-{userId}.preview.example.com
 preview는 다음 순서를 따른다.
 
 ```text
-RESERVED -> STARTING -> READY -> STOPPED
+QUEUED -> RESERVED -> STARTING -> READY -> STOPPED
 ```
 
 예외 상태:

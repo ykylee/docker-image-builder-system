@@ -4,8 +4,8 @@
 - 범위: `userId`, `appName`, `buildId`, active build 기준, naming policy
 - 대상 독자: 프로젝트 리드, AI 에이전트, API/도메인 설계자
 - 상태: draft
-- 최종 수정일: 2026-07-02
-- 관련 문서: `docs/CONCEPT_REFINEMENT.md`, `docs/MVP_ONBOARDING.md`, `docs/PREVIEW_POLICY.md`
+- 최종 수정일: 2026-07-03
+- 관련 문서: `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/01-mvp-onboarding.md`, `docs/PREVIEW_POLICY.md`
 
 ## 1. 정책 목표
 
@@ -106,7 +106,6 @@ VALIDATING
 BUILDING
 IMAGE_BUILT
 TEST_DEPLOYING
-TEST_READY
 PUSHING
 REGISTERING
 ```
@@ -121,11 +120,13 @@ FAILED
 CANCELLED
 ```
 
-### 3.4 `TEST_READY`를 active로 유지하는 이유
+### 3.4 `TEST_READY`를 active로 유지하지 않는 이유
 
-`TEST_READY`를 active 상태에 포함하는 이유는 preview가 아직 "현재 사용자가 테스트 중인 최신 실행 결과"이기 때문이다.
+`TEST_READY`는 preview URL을 전달할 준비가 끝난 성공 handoff 상태다.
 
-즉, 빌드 파이프라인 실행은 끝나가더라도 사용자 경험 관점에서는 아직 같은 작업 맥락이 유지된다.
+즉, 사용자는 같은 결과를 테스트할 수 있지만 build queue 관점에서는 이미 다음 빌드를 막아야 할 long-running 작업이 아니다.
+
+preview 유지와 동시 실행 제한은 build active 판정이 아니라 preview service queue와 service slot 정책으로 제어한다.
 
 ## 4. naming policy
 

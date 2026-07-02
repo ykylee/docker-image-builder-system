@@ -4,8 +4,8 @@
 - 범위: 사용자 모델, 책임 경계, 운영 정책, 미결정 항목, 문서화 우선순위
 - 대상 독자: 프로젝트 리드, AI 에이전트, 설계 참여자
 - 상태: draft
-- 최종 수정일: 2026-07-02
-- 관련 문서: `docs/MVP_ONBOARDING.md`, `docs/PROJECT_PROFILE.md`, `docs/PREVIEW_POLICY.md`, `docs/IDENTITY_MODEL.md`, `docs/GLOSSARY_AND_STATE_MODEL.md`, `docs/REQUIREMENTS_BASELINE.md`, `ai-workflow/memory/active/work_backlog.md`
+- 최종 수정일: 2026-07-03
+- 관련 문서: `docs/sdlc/02-concept-refinement.md`, `docs/PROJECT_PROFILE.md`, `docs/PREVIEW_POLICY.md`, `docs/IDENTITY_MODEL.md`, `docs/GLOSSARY_AND_STATE_MODEL.md`, `docs/REQUIREMENTS_BASELINE.md`, `ai-workflow/memory/active/work_backlog.md`
 
 ## 1. 이번 단계의 목표
 

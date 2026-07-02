@@ -1,38 +1,39 @@
-# 과제 계획안
+# Build Server 구현 착수 계획안
 
-- 문서 목적: 요구사항-설계 검토 결과를 반영해 구현 착수 전 과제 수행 계획을 정의한다.
+- 문서 목적: 현재 SDLC 기준선을 바탕으로 Build Server 구현 착수 전략을 정의한다.
 - 범위: 정비 작업, 스캐폴드 작업, 구현 1차 범위, 산출물, 리스크
 - 대상 독자: 과제 수행자, 지도/검토자, 프로젝트 리드
 - 상태: draft
-- 최종 수정일: 2026-07-02
+- 최종 수정일: 2026-07-03
 - 관련 문서: `docs/review/01-sdlc-review.md`, `docs/sdlc/07-implementation-backlog-baseline.md`, `docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md`
 
-## 1. 과제 목표
+## 1. 추진 목표
 
-- 요구사항-설계 문서를 기준으로 Build Server MVP 구현 착수 가능한 baseline을 만든다.
-- 문서 기준선과 workflow 메타 문서의 불일치를 먼저 정리해 source-of-truth를 단일화한다.
-- Build Server P0 범위인 `PKG-001`~`PKG-004`를 코드 스캐폴드와 초기 구현 단위로 연결한다.
+- 현재 요구사항-설계 기준선을 손상시키지 않는 방식으로 Build Server MVP 구현을 시작한다.
+- Build Server P0 범위인 `PKG-001`~`PKG-004`를 실제 코드 스캐폴드와 초기 구현 단위로 연결한다.
+- 공통 계약과 persistence 경계를 먼저 고정해 이후 API, Runner, Skill/MCP 확장의 재작업을 줄인다.
 
-## 2. 수행 원칙
+## 2. 추진 원칙
 
 - 설계와 충돌하는 구현은 보류한다.
 - source-of-truth는 `docs/sdlc/` 기준으로 단일화한다.
 - shared package를 먼저 열고, API/Runner는 그 위에 쌓는다.
 - 구현과 동시에 medium decision을 늘리지 않고 필요한 범위만 닫는다.
 
-## 3. 단계별 계획
+## 3. 추진 단계
 
 ### Phase 0. 문서 정합성 정리
 
 목표:
 
-- 리뷰에서 확인된 문서 충돌과 stale 사실을 정리한다.
+- 구현 착수 전 source-of-truth를 단일화한다.
 
 작업:
 
 - `docs/GLOSSARY_AND_STATE_MODEL.md`, `docs/IDENTITY_MODEL.md`를 SDLC canonical 상태 모델에 정렬
 - `docs/sdlc/SRS/04-policy-and-constraints.md`의 stale 제약 문구 정정
 - `ai-workflow/memory/active/repository_assessment.md`, `docs/PROJECT_PROFILE.md`의 legacy 문서명 정리
+- review/report 문서에도 canonical source와 보정 범위를 명시
 
 완료 기준:
 
@@ -114,7 +115,7 @@
 
 - Build Server 구현만으로 막히는 후속 의존성이 줄어든다
 
-## 4. 우선순위
+## 4. 우선 추진 순서
 
 1. 문서 정합성 정리
 2. shared package 스캐폴드
@@ -122,13 +123,13 @@
 4. persistence 초기 구현
 5. Runner 또는 medium decision
 
-## 5. 주요 산출물
+## 5. 기대 산출물
 
 - 정합성 정리 패치
 - `packages/shared-contract`, `packages/shared-config`, `packages/db` 스캐폴드
 - `apps/build-server` 초기 API 스캐폴드
 - baseline migration 및 repository contract 구현
-- 중간 점검 보고자료 업데이트
+- 기획안/보고자료 업데이트
 
 ## 6. 리스크와 대응
 
@@ -141,5 +142,5 @@
 
 ## 7. 계획 결론
 
-- 과제의 첫 구현 단계는 Build Server P0를 코드 구조로 여는 것이다.
-- 다만 바로 코드부터 쓰기보다, 문서 정합성 보정과 shared package 스캐폴드가 선행되어야 이후 재작업이 줄어든다.
+- 이번 과제의 첫 구현 단계는 Build Server P0를 코드 구조로 여는 것이다.
+- 가장 안정적인 시작점은 shared package 스캐폴드를 먼저 열고, 그 위에 Build Server API 골격을 얹는 순서다.

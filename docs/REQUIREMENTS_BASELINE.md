@@ -4,8 +4,8 @@
 - 범위: 문제 정의, 사용자 요구사항, 시스템 요구사항, 비기능 요구사항, 제약, 미결정 항목
 - 대상 독자: 프로젝트 리드, 기획자, AI 에이전트, 설계 참여자
 - 상태: draft
-- 최종 수정일: 2026-07-02
-- 관련 문서: `docs/MVP_ONBOARDING.md`, `docs/CONCEPT_REFINEMENT.md`, `docs/PREVIEW_POLICY.md`, `docs/IDENTITY_MODEL.md`, `docs/GLOSSARY_AND_STATE_MODEL.md`
+- 최종 수정일: 2026-07-03
+- 관련 문서: `docs/sdlc/03-requirements-baseline.md`, `docs/sdlc/SRS/04-policy-and-constraints.md`, `docs/PREVIEW_POLICY.md`, `docs/IDENTITY_MODEL.md`, `docs/GLOSSARY_AND_STATE_MODEL.md`
 
 ## 1. 문서 목적과 사용 방식
 
@@ -169,8 +169,8 @@
 
 - `DR-001` 시스템은 최소 `build_request`, `build_log`, `test_deployment` 수준의 데이터 모델을 가져야 한다.
 - `DR-002` build 상태 모델은 `RECEIVED`부터 `COMPLETED/FAILED/CANCELLED`까지 추적 가능해야 한다.
-- `DR-003` preview 상태 모델은 `RESERVED`, `STARTING`, `READY`, `FAILED`, `STOPPED`, `EXPIRED`를 다룰 수 있어야 한다.
-- `DR-004` `TEST_READY`는 active build 판정에 포함되어야 한다.
+- `DR-003` preview 상태 모델은 `QUEUED`, `RESERVED`, `STARTING`, `READY`, `FAILED`, `STOPPED`, `EXPIRED`를 다룰 수 있어야 한다.
+- `DR-004` `TEST_READY`는 build 성공 handoff 상태이며 active build 판정에 포함되지 않아야 한다.
 
 ## 9. 정책 요구사항
 
@@ -183,7 +183,7 @@
 ## 10. 제약 조건
 
 - 현재 저장소는 구현 전 문서 중심 단계다.
-- Git 저장소 초기화가 아직 되어 있지 않다.
+- Git 저장소 초기화와 원격 저장소 연결은 완료되었지만, 애플리케이션 코드와 실행 명령은 아직 준비되지 않았다.
 - 실제 인증 시스템, object storage, registry, reverse proxy는 아직 확정되지 않았다.
 - 보안/격리 정책은 문서 선행 합의가 필요하다.
 
