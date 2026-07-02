@@ -1,146 +1,175 @@
-# Build Server 구현 착수 계획안
+# Docker Image Builder System 프로젝트 기획안
 
-- 문서 목적: 현재 SDLC 기준선을 바탕으로 Build Server 구현 착수 전략을 정의한다.
-- 범위: 정비 작업, 스캐폴드 작업, 구현 1차 범위, 산출물, 리스크
+- 문서 목적: 프로젝트 개요부터 구현 진입 계획과 예상 산출물까지 한 번에 설명하는 기획 기준 문서를 제공한다.
+- 범위: 프로젝트 배경, 목표, 구성, 단계별 추진 전략, 예상 산출물, 리스크
 - 대상 독자: 과제 수행자, 지도/검토자, 프로젝트 리드
 - 상태: draft
 - 최종 수정일: 2026-07-03
-- 관련 문서: `docs/review/01-sdlc-review.md`, `docs/sdlc/07-implementation-backlog-baseline.md`, `docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md`
+- 관련 문서: `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/03-requirements-baseline.md`, `docs/sdlc/07-implementation-backlog-baseline.md`, `docs/review/01-sdlc-review.md`
 
-## 1. 추진 목표
+## 1. 프로젝트 개요
 
-- 현재 요구사항-설계 기준선을 손상시키지 않는 방식으로 Build Server MVP 구현을 시작한다.
-- Build Server P0 범위인 `PKG-001`~`PKG-004`를 실제 코드 스캐폴드와 초기 구현 단위로 연결한다.
-- 공통 계약과 persistence 경계를 먼저 고정해 이후 API, Runner, Skill/MCP 확장의 재작업을 줄인다.
+Docker Image Builder System은 비개발자 사용자가 AI 에이전트와 함께 만든 애플리케이션을 별도의 Docker 전문 지식 없이 테스트 가능한 상태까지 배포할 수 있도록 돕는 플랫폼이다.
 
-## 2. 추진 원칙
+이 프로젝트가 해결하려는 핵심 문제는 명확하다. 사용자는 앱 생성까지는 AI의 도움을 받을 수 있지만, 실제 실행 가능한 preview 환경을 만들기 위해 필요한 Docker 이미지 빌드, 컨테이너 실행, 로그 확인, 실패 대응은 여전히 높은 진입 장벽으로 남아 있다.
 
-- 설계와 충돌하는 구현은 보류한다.
-- source-of-truth는 `docs/sdlc/` 기준으로 단일화한다.
-- shared package를 먼저 열고, API/Runner는 그 위에 쌓는다.
-- 구현과 동시에 medium decision을 늘리지 않고 필요한 범위만 닫는다.
+이 시스템은 사용자의 자연어 요청을 Build Server 기반의 추적 가능한 작업으로 전환하고, 최종적으로 preview URL을 제공하는 흐름을 설계 대상으로 삼는다.
 
-## 3. 추진 단계
+## 2. 추진 배경과 필요성
 
-### Phase 0. 문서 정합성 정리
+- AI 에이전트가 생성한 앱 결과물을 바로 검증할 수 있는 실행 환경이 필요하다.
+- 비개발자 사용자는 Dockerfile, port mapping, runtime 설정을 직접 다루기 어렵다.
+- 단순 빌드 성공보다 "실행 가능한 테스트 URL 확보"가 사용자 가치에 더 직접적이다.
+- 빌드와 preview 실행을 표준화하면 Skill/MCP, Build Server, Runner 간 책임 분리가 쉬워진다.
 
-목표:
+## 3. 프로젝트 목표
 
-- 구현 착수 전 source-of-truth를 단일화한다.
+### 3.1 최종 목표
 
-작업:
+- 사용자가 자연어로 배포를 요청할 수 있는 경험을 만든다.
+- AI 에이전트가 배포 입력물을 준비하고 서버 요청까지 연결할 수 있게 한다.
+- Build Server가 빌드 요청, 상태, 로그, preview 정보를 일관되게 관리하게 한다.
+- 테스트 가능한 preview URL을 사용자에게 안정적으로 전달하는 MVP를 설계하고 구현 착수 기반을 만든다.
 
-- `docs/GLOSSARY_AND_STATE_MODEL.md`, `docs/IDENTITY_MODEL.md`를 SDLC canonical 상태 모델에 정렬
-- `docs/sdlc/SRS/04-policy-and-constraints.md`의 stale 제약 문구 정정
-- `ai-workflow/memory/active/repository_assessment.md`, `docs/PROJECT_PROFILE.md`의 legacy 문서명 정리
-- review/report 문서에도 canonical source와 보정 범위를 명시
+### 3.2 이번 단계 목표
 
-완료 기준:
+- SDLC 기준 문서를 바탕으로 구현 착수용 계획을 다시 정렬한다.
+- 전체 프로젝트를 설명하는 발표/보고용 기획 문서 구조를 정리한다.
+- 다음 실작업인 shared package 또는 Build Server API 스캐폴드 진입 기준을 명확히 한다.
 
-- active build 정의가 문서 전반에서 하나로 정리된다
-- Git/저장소 준비도 관련 stale 사실이 제거된다
+## 4. 프로젝트 구성
 
-### Phase 1. shared package 스캐폴드
+### 4.1 사용자 관점 구성
 
-목표:
+1. 사용자가 AI 에이전트에게 배포를 요청한다.
+2. AI 에이전트가 앱 산출물과 Docker 관련 준비물을 점검한다.
+3. Build Server가 요청을 접수하고 상태를 관리한다.
+4. Runner가 실제 이미지 빌드와 preview 실행을 수행한다.
+5. 사용자는 preview URL 또는 실패 안내를 받는다.
 
-- 공통 계약과 DB 계층을 코드 구조로 연다.
+### 4.2 시스템 관점 구성
 
-작업:
+- Skill / MCP
+  - 사용자 요청 해석
+  - 앱 산출물 확인
+  - `Dockerfile`, `.dockerignore` 준비
+  - Build Server 요청 및 상태 안내
+- Build Server
+  - 빌드 요청 수신
+  - active build 중복 방지
+  - 상태, 로그, metadata 저장
+  - Runner용 작업 허브 제공
+- Runner
+  - `docker build`, `docker run` 실행
+  - 상태 전이 및 로그 적재
+  - preview 수명 관리
+
+### 4.3 구현 Workstream 구성
+
+- Workstream A: 공통 계약과 상태 모델 정리
+- Workstream B: Build Server request intake 및 query API 설계
+- Workstream C: persistence 계층과 migration baseline 정리
+- Workstream D: Runner 연계 및 preview 실행 흐름 준비
+- Workstream E: 보고 자료와 SDLC 기준 문서 정합성 유지
+
+## 5. 추진 범위
+
+### 5.1 MVP 우선 범위
+
+- `POST /builds`, `GET /builds/{buildId}`, `GET /builds/{buildId}/logs`
+- `build_request`, `build_log`, `test_deployment` 도메인 모델
+- active build 중복 방지 규칙
+- preview URL 제공까지의 상태 전이 모델
+- Skill/MCP와 Build Server 간 요청 계약
+
+### 5.2 후순위 범위
+
+- registry push 세부 정책
+- 다중 Runner 병렬 처리
+- reverse proxy 기반 preview 라우팅 고도화
+- production deployment 연계
+
+## 6. 추진 전략
+
+### Phase 0. 기준선 정리
+
+- SDLC 문서와 보고 문서의 source-of-truth를 `docs/sdlc/` 중심으로 통일한다.
+- 상태 모델, 정책 제약, 용어 정의를 문서 전반에서 일치시킨다.
+
+### Phase 1. 공통 기반 스캐폴드
 
 - `packages/shared-contract/`
 - `packages/shared-config/`
 - `packages/db/`
 
-연결 문서:
-
-- `docs/sdlc/contracts/01-shared-build-contract-baseline.md`
-- `docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md`
-
-완료 기준:
-
-- package 경계와 최소 파일 구조가 생성된다
-- 타입, enum, schema 진입점이 마련된다
+이 단계의 목표는 구현보다 먼저 계약, 타입, schema 진입점을 고정하는 것이다.
 
 ### Phase 2. Build Server API 스캐폴드
 
-목표:
+- `apps/build-server` bootstrap
+- request / response schema 연결
+- route / service / repository 골격 구성
 
-- `apps/build-server`의 route/schema/service/repository 골격을 연다.
+이 단계에서 Build Server P0 범위를 실제 코드 구조로 변환한다.
 
-작업:
+### Phase 3. persistence 및 조회 흐름 구현
 
-- `POST /builds` 진입 구조 스캐폴드
-- `GET /builds/{buildId}`
-- `GET /builds/{buildId}/logs`
-- Fastify bootstrap, Zod schema binding
-
-연결 문서:
-
-- `docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md`
-- `docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md`
-
-완료 기준:
-
-- API 진입 구조와 shared package 의존 방향이 실제 코드에 반영된다
-
-### Phase 3. persistence 초기 구현
-
-목표:
-
-- Build Server가 최소 저장/조회 동작을 할 수 있도록 한다.
-
-작업:
-
-- `build_request`, `build_log`, `test_deployment` schema
 - baseline migration
-- active build lookup / build create / status read / log read repository
+- build 저장/조회 repository
+- 상태 및 로그 조회 contract 구현
 
-완료 기준:
+### Phase 4. Runner 및 후속 결정 연계
 
-- `PKG-002`와 `PKG-004`가 persistence contract를 실제로 소비할 수 있다
+- Runner claim skeleton 검토
+- preview queue 운영 모델 구체화
+- 미결정 항목 `OI-006`, `OI-008`, `OI-009` 후속 정리
 
-### Phase 4. Runner/후속 결정 진입
+## 7. 예상 산출물
 
-목표:
+### 7.1 문서 산출물
 
-- Build Server P0 이후 Runner P1 또는 medium decision 정리를 선택적으로 연다.
+- 프로젝트 기획안
+- SDLC 단계별 기준 문서
+- 요구사항 baseline 및 design 문서 세트
+- 리뷰 문서와 보고용 발표 자료
 
-작업 후보:
+### 7.2 설계 산출물
 
-- `PKG-005` Runner claim skeleton
-- `OI-008`, `OI-009`, `OI-006` 정리
+- 시스템 책임 분리안
+- 상태 전이 모델
+- API contract 초안
+- 데이터 모델 및 persistence 기준
 
-완료 기준:
+### 7.3 구현 산출물
 
-- Build Server 구현만으로 막히는 후속 의존성이 줄어든다
-
-## 4. 우선 추진 순서
-
-1. 문서 정합성 정리
-2. shared package 스캐폴드
-3. Build Server API 스캐폴드
-4. persistence 초기 구현
-5. Runner 또는 medium decision
-
-## 5. 기대 산출물
-
-- 정합성 정리 패치
 - `packages/shared-contract`, `packages/shared-config`, `packages/db` 스캐폴드
 - `apps/build-server` 초기 API 스캐폴드
-- baseline migration 및 repository contract 구현
-- 기획안/보고자료 업데이트
+- baseline migration 초안
+- build 저장/조회 repository 기본 구조
 
-## 6. 리스크와 대응
+### 7.4 검증 및 발표 산출물
 
-- 문서 canonical source가 다시 흔들릴 수 있다.
-  - 대응: `docs/sdlc/` 우선 원칙 유지
-- 스캐폴드가 너무 빨리 열리면 구조만 있고 contract가 흐려질 수 있다.
-  - 대응: `PKG-001`~`PKG-004` 문서와 1:1로 연결하며 생성
-- medium decision을 동시에 많이 열면 일정이 늘어진다.
-  - 대응: 구현 차단점이 되는 항목만 선택적으로 정리
+- 구현 착수 기준 정리본
+- 다음 단계 backlog와 실행 우선순위
+- 발표용 보고자료 재구성 초안
 
-## 7. 계획 결론
+## 8. 기대 효과
 
-- 이번 과제의 첫 구현 단계는 Build Server P0를 코드 구조로 여는 것이다.
-- 가장 안정적인 시작점은 shared package 스캐폴드를 먼저 열고, 그 위에 Build Server API 골격을 얹는 순서다.
+- 비개발자 사용자를 위한 배포 경험을 구조적으로 설명할 수 있다.
+- 구현 전에 책임 경계와 계약을 정리해 재작업 위험을 줄일 수 있다.
+- 발표와 과제 제출 관점에서 "무엇을 만들고 왜 필요한가"를 일관되게 전달할 수 있다.
+
+## 9. 리스크와 대응
+
+- 문서 기준선과 구현 구조가 다시 어긋날 수 있다.
+  - 대응: `docs/sdlc/`를 canonical source로 유지한다.
+- 스캐폴드만 먼저 열리고 실제 계약 의미가 약해질 수 있다.
+  - 대응: `PKG-001`~`PKG-004` 문서와 1:1로 매핑해 생성한다.
+- Runner/preview 운영 정책이 늦게 확정되면 후속 설계가 지연될 수 있다.
+  - 대응: 구현 차단 여부가 높은 결정부터 우선 닫는다.
+
+## 10. 계획 결론
+
+이 프로젝트의 핵심은 Docker 빌드 시스템 자체를 만드는 것이 아니라, AI 에이전트 기반 앱 제작 흐름을 테스트 가능한 preview 경험으로 연결하는 것이다.
+
+따라서 이번 기획안의 결론은 다음과 같다. 먼저 전체 프로젝트 구조와 산출물을 발표 가능한 형태로 정리하고, 그 다음 shared package와 Build Server API 스캐폴드를 여는 순서로 구현에 진입하는 것이 가장 안정적이다.

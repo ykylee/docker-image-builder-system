@@ -3,24 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Docker Build Preview Platform Project Proposal</title>
+    <title>Docker Image Builder System 소개 및 승인안</title>
     <style>
       :root {
-        --bg: #f3efe6;
-        --bg-deep: #e8dfcf;
-        --panel: rgba(255, 252, 246, 0.84);
-        --panel-strong: #fffaf1;
-        --ink: #1f2528;
-        --muted: #5f6b71;
-        --line: rgba(48, 58, 61, 0.12);
-        --teal: #0f6d67;
-        --teal-soft: rgba(15, 109, 103, 0.1);
-        --amber: #b7662d;
-        --amber-soft: rgba(183, 102, 45, 0.12);
-        --rose: #a14242;
-        --rose-soft: rgba(161, 66, 66, 0.12);
-        --navy: #24384b;
-        --shadow: 0 24px 80px rgba(44, 38, 27, 0.12);
+        --bg: #f5f2ea;
+        --bg-strong: #e9e0d0;
+        --paper: rgba(255, 251, 245, 0.88);
+        --paper-solid: #fffaf2;
+        --paper-deep: #f7f0e5;
+        --ink: #162126;
+        --muted: #5e6a70;
+        --line: rgba(22, 33, 38, 0.1);
+        --teal: #0f6b68;
+        --teal-strong: #094c4a;
+        --coral: #d76b42;
+        --gold: #d8a94a;
+        --navy: #20384b;
+        --danger: #8f4942;
+        --shadow: 0 28px 90px rgba(47, 40, 28, 0.14);
+        --shadow-soft: 0 18px 42px rgba(47, 40, 28, 0.09);
+        --radius-xl: 32px;
+        --radius-lg: 24px;
+        --radius-md: 18px;
       }
 
       * {
@@ -36,9 +40,9 @@
         color: var(--ink);
         font-family: "Pretendard Variable", "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
         background:
-          radial-gradient(circle at 0% 0%, rgba(15, 109, 103, 0.18), transparent 28%),
-          radial-gradient(circle at 100% 20%, rgba(183, 102, 45, 0.2), transparent 24%),
-          linear-gradient(180deg, var(--bg) 0%, #f8f4ec 46%, var(--bg-deep) 100%);
+          radial-gradient(circle at 12% 10%, rgba(15, 107, 104, 0.16), transparent 24%),
+          radial-gradient(circle at 88% 18%, rgba(215, 107, 66, 0.18), transparent 22%),
+          linear-gradient(180deg, #f6f2ea 0%, #f2ebdf 52%, #e7dccb 100%);
       }
 
       body::before {
@@ -46,17 +50,16 @@
         position: fixed;
         inset: 0;
         pointer-events: none;
-        opacity: 0.45;
         background-image:
-          linear-gradient(rgba(255, 255, 255, 0.32) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(255, 255, 255, 0.32) 1px, transparent 1px);
-        background-size: 36px 36px;
-        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.7), transparent 88%);
+          linear-gradient(rgba(255, 255, 255, 0.22) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.22) 1px, transparent 1px);
+        background-size: 34px 34px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.75), transparent 90%);
       }
 
       .deck {
-        width: min(1240px, calc(100vw - 40px));
-        margin: 28px auto 72px;
+        width: min(1280px, calc(100vw - 36px));
+        margin: 18px auto 56px;
         display: grid;
         gap: 24px;
       }
@@ -64,9 +67,9 @@
       .slide {
         position: relative;
         overflow: hidden;
-        background: var(--panel);
+        border-radius: var(--radius-xl);
         border: 1px solid var(--line);
-        border-radius: 30px;
+        background: var(--paper);
         box-shadow: var(--shadow);
         backdrop-filter: blur(18px);
       }
@@ -74,28 +77,108 @@
       .slide::after {
         content: "";
         position: absolute;
-        inset: auto -80px -100px auto;
-        width: 280px;
-        height: 280px;
+        right: -110px;
+        bottom: -140px;
+        width: 320px;
+        height: 320px;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(15, 109, 103, 0.09), transparent 68%);
+        background: radial-gradient(circle, rgba(15, 107, 104, 0.1), transparent 70%);
       }
 
       .content {
         position: relative;
         z-index: 1;
-        padding: 34px 38px 38px;
+        padding: 36px 38px 40px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .hero {
+        background:
+          linear-gradient(135deg, rgba(9, 76, 74, 0.97), rgba(32, 56, 75, 0.95)),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
+        color: #f4fbfb;
+      }
+
+      .hero::after {
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.1), transparent 72%);
+      }
+
+      .hero .content {
+        padding: 42px 42px 46px;
+      }
+
+      h1,
+      h2,
+      h3,
+      h4,
+      p {
+        margin: 0;
+      }
+
+      h1 {
+        font-size: clamp(42px, 6vw, 78px);
+        line-height: 0.95;
+        letter-spacing: -0.05em;
+      }
+
+      h2 {
+        font-size: clamp(30px, 3.6vw, 44px);
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+      }
+
+      h3 {
+        font-size: 22px;
+        line-height: 1.25;
+        letter-spacing: -0.02em;
+      }
+
+      h4 {
+        font-size: 16px;
+        line-height: 1.35;
+        letter-spacing: -0.01em;
+      }
+
+      p,
+      li {
+        font-size: 17px;
+        line-height: 1.7;
+        color: var(--muted);
+      }
+
+      .hero p,
+      .hero li,
+      .hero .meta {
+        color: rgba(244, 251, 251, 0.84);
+      }
+
+      strong {
+        color: var(--ink);
+      }
+
+      .hero strong {
+        color: #ffffff;
       }
 
       .eyebrow {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        margin-bottom: 14px;
         padding: 8px 14px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.68);
-        border: 1px solid rgba(48, 58, 61, 0.08);
+        border: 1px solid rgba(32, 56, 75, 0.09);
+        background: rgba(255, 255, 255, 0.74);
         color: var(--navy);
         font-size: 12px;
         font-weight: 800;
@@ -103,127 +186,24 @@
         text-transform: uppercase;
       }
 
-      h1,
-      h2,
-      h3,
-      p {
-        margin: 0;
-      }
-
-      h1 {
-        font-size: clamp(38px, 6vw, 72px);
-        line-height: 0.98;
-        letter-spacing: -0.04em;
-      }
-
-      h2 {
-        font-size: clamp(26px, 3.4vw, 40px);
-        line-height: 1.08;
-        letter-spacing: -0.03em;
-      }
-
-      h3 {
-        font-size: 18px;
-        line-height: 1.3;
-      }
-
-      p,
-      li {
-        font-size: 17px;
-        line-height: 1.72;
-        color: var(--muted);
-      }
-
-      strong {
-        color: var(--ink);
-      }
-
-      ul {
-        margin: 0;
-        padding-left: 20px;
-      }
-
-      .hero {
-        background:
-          linear-gradient(135deg, rgba(15, 109, 103, 0.95), rgba(36, 56, 75, 0.94)),
-          linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0));
-        color: #f6fbfb;
-      }
-
-      .hero .content {
-        padding: 42px 40px 44px;
-      }
-
-      .hero p,
-      .hero .meta,
-      .hero .hero-note {
-        color: rgba(244, 251, 251, 0.84);
-      }
-
       .hero .eyebrow {
         background: rgba(255, 255, 255, 0.12);
+        color: #edf8f7;
         border-color: rgba(255, 255, 255, 0.14);
-        color: #eff8f7;
       }
 
-      .hero-grid {
-        margin-top: 24px;
-        display: grid;
-        grid-template-columns: 1.25fr 0.75fr;
-        gap: 20px;
-        align-items: end;
-      }
-
-      .meta {
-        margin-top: 18px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px 16px;
-        font-size: 14px;
-        font-weight: 600;
-      }
-
-      .hero-note {
-        max-width: 720px;
-        margin-top: 18px;
-        font-size: 19px;
-        line-height: 1.65;
-      }
-
-      .hero-panel {
-        padding: 18px 20px;
-        border-radius: 22px;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-      }
-
-      .hero-panel .label {
-        display: block;
-        margin-bottom: 10px;
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .hero-panel .value {
-        font-size: 34px;
-        line-height: 1;
-        font-weight: 900;
-        letter-spacing: -0.04em;
-      }
-
-      .hero-panel p {
-        margin-top: 10px;
-        font-size: 15px;
-        line-height: 1.6;
-      }
-
+      .hero-grid,
       .grid-2,
       .grid-3,
       .grid-4 {
         display: grid;
         gap: 18px;
+      }
+
+      .hero-grid {
+        margin-top: 22px;
+        grid-template-columns: 1.1fr 0.9fr;
+        align-items: end;
       }
 
       .grid-2 {
@@ -238,11 +218,129 @@
         grid-template-columns: repeat(4, minmax(0, 1fr));
       }
 
+      .meta {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 16px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .hero-note {
+        margin-top: 18px;
+        max-width: 760px;
+        font-size: 20px;
+        line-height: 1.62;
+      }
+
+      .hero-panel,
+      .card {
+        border-radius: var(--radius-lg);
+        border: 1px solid var(--line);
+        background: var(--paper-solid);
+      }
+
+      .hero-panel {
+        padding: 22px;
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.12);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      }
+
+      .card {
+        padding: 22px;
+        box-shadow: var(--shadow-soft);
+      }
+
+      .hero-panel .label,
+      .metric-label,
+      .mini-label {
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .hero-panel .value {
+        margin-top: 12px;
+        font-size: clamp(32px, 4vw, 48px);
+        line-height: 0.96;
+        font-weight: 900;
+        letter-spacing: -0.05em;
+      }
+
+      .hero-panel p {
+        margin-top: 12px;
+      }
+
+      .hero-stage {
+        display: grid;
+        gap: 14px;
+      }
+
+      .hero-visual {
+        position: relative;
+        overflow: hidden;
+        padding: 18px;
+        border-radius: 26px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.04)),
+          rgba(255, 255, 255, 0.06);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .hero-visual::before {
+        content: "";
+        position: absolute;
+        inset: 14px;
+        border-radius: 20px;
+        border: 1px dashed rgba(255, 255, 255, 0.12);
+        pointer-events: none;
+      }
+
+      .hero-visual svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+
+      .hero-ribbon {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .hero-pill {
+        padding: 12px 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .hero-pill strong,
+      .hero-pill span {
+        display: block;
+      }
+
+      .hero-pill strong {
+        font-size: 13px;
+        line-height: 1.3;
+      }
+
+      .hero-pill span {
+        margin-top: 6px;
+        font-size: 13px;
+        line-height: 1.45;
+        color: rgba(244, 251, 251, 0.7);
+      }
+
       .section-head {
         display: flex;
         justify-content: space-between;
-        gap: 20px;
         align-items: end;
+        gap: 18px;
         margin-bottom: 22px;
       }
 
@@ -250,180 +348,402 @@
         max-width: 620px;
       }
 
-      .card {
-        background: var(--panel-strong);
-        border: 1px solid var(--line);
-        border-radius: 22px;
-        padding: 20px 20px 18px;
+      .section-frame {
+        position: relative;
+      }
+
+      .section-frame::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -8px;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(15, 107, 104, 0.18), transparent);
       }
 
       .metric-card {
-        min-height: 168px;
+        min-height: 180px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
       }
 
-      .metric-kicker {
+      .metric-label {
         color: var(--navy);
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
       }
 
       .metric-value {
         margin: 12px 0 8px;
-        font-size: clamp(40px, 5vw, 56px);
+        font-size: clamp(42px, 4.8vw, 58px);
         line-height: 0.95;
         font-weight: 900;
         letter-spacing: -0.06em;
         color: var(--teal);
       }
 
-      .accent-band {
+      .statement {
         margin-top: 20px;
-        padding: 16px 18px;
-        border-radius: 18px;
-        background: linear-gradient(135deg, rgba(15, 109, 103, 0.1), rgba(36, 56, 75, 0.08));
-        border: 1px solid rgba(15, 109, 103, 0.12);
+        padding: 18px 20px;
+        border-radius: var(--radius-md);
+        background: linear-gradient(135deg, rgba(15, 107, 104, 0.12), rgba(32, 56, 75, 0.08));
+        border: 1px solid rgba(15, 107, 104, 0.12);
       }
 
-      .badge {
-        display: inline-flex;
+      .flow-shell {
+        display: grid;
+        gap: 14px;
+      }
+
+      .flow-row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 14px;
         align-items: center;
-        gap: 8px;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 12px;
+      }
+
+      .flow-card {
+        position: relative;
+        min-height: 148px;
+        padding: 18px 18px 18px 20px;
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .flow-card::after {
+        content: "→";
+        position: absolute;
+        right: -10px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: var(--teal);
+        color: #fff;
+        font-size: 14px;
         font-weight: 800;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
+        box-shadow: 0 10px 24px rgba(15, 107, 104, 0.2);
       }
 
-      .badge.teal {
-        background: var(--teal-soft);
-        color: var(--teal);
+      .flow-card:last-child::after {
+        display: none;
       }
 
-      .badge.amber {
-        background: var(--amber-soft);
-        color: var(--amber);
+      .flow-card.user {
+        background: linear-gradient(180deg, rgba(215, 107, 66, 0.1), rgba(255, 255, 255, 0.84));
       }
 
-      .badge.rose {
-        background: var(--rose-soft);
-        color: var(--rose);
+      .flow-card.agent {
+        background: linear-gradient(180deg, rgba(15, 107, 104, 0.1), rgba(255, 255, 255, 0.84));
       }
 
-      .signal {
-        min-height: 212px;
+      .flow-card.server {
+        background: linear-gradient(180deg, rgba(32, 56, 75, 0.1), rgba(255, 255, 255, 0.84));
       }
 
-      .signal p + p {
+      .flow-card.runner {
+        background: linear-gradient(180deg, rgba(216, 169, 74, 0.12), rgba(255, 255, 255, 0.84));
+      }
+
+      .flow-card.outcome {
+        background: linear-gradient(180deg, rgba(15, 107, 104, 0.16), rgba(255, 255, 255, 0.84));
+      }
+
+      .flow-card h3 {
         margin-top: 10px;
       }
 
-      .status-board {
-        display: grid;
-        gap: 14px;
-      }
-
-      .status-row {
-        display: grid;
-        grid-template-columns: 140px 1fr;
-        gap: 16px;
-        align-items: start;
-        padding: 14px 0;
-        border-top: 1px solid rgba(48, 58, 61, 0.08);
-      }
-
-      .status-row:first-child {
-        border-top: 0;
-        padding-top: 0;
-      }
-
-      .status-row .key {
-        color: var(--navy);
-        font-size: 14px;
-        font-weight: 800;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-      }
-
-      .timeline {
-        display: grid;
-        gap: 14px;
-      }
-
-      .step {
-        position: relative;
-        padding: 18px 18px 18px 24px;
-        border-radius: 20px;
-        background: rgba(255, 255, 255, 0.78);
-        border: 1px solid rgba(48, 58, 61, 0.08);
-      }
-
-      .step::before {
-        content: "";
-        position: absolute;
-        left: 0;
-        top: 16px;
-        bottom: 16px;
-        width: 6px;
-        border-radius: 999px;
-        background: linear-gradient(180deg, var(--teal), rgba(15, 109, 103, 0.25));
-      }
-
-      .step .phase {
-        display: inline-block;
-        margin-bottom: 10px;
-        color: var(--teal);
-        font-size: 12px;
-        font-weight: 800;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
-      .step p {
+      .flow-card p {
         margin-top: 8px;
+        font-size: 15px;
+        line-height: 1.55;
       }
 
-      .decision-table {
+      .flow-icon {
+        width: 38px;
+        height: 38px;
+        display: inline-grid;
+        place-items: center;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+      }
+
+      .flow-icon svg {
+        width: 22px;
+        height: 22px;
+        display: block;
+      }
+
+      .flow-note {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.82), rgba(255, 255, 255, 0.6));
+        border: 1px solid rgba(22, 33, 38, 0.08);
+      }
+
+      .architecture {
+        display: grid;
+        grid-template-columns: 0.95fr 1.1fr 0.95fr;
+        gap: 18px;
+        align-items: center;
+      }
+
+      .stack {
         display: grid;
         gap: 12px;
       }
 
-      .decision-row {
+      .stack-card {
+        padding: 18px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .stack-card p {
+        margin-top: 8px;
+        font-size: 15px;
+        line-height: 1.58;
+      }
+
+      .core-diagram {
+        position: relative;
+        padding: 18px;
+        border-radius: 26px;
+        background:
+          radial-gradient(circle at 50% 14%, rgba(15, 107, 104, 0.14), transparent 28%),
+          rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .core-diagram::before,
+      .core-diagram::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: 48px;
+        border-top: 2px dashed rgba(15, 107, 104, 0.28);
+      }
+
+      .core-diagram::before {
+        left: -48px;
+      }
+
+      .core-diagram::after {
+        right: -48px;
+      }
+
+      .center-node {
+        padding: 26px 20px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(15, 107, 104, 0.16), rgba(32, 56, 75, 0.08));
+        border: 1px solid rgba(15, 107, 104, 0.16);
+        text-align: center;
+      }
+
+      .center-node p {
+        margin-top: 10px;
+      }
+
+      .subnodes {
+        margin-top: 16px;
         display: grid;
-        grid-template-columns: 132px 1fr;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .subnode {
+        padding: 14px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+      }
+
+      .subnode p {
+        margin-top: 6px;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
+      .priority-board {
+        display: grid;
+        gap: 14px;
+      }
+
+      .priority-row {
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 16px;
+        align-items: start;
+        padding: 16px 0;
+        border-top: 1px solid rgba(22, 33, 38, 0.08);
+      }
+
+      .priority-row:first-child {
+        border-top: 0;
+        padding-top: 0;
+      }
+
+      .priority-key {
+        color: var(--navy);
+        font-size: 14px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .roadmap {
+        display: grid;
+        gap: 14px;
+      }
+
+      .roadmap-step {
+        position: relative;
+        padding: 18px 18px 18px 24px;
+        border-radius: 20px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .roadmap-step::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 14px;
+        bottom: 14px;
+        width: 6px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, var(--teal), rgba(15, 107, 104, 0.22));
+      }
+
+      .roadmap-step p {
+        margin-top: 8px;
+      }
+
+      .output-card {
+        min-height: 188px;
+      }
+
+      .output-card p {
+        margin-top: 10px;
+      }
+
+      .risk-list {
+        display: grid;
+        gap: 12px;
+      }
+
+      .risk-item {
+        display: grid;
+        grid-template-columns: 140px 1fr;
         gap: 14px;
         padding: 16px 18px;
         border-radius: 18px;
-        background: rgba(255, 255, 255, 0.76);
-        border: 1px solid rgba(48, 58, 61, 0.08);
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+        box-shadow: var(--shadow-soft);
       }
 
-      .decision-row .name {
+      .risk-item .name {
         font-weight: 800;
-        color: var(--navy);
+        color: var(--danger);
+      }
+
+      .summary-board {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 18px;
+      }
+
+      .quote-box {
+        padding: 24px;
+        border-radius: 24px;
+        background: linear-gradient(135deg, rgba(15, 107, 104, 0.12), rgba(32, 56, 75, 0.08));
+        border: 1px solid rgba(15, 107, 104, 0.12);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .quote-box p {
+        font-size: 22px;
+        line-height: 1.52;
+        color: var(--ink);
+      }
+
+      .checklist {
+        display: grid;
+        gap: 12px;
+      }
+
+      .check {
+        display: flex;
+        gap: 12px;
+        align-items: start;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.78);
+        border: 1px solid rgba(22, 33, 38, 0.08);
+        box-shadow: var(--shadow-soft);
+      }
+
+      .check-mark {
+        width: 28px;
+        height: 28px;
+        flex: 0 0 28px;
+        border-radius: 50%;
+        display: grid;
+        place-items: center;
+        background: rgba(15, 107, 104, 0.14);
+        color: var(--teal);
+        font-size: 15px;
+        font-weight: 800;
       }
 
       .footer-note {
-        margin-top: 16px;
+        margin-top: 18px;
         font-size: 14px;
-        color: var(--muted);
       }
 
-      @media (max-width: 980px) {
+      .asset-credit {
+        margin-top: 8px;
+        font-size: 12px;
+        line-height: 1.5;
+        color: rgba(94, 106, 112, 0.9);
+      }
+
+      @media (max-width: 1080px) {
+        .flow-row,
+        .architecture,
+        .summary-board {
+          grid-template-columns: 1fr;
+        }
+
+        .core-diagram::before,
+        .core-diagram::after,
+        .flow-card::after {
+          display: none;
+        }
+      }
+
+      @media (max-width: 900px) {
         .deck {
-          width: calc(100vw - 24px);
-          margin: 12px auto 40px;
+          width: calc(100vw - 20px);
+          margin: 10px auto 34px;
+          gap: 16px;
         }
 
         .content,
         .hero .content {
-          padding: 26px 22px 28px;
+          padding: 26px 20px 28px;
         }
 
         .hero-grid,
@@ -431,8 +751,9 @@
         .grid-3,
         .grid-4,
         .section-head,
-        .decision-row,
-        .status-row {
+        .subnodes,
+        .priority-row,
+        .risk-item {
           grid-template-columns: 1fr;
         }
 
@@ -440,13 +761,17 @@
           align-items: start;
         }
 
-        .status-row {
-          gap: 6px;
+        .section-head p,
+        .hero-note {
+          max-width: none;
         }
 
-        .hero-note,
-        .section-head p {
-          max-width: none;
+        .flow-row {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-ribbon {
+          grid-template-columns: 1fr;
         }
 
         p,
@@ -457,28 +782,108 @@
     </style>
   </head>
   <body>
+    <svg class="sr-only" aria-hidden="true" focusable="false">
+      <defs>
+        <symbol id="icon-user" viewBox="0 0 24 24">
+          <circle cx="12" cy="8" r="4" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <path d="M5 20c1.4-3.3 4-5 7-5s5.6 1.7 7 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </symbol>
+        <symbol id="icon-spark" viewBox="0 0 24 24">
+          <path d="M12 2l1.8 5.2L19 9l-5.2 1.8L12 16l-1.8-5.2L5 9l5.2-1.8z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" />
+          <path d="M18.5 15.5l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9z" fill="currentColor" />
+        </symbol>
+        <symbol id="icon-server" viewBox="0 0 24 24">
+          <rect x="4" y="4" width="16" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <rect x="4" y="14" width="16" height="6" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" />
+          <circle cx="8" cy="7" r="1" fill="currentColor" />
+          <circle cx="8" cy="17" r="1" fill="currentColor" />
+        </symbol>
+        <symbol id="icon-runner" viewBox="0 0 24 24">
+          <path d="M5 16l4-4 3 3 7-7" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M14 8h5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
+        </symbol>
+        <symbol id="icon-link" viewBox="0 0 24 24">
+          <path d="M10 14l4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          <path d="M8 17H6a4 4 0 010-8h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+          <path d="M16 7h2a4 4 0 010 8h-2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
+        </symbol>
+      </defs>
+    </svg>
     <main class="deck">
       <section class="slide hero">
         <div class="content">
-          <div class="eyebrow">Project Proposal · 2026-07-03</div>
+          <div class="eyebrow">Leadership Brief · 2026-07-03</div>
           <div class="hero-grid">
             <div>
-              <h1>Docker Build Preview Platform<br />구현 착수 기획안</h1>
+              <h1>Docker Image Builder System<br />소개 및 승인안</h1>
               <p class="hero-note">
-                요구사항 정리, 설계 세분화, 리뷰, 문서 정합성 보정을 거친 현재 기준에서
-                <strong>왜 지금 구현에 들어갈 수 있는지</strong>, <strong>어떤 순서로 시작해야 하는지</strong>를
-                과제 기획안 관점으로 정리한 문서다.
+                비개발자 사용자가 AI 에이전트와 만든 앱을
+                <strong>직접 Docker를 몰라도</strong>
+                바로 실행해볼 수 있게 만드는 플랫폼이다.
               </p>
               <div class="meta">
-                <span>기준 시점: 2026-07-03</span>
-                <span>현재 focus: TASK-017</span>
-                <span>다음 착수: shared package 또는 API scaffold</span>
+                <span>문서 목적: 리더 대상 소개 및 승인</span>
+                <span>핵심 가치: Preview URL 제공</span>
+                <span>현재 단계: 구현 착수 직전</span>
               </div>
             </div>
-            <div class="hero-panel">
-              <span class="label">Proposal Summary</span>
-              <div class="value">Build Server P0 선착수</div>
-              <p>공통 계약과 API 뼈대를 먼저 여는 방식이 현재 문서 기준선과 가장 잘 맞고, 이후 재작업 비용도 가장 낮다.</p>
+            <div class="hero-stage">
+              <aside class="hero-panel">
+                <span class="label">한 줄 요약</span>
+                <div class="value">"배포해줘"를<br />실행 가능한 결과로</div>
+                <p>자연어 요청을 받아 Build Server와 Runner가 이미지를 빌드하고 preview URL까지 연결한다.</p>
+              </aside>
+              <div class="hero-visual" aria-label="사용자 요청이 Build Server와 Runner를 거쳐 preview URL로 연결되는 개념도">
+                <svg viewBox="0 0 540 280" role="img">
+                  <defs>
+                    <linearGradient id="heroPanelGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="rgba(255,255,255,0.20)" />
+                      <stop offset="100%" stop-color="rgba(255,255,255,0.04)" />
+                    </linearGradient>
+                  </defs>
+                  <rect x="12" y="12" width="516" height="256" rx="28" fill="url(#heroPanelGradient)" stroke="rgba(255,255,255,0.16)" />
+                  <g font-family="Pretendard, Apple SD Gothic Neo, Noto Sans KR, sans-serif">
+                    <rect x="34" y="72" width="108" height="132" rx="20" fill="rgba(215,107,66,0.18)" stroke="rgba(255,255,255,0.16)" />
+                    <circle cx="88" cy="110" r="22" fill="rgba(255,255,255,0.18)" />
+                    <text x="88" y="115" text-anchor="middle" font-size="12" fill="#fff">USER</text>
+                    <text x="88" y="146" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">사용자 요청</text>
+                    <text x="88" y="168" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.8)">"배포해줘"</text>
+                    <rect x="180" y="52" width="166" height="170" rx="24" fill="rgba(15,107,104,0.18)" stroke="rgba(255,255,255,0.18)" />
+                    <text x="263" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">Build Server</text>
+                    <rect x="204" y="103" width="118" height="30" rx="15" fill="rgba(255,255,255,0.14)" />
+                    <rect x="204" y="143" width="118" height="30" rx="15" fill="rgba(255,255,255,0.11)" />
+                    <rect x="204" y="183" width="118" height="20" rx="10" fill="rgba(255,255,255,0.08)" />
+                    <text x="263" y="123" text-anchor="middle" font-size="12" fill="#fff">request intake</text>
+                    <text x="263" y="163" text-anchor="middle" font-size="12" fill="#fff">status + logs</text>
+                    <text x="263" y="198" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.84)">queue coordination</text>
+                    <rect x="382" y="72" width="124" height="132" rx="20" fill="rgba(216,169,74,0.18)" stroke="rgba(255,255,255,0.16)" />
+                    <text x="444" y="108" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">Runner</text>
+                    <text x="444" y="136" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.84)">docker build</text>
+                    <text x="444" y="156" text-anchor="middle" font-size="12" fill="rgba(255,255,255,0.84)">docker run</text>
+                    <rect x="410" y="173" width="68" height="12" rx="6" fill="rgba(255,255,255,0.18)" />
+                    <path d="M142 138H180" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="3" stroke-linecap="round" />
+                    <path d="M346 138H382" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="3" stroke-linecap="round" />
+                    <circle cx="161" cy="138" r="4" fill="#fff" />
+                    <circle cx="364" cy="138" r="4" fill="#fff" />
+                    <rect x="156" y="228" width="230" height="22" rx="11" fill="rgba(255,255,255,0.12)" />
+                    <text x="271" y="243" text-anchor="middle" font-size="11" letter-spacing="1.2" fill="rgba(255,255,255,0.88)">PREVIEW URL RETURNED TO USER</text>
+                  </g>
+                </svg>
+              </div>
+              <div class="hero-ribbon">
+                <div class="hero-pill">
+                  <strong>입력</strong>
+                  <span>자연어 요청</span>
+                </div>
+                <div class="hero-pill">
+                  <strong>핵심 처리</strong>
+                  <span>Build + Preview</span>
+                </div>
+                <div class="hero-pill">
+                  <strong>최종 가치</strong>
+                  <span>실행 가능한 URL</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -486,106 +891,168 @@
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
             <div>
-              <div class="eyebrow">Proposal Basis</div>
-              <h2>기획안의 출발점</h2>
+              <div class="eyebrow">Overview</div>
+              <h2>프로젝트 개요</h2>
             </div>
-            <p>이 기획안은 `docs/sdlc/` 문서군과 `docs/sdlc/contracts/01-shared-build-contract-baseline.md`를 기준으로 한다.</p>
+            <p>이 프로젝트는 AI 앱 제작 흐름의 마지막 병목인 “실행 가능한 테스트 환경 확보”를 해결하기 위한 플랫폼이다.</p>
           </div>
           <div class="grid-4">
             <article class="card metric-card">
               <div>
-                <div class="metric-kicker">SDLC Steps</div>
-                <div class="metric-value">12</div>
+                <div class="metric-label">사용자</div>
+                <div class="metric-value">비개발자</div>
               </div>
-              <p>Step 01부터 Step 12까지 설계와 세분화 문서 흐름이 연결되어 있다.</p>
+              <p>Dockerfile, 이미지 빌드, 포트 설정을 몰라도 배포를 요청할 수 있어야 한다.</p>
             </article>
             <article class="card metric-card">
               <div>
-                <div class="metric-kicker">P0 Packages</div>
-                <div class="metric-value">4</div>
+                <div class="metric-label">입력</div>
+                <div class="metric-value">자연어</div>
               </div>
-              <p>`PKG-001`~`PKG-004` 기준으로 Build Server P0 구현 축이 분해되어 있다.</p>
+              <p>사용자는 AI 에이전트에게 “배포해줘”라고 말하는 수준의 경험을 기대한다.</p>
             </article>
             <article class="card metric-card">
               <div>
-                <div class="metric-kicker">Core Outcome</div>
-                <div class="metric-value">1</div>
+                <div class="metric-label">핵심 처리</div>
+                <div class="metric-value">Build + Preview</div>
               </div>
-              <p>핵심 사용자 가치는 Docker 빌드 자체가 아니라 테스트 가능한 preview URL 제공이다.</p>
+              <p>빌드 성공보다 테스트 가능한 preview URL 제공이 더 중요하다.</p>
             </article>
             <article class="card metric-card">
               <div>
-                <div class="metric-kicker">Immediate Focus</div>
-                <div class="metric-value">TASK-017</div>
+                <div class="metric-label">현재 상태</div>
+                <div class="metric-value">설계 완료</div>
               </div>
-              <p>문서 정합성 보정 이후 첫 코드 진입점으로 scaffold 착수가 대기 중이다.</p>
+              <p>요구사항과 설계 정리까지 끝났고, 이제 구현 스캐폴드를 여는 단계다.</p>
             </article>
           </div>
-          <div class="accent-band">
-            <p><strong>기획 판단:</strong> 남은 핵심 과제는 설계 추가 생산이 아니라, 현재 기준선을 손상시키지 않는 첫 구현 진입 순서를 선택하는 일이다.</p>
+          <div class="statement">
+            <p><strong>핵심 메시지:</strong> 이 프로젝트는 Docker 도구가 아니라, AI가 만든 앱을 누구나 실제로 실행해보게 만드는 마지막 연결 고리다.</p>
           </div>
         </div>
       </section>
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
             <div>
-              <div class="eyebrow">Why Now</div>
-              <h2>왜 지금 구현 착수가 가능한가</h2>
+              <div class="eyebrow">Flow</div>
+              <h2>사용자에게 보이는 서비스 흐름</h2>
             </div>
-            <p>이번 기획안은 리뷰 결과를 그대로 나열하지 않고, 이미 보정이 끝난 상태를 기반으로 다음 행동을 제안한다.</p>
+            <p>리더에게는 기술 설명보다 “요청이 어떻게 결과로 바뀌는가”가 먼저 보여야 한다.</p>
           </div>
-          <div class="grid-3">
-            <article class="card signal">
-              <div class="badge teal">Reason 01</div>
-              <h3>요구사항과 설계가 닫혀 있다</h3>
-              <p>MVP 범위, 상태 모델, preview 정책, 공통 계약, Build Server P0 구현 축이 단계별 문서로 연결되어 있다.</p>
-              <p>구현자가 무엇을 기준으로 시작해야 하는지가 문서에 남아 있다.</p>
-            </article>
-            <article class="card signal">
-              <div class="badge teal">Reason 02</div>
-              <h3>정합성 보정이 끝났다</h3>
-              <p>`TEST_READY`, preview `QUEUED`, 저장소 준비도, workflow 메타 문서명 혼선이 정리되었다.</p>
-              <p>즉, 현재는 “무엇이 진짜 기준인가”를 다시 묻지 않고 착수할 수 있다.</p>
-            </article>
-            <article class="card signal">
-              <div class="badge teal">Reason 03</div>
-              <h3>다음 작업이 하나로 좁혀졌다</h3>
-              <p>이제 남은 선택지는 shared package scaffold와 Build Server API scaffold의 순서 문제다.</p>
-              <p>즉, 설계 탐색 단계가 아니라 구현 진입 전략 단계다.</p>
-            </article>
+          <div class="flow-shell">
+            <div class="flow-row">
+              <article class="flow-card user">
+                <div class="flow-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-user"></use></svg>
+                </div>
+                <div class="mini-label">Step 01</div>
+                <h3>사용자 요청</h3>
+                <p>사용자가 AI 에이전트에게 배포를 요청한다.</p>
+              </article>
+              <article class="flow-card agent">
+                <div class="flow-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-spark"></use></svg>
+                </div>
+                <div class="mini-label">Step 02</div>
+                <h3>AI 에이전트 준비</h3>
+                <p>앱 산출물과 Docker 준비물을 점검하고 전달 형식을 맞춘다.</p>
+              </article>
+              <article class="flow-card server">
+                <div class="flow-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-server"></use></svg>
+                </div>
+                <div class="mini-label">Step 03</div>
+                <h3>Build Server 접수</h3>
+                <p>빌드 요청을 저장하고 상태, 로그, 중복 요청을 관리한다.</p>
+              </article>
+              <article class="flow-card runner">
+                <div class="flow-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-runner"></use></svg>
+                </div>
+                <div class="mini-label">Step 04</div>
+                <h3>Runner 실행</h3>
+                <p>실제 Docker 이미지 빌드와 preview 실행을 수행한다.</p>
+              </article>
+              <article class="flow-card outcome">
+                <div class="flow-icon">
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><use href="#icon-link"></use></svg>
+                </div>
+                <div class="mini-label">Step 05</div>
+                <h3>결과 반환</h3>
+                <p>사용자는 preview URL 또는 실패 안내를 받는다.</p>
+              </article>
+            </div>
+            <div class="flow-note">
+              <p><strong>핵심 포인트:</strong> 사용자는 Docker 절차를 보지 않는다. 시스템이 복잡성을 숨기고 결과만 preview URL로 돌려준다.</p>
+            </div>
           </div>
         </div>
       </section>
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
             <div>
-              <div class="eyebrow">Goal</div>
-              <h2>이번 과제의 목표</h2>
+              <div class="eyebrow">Architecture</div>
+              <h2>시스템 구성</h2>
             </div>
-            <p>이번 기획안의 목표는 Build Server MVP를 가장 안정적으로 구현 착수 가능한 구조로 여는 것이다.</p>
+            <p>구성은 단순하다. 사용자 접점은 AI 에이전트가 맡고, 실제 빌드와 실행은 서버 쪽으로 분리한다.</p>
           </div>
-          <div class="status-board">
-            <div class="status-row">
-              <div class="key">Goal 01</div>
-              <div><p><strong>문서 기준선 보존.</strong> 구현이 요구사항과 설계 문서를 거스르지 않도록 source-of-truth를 유지한다.</p></div>
+          <div class="architecture">
+            <div class="stack">
+              <article class="stack-card">
+                <div class="mini-label">Front Layer</div>
+                <h3>Skill / MCP</h3>
+                <p>요청 해석, 앱 산출물 준비, Build Server 호출, 상태 안내를 담당한다.</p>
+              </article>
+              <article class="stack-card">
+                <div class="mini-label">User Value</div>
+                <h3>쉬운 배포 경험</h3>
+                <p>비개발자도 인프라 지식 없이 테스트 URL을 받을 수 있어야 한다.</p>
+              </article>
             </div>
-            <div class="status-row">
-              <div class="key">Goal 02</div>
-              <div><p><strong>Build Server P0 우선 착수.</strong> `PKG-001`~`PKG-004`를 코드 scaffold와 초기 구현 단위로 연결한다.</p></div>
+
+            <div class="core-diagram">
+              <div class="center-node">
+                <div class="mini-label">Core Hub</div>
+                <h3>Build Server</h3>
+                <p>모든 요청과 상태를 중앙에서 관리하는 운영 허브</p>
+              </div>
+              <div class="subnodes">
+                <div class="subnode">
+                  <h4>Request Intake</h4>
+                  <p>빌드 요청 수신과 active build 중복 방지</p>
+                </div>
+                <div class="subnode">
+                  <h4>Status Tracking</h4>
+                  <p>상태, 로그, 메타데이터 저장과 조회</p>
+                </div>
+                <div class="subnode">
+                  <h4>Queue Coordination</h4>
+                  <p>Runner가 소비할 작업 단위 관리</p>
+                </div>
+                <div class="subnode">
+                  <h4>Preview Metadata</h4>
+                  <p>preview URL과 테스트 실행 결과 정리</p>
+                </div>
+              </div>
             </div>
-            <div class="status-row">
-              <div class="key">Goal 03</div>
-              <div><p><strong>재작업 최소화.</strong> 공통 계약과 DB 경계를 먼저 고정해 이후 API, Runner, Skill/MCP가 같은 기준 위에 올라가게 한다.</p></div>
-            </div>
-            <div class="status-row">
-              <div class="key">Goal 04</div>
-              <div><p><strong>후속 결정 통제.</strong> medium decision은 실제 차단점이 생길 때만 선택적으로 닫아 일정 확장을 막는다.</p></div>
+
+            <div class="stack">
+              <article class="stack-card">
+                <div class="mini-label">Execution Layer</div>
+                <h3>Runner</h3>
+                <p>`docker build`, `docker run`, 로그 적재, preview 수명 관리의 실행 주체다.</p>
+              </article>
+              <article class="stack-card">
+                <div class="mini-label">Outcome</div>
+                <h3>Preview URL</h3>
+                <p>최종 결과물은 기술 로그가 아니라 사용자가 눌러볼 수 있는 실행 링크다.</p>
+              </article>
             </div>
           </div>
         </div>
@@ -593,71 +1060,101 @@
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
+            <div>
+              <div class="eyebrow">Why It Matters</div>
+              <h2>왜 필요한가</h2>
+            </div>
+            <p>이 프로젝트는 기술 탐색이 아니라 AI 제품 경험을 완성하기 위한 운영 인프라 투자에 가깝다.</p>
+          </div>
+          <div class="priority-board">
+            <div class="priority-row">
+              <div class="priority-key">문제 01</div>
+              <div><p><strong>AI가 앱을 만들어도 바로 검증하기 어렵다.</strong> 결과물을 실행해볼 환경이 없으면 사용자 신뢰가 떨어진다.</p></div>
+            </div>
+            <div class="priority-row">
+              <div class="priority-key">문제 02</div>
+              <div><p><strong>비개발자에게 Docker는 너무 어렵다.</strong> 빌드와 실행의 복잡성은 시스템이 흡수해야 한다.</p></div>
+            </div>
+            <div class="priority-row">
+              <div class="priority-key">문제 03</div>
+              <div><p><strong>운영 책임 분리가 필요하다.</strong> 요청 해석, 상태 관리, 실제 실행을 나누지 않으면 확장성과 안정성이 떨어진다.</p></div>
+            </div>
+            <div class="priority-row">
+              <div class="priority-key">기대 효과</div>
+              <div><p><strong>“만들었다”에서 “실행해봤다”로 전환된다.</strong> AI 앱 제작 경험이 실제 서비스 경험으로 올라가는 변화다.</p></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="slide">
+        <div class="content">
+          <div class="section-head section-frame">
             <div>
               <div class="eyebrow">Scope</div>
-              <h2>1차 수행 범위</h2>
+              <h2>1차 구현 범위</h2>
             </div>
-            <p>이번 과제의 1차 범위는 Build Server P0를 코드 구조로 여는 것이며, Runner 전체 구현은 후속 범위로 둔다.</p>
+            <p>처음부터 모든 것을 만들지 않는다. 사용자 가치와 직접 연결되는 Build Server P0를 먼저 만든다.</p>
           </div>
           <div class="grid-2">
             <article class="card">
-              <div class="badge teal">P0 · Build Server</div>
-              <h3>포함 범위</h3>
+              <div class="mini-label">Priority Scope</div>
+              <h3>이번에 먼저 만드는 것</h3>
               <ul>
-                <li>`packages/shared-contract`</li>
-                <li>`packages/shared-config`</li>
-                <li>`packages/db`</li>
-                <li>`apps/build-server` bootstrap</li>
-                <li>`POST /builds`, `GET /builds/{buildId}`, `GET /builds/{buildId}/logs` 진입 구조</li>
+                <li>공통 계약 패키지 `packages/shared-contract`</li>
+                <li>공통 설정 패키지 `packages/shared-config`</li>
+                <li>DB 계층 패키지 `packages/db`</li>
+                <li>`apps/build-server` 초기 API 골격</li>
+                <li>`POST /builds`, `GET /builds/{buildId}`, `GET /builds/{buildId}/logs`</li>
               </ul>
             </article>
             <article class="card">
-              <div class="badge amber">Later · Follow-up</div>
-              <h3>후속 범위</h3>
+              <div class="mini-label">Deferred Scope</div>
+              <h3>다음 단계로 미루는 것</h3>
               <ul>
-                <li>Runner claim/execute loop 전체 구현</li>
-                <li>reverse proxy 기반 preview URL 확장</li>
+                <li>다중 Runner 병렬 처리</li>
+                <li>reverse proxy 기반 preview 라우팅 확장</li>
                 <li>registry push / deployment registration</li>
-                <li>`OI-006`, `OI-008`, `OI-009`의 전면 정리</li>
+                <li>운영 미결정 항목 전면 정리</li>
               </ul>
             </article>
           </div>
-          <div class="accent-band">
-            <p><strong>범위 원칙:</strong> 사용자 가치와 직접 연결되는 Build Server P0부터 열고, 운영 확장과 후속 자동화는 다음 단계로 넘긴다.</p>
+          <div class="statement">
+            <p><strong>범위 전략:</strong> 먼저 빌드 요청, 상태 관리, preview 연결의 최소 구조를 만들고 이후 운영 확장을 붙인다.</p>
           </div>
         </div>
       </section>
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
             <div>
-              <div class="eyebrow">Plan</div>
+              <div class="eyebrow">Roadmap</div>
               <h2>추진 단계</h2>
             </div>
-            <p>기획상 가장 안정적인 추진 순서는 shared package 선착수, API 진입 구조 확장, persistence 연결 순서다.</p>
+            <p>지금은 설계를 더 늘리기보다, 정리된 설계를 안전하게 코드 구조로 옮기는 순서가 중요하다.</p>
           </div>
-          <div class="timeline">
-            <article class="step">
-              <span class="phase">Phase 1</span>
-              <h3>shared package scaffold</h3>
-              <p>먼저 `packages/shared-contract`, `packages/shared-config`, `packages/db`를 만들고 enum, schema, config entry를 배치한다.</p>
+          <div class="roadmap">
+            <article class="roadmap-step">
+              <div class="mini-label">Phase 1</div>
+              <h3>공통 기반 스캐폴드</h3>
+              <p>`shared-contract`, `shared-config`, `db` 패키지를 먼저 열어 타입, enum, schema 진입점을 고정한다.</p>
             </article>
-            <article class="step">
-              <span class="phase">Phase 2</span>
-              <h3>Build Server API shell</h3>
-              <p>`apps/build-server`에 Fastify bootstrap, route registry, Zod schema 연결 구조를 생성한다.</p>
+            <article class="roadmap-step">
+              <div class="mini-label">Phase 2</div>
+              <h3>Build Server API 진입 구조 생성</h3>
+              <p>Fastify bootstrap, route, schema, service, repository 뼈대를 만들어 서버 책임을 명확히 한다.</p>
             </article>
-            <article class="step">
-              <span class="phase">Phase 3</span>
-              <h3>persistence baseline</h3>
-              <p>`build_request`, `build_log`, `test_deployment` schema와 migration, repository contract를 연결한다.</p>
+            <article class="roadmap-step">
+              <div class="mini-label">Phase 3</div>
+              <h3>Persistence baseline 연결</h3>
+              <p>`build_request`, `build_log`, `test_deployment` 기준으로 migration과 repository contract를 연결한다.</p>
             </article>
-            <article class="step">
-              <span class="phase">Phase 4</span>
-              <h3>selective decision closure</h3>
-              <p>구현 차단이 생길 때만 `OI-006`, `OI-008`, `OI-009`를 선택적으로 닫아 일정 확장을 통제한다.</p>
+            <article class="roadmap-step">
+              <div class="mini-label">Phase 4</div>
+              <h3>Runner 및 운영 정책 확장</h3>
+              <p>필요할 때만 preview queue, Runner claim, 후속 의사결정 항목을 닫아 확장한다.</p>
             </article>
           </div>
         </div>
@@ -665,55 +1162,59 @@
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
             <div>
               <div class="eyebrow">Deliverables</div>
-              <h2>기대 산출물</h2>
+              <h2>예상 산출물</h2>
             </div>
-            <p>이번 기획안에 따라 착수할 경우 산출물은 문서가 아니라 실제 저장소 구조와 실행 가능한 초기 코드가 된다.</p>
+            <p>이 프로젝트는 문서만 쌓는 과제가 아니라, 실제 저장소 구조와 구현 시작점을 만드는 과제다.</p>
           </div>
-          <div class="decision-table">
-            <div class="decision-row">
-              <div class="name">Output 01</div>
-              <div><p><strong>shared package scaffold</strong>와 공통 타입, enum, schema 진입점</p></div>
-            </div>
-            <div class="decision-row">
-              <div class="name">Output 02</div>
-              <div><p><strong>Build Server API shell</strong>과 route, schema, service 기본 골격</p></div>
-            </div>
-            <div class="decision-row">
-              <div class="name">Output 03</div>
-              <div><p><strong>DB schema 및 migration baseline</strong>, repository contract 초안</p></div>
-            </div>
-            <div class="decision-row">
-              <div class="name">Output 04</div>
-              <div><p><strong>개발 기본 명령 정의</strong>와 이후 Runner 확장에 필요한 초기 실행 기준</p></div>
-            </div>
+          <div class="grid-4">
+            <article class="card output-card">
+              <div class="mini-label">Output 01</div>
+              <h3>기획 산출물</h3>
+              <p>프로젝트 소개 자료, 기획안, SDLC 기준 문서 세트</p>
+            </article>
+            <article class="card output-card">
+              <div class="mini-label">Output 02</div>
+              <h3>설계 산출물</h3>
+              <p>상태 전이 모델, 시스템 책임 분리, API 계약 초안, 데이터 모델 기준</p>
+            </article>
+            <article class="card output-card">
+              <div class="mini-label">Output 03</div>
+              <h3>구현 산출물</h3>
+              <p>shared packages, Build Server API shell, migration baseline, repository 기본 구조</p>
+            </article>
+            <article class="card output-card">
+              <div class="mini-label">Output 04</div>
+              <h3>운영 산출물</h3>
+              <p>다음 단계 backlog, 기본 실행 명령, Runner 확장 진입 기준</p>
+            </article>
           </div>
         </div>
       </section>
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
             <div>
               <div class="eyebrow">Risk</div>
               <h2>주요 리스크와 대응</h2>
             </div>
-            <p>현재 리스크는 설계 부족보다 구현 초반 경계 설정 실패에 가깝기 때문에, 대응도 범위 통제와 기준 유지에 집중한다.</p>
+            <p>현재 리스크의 본질은 기술 난이도보다 “무엇을 먼저 고정할 것인가”에 있다.</p>
           </div>
-          <div class="decision-table">
-            <div class="decision-row">
+          <div class="risk-list">
+            <div class="risk-item">
               <div class="name">Risk 01</div>
-              <div><p><strong>패키지 경계 혼선.</strong> `PKG-001`~`PKG-004` 문서와 1:1 대응되는 디렉터리 책임을 먼저 고정한다.</p></div>
+              <div><p><strong>패키지 경계 혼선.</strong> `PKG-001`~`PKG-004`와 코드 디렉터리 책임을 1:1로 대응시켜 방지한다.</p></div>
             </div>
-            <div class="decision-row">
+            <div class="risk-item">
               <div class="name">Risk 02</div>
-              <div><p><strong>후속 decision 확장.</strong> `OI-006`, `OI-008`, `OI-009`는 실제 차단점이 생길 때만 닫는다.</p></div>
+              <div><p><strong>미결정 항목 확장.</strong> 운영 정책은 구현 차단점이 생길 때만 닫아 일정 확대를 막는다.</p></div>
             </div>
-            <div class="decision-row">
+            <div class="risk-item">
               <div class="name">Risk 03</div>
-              <div><p><strong>실행 기준 부재.</strong> scaffold와 동시에 기본 `install`, `run`, `test` 명령을 정의한다.</p></div>
+              <div><p><strong>실행 기준 부재.</strong> 스캐폴드와 함께 기본 `install`, `run`, `test` 명령을 정의한다.</p></div>
             </div>
           </div>
         </div>
@@ -721,23 +1222,38 @@
 
       <section class="slide">
         <div class="content">
-          <div class="section-head">
+          <div class="section-head section-frame">
             <div>
               <div class="eyebrow">Conclusion</div>
-              <h2>기획 결론</h2>
+              <h2>의사결정 포인트</h2>
+            </div>
+            <p>리더에게 필요한 것은 설계 상세가 아니라, 지금 무엇을 승인하면 되는지다.</p>
+          </div>
+          <div class="summary-board">
+            <div class="quote-box">
+              <p>“지금은 추가 기획보다, 정리된 기준선 위에서 Build Server P0 구현을 시작할 시점이다.”</p>
+            </div>
+            <div class="checklist">
+              <div class="check">
+                <div class="check-mark">1</div>
+                <p>프로젝트 목적은 명확하다. AI가 만든 앱을 실제로 실행해보게 만드는 것이다.</p>
+              </div>
+              <div class="check">
+                <div class="check-mark">2</div>
+                <p>구성은 단순하다. AI 에이전트, Build Server, Runner의 책임이 구분되어 있다.</p>
+              </div>
+              <div class="check">
+                <div class="check-mark">3</div>
+                <p>범위는 통제되어 있다. Build Server P0부터 시작하고 후속 확장은 단계적으로 진행한다.</p>
+              </div>
+              <div class="check">
+                <div class="check-mark">4</div>
+                <p>다음 행동은 분명하다. shared package와 API scaffold를 먼저 연다.</p>
+              </div>
             </div>
           </div>
-          <div class="grid-2">
-            <article class="card">
-              <h3>핵심 제안</h3>
-              <p>이번 과제는 Build Server P0를 중심으로 shared package와 API scaffold를 먼저 여는 방향으로 추진하는 것이 가장 적절하다.</p>
-            </article>
-            <article class="card">
-              <h3>기대 효과</h3>
-              <p>문서 기준선의 강점을 그대로 코드 구조로 옮길 수 있고, 이후 Runner와 운영 확장도 더 낮은 비용으로 이어갈 수 있다.</p>
-            </article>
-          </div>
-          <p class="footer-note">제안 문장: “문서 정합성 보정이 마감된 현재 시점에서, Build Server P0 구현을 위한 shared package 및 API scaffold 착수를 1차 과제로 추진한다.”</p>
+          <p class="footer-note">제안 문장: <strong>Docker Image Builder System의 1차 구현 범위를 Build Server P0 중심으로 승인하고, 공통 패키지와 API 스캐폴드 착수를 즉시 진행한다.</strong></p>
+          <p class="asset-credit">에셋 메모: 본 자료의 아이콘과 도식은 모두 HTML 내부 SVG와 CSS로 포함되어 있어, 외부 네트워크 없이 오프라인에서도 동일하게 동작한다.</p>
         </div>
       </section>
     </main>

@@ -16,6 +16,10 @@
 - SDLC 리뷰 문서, 과제 계획안, 보고용 HTML 자료가 추가되었다.
 - root 개념 문서와 workflow 메타 문서를 `docs/sdlc/` 및 shared contract canonical source 기준으로 정합성 보정했다.
 - 보고용 HTML 자료를 검토 결과 보고서가 아니라 구현 착수 기획안 톤으로 재작성했다.
+- 과제 계획안을 Build Server 착수 메모에서 프로젝트 개요 중심 기획안 문서로 전면 재구성했다.
+- 보고용 HTML 자료를 리더 소개용 slide deck 구조로 다시 재작성하고 개요/구성/흐름 도식을 추가했다.
+- 보고용 HTML 자료에 CSS 시각 강화와 인라인 SVG 에셋을 추가해 오프라인 완결형 자료로 보강했다.
+- 보고용 HTML 자료의 카피를 더 짧은 승인안 톤으로 압축했다.
 - 현재 다음 착수점은 shared package 또는 API 스캐폴드다.
 
 ## Work Status
@@ -37,6 +41,10 @@
 - TASK-014 shared package 또는 API 스캐폴드 진입 판단: done
 - TASK-015 SDLC 리뷰 및 보고 패키지 작성: done
 - TASK-016 문서 정합성 보정 및 스캐폴드 진입 준비: done
+- TASK-018 보고자료 재구성 및 기획안 재작성: done
+- TASK-019 리더 소개용 HTML 보고자료 시각화 재작성: done
+- TASK-020 HTML 시각화 보강 및 오프라인 에셋 내장화: done
+- TASK-021 발표용 카피 압축 및 승인안 톤 보정: done
 - TASK-017 shared package 또는 API 스캐폴드 착수: planned
 
 ## Key Changes
@@ -71,7 +79,11 @@
 - `docs/report/01-assignment-plan.md` 추가
 - `docs/report/02-sdlc-review-report.html` 추가
 - `docs/report/01-assignment-plan.md` 기획안 톤 정리
+- `docs/report/01-assignment-plan.md` 프로젝트 개요 중심 구조로 전면 재작성
 - `docs/report/02-sdlc-review-report.html` 기획안형 전면 재작성
+- `docs/report/02-sdlc-review-report.html` 리더 브리프형 slide deck으로 전면 재작성
+- `docs/report/02-sdlc-review-report.html` CSS 및 인라인 SVG 기반 오프라인 완결형 시각 자료로 보강
+- `docs/report/02-sdlc-review-report.html` 발표용 승인안 카피로 압축
 - `docs/GLOSSARY_AND_STATE_MODEL.md` 정합성 보정
 - `docs/IDENTITY_MODEL.md` 정합성 보정
 - `docs/sdlc/SRS/04-policy-and-constraints.md` stale 제약 보정
