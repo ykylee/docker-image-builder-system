@@ -4,7 +4,8 @@
 - 범위: 개발 목표, 기술 기준, 단계별 일정, 작업 묶음, 산출물, 리스크, 검증 기준
 - 대상 독자: 프로젝트 리드, Build Server 구현자, Runner 구현자, AI 에이전트
 - 상태: draft
-- 최종 수정일: 2026-07-03
+- 최종 수정일: 2026-07-03 (rev 1: Phase 1~7 단계별 개발 계획)
+- 최종 수정일: 2026-07-03 (rev 2: 리뷰 반영, Phase 2/3 순서를 Persistence Baseline → Build Server Skeleton 으로 교체, §3/§9/§10 의 `먼저` 원칙과 정합)
 - 관련 문서: `docs/sdlc/07-implementation-backlog-baseline.md`, `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`, `docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md`, `docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md`, `docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md`
 
 ## 1. 계획 목표
@@ -78,38 +79,12 @@
 - db package에 schema/migration 진입 구조가 존재한다
 - Build Server와 Runner가 참조할 canonical key가 코드 구조로 고정된다
 
-### Phase 2. Build Server Skeleton
+### Phase 2. Persistence Baseline
 
 목표:
 
-- Build Server를 system-of-record로 세우는 최소 API 골격을 연다.
-
-주요 작업:
-
-- `apps/build-server` 생성
-- Fastify bootstrap
-- route / schema / service / repository 디렉터리 생성
-- `POST /builds`
-- `GET /builds/{buildId}`
-- `GET /builds/{buildId}/logs`
-- health endpoint
-
-연결 패키지:
-
-- `PKG-002`
-- `PKG-004`
-
-완료 기준:
-
-- API 엔트리포인트가 실행 가능한 구조로 존재한다
-- request/response schema 진입점이 연결된다
-- accepted / duplicate / status / logs 응답 골격이 코드에 반영된다
-
-### Phase 3. Persistence Baseline
-
-목표:
-
-- Build Server 단독 소유의 상태 저장 구조를 PostgreSQL 기준으로 고정한다.
+- Build Server 단독 소유의 상태 저장 구조를 PostgreSQL 기준으로 먼저 고정한다.
+- `Build Server skeleton 만 먼저` 라는 표현을 회피하고, persistence contract 가 닫힌 뒤 Phase 3 에서 Build Server 골격을 연다.
 
 주요 작업:
 
@@ -130,6 +105,34 @@
 - schema와 migration baseline이 생성된다
 - Build Server repository contract가 persistence와 연결된다
 - queue claim에 필요한 필드와 인덱스 기준이 닫힌다
+
+### Phase 3. Build Server Skeleton
+
+목표:
+
+- Phase 2 의 persistence contract 와 Phase 1 의 shared contract 가 닫힌 위에서 Build Server 의 최소 API 골격을 연다.
+
+주요 작업:
+
+- `apps/build-server` 생성 (Fastify + Zod)
+- Phase 2 의 repository contract 를 실제 repository 구현으로 연결
+- `POST /builds` intake → `build_request` row 생성 → `QUEUED` 응답
+- `GET /builds/{buildId}` → persistence contract 기반 status assembly
+- `GET /builds/{buildId}/logs` → persistence contract 기반 logs assembly
+- health endpoint
+
+연결 패키지:
+
+- `PKG-002`
+- `PKG-004`
+- (Phase 2 의 `PKG-003` 결과를 사용)
+
+완료 기준:
+
+- API 엔트리포인트가 실행 가능한 구조로 존재한다
+- repository contract 가 persistence 와 end-to-end 로 연결된다
+- accepted / duplicate / status / logs 응답 골격이 코드에 반영된다
+- Phase 1 의 shared contract 와의 drift 가 발생하지 않는다
 
 ### Phase 4. Build Server P0 Completion
 
@@ -297,7 +300,7 @@ apps/runner/
 - Go Runner와 TypeScript Build Server 간 contract drift 위험
   - 대응: shared-contract를 canonical source로 유지하고 generated artifact를 도입한다
 - Build Server를 열기 전에 DB 구조가 흔들릴 위험
-  - 대응: schema/migration baseline을 Build Server skeleton 직후 즉시 고정한다
+  - 대응: schema/migration baseline을 Phase 2 에서 먼저 고정하고, Phase 3 의 Build Server skeleton 은 그 위에서만 연다
 - Runner를 너무 늦게 열어 preview 정책 구현이 밀릴 위험
   - 대응: Build Server P0 직후 Go Runner skeleton을 바로 연다
 - monorepo 안에서 Node와 Go toolchain이 혼재해 운영 기준이 흐려질 위험
@@ -307,8 +310,8 @@ apps/runner/
 
 - `packages/shared-contract` 스캐폴드 착수
 - `packages/shared-config` 스캐폴드 착수
-- `packages/db` 스캐폴드 및 migration baseline 착수
-- Build Server API skeleton 생성
+- `packages/db` 스캐폴드 및 migration baseline 착수 (Phase 2)
+- Build Server API skeleton 생성 (Phase 3, persistence contract 와 shared contract 가 닫힌 뒤)
 
 ## 11. 현 단계 결론
 

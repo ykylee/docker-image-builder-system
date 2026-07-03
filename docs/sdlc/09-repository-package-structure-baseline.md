@@ -4,7 +4,7 @@
 - 범위: monorepo 디렉터리 구조, 앱/패키지 책임, 의존 방향, 초기 생성 순서, 비범위
 - 대상 독자: 프로젝트 리드, Build Server 구현자, Runner 구현자, AI 에이전트
 - 상태: draft
-- 최종 수정일: 2026-07-03 (rev 2: 리뷰 반영, apps/runner 을 Go (go.mod/cmd/internal) 예시로 정렬, 의존방향 / PKG-005~007 경로 갱신)
+- 최종 수정일: 2026-07-03 (rev 3: 리뷰 반영, §3 의 최상위 트리는 언어 무관 안내로 한정, §4.1/§4.2 헤더에 TypeScript/Go 언어 명시)
 - 관련 문서: `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, `docs/sdlc/07-implementation-backlog-baseline.md`
 
 ## 1. 문서 목표
@@ -39,9 +39,11 @@ docs/
 ai-workflow/
 ```
 
+> 본 §3 의 최상위 디렉터리 트리는 Build Server/Runner 가 같은 부모 (`apps/`) 를 공유한다는 점만 보여준다. 각 앱의 실제 하위 구조는 §4.1 (`apps/build-server`, TypeScript) 과 §4.2 (`apps/runner`, Go) 가 언어별 baseline 으로 정의하므로, 본 트리만 보고 임의로 `src/`/`tsconfig.json` 같은 TypeScript 전용 골격을 모든 앱에 적용하지 않는다.
+
 ## 4. 앱 구조
 
-### 4.1 `apps/build-server`
+### 4.1 `apps/build-server` (TypeScript, Fastify)
 
 역할:
 
@@ -51,7 +53,7 @@ ai-workflow/
 - 로그 조회 API
 - health endpoint
 
-초기 하위 구조 권장:
+초기 하위 구조 권장 (TypeScript workspace 기준):
 
 ```text
 apps/build-server/
@@ -78,7 +80,7 @@ apps/build-server/
 - `plugins/`: Fastify plugins
 - `lib/`: app-local helpers
 
-### 4.2 `apps/runner` (Go)
+### 4.2 `apps/runner` (Go, `go.mod` + `cmd/` + `internal/`)
 
 역할:
 

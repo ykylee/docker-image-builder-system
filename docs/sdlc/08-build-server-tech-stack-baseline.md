@@ -4,7 +4,7 @@
 - 범위: 언어, API 프레임워크, DB, queue 처리 방식, 런타임, 저장소 구조 방향
 - 대상 독자: 프로젝트 리드, Build Server 구현자, Runner 구현자, AI 에이전트
 - 상태: draft
-- 최종 수정일: 2026-07-03 (rev 2: 리뷰 반영, Build Server=TS / Runner=Go baseline 으로 정렬, polyglot 보류항목 정리)
+- 최종 수정일: 2026-07-03 (rev 3: 리뷰 반영, §10 polyglot 항목을 §12 후속 재검토로 이동, §13 결론에서 cross-language 결합 명시)
 - 관련 문서: `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, `docs/sdlc/07-implementation-backlog-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`, `docs/sdlc/design/03-api-contract-design.md`, `docs/sdlc/design/04-data-model-design.md`
 
 ## 1. 문서 목표
@@ -134,11 +134,14 @@ packages/
 
 ## 10. 지금 당장 도입하지 않는 것
 
+본 절은 §13 baseline 에 따라 `Build Server=TypeScript, Runner=Go` 가 채택된 항목이므로, `지금 당장 도입하지 않는 것` 의 후보는 본 baseline 의 다른 언어/스택 전환 안으로 한정한다. cross-language 결합 자체(§13 후단)는 보류 대상이 아니다.
+
+후보:
+
 - Redis, RabbitMQ, Kafka 같은 외부 queue broker
 - Kubernetes 기반 job orchestration
 - multi-runner autoscaling
 - service mesh / reverse proxy routing 최적화
-- Build Server 까지 Go/Python 으로 옮기는 안 — contract drift 위험을 본 단계에서는 감수하지 않는다.
 - Build Server 안에서 Node worker 를 띄워 queue 까지 같이 처리하는 안 — Runner 와 책임이 겹친다.
 - Build Server ↔ Runner 간 gRPC / 강한 in-process 결합 — MVP 단계에서는 Host Server REST/JSON API 로 충분하다.
 
@@ -162,6 +165,8 @@ packages/
 - migration 도구 세부 선택
 - observability stack
 - Runner 의 Go module 모듈명 / internal package 경계 (예: `apps/runner/cmd/runner`, `internal/queue`, `internal/docker`)
+- Build Server 의 언어를 Go/Python 으로 옮기는 안 — §13 baseline 으로 보류 (재검토 시 `packages/shared-contract` drift 위험을 재평가한다)
+- Build Server 의 런타임을 다른 container orchestration 으로 교체하는 안 — §13 baseline 으로 보류
 
 ## 13. 현 단계 결론
 
