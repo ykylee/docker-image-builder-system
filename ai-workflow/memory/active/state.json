@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "TASK-025/026/027/028/029 모두 main 으로 진입 완료 (PR #3). 우리 시스템 P0 skill 2종 + P0 MCP 2종 모두 합출. 다음은 P1 skill (failure-summary-shaper) 하나 이어나 TASK-017 의 stdio transport 연결.",
-  "purpose_digest_rev": "32",
+  "purpose_digest": "TASK-030 으로 contract-drift-checker (P1 skill) 구현, 25 tests OK (총 132). PR #2 머지 지점에서 실제 저장소를 적용해 보니 BuildStatus 5종 missing / 1종 extra, previewStatus 3종 missing / 2종 extra, BuildPhase 7종 missing, ErrorCode 7종 missing, BuildRequest field 5종 missing / 6종 extra drift 자동 장악. 다음 수동: drift 해소 결정 (대상: PKG-001 owner).",
+  "purpose_digest_rev": "33",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,11 +28,12 @@
   },
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-    "current_axis": "P0 후보 4종 (build-request-intake / build-status-explainer / latest-build-status / build-log-tail) 이 main 으로 걸어갔다. 다음은 두 가지 원치 중 하나: (a) P1 skill 하나 이어나 (failure-summary-shaper), (b) TASK-017 의 stdio transport 연결으로 MCP 가 4종이 real 프로세스로 동작하도록 했다.",
-    "current_focus": "PR #3 매지 완료, 다음은 P1 skill (failure-summary-shaper) 하나 이어나 TASK-017 stdio transport",
+    "current_axis": "PR #3 머지 지점에서 실제 저장소를 적용해 본 drift 가 자동으로 실시간 검증 되었다. 다음은 drift 해소 결정(대상: PKG-001 owner) 이어나 P1 skill 하나 이어나 (필요시).",
+    "current_focus": "TASK-030 contract-drift-checker P1 skill 구현 완료 (Python, 25 tests, total 132)",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-030 contract-drift-checker skill 1종 구현 (apps/skill_mcp/skills/contract_drift_checker, Python, 25 tests OK, total 132)",
       "TASK-025 우리 시스템 skill/MCP 후보 정리 및 개발 계획 (docs/sdlc/13, PROJECT_PROFILE §3.2, PKG-008/009 cross-ref)",
       "TASK-026 build-request-intake skill 1종 구현 (apps/skill_mcp/skills/build_request_intake, Python, 14 tests OK)",
       "TASK-027 build-status-explainer skill 2종 구현 (apps/skill_mcp/skills/build_status_explainer, Python, 22 tests OK)",
@@ -70,10 +71,11 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
-    "task_count": 29,
+    "task_count": 30,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
+      "TASK-030 contract-drift-checker skill 1종 구현 (apps/skill_mcp/skills/contract_drift_checker, Python, 25 tests OK, total 132)",
       "TASK-025 우리 시스템 skill/MCP 후보 정리 및 개발 계획 (docs/sdlc/13, PROJECT_PROFILE §3.2, PKG-008/009 cross-ref)",
       "TASK-026 build-request-intake skill 1종 구현 (apps/skill_mcp/skills/build_request_intake, Python, 14 tests OK)",
       "TASK-027 build-status-explainer skill 2종 구현 (apps/skill_mcp/skills/build_status_explainer, Python, 22 tests OK)",
