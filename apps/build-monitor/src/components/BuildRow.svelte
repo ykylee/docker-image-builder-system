@@ -9,6 +9,11 @@
   type BuildRowData = {
     buildId: string;
     status: string;
+    // lifecycleStatus (TASK-052) 는 canonical 12-state union 의 optional
+    // 필드. BuildSummary 가 status 와 lifecycleStatus 를 동시 emit 하는
+    // migration window 에서 StatusPill 이 lifecycleStatus 를 우선 사용
+    // 하도록 전달한다. 없으면 legacy status 로 fallback.
+    lifecycleStatus?: string;
     // appName is the canonical application identifier (v0.2 collapse of
     // the legacy projectId/repositoryId pair). It is rendered as the App
     // column in both the user-facing BuildsList and the admin builds view.
@@ -41,7 +46,7 @@
 
 <tr class="row" data-testid="build-row">
   <td class="status-cell">
-    <StatusPill status={build.status} />
+    <StatusPill status={build.status} lifecycleStatus={build.lifecycleStatus} />
   </td>
   <td class="id-cell">
     <a use:link href={`/builds/${build.buildId}`} class="mono">{build.buildId.slice(0, 8)}</a>

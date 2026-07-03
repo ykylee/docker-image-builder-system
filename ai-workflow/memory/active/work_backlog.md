@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 36→37: 문서 정리 세션 진행 중. canonical SDLC 문서, README, legacy 루트 문서, 보고 자료, workflow 메타를 build -> container test -> external deployment -> result delivery 모델 기준으로 재정렬. **rev 37→38: PR #13 self-review follow-up 보완(transaction wrap / FK+DEFAULT / left join / omitempty / openapi 응답 / docker marker guard / EXPIRED 코멘트) 7건 amend commit 으로 봉인. rev 38→39: PR #13 squash merge 합류 sync (main HEAD `56727d3`).**)
+- 최종 수정일: 2026-07-03 (rev 36→37: 문서 정리 세션 진행 중. canonical SDLC 문서, README, legacy 루트 문서, 보고 자료, workflow 메타를 build -> container test -> external deployment -> result delivery 모델 기준으로 재정렬. **rev 37→38: PR #13 self-review follow-up 보완(transaction wrap / FK+DEFAULT / left join / omitempty / openapi 응답 / docker marker guard / EXPIRED 코멘트) 7건 amend commit 으로 봉인. rev 38→39: PR #13 squash merge 합류 sync (main HEAD `56727d3`). rev 39→40: TASK-060 1차 PR 진입 — `BuildDetail.svelte` canonical 4 block (lifecycle / container test / deployment / result delivery) 노출 + `StatusPill.svelte` `lifecycleStatus` prop 추가 + legacy preview section `deprecated` badge 로 분리. 회귀: TS 4 packages clean, Go 9 packages, build-server 52/52, build-monitor svelte-check 0/0. 후속 TASK-060 2차 PR: fixture 갱신 + BuildRow/BuildsList/AdminBuilds/AdminUsers status 매핑 정렬. rev 40→41: PR #14 self-review follow-up 보완 5건 amend (StatusPill 색상 통일 / BuildDetail .kv breakpoint / section 이름 차별화 / Legacy preview 안내문 명확화 / BuildRow lifecycleStatus prop). 회귀 그대로 그린 유지.**)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -78,7 +78,7 @@
 - [x] TASK-058: container test result reporting
 - [x] TASK-059: external deployment adapter v1
 - [x] PR #13 self-review follow-up 보완 (race / schema 정확성 / spec 일관성 7건): `reportPreviewStatus` / `reportDeploymentResult` `db.transaction` wrap, `getTestDeployment` `build_test` left join 으로 `host`/`hostPort`/`internalPort`/`runtimeUrl` 노출, `0003_build_test_and_deployment_attempt.sql` 에 `DEFAULT gen_random_uuid()` + `build_id REFERENCES build_request(id) ON DELETE CASCADE` FK, `apps/runner` claim 응답 `Reason` `omitempty`, OpenAPI `POST /builds/:buildId/deployment` 200 응답 `buildStatusResponseSchema` ref, `docker.BuildImage` marker 기반 idempotent guard 로 ProcessClaim 의 중복 `PrepareSource` 제거, memory repo EXPIRED case 코멘트 보강. 회귀: TS 4 packages clean, Go 9 packages OK, build-server focused 52/52, build-monitor tsc + svelte-check 0/0. workflow meta 동기화 (state rev 65→66, handoff 44→45, work_backlog 37→38, backlog §46→47 + 새 §48) 같은 amend commit 에 포함.
-- [ ] TASK-060: Build Monitor status model/UI refactor
+- [ ] TASK-060: Build Monitor status model/UI refactor (1차 PR: BuildDetail canonical 4 block + StatusPill lifecycleStatus + legacy preview 분리. 2차 PR: fixture + BuildRow/BuildsList/AdminBuilds/AdminUsers status 매핑)
 - [ ] TASK-061: Skill/MCP contract rename and payload refactor
 - [ ] TASK-062: stdio transport 정리 및 generated contract 재동기화
 - [x] TASK-063: roadmap/progress 운영 규칙 도입 (Step 15 로드맵/마일스톤/진척 관리 기준선 정리)
