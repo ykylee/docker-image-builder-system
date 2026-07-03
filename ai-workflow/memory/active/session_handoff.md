@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 22: PR #9 (ADMIN-* Admin UI + bug fix 2건) squash merge 대기. main 합류 후 backlog §27.5 의 merge commit hash 만 amend 하면 §28 PR 가 자동 complete. 회귀 270/270. 다음 후속: DB schema migration TODO / light mode QA / TASK-017 stdio / TASK-037 sweeper / admin owner block-delete)
+- Updated: 2026-07-03 (rev 23: PR #9 squash merge `af2ade4` main 합류 완료. 회귀 270/270 재검증 OK. §27.5 hash amend + 메타 1단 bump. 다음 후속: DB schema migration (TASK-044 TODO) / light mode QA / TASK-017 stdio / TASK-037 sweeper / admin owner block-delete)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus

@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-03T07:25:00Z",
+  "generated_at": "2026-07-03T07:28:00Z",
   "purpose_digest": "ADMIN-* Admin UI 완료 (TASK-043). Build Server ADMIN_IDS env (default admin,yky.lee) + X-Admin-Id 가드, /admin/builds (모든 owner) + /admin/users (per-user buildCount/lastBuildAt). shared-contract admin 4 schemas (AdminListBuildsQuery/Response, AdminUserBuildSummary, AdminUserListResponse) + openapi Admin tag + zod v4 .extend().meta() 함정 회피 (component helper Map 으로 refId 부착 clone 보존). BuildServer memory/postgres listBuildsAcrossUsers + listBuildOwners 구현. build-monitor: AdminLogin/AdminBuilds/AdminUsers 라우트 + Header adminId 분기 (localStorage.adminId 분리) + BuildRow requestedBy? optional. vitest 34 (AdminLogin 2 + AdminBuilds 4 + AdminUsers 3 + Header 6 + 기존 19) + svelte-check 0/0 + vite build OK. live e2e: x-admin-id admin 200, alice 403, no header 401; alice 2 / bob 1 lastBuildAt; /admin/builds?requestedBy=alice 2 builds. 회귀: TS 53 (build-server 49 → 53, +4 admin) + vitest 34 + svelte-check 0/0 + Go 13 + Python 215. 후속: light mode / TASK-017 stdio transport / TASK-037 sweeper / admin owner block-delete.",
-  "purpose_digest_rev": 49,
+  "purpose_digest_rev": 50,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,11 +28,12 @@
   },
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-    "current_axis": "v0.2 admin + appName collapse 가 branch 위에서 완료. 사용자가 main squash merge 하면 메타 sync 가 자동 포함. 다음 후속 후보: DB schema migration (TODO), light mode QA, TASK-017 stdio, TASK-037 sweeper, admin owner block-delete.",
-    "current_focus": "PR #9 (ADMIN-* Admin UI + bug fix 2건) squash merge 대기. main 합류 후 backlog §27.5 의 merge commit hash 만 amend 하면 §28 PR 가 자동 complete. 회귀 270/270 (TS 54 + vitest 35 + Go 13 + Python 215).",
+    "current_axis": "PR #9 squash merge `af2ade4` 가 main 에 합류했다 (270/270 OK). 다음 후속 후보: DB schema migration (app_name 컬럼 + project_id/repository_id drop, TASK-044 의 TODO), light mode QA, TASK-017 stdio, TASK-037 sweeper, admin owner block-delete.",
+    "current_focus": "TASK-043 + TASK-044 (PR #9) main 합류 완료. 회귀 270/270. §27.5 의 merge commit hash amend + 메타 1단 bump. 다음 후속 후보 대기.",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
+      "PR #9 squash merge `af2ade4` main 합류 (TASK-043 ADMIN-* + TASK-044 Bug fix 2건). 회귀 270/270. §27.5 placeholder → hash amend + 메타 rev 49→50 sync",
       "Bug fix 2건 — Header 즉시 갱신 (session store), appName 단일 식별자 (BuildRequest/BuildSummary, memory/postgres repo, build-monitor BuildRow/BuildsList/BuildDetail/AdminUsers). 회귀 TS 54 + vitest 35 + Go 13 + Python 215 = 270/270",
       "TASK-036 PKG-006 Preview Service Queue And Readiness — 4 endpoint + Runner queue/ready 자동 보고, e2e smoke 8 phase + TS 37/37 + Go 13/13 + Python 215/215 = 265 tests",
       "TASK-035 Go Runner claim loop + phase call 구현 — HTTPBuildControlClient + BuildService 4-phase 자동 보고 + Worker loop, end-to-end smoke 6 phase 완료 + Go 10 tests",
@@ -76,10 +77,10 @@
       "TASK-043 ADMIN-* Admin UI — ADMIN_IDS env (default admin,yky.lee) + /admin/builds + /admin/users + AdminLogin/AdminBuilds/AdminUsers + Header adminId 분기. 회귀 TS 53 + vitest 34 + svelte-check 0/0 + Go 13 + Python 215. live e2e: 401/403/200 + owner list + owner filter 정상"
     ],
     "environment_constraints": [],
-    "handoff_rev": 20,
+    "handoff_rev": 21,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 25,
-    "latest_rev": 26
+    "index_rev": 26,
+    "latest_rev": 27
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
