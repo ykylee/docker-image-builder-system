@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03
+- Updated: 2026-07-03 (rev 3: TASK-023 워크플로우 skill/MCP 셋업 반영)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -21,6 +21,9 @@
 - 보고용 HTML 자료에 CSS 시각 강화와 인라인 SVG 에셋을 추가해 오프라인 완결형 자료로 보강했다.
 - 보고용 HTML 자료의 카피를 더 짧은 승인안 톤으로 압축했다.
 - 현재 다음 착수점은 shared package 또는 API 스캐폴드다.
+
+- 표준 워크플로우 키트 prototype skill/MCP를 우리 프로젝트 운영에 active/deferred로 묶고, Codex 측 진입 메모와 additive MCP 스니펫을 운영 폴더 미러 위치에 정리했다.
+- 현재 next focus는 TASK-017 `shared package` 또는 `apps/build-server` API 스캐폴드이며, 본 TASK-023은 그 prerequisite으로 끝났다.
 
 ## Work Status
 
@@ -45,6 +48,7 @@
 - TASK-019 리더 소개용 HTML 보고자료 시각화 재작성: done
 - TASK-020 HTML 시각화 보강 및 오프라인 에셋 내장화: done
 - TASK-021 발표용 카피 압축 및 승인안 톤 보정: done
+- TASK-023 워크플로우 skill/MCP 셋업: done
 - TASK-017 shared package 또는 API 스캐폴드 착수: planned
 
 ## Key Changes
@@ -92,11 +96,29 @@
 - `README.md`, `docs/PROJECT_PROFILE.md`를 제품 컨셉 기준으로 정렬
 - `ai-workflow/memory/active/repository_assessment.md` 추가
 
+- `docs/PROJECT_PROFILE.md` §3 명령 placeholder를 Step 08/09 baseline 기준으로 좁힘
+- `ai-workflow/memory/active/state.json` `commands` 5종과 `next_documents`를 그룹 코멘트와 함께 갱신
+- `ai-workflow/memory/active/project_status_assessment.md` 진단 요약/매트릭스/로드맵 본문 작성
+- `docs/report/README.md` 신규 추가 (산출물 정체와 진화 이력 인덱스)
+- `docs/MVP_ONBOARDING.md`, `docs/CONCEPT_REFINEMENT.md` 상단에 superseded 배너 추가
+- `ai-workflow/memory/active/backlog/2026-07-02.md` TASK-013/014/016 본문 done 봉인 + 후속 세션 노트 추가
+- `ai-workflow/memory/active/session_handoff.md`의 `Next Actions`/`Risks & Blockers` 갱신, MiniMax overlay 후속 점검 1줄 추가
+- `docs/sdlc/08-build-server-tech-stack-baseline.md` rev 2: Build Server=TS / Runner=Go baseline 정합, polyglot 보류항목 정리
+- `docs/sdlc/09-repository-package-structure-baseline.md` rev 2: `apps/runner` Go (`go.mod`/`cmd/runner`/`internal/...`) 예시, 의존방향 cross-language 정합, PKG-005~007 Go 경로 갱신
+- `ai-workflow/memory/active/state.json` rev 25: current_focus=TASK-024, done 카운트 23
+- `ai-workflow/memory/active/work_backlog.md` TASK-024 추가, TASK-017 planned 유지
+- `ai-workflow/memory/active/backlog/2026-07-03.md` §8 TASK-024 섹션 추가
+- `ai-workflow/memory/active/session_handoff.md` rev 4: TASK-024 work status, Key Changes, Next Actions 보강
 ## Next Actions
 
-- [ ] shared package 또는 API 스캐폴드 진입
+- [ ] TASK-017 `packages/shared-contract` (TS) + `apps/build-server` (TS, Fastify) + `apps/runner` (Go module) 골격 진입 (TASK-023 + TASK-024 prerequisite 통과)
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
+- [ ] `MiniMax.md`, `MiniMax_config.example.json` vendor-specific overlay 점검 (MiniMax 하네스 환경에서 별도 진행, 본 세션에서는 기록만)
 
 ## Risks & Blockers
 
 - 애플리케이션 코드와 실행 명령이 아직 없어서 구현 backlog가 문서 수준 추정치에 머물러 있다.
+- `docs/MVP_ONBOARDING.md`, `docs/CONCEPT_REFINEMENT.md`는 superseded 배너를 부착했지만 실제로는 archive로 이동하지는 않았다. archive 이동은 본 브랜치 범위에서 제외했고, 후속 TASK에서 처리한다.
+- `.git`이 read-only로 마운트된 환경에서 작업해 writable clone(`/home/yklee/repos/docker-image-builder-system.work`)으로 커밋을 작성했다. 사용자 측에서 원본 저장소로 옮기는 절차가 필요하다.
+- 저장소 root의 `.codex/`, `.agents/`는 권한상 read-only로 잠겨 있어, 본 TASK의 진입 메모와 MCP 스니펫은 `ai-workflow/memory/active/.codex/`, `ai-workflow/memory/active/.agents/` 미러 위치에 둔다. 권한이 풀리면 root로 이동 검토.
+- 표준 키트 prototype의 실제 MCP transport는 미구현이므로 active MCP 3종은 `transport_ready=false` 상태에서 동일 계약의 수동 절차로 운영한다.

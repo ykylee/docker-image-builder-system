@@ -1,3 +1,6 @@
 .DS_Store
-.codex/
-.MiniMax/
+# root의 .codex/ 와 .MiniMax/ 는 사용자/벤더 로컬 환경 폴더로 추적하지 않는다.
+# 단, 워크플로우 운영 폴더(ai-workflow/memory/active/.codex/, .agents/)는 추적 대상이다.
+/.codex/
+/.MiniMax/
+/.agents/

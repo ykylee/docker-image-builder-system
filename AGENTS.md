@@ -5,8 +5,8 @@
 - 문서 목적: Codex 가 이 저장소에서 먼저 읽어야 할 workflow 진입 규칙과 기본 작업 원칙을 제공한다.
 - 범위: 세션 복원, workflow state docs 참조 순서, 사용자 보고 언어, 기본 실행/검증 명령
 - 대상 독자: Codex, 저장소 관리자, workflow 설계자
-- 상태: draft
-- 최종 수정일: 2026-07-02
+- 상태: stable
+- 최종 수정일: 2026-07-03
 - 관련 문서: `ai-workflow/memory/active/state.json`, `ai-workflow/memory/active/session_handoff.md`, `ai-workflow/memory/active/work_backlog.md`, `docs/PROJECT_PROFILE.md`
 
 ## 목적
@@ -39,11 +39,12 @@
 
 ## 프로젝트 실행 기본값
 
-- 설치: `TODO: 설치 명령 입력`
-- 로컬 실행: `TODO: 로컬 실행 명령 입력`
-- 빠른 테스트: `TODO: 빠른 테스트 명령 입력`
-- 격리 테스트: `TODO: 격리 테스트 명령 입력`
-- 실행 확인: `TODO: 실행 확인 명령 입력`
+- 설치: `pnpm install` (스캐폴드 생성 후 확정, 현 단계는 placeholder)
+- 로컬 실행: `pnpm --filter build-server dev` (Fastify + Node worker baseline, 스캐폴드 후 확정)
+- 빠른 테스트: `pnpm -w test` (TypeScript 유닛 테스트 baseline, 스캐폴드 후 확정)
+- 격리 테스트: `docker compose -f compose.dev.yaml up --abort-on-container-exit` (Build Server + Postgres 통합, 결정 후 확정)
+- 실행 확인: `docs/PROJECT_PROFILE.md`, `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus, 작업 상태, 참조 경로 정합성 점검
+- 출처: `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`, `docs/PROJECT_PROFILE.md §3`
 
 ## 문서 작업 기준
 
