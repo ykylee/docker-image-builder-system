@@ -1,13 +1,13 @@
 # Skill: contract-drift-checker
 
-- 문서 목적: `packages/shared-contract` (TS, `src/build/*.ts`) 의 enum / request schema 와 canonical 문서 `docs/sdlc/contracts/01-shared-build-contract-baseline.md` 의 §5/§6/§7/§8 enum block + §3 BuildRequest payload 표를 비교해 drift 리포트를 만든다. 비개발자 / AI agent 가 "코드가 canonical 과 어긋났어?" 라고 물을 때 사용.
-- 범위: 4개 enum (BuildStatus / PreviewStatus / BuildPhase / ErrorCode) 의 symmetric difference + BuildRequest field 차이. **읽기 전용** — 코드를 수정하지 않는다. Go Runner 측은 본 단계에서는 spec mirror 가정이라 검사하지 않는다.
+- 문서 목적: `packages/shared-contract` (TS) 와 canonical 문서 `docs/sdlc/contracts/01-shared-build-contract-baseline.md` 의 enum/필드를 비교해 drift 리포트를 만든다. **v2 (TASK-061) 부터** Python-side `apps/skill_mcp/contract/canonical.py` 도 cross-check 대상 — drift 가 두 layer (TS↔canonical markdown + Python↔TS) 에서 모두 잡힌다. 비개발자 / AI agent 가 "코드가 canonical 과 어긋났어?" 라고 물을 때 사용.
+- 범위: 4개 enum (BuildStatus / PreviewStatus / BuildPhase / ErrorCode) 의 symmetric difference + BuildRequest field 차이 + Python canonical 4종 (`CANONICAL_BUILD_STATUSES` / `EXECUTION_STATUSES` / `BUILD_PHASES` / `ERROR_CODES`) ↔ TS 동명 export. **읽기 전용** — 코드를 수정하지 않는다. Go Runner 측은 본 단계에서는 spec mirror 가정이라 검사하지 않는다.
 - 대상 독자: AI agent, Build Server / Runner 구현자, Skill/MCP 구현자, 프로젝트 리드
-- 상태: draft (v0.1.0)
-- 최종 수정일: 2026-07-03
+- 상태: stable (v2.0.0)
+- 최종 수정일: 2026-07-03 (TASK-061 contract rename — Python canonical source-of-truth 추가)
 - 관련 문서:
   - canonical: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md) §3/§5/§6/§7/§8
-  - 검사 대상: [`packages/shared-contract/src/build/{status,phase,errors,request}.ts`](../../../../packages/shared-contract/src/build/)
+  - 검사 대상: [`packages/shared-contract/src/build/{status,phase,errors,request}.ts`](../../../../packages/shared-contract/src/build/) **+** [`apps/skill_mcp/contract/canonical.py`](../../contract/canonical.py)
   - 후보 카탈로그: [`docs/sdlc/13-skills-and-mcp-plan.md`](../../../../docs/sdlc/13-skills-and-mcp-plan.md) §3.5
 
 ## 1. 입출력 계약

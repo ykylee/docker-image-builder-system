@@ -1,0 +1,185 @@
+"""Canonical contract enums (single source of truth for skill/MCP layer).
+
+This Python module is the **only** place where skill/MCP code may declare
+literal enum values that come from the shared canonical contract. The
+typescript source is `packages/shared-contract/src/build/{status,errors,phase}.ts`.
+Both sides MUST be kept in sync; `contract-drift-checker` verifies them.
+
+The drift checker has been extended (TASK-061) to:
+
+1. Cross-check these Python frozenset literals against the TypeScript
+   source so accidental additions/removals are caught.
+2. Cross-check any literal status / phase / error-code reference in any
+   `apps/skill_mcp/**/core.py` against the frozensets in this module —
+   so skills can't quietly re-introduce legacy pre-canonical values.
+
+Anything outside this contract is a `legacy_*` shim with an explicit
+migration window marker (see `LEGACY_*` constants below).
+"""
+
+from __future__ import annotations
+
+# Canonical lifecycle statuses. Mirrors packages/shared-contract/src/build/status.ts
+# `canonicalBuildStatuses`. 12 values aligned with the SDLC docs:
+# build (PREPARING_SOURCE / BUILDING / BUILD_SUCCESS) ->
+# container test (TESTING / TEST_SUCCESS) ->
+# external deployment (DEPLOYING / DEPLOY_SUCCESS) ->
+# terminal (COMPLETED / FAILED / CANCELLED).
+CANONICAL_BUILD_STATUSES: frozenset[str] = frozenset({
+    "RECEIVED",
+    "QUEUED",
+    "PREPARING_SOURCE",
+    "BUILDING",
+    "BUILD_SUCCESS",
+    "TESTING",
+    "TEST_SUCCESS",
+    "DEPLOYING",
+    "DEPLOY_SUCCESS",
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED",
+})
+
+# Generic step/result status used by BuildStatusResponse.lifecycle /
+# .image / .test / .deploy / .resultDelivery blocks. Mirrors
+# packages/shared-contract/src/build/status.ts `executionStatuses`.
+EXECUTION_STATUSES: frozenset[str] = frozenset({
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "SUCCESS",
+    "FAILED",
+    "SKIPPED",
+})
+
+# Legacy adapter statuses still emitted by the current build-server
+# during the migration window. Mirrors `legacyBuildStatuses` in
+# status.ts. Skills should accept these as inputs but never produce
+# them in user-facing messages — they map into canonical terminal
+# states instead.
+LEGACY_BUILD_STATUSES: frozenset[str] = frozenset({
+    "CLAIMED",
+    "TEST_READY",
+})
+
+# Public union: what skills accept as a `build.status` input.
+PUBLIC_BUILD_STATUSES: frozenset[str] = frozenset(
+    CANONICAL_BUILD_STATUSES | LEGACY_BUILD_STATUSES
+)
+
+# Legacy preview/test-deployment states. Mirrors `previewStatuses` in
+# status.ts. Kept only because the build-server's legacy endpoints
+# still emit them during the migration. New code MUST prefer the
+# canonical `test` / `deploy` blocks (ContainerTestResult /
+# DeploymentResult) in BuildStatusResponse instead.
+LEGACY_PREVIEW_STATUSES: frozenset[str] = frozenset({
+    "NOT_REQUESTED",
+    "QUEUED",
+    "PROVISIONING",
+    "READY",
+    "FAILED",
+    "EXPIRED",
+})
+
+# Build phase enum. Mirrors packages/shared-contract/src/build/phase.ts
+# `buildPhases`. Drives host-side status transitions.
+BUILD_PHASES: frozenset[str] = frozenset({
+    "REQUEST_ACCEPTED",
+    "QUEUE_CLAIMED",
+    "SOURCE_PREPARED",
+    "DOCKER_BUILD_STARTED",
+    "DOCKER_BUILD_COMPLETED",
+    "PREVIEW_QUEUED",
+    "PREVIEW_READY",
+    "DEPLOYMENT_STARTED",
+    "DEPLOYMENT_COMPLETED",
+    "COMPLETED",
+    "FAILED",
+})
+
+# Canonical error codes. Mirrors packages/shared-contract/src/build/errors.ts
+# `errorCodes`. 8 values.
+ERROR_CODES: frozenset[str] = frozenset({
+    "ACTIVE_BUILD_EXISTS",
+    "INVALID_REQUEST",
+    "BUILD_NOT_FOUND",
+    "LOGS_NOT_FOUND",
+    "QUEUE_CLAIM_FAILED",
+    "DOCKER_BUILD_FAILED",
+    "PREVIEW_PROVISION_FAILED",
+    "UNKNOWN_ERROR",
+})
+
+# Canonical next_action enum surfaced by build-status-explainer /
+# failure-summary-shaper / preview-readiness-checker.
+#
+# Note the rename vs the legacy `OPEN_PREVIEW`: under the
+# build/test/deploy/result-delivery model, the success path now ends
+# at a deployment (or a test deployment). `OPEN_PREVIEW` is replaced by
+# `OPEN_DEPLOYMENT` so the action matches what the user actually does
+# next: open the deployed artifact (test deployment in MVP, real
+# deployment in production).
+NEXT_ACTIONS: frozenset[str] = frozenset({
+    "WAIT",
+    "OPEN_DEPLOYMENT",
+    "RETRY",
+    "FIX_DOCKERFILE",
+    "FIX_PORT",
+    "CHECK_SOURCE",
+    "CONTACT_OPERATOR",
+    "NONE",
+})
+
+# Canonical readiness_state enum surfaced by
+# preview-readiness-checker (skill name retained for stability — the
+# internal model is container-test readiness now). 7 values.
+READINESS_STATES: frozenset[str] = frozenset({
+    "READY",
+    "PREPARING",
+    "WAITING_FOR_SLOT",
+    "STARTING",
+    "DEGRADED",
+    "EXPIRED",
+    "UNKNOWN",
+})
+
+CANONICAL_CONTRACT_VERSION = "v2"
+"""Bumped from v1 to v2 in TASK-061 when the skill/MCP surface switched
+from preview-era enums to canonical blocks (`lifecycle`/`image`/`test`/
+`deploy`/`resultDelivery`). Bump on the next contract-shape change.
+"""
+
+
+def is_canonical_build_status(value: object) -> bool:
+    """True if `value` is a canonical build status (not a legacy shim)."""
+    return isinstance(value, str) and value in CANONICAL_BUILD_STATUSES
+
+
+def is_public_build_status(value: object) -> bool:
+    """True if `value` is in the public build-status union (canonical +
+    legacy shims). Use this when accepting user/server inputs.
+    """
+    return isinstance(value, str) and value in PUBLIC_BUILD_STATUSES
+
+
+def is_execution_status(value: object) -> bool:
+    return isinstance(value, str) and value in EXECUTION_STATUSES
+
+
+def is_legacy_preview_status(value: object) -> bool:
+    return isinstance(value, str) and value in LEGACY_PREVIEW_STATUSES
+
+
+def is_build_phase(value: object) -> bool:
+    return isinstance(value, str) and value in BUILD_PHASES
+
+
+def is_error_code(value: object) -> bool:
+    return isinstance(value, str) and value in ERROR_CODES
+
+
+def is_next_action(value: object) -> bool:
+    return isinstance(value, str) and value in NEXT_ACTIONS
+
+
+def is_readiness_state(value: object) -> bool:
+    return isinstance(value, str) and value in READINESS_STATES
