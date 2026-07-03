@@ -45,13 +45,14 @@
 - 설계 문서 6: docs/sdlc/design/06-user-messaging-and-failure-handling.md
 
 ## 3. 기본 명령 (Commands)
-- 설치: `pnpm install` (스캐폴드 생성 후 채움; 현 단계는 placeholder)
-- 로컬 실행: `pnpm --filter build-server dev` (Fastify + Node worker baseline 기준; 스캐폴드 후 확정)
-- 빠른 테스트: `pnpm -w test` (TypeScript 유닛 테스트 baseline; 스캐폴드 후 확정)
-- 격리 테스트: `docker compose -f compose.dev.yaml up --abort-on-container-exit` (Build Server + Postgres 통합, 결정 후 확정)
-- 실행 확인: `docs/PROJECT_PROFILE.md`, `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus, 작업 상태, 참조 경로 정합성 점검
+- 설치: `pnpm install` (`esbuild` 계열 승인 정책 때문에 환경에 따라 `ERR_PNPM_IGNORED_BUILDS`가 날 수 있으며, 이 경우 watch/dev dependency 승인 또는 direct `tsc` 검증으로 우회)
+- 로컬 실행: `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && ./node_modules/.bin/tsc -p packages/db/tsconfig.json && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js`
+- Postgres 실행: `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres DB_AUTO_BOOTSTRAP=true node apps/build-server/dist/apps/build-server/src/index.js`
+- 빠른 테스트: `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/db/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json --noEmit && (cd apps/runner && go build ./...)`
+- 격리 테스트: `curl http://127.0.0.1:3000/health && curl -X POST http://127.0.0.1:3000/builds ...` (memory / postgres backend smoke 모두 확인 완료)
+- 실행 확인: `GET /health`, `POST /builds`, `GET /builds/:buildId`, `GET /builds/:buildId/logs` 응답과 `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus 정합성 점검
 - 출처: `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`
-- 메모: 현 placeholder 값은 TASK-017 `shared package` 또는 `apps/build-server` API 스캐폴드와 함께 실제 명령으로 좁히며, 본 셋업은 TASK-023에서 진행한다.
+- 메모: `apps/build-server`는 현재 `BUILD_REPOSITORY_BACKEND=memory|postgres` 두 경로를 모두 가진다. `postgres`는 Colima + Docker + `docker-image-builder-postgres`(127.0.0.1:15432) 기준 live smoke까지 통과했다. 현재 `tsconfig` 산출물은 `dist/apps/build-server/src/index.js` 경로를 사용한다. `pnpm --filter @docker-image-builder-system/build-server dev` 는 `tsx` build script 승인 이후 dev watch 경로로 재개방한다.
 
 ## 3.1 활성 워크플로우 자산 (Active Skills / MCPs)
 - 본 프로젝트가 표준 워크플로우 키트(`ai-workflow/`)에서 active로 채택한 자산을 정리한다. 미채택 prototype은 명시적으로 deferred 처리한다.
@@ -85,8 +86,8 @@
 ## 5. 예외 규칙 (Policy)
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
 - 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
-- 제약: 애플리케이션 코드와 실행 명령이 아직 없으며 문서 기반 설계 상태다
-- 기타: 현재 다음 단계는 shared package(`packages/shared-contract`, `packages/shared-config`, `packages/db`) 또는 `apps/build-server` API 스캐폴드 진입이다
+- 제약: Postgres smoke는 통과했지만 Drizzle migration artifact 생성/운영 규칙은 아직 고정되지 않았다
+- 기타: 현재 다음 단계는 postgres 경로를 기본 개발 경로로 승격할지 결정하고, `Runner -> Host Server API only`, `Host Server -> PostgreSQL only` 경계 위에서 Runner 연동으로 넘어가는 것이다
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)

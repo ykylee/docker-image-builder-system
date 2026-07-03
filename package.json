@@ -1,0 +1,16 @@
+{
+  "name": "docker-image-builder-system",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "build": "pnpm -r build",
+    "check": "pnpm -r check",
+    "dev:build-server": "pnpm --filter @docker-image-builder-system/build-server dev"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.13",
+    "@types/pg": "^8.15.5",
+    "typescript": "^5.8.3"
+  }
+}

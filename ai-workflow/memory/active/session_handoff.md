@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 3: TASK-023 워크플로우 skill/MCP 셋업 반영)
+- Updated: 2026-07-03 (rev 7: postgres live smoke 반영)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -23,7 +23,10 @@
 - 현재 다음 착수점은 shared package 또는 API 스캐폴드다.
 
 - 표준 워크플로우 키트 prototype skill/MCP를 우리 프로젝트 운영에 active/deferred로 묶고, Codex 측 진입 메모와 additive MCP 스니펫을 운영 폴더 미러 위치에 정리했다.
-- 현재 next focus는 TASK-017 `shared package` 또는 `apps/build-server` API 스캐폴드이며, 본 TASK-023은 그 prerequisite으로 끝났다.
+- `TASK-017`에서 root workspace, shared packages, `apps/build-server`, `apps/runner` 최소 골격과 1차 smoke 검증까지 완료했다.
+- `apps/build-server`는 이제 `BUILD_REPOSITORY_BACKEND=memory|postgres` 두 경로를 가지며, `postgres`는 schema auto-bootstrap, insert/query, duplicate `409`까지 live smoke를 통과했다.
+- Runner 는 Host Server API 만 바라보고 PostgreSQL 은 Host Server 만 직접 접근하는 경계로 고정했다.
+- 현재 next focus는 postgres 경로를 기본 개발 경로로 승격할지 결정하고, 그 위에서 Runner queue claim / phase update 설계를 실제 코드로 잇는 일이다.
 
 ## Work Status
 
@@ -49,7 +52,7 @@
 - TASK-020 HTML 시각화 보강 및 오프라인 에셋 내장화: done
 - TASK-021 발표용 카피 압축 및 승인안 톤 보정: done
 - TASK-023 워크플로우 skill/MCP 셋업: done
-- TASK-017 shared package 또는 API 스캐폴드 착수: planned
+- TASK-017 shared package / build-server / runner 골격 스캐폴드 및 1차 검증: done
 
 ## Key Changes
 
@@ -109,9 +112,23 @@
 - `ai-workflow/memory/active/work_backlog.md` TASK-024 추가, TASK-017 planned 유지
 - `ai-workflow/memory/active/backlog/2026-07-03.md` §8 TASK-024 섹션 추가
 - `ai-workflow/memory/active/session_handoff.md` rev 4: TASK-024 work status, Key Changes, Next Actions 보강
+- root `package.json`, `pnpm-workspace.yaml`, `tsconfig.base.json` 추가
+- `packages/shared-contract`, `packages/shared-config`, `packages/db` 스캐폴드 추가
+- `apps/build-server` Fastify skeleton (`/health`, `POST /builds`, `GET /builds/:buildId`, `GET /builds/:buildId/logs`) 추가
+- `apps/runner` Go skeleton (`go.mod`, `cmd/runner`, `internal/...`) 추가
+- direct `tsc` + `node` + `go build` 기반 1차 검증 경로를 `docs/PROJECT_PROFILE.md`에 반영
+- `packages/shared-config`에 `BUILD_REPOSITORY_BACKEND`, `DB_AUTO_BOOTSTRAP` runtime 설정 추가
+- `packages/db` schema 확장 (source archive size, preview TTL, metadata, last error) 및 `ensureDbSchema` bootstrap helper 추가
+- `apps/build-server`에 `PostgresBuildRepository`와 backend 선택 로직 추가
+- Colima + Docker + `docker-image-builder-postgres` (`127.0.0.1:15432`) 기준 live Postgres smoke 통과
+- `apps/runner`의 DB 직접 접근 skeleton 을 제거하고 `internal/hostclient` 기반 Host Server API client skeleton 으로 전환
 ## Next Actions
 
-- [ ] TASK-017 `packages/shared-contract` (TS) + `apps/build-server` (TS, Fastify) + `apps/runner` (Go module) 골격 진입 (TASK-023 + TASK-024 prerequisite 통과)
+- [ ] memory fallback 을 계속 기본값으로 둘지, postgres 를 기본 개발 경로로 승격할지 결정
+- [ ] build-server 산출물 경로(`dist/apps/build-server/src/index.js`)를 단순화할지 검토
+- [ ] Runner 가 소비할 Host Server claim/report API shape 를 닫고 skeleton client를 실제 호출로 연결 (`PKG-005`)
+- [ ] `POST /builds`, `GET /builds/{id}`, `GET /builds/{id}/logs` 응답을 persistence 운영 기준으로 더 정교화 (`PKG-002`, `PKG-003`, `PKG-004`)
+- [ ] shared-contract 의 Go 측 generated binding 전략 결정
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
 - [ ] `MiniMax.md`, `MiniMax_config.example.json` vendor-specific overlay 점검 (MiniMax 하네스 환경에서 별도 진행, 본 세션에서는 기록만)
 
@@ -122,3 +139,5 @@
 - `.git`이 read-only로 마운트된 환경에서 작업해 writable clone(`/home/yklee/repos/docker-image-builder-system.work`)으로 커밋을 작성했다. 사용자 측에서 원본 저장소로 옮기는 절차가 필요하다.
 - 저장소 root의 `.codex/`, `.agents/`는 권한상 read-only로 잠겨 있어, 본 TASK의 진입 메모와 MCP 스니펫은 `ai-workflow/memory/active/.codex/`, `ai-workflow/memory/active/.agents/` 미러 위치에 둔다. 권한이 풀리면 root로 이동 검토.
 - 표준 키트 prototype의 실제 MCP transport는 미구현이므로 active MCP 3종은 `transport_ready=false` 상태에서 동일 계약의 수동 절차로 운영한다.
+- `pnpm -r check` 는 현재 환경에서 `ERR_PNPM_IGNORED_BUILDS` 정책에 걸릴 수 있다. 이 저장소의 1차 검증 경로는 direct `tsc` + `go build` + HTTP smoke 로 우회 중이다.
+- Colima 기반 Postgres smoke는 통과했지만, 컨테이너 lifecycle 과 migration artifact 운영 규칙은 아직 문서화/자동화되지 않았다.

@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "리뷰 P1/P2를 반영해 08 baseline(TS+TS → TS+Go) 및 09 apps/runner Go 예시·의존방향·PKG-005~007 경로를 정합시켰다. 다음 단계는 TASK-017 shared package / apps/build-server / apps/runner 골격이다.",
-  "purpose_digest_rev": "25",
+  "purpose_digest": "build-server의 postgres persistence path를 Colima 기반 Postgres 컨테이너에 붙여 live smoke를 통과시켰고, Runner 는 Host Server API only / DB direct access 금지 경계로 고정했다. 다음 단계는 postgres 기본 경로 승격과 runner claim/report API shape 구체화다.",
+  "purpose_digest_rev": "29",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -19,19 +19,24 @@
     "environment_path": "ai-workflow/memory/active/repository_assessment.md"
   },
   "commands": {
-    "install": "pnpm install (스캐폴드 후 확정, 현 단계는 placeholder)",
-    "run_local": "pnpm --filter build-server dev (Fastify + Node worker baseline, 스캐폴드 후 확정)",
-    "quick_tests": "pnpm -w test (TypeScript 유닛 테스트 baseline, 스캐폴드 후 확정)",
-    "isolated_tests": "docker compose -f compose.dev.yaml up --abort-on-container-exit (Build Server + Postgres 통합, 결정 후 확정)",
-    "runtime_checks": "docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus/작업 상태/참조 경로 정합성 점검"
+    "install": "pnpm install (환경에 따라 ERR_PNPM_IGNORED_BUILDS 발생 가능; direct tsc 검증으로 우회 가능)",
+    "run_local": "./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && ./node_modules/.bin/tsc -p packages/db/tsconfig.json && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js",
+    "run_local_postgres": "DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres DB_AUTO_BOOTSTRAP=true node apps/build-server/dist/apps/build-server/src/index.js",
+    "quick_tests": "./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/db/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json --noEmit && (cd apps/runner && go build ./...)",
+    "isolated_tests": "curl http://127.0.0.1:3000/health && curl -X POST http://127.0.0.1:3000/builds ... (memory/postgres backend smoke 확인 완료, duplicate 409 포함)",
+    "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06~12 구현 세분화 문서, SDLC 리뷰/계획/보고 패키지, 문서 정합성 보정, 프로젝트 기획안 재구성, 리더 소개용 HTML 보고자료 시각화, 오프라인 에셋 내장화, 승인안 톤 보정까지 정리되었다.",
-    "current_axis": "리뷰 P1/P2 반영으로 08/09 baseline 을 Build Server=TS / Runner=Go 로 정렬, polyglot 보류항목 정리. 직후 TASK-017 shared package / apps/build-server·apps/runner 골격으로 이동.",
-    "current_focus": "TASK-024 리뷰 반영 (Build Server=TS / Runner=Go baseline 정합) — TASK-017 prerequisite 보강",
+    "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
+    "current_axis": "Build Server P0 API shape 는 memory/postgres 양쪽에서 검증됐고, Runner 는 Host Server API only 경계로 정리됐다. 이제 postgres를 기본 개발 경로로 둘지와 runner claim/report API shape 를 구체화하는 단계다.",
+    "current_focus": "Postgres 기본 개발 경로 승격 여부 및 Runner claim/report API 경계 구체화",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-017 shared package / build-server / runner 골격 스캐폴드 및 1차 검증",
+      "Build Server postgres persistence path 및 schema auto-bootstrap 연결",
+      "Colima + Docker Postgres live smoke 통과 (insert/query/logs/duplicate 409)",
+      "Runner = Host Server API only, DB = Host Server only 경계 고정",
       "TASK-024 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)",
       "TASK-023 워크플로우 skill/MCP 셋업 (.codex/.agents 진입 메모, PROJECT_PROFILE §3.1 active/deferred 표)",
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
@@ -60,10 +65,11 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
-    "task_count": 23,
+    "task_count": 24,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
+      "TASK-017 shared package / build-server / runner 골격 스캐폴드 및 1차 검증",
       "TASK-024 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)",
       "TASK-023 워크플로우 skill/MCP 셋업 (.codex/.agents 진입 메모, PROJECT_PROFILE §3.1 active/deferred 표)",
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",

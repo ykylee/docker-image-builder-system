@@ -116,21 +116,21 @@ Done when:
 
 ### PKG-005 Runner Claim And Build Phase Skeleton
 
-- 목표: Runner가 build queue를 선점하고 build phase를 기록하는 최소 골격을 정의한다.
+- 목표: Runner가 Host Server API를 통해 작업을 할당받고 build phase를 다시 Host Server로 보고하는 최소 골격을 정의한다.
 - 범위:
-  - queue poll / claim 순서
+  - Host Server claim API poll 순서
   - 작업 디렉터리 준비
   - Docker build phase 기록
-  - 실패 시 error/phase 저장
+  - 실패 시 error/phase report API 기준
 - Refs: `MVP-FR-014`, `MVP-FR-015`, `MVP-FR-016`, `MVP-FR-019`, `MVP-NFR-004`
 - Depends on: `PKG-003`, `docs/sdlc/design/05-build-and-preview-execution-flow.md`
 - Done when:
-  - Runner 선점-실행-기록 순서가 task 단위로 분해된다
-  - phase 이름과 실패 기록 위치가 닫힌다
+  - Runner 할당-실행-보고 순서가 task 단위로 분해된다
+  - phase 이름과 실패 보고 API 기준이 닫힌다
 
 ### PKG-006 Preview Service Queue And Readiness
 
-- 목표: preview service queue와 readiness 기록 흐름을 정의한다.
+- 목표: preview readiness 흐름을 Runner와 Host Server 간 API 경계로 정의한다.
 - 범위:
   - preview service `QUEUED`
   - slot 할당 기준
@@ -139,7 +139,7 @@ Done when:
 - Refs: `MVP-FR-017`, `MVP-FR-018`, `MVP-NFR-005`, `MVP-PR-001`, `MVP-PR-005`
 - Depends on: `PKG-003`, `PKG-005`, `BD-002`, `BD-005`
 - Done when:
-  - preview service queue 진입/해제 규칙이 정리된다
+  - preview readiness 상태 보고 API 경계가 정리된다
   - readiness 성공 이후 build 종료 처리 기준이 명시된다
 
 ### PKG-007 Preview Cleanup Policy Binding

@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 3: TASK-024 리뷰 반영 추가)
+- 최종 수정일: 2026-07-03 (rev 6: TASK-017 마감 상태 명시)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -38,8 +38,10 @@
 - [x] TASK-022: workflow 메타 정합성 보강 (commands placeholder, status assessment, report 인덱스, legacy 배너, 2026-07-02 백로그 봉인)
 - [x] TASK-023: 워크플로우 skill/MCP 셋업 (워크플로우 온보딩 마무리)
 - [x] TASK-024: 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)
-- [ ] TASK-017: shared package 또는 API 스캐폴드 착수
+- [x] TASK-017: shared package / build-server / runner 골격 스캐폴드 및 1차 검증
 - [x] TASK-018: 보고자료 재구성 및 기획안 재작성
 - [x] TASK-019: 리더 소개용 HTML 보고자료 시각화 재작성
 - [x] TASK-020: HTML 시각화 보강 및 오프라인 에셋 내장화
 - [x] TASK-021: 발표용 카피 압축 및 승인안 톤 보정
+- [x] TASK-022: 백엔드 착수용 기술스택 결정 보정
+- [x] TASK-023: 백엔드 개발 계획 수립 및 문서화

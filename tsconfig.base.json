@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "baseUrl": ".",
+    "paths": {
+      "@docker-image-builder-system/shared-contract": [
+        "packages/shared-contract/src/index.ts"
+      ],
+      "@docker-image-builder-system/shared-config": [
+        "packages/shared-config/src/index.ts"
+      ],
+      "@docker-image-builder-system/db": [
+        "packages/db/src/index.ts"
+      ]
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./packages/db/src/types"
+    ],
+    "strict": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
+  }
+}
