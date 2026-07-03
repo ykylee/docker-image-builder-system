@@ -1,14 +1,14 @@
 # Skill: build-request-intake
 
 - 문서 목적: 비개발자 시나리오에서 build 요청 payload 초안을 만들 때, shared contract 의 `BuildRequest` 최소 필드 / enum 정의를 강제로 채워 `POST /builds` 에 그대로 보낼 수 있는 JSON 초안 + 누락 필드 경고를 만든다.
-- 범위: `BuildRequest` payload 합성, 필드별 형식 검사, enum 정규화, 누락/오류 경고. 실제 HTTP 호출은 이 skill 의 책임이 아니다 (`apps/build-server` 가 canonical, 호출은 사용자가 직접 또는 `apps/skill-mcp/mcp_servers/latest-build-status` 등 후속 MCP 가 담당).
+- 범위: `BuildRequest` payload 합성, 필드별 형식 검사, enum 정규화, 누락/오류 경고. 실제 HTTP 호출은 이 skill 의 책임이 아니다 (`apps/build-server` 가 canonical, 호출은 사용자가 직접 또는 `apps/skill_mcp/mcp_servers/latest-build-status` 등 후속 MCP 가 담당).
 - 대상 독자: AI agent, 비개발자 build 요청자, Skill/MCP 구현자
 - 상태: draft (v0.1.0)
 - 최종 수정일: 2026-07-03
 - 관련 문서:
   - canonical: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md)
   - 후보 카탈로그: [`docs/sdlc/13-skills-and-mcp-plan.md`](../../../../docs/sdlc/13-skills-and-mcp-plan.md) §3.1
-  - 후속 MCP: `apps/skill-mcp/mcp_servers/latest-build-status/` (TBD)
+  - 후속 MCP: `apps/skill_mcp/mcp_servers/latest-build-status/` (TBD)
 
 ## 1. 입출력 계약
 
@@ -79,7 +79,7 @@
 
 ## 5. 후속 구현 포인트
 
-- `apps/skill-mcp` 골격 결정 시 본 skill 디렉터리를 그대로 살릴 것 (TASK-017).
+- `apps/skill_mcp` 골격 결정 시 본 skill 디렉터리를 그대로 살릴 것 (TASK-017).
 - shared contract 가 진화하면 canonical 문서 버전(`contract_version`) 을 bump 하고 본 skill 의 `core.py` 가 그 버전을 인지하도록 한다.
 - 후속 MCP `latest-build-status` 와 결합 시 `payload.userId + payload.appName` 으로 `GET /builds` 목록 조회 → 동일 active build 가 있으면 payload 사용자에게 경고.
 - `OI-008` (Dockerfile 생성 우선순위) 결정 시 `extra.dockerfileOverride` 의미를 그쪽 결정에 맞춰 조정.

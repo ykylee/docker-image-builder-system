@@ -105,6 +105,6 @@
 
 ## 5. 후속 구현 포인트
 
-- `apps/skill-mcp/mcp_servers/latest-build-status` 와 결합 시 `buildId` 없이 `userId+appName` 으로 `GET /builds` 를 호출하고, 그 결과를 다시 본 skill 의 `explain()` 에 넣어 사용자 노출용 응답을 만든다.
+- `apps/skill_mcp/mcp_servers/latest-build-status` 와 결합 시 `buildId` 없이 `userId+appName` 으로 `GET /builds` 를 호출하고, 그 결과를 다시 본 skill 의 `explain()` 에 넣어 사용자 노출용 응답을 만든다.
 - `OI-009` (실패 요약 책임) 결정 시 본 skill 의 `error_summary` 가 canonical 인지, `failure-summary-shaper` 가 canonical 인지에 따라 본 skill 의 책임 범위를 좁힌다.
 - shared contract 가 bump 되면 `CONTRACT_VERSION` 와 `EXPLANATION_VERSION` 을 함께 올리고 `ref.contract_version` 을 갱신한다.

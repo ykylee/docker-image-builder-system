@@ -27,7 +27,7 @@
 | 구분 | 표준 키트 (`ai-workflow/`) | 우리 도메인 (이 문서) |
 | --- | --- | --- |
 | 대상 | 워크플로우 운영(세션/백로그/문서) | Build Server / Runner / Preview / Docker 운영 |
-| 저장 위치 | `ai-workflow/skills/`, `ai-workflow/mcp_servers/` | `apps/skill-mcp/skills/`, `apps/skill-mcp/mcp_servers/` (TASK-017 의 `apps/skill-mcp` 골격에서 결정) |
+| 저장 위치 | `ai-workflow/skills/`, `ai-workflow/mcp_servers/` | `apps/skill_mcp/skills/`, `apps/skill_mcp/mcp_servers/` (TASK-017 의 `apps/skill_mcp` 골격에서 결정) |
 | Active 결정 문서 | `docs/PROJECT_PROFILE.md` §3.1 | 본 문서 + `docs/PROJECT_PROFILE.md` §3.2 (신설 예정) |
 | Transport | `transport_ready=false` (프로토타입 단계) | MCP transport 는 TASK-017 이후 구현. stdio 우선, jsonrpc-bridge 는 후속. |
 | 공통 참조 | `packages/shared-contract` (PKG-001) | `packages/shared-contract` |
@@ -39,7 +39,7 @@
 
 ## 3. Skill 후보 (5종)
 
-각 skill 은 `apps/skill-mcp/skills/<name>/SKILL.md` + (선택) 실행 스크립트 형태로 둔다. 표준 키트의 prototype 과 동일한 `SKILL.md` 헤더(목적/입력/출력/읽기·쓰기 권한 경계/후속 구현 포인트) 를 따른다.
+각 skill 은 `apps/skill_mcp/skills/<name>/SKILL.md` + (선택) 실행 스크립트 형태로 둔다. 표준 키트의 prototype 과 동일한 `SKILL.md` 헤더(목적/입력/출력/읽기·쓰기 권한 경계/후속 구현 포인트) 를 따른다.
 
 ### 3.1 `build-request-intake`
 
@@ -93,7 +93,7 @@
 
 ## 4. MCP 후보 (5종)
 
-각 MCP 는 `apps/skill-mcp/mcp_servers/<name>/MCP.md` + (선택) Python/TypeScript 구현체로 둔다. 표준 키트 prototype 의 `MCP.md` 헤더를 따른다. **현 단계(`transport_ready=false`) 에서는 동일 계약의 수동 절차로 운영**한다.
+각 MCP 는 `apps/skill_mcp/mcp_servers/<name>/MCP.md` + (선택) Python/TypeScript 구현체로 둔다. 표준 키트 prototype 의 `MCP.md` 헤더를 따른다. **현 단계(`transport_ready=false`) 에서는 동일 계약의 수동 절차로 운영**한다.
 
 ### 4.1 `latest-build-status`
 
@@ -160,7 +160,7 @@ PKG-005/006/007 (Runner / Preview)
 
 ## 6. Active 결정 / 노출 시점
 
-- `apps/skill-mcp/` 디렉터리 골격과 skill/MCP 디렉터리 컨벤션은 TASK-017 의 `apps/skill-mcp` 결정에서 함께 확정한다.
+- `apps/skill_mcp/` 디렉터리 골격과 skill/MCP 디렉터리 컨벤션은 TASK-017 의 `apps/skill_mcp` 결정에서 함께 확정한다.
 - 본 문서에서 P0 으로 분류된 후보는 TASK-017 종료 시점에 한 번 더 active/deferred 재평가한다. `transport_ready=false` 인 동안 동일 입력/출력 계약의 **수동 절차**로 운영한다.
 - `PKG-008` (Skill/MCP Request Client) 의 구현 분해 시 본 문서의 skill 5종을 1:1 매핑으로 다루고, `PKG-009` 의 분해 시 MCP 5종을 같은 방식으로 다룬다.
 
@@ -172,7 +172,7 @@ PKG-005/006/007 (Runner / Preview)
 
 ## 8. 다음 액션
 
-- [ ] TASK-017 에서 `apps/skill-mcp/` 골격 + `SKILL.md` / `MCP.md` 헤더 컨벤션 확정
+- [ ] TASK-017 에서 `apps/skill_mcp/` 골격 + `SKILL.md` / `MCP.md` 헤더 컨벤션 확정
 - [ ] 본 문서를 기준으로 `docs/PROJECT_PROFILE.md` §3.2 "우리 도메인 active skill/MCP" 신설
 - [ ] `PKG-008` / `PKG-009` 의 구현 분해를 본 문서 표와 1:1 로 정렬
 - [ ] `OI-006` / `OI-008` / `OI-009` 결정 후 해당 후보의 우선순위 / 책임 위치 재평가
