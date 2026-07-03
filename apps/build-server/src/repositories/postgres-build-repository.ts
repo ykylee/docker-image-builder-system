@@ -21,13 +21,17 @@ import type {
   BuildStatusResponse,
   BuildSummary,
   ErrorCode,
-  PreviewStatus
+  PreviewStatus,
+  TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
 import type {
   BuildRepository,
   ClaimNextBuildResult,
   CreateBuildResult,
+  GetTestDeploymentResult,
+  QueueTestDeploymentResult,
+  ReportPreviewStatusResult,
   UpdatePhaseResult
 } from "./build-repository.js";
 
@@ -322,5 +326,181 @@ export class PostgresBuildRepository implements BuildRepository {
         lastError: mapBuildRowToLastError(updated)
       }
     };
+  }
+
+  async queueTestDeployment(
+    buildId: string,
+    internalPort: number,
+    ttlMinutes: number
+  ): Promise<QueueTestDeploymentResult> {
+    const [row] = await this.db
+      .select()
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+
+    if (!row) {
+      return { kind: "not_found" };
+    }
+
+    if (!["BUILDING", "TEST_READY"].includes(row.status as string) &&
+        !["DOCKER_BUILD_COMPLETED", "TEST_READY"].includes(row.phase as string)) {
+      return {
+        kind: "invalid_state",
+        reason: `cannot queue preview from phase=${row.phase} status=${row.status}`
+      };
+    }
+
+    const timestamp = new Date();
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
+
+    const [updated] = await this.db
+      .update(buildRequestTable)
+      .set({
+        phase: "PREVIEW_QUEUED",
+        previewStatus: "QUEUED",
+        previewUrl: null,
+        updatedAt: timestamp
+      })
+      .where(eq(buildRequestTable.id, buildId))
+      .returning();
+
+    if (!updated) {
+      return { kind: "not_found" };
+    }
+
+    await this.db.insert(buildLogTable).values({
+      id: randomUUID(),
+      buildId,
+      phase: "PREVIEW_QUEUED",
+      message: `Preview queued: internalPort=${internalPort} ttlMinutes=${ttlMinutes}`,
+      createdAt: timestamp
+    });
+
+    const testDeployment: TestDeployment = {
+      status: "QUEUED",
+      previewUrl: null,
+      host: null,
+      hostPort: null,
+      internalPort,
+      expiresAt: expiresAt.toISOString(),
+      updatedAt: timestamp.toISOString()
+    };
+
+    return {
+      kind: "queued",
+      response: {
+        build: mapBuildRowToSummary(updated),
+        lastError: mapBuildRowToLastError(updated)
+      },
+      testDeployment
+    };
+  }
+
+  async reportPreviewStatus(
+    buildId: string,
+    status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
+    details?: { previewUrl?: string; host?: string; hostPort?: number }
+  ): Promise<ReportPreviewStatusResult> {
+    const [row] = await this.db
+      .select()
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+
+    if (!row) {
+      return { kind: "not_found" };
+    }
+
+    const timestamp = new Date();
+    let nextPhase: BuildPhase = row.phase as BuildPhase;
+    let nextStatus: BuildStatus = row.status as BuildStatus;
+
+    if (status === "PROVISIONING") {
+      nextPhase = "PREVIEW_QUEUED";
+      nextStatus = "BUILDING";
+    } else if (status === "READY") {
+      nextPhase = "PREVIEW_READY";
+      nextStatus = "TEST_READY";
+    } else if (status === "FAILED") {
+      nextPhase = "FAILED";
+      nextStatus = "FAILED";
+    }
+
+    const nextPreviewUrl = details?.previewUrl ?? row.previewUrl;
+
+    const [updated] = await this.db
+      .update(buildRequestTable)
+      .set({
+        phase: nextPhase,
+        status: nextStatus,
+        previewStatus: status as PreviewStatus,
+        previewUrl: nextPreviewUrl,
+        updatedAt: timestamp
+      })
+      .where(eq(buildRequestTable.id, buildId))
+      .returning();
+
+    if (!updated) {
+      return { kind: "not_found" };
+    }
+
+    await this.db.insert(buildLogTable).values({
+      id: randomUUID(),
+      buildId,
+      phase: nextPhase,
+      message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
+      createdAt: timestamp
+    });
+
+    const testDeployment: TestDeployment = {
+      status,
+      previewUrl: nextPreviewUrl,
+      host: details?.host ?? null,
+      hostPort: details?.hostPort ?? null,
+      internalPort: null,
+      expiresAt: null,
+      updatedAt: timestamp.toISOString()
+    };
+
+    return {
+      kind: "ok",
+      response: {
+        build: mapBuildRowToSummary(updated),
+        lastError: mapBuildRowToLastError(updated)
+      },
+      testDeployment
+    };
+  }
+
+  async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> {
+    const [row] = await this.db
+      .select({
+        previewStatus: buildRequestTable.previewStatus,
+        previewUrl: buildRequestTable.previewUrl,
+        updatedAt: buildRequestTable.updatedAt
+      })
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+
+    if (!row) {
+      return { kind: "not_found" };
+    }
+    if (!row.previewStatus || row.previewStatus === "NOT_REQUESTED") {
+      return { kind: "not_requested" };
+    }
+
+    const testDeployment: TestDeployment = {
+      status: row.previewStatus as TestDeployment["status"],
+      previewUrl: row.previewUrl,
+      host: null,
+      hostPort: null,
+      internalPort: null,
+      expiresAt: null,
+      updatedAt: row.updatedAt.toISOString()
+    };
+
+    return { kind: "found", testDeployment };
   }
 }

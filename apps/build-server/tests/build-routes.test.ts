@@ -129,3 +129,137 @@ describe("POST /builds/:buildId/phase", () => {
     await app.close();
   });
 });
+
+describe("POST /builds/:buildId/preview", () => {
+  async function setupCompletedBuild() {
+    const repo = createMemoryBuildRepository();
+    const service = new BuildService(repo);
+    const create = await service.createBuild(baseBody);
+    if (!("accepted" in create) || !create.accepted) throw new Error("setup");
+    const buildId = create.build.buildId;
+    await service.claimNextBuild();
+    await service.reportPhase(buildId, "SOURCE_PREPARED");
+    await service.reportPhase(buildId, "DOCKER_BUILD_STARTED");
+    await service.reportPhase(buildId, "DOCKER_BUILD_COMPLETED");
+    return { repo, service, buildId };
+  }
+
+  it("returns 202 with queued testDeployment", async () => {
+    const { repo, service } = { ...(await setupCompletedBuild()) };
+    const app = Fastify({ logger: false });
+    await registerBuildRoutes(app, service);
+    // x-not-existing is non-UUID so it fails zod and returns 400; not_found (404) is tested via unknown UUID below.
+    const res = await app.inject({
+      method: "POST",
+      url: "/builds/x-not-existing/preview",
+      payload: { internalPort: 8080, ttlMinutes: 30, runnerId: "r-1" }
+    });
+    assert.equal(res.statusCode, 400);
+    await app.close();
+
+    // proper call: a separate setup for a fresh completed build
+    const fresh = await setupCompletedBuild();
+    const app2 = Fastify({ logger: false });
+    await registerBuildRoutes(app2, fresh.service);
+    const res2 = await app2.inject({
+      method: "POST",
+      url: `/builds/${fresh.buildId}/preview`,
+      payload: { internalPort: 8080, ttlMinutes: 30, runnerId: "r-1" }
+    });
+    assert.equal(res2.statusCode, 202);
+    const body = res2.json();
+    assert.equal(body.testDeployment.status, "QUEUED");
+    await app2.close();
+  });
+
+  it("returns 400 on missing internalPort", async () => {
+    const { service } = await setupCompletedBuild();
+    const app = Fastify({ logger: false });
+    await registerBuildRoutes(app, service);
+    const res = await app.inject({
+      method: "POST",
+      url: "/builds/00000000-0000-0000-0000-000000000000/preview",
+      payload: { ttlMinutes: 30, runnerId: "r-1" }
+    });
+    assert.equal(res.statusCode, 400);
+    await app.close();
+  });
+});
+
+describe("POST /builds/:buildId/test-deployment/ready", () => {
+  it("returns 200 after queue with updated status READY", async () => {
+    const { service, buildId } = await (async () => {
+      const repo = createMemoryBuildRepository();
+      const svc = new BuildService(repo);
+      const create = await svc.createBuild(baseBody);
+      if (!("accepted" in create) || !create.accepted) throw new Error("setup");
+      const id = create.build.buildId;
+      await svc.claimNextBuild();
+      await svc.reportPhase(id, "SOURCE_PREPARED");
+      await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
+      await svc.reportPhase(id, "DOCKER_BUILD_COMPLETED");
+      await svc.queueTestDeployment(id, 8080, 30);
+      return { service: svc, buildId: id };
+    })();
+    const app = Fastify({ logger: false });
+    await registerBuildRoutes(app, service);
+    const res = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/test-deployment/ready`,
+      payload: {
+        previewUrl: "http://preview.local/x",
+        host: "preview.local",
+        hostPort: 38124,
+        runnerId: "r-1"
+      }
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.build.status, "TEST_READY");
+    assert.equal(body.build.previewStatus, "READY");
+    assert.equal(body.build.phase, "PREVIEW_READY");
+    assert.equal(body.build.previewUrl, "http://preview.local/x");
+    await app.close();
+  });
+});
+
+describe("GET /builds/:buildId/test-deployment", () => {
+  it("returns 404 when no preview requested", async () => {
+    const repo = createMemoryBuildRepository();
+    const service = new BuildService(repo);
+    const create = await service.createBuild(baseBody);
+    if (!("accepted" in create) || !create.accepted) throw new Error("setup");
+    const app = Fastify({ logger: false });
+    await registerBuildRoutes(app, service);
+    const res = await app.inject({
+      method: "GET",
+      url: `/builds/${create.build.buildId}/test-deployment`
+    });
+    assert.equal(res.statusCode, 404);
+    await app.close();
+  });
+
+  it("returns 200 with testDeployment after queue", async () => {
+    const repo = createMemoryBuildRepository();
+    const service = new BuildService(repo);
+    const create = await service.createBuild(baseBody);
+    if (!("accepted" in create) || !create.accepted) throw new Error("setup");
+    const id = create.build.buildId;
+    await service.claimNextBuild();
+    await service.reportPhase(id, "DOCKER_BUILD_STARTED");
+    await service.reportPhase(id, "DOCKER_BUILD_COMPLETED");
+    await service.queueTestDeployment(id, 8080, 30);
+
+    const app = Fastify({ logger: false });
+    await registerBuildRoutes(app, service);
+    const res = await app.inject({
+      method: "GET",
+      url: `/builds/${id}/test-deployment`
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.testDeployment.status, "QUEUED");
+    assert.equal(body.testDeployment.internalPort, 8080);
+    await app.close();
+  });
+});

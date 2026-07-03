@@ -4,7 +4,9 @@ import type {
   BuildLogsResponse,
   BuildRequest,
   BuildStatusResponse,
-  ClaimResponse
+  ClaimResponse,
+  TestDeployment,
+  TestDeploymentQueueResponse
 } from "@docker-image-builder-system/shared-contract";
 
 import type { BuildRepository } from "../repositories/build-repository.js";
@@ -13,6 +15,20 @@ export type ReportPhaseOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
   | { kind: "not_found" }
   | { kind: "invalid_transition"; fromPhase: string; toPhase: string };
+
+export type QueuePreviewOutcome =
+  | { kind: "ok"; response: TestDeploymentQueueResponse }
+  | { kind: "not_found" }
+  | { kind: "invalid_state"; reason: string };
+
+export type ReportPreviewOutcome =
+  | { kind: "ok"; response: BuildStatusResponse; testDeployment: TestDeployment }
+  | { kind: "not_found" };
+
+export type GetTestDeploymentOutcome =
+  | { kind: "found"; testDeployment: TestDeployment }
+  | { kind: "not_requested" }
+  | { kind: "not_found" };
 
 export class BuildService {
   constructor(private readonly repository: BuildRepository) {}
@@ -81,5 +97,47 @@ export class BuildService {
   ): Promise<ReportPhaseOutcome> {
     const result = await this.repository.updatePhase(buildId, phase);
     return result;
+  }
+
+  async queueTestDeployment(
+    buildId: string,
+    internalPort: number,
+    ttlMinutes: number
+  ): Promise<QueuePreviewOutcome> {
+    const result = await this.repository.queueTestDeployment(
+      buildId,
+      internalPort,
+      ttlMinutes
+    );
+    if (result.kind === "not_found") {
+      return { kind: "not_found" };
+    }
+    if (result.kind === "invalid_state") {
+      return { kind: "invalid_state", reason: result.reason };
+    }
+    return {
+      kind: "ok",
+      response: { testDeployment: result.testDeployment }
+    };
+  }
+
+  async reportPreviewStatus(
+    buildId: string,
+    status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
+    details?: { previewUrl?: string; host?: string; hostPort?: number }
+  ): Promise<ReportPreviewOutcome> {
+    const result = await this.repository.reportPreviewStatus(buildId, status, details);
+    if (result.kind === "not_found") {
+      return { kind: "not_found" };
+    }
+    return {
+      kind: "ok",
+      response: result.response,
+      testDeployment: result.testDeployment
+    };
+  }
+
+  async getTestDeployment(buildId: string): Promise<GetTestDeploymentOutcome> {
+    return this.repository.getTestDeployment(buildId);
   }
 }

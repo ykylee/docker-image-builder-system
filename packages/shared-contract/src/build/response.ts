@@ -80,3 +80,42 @@ export const phaseUpdateRequestSchema = z.object({
 export type ClaimRequest = z.infer<typeof claimRequestSchema>;
 export type ClaimResponse = z.infer<typeof claimResponseSchema>;
 export type PhaseUpdateRequest = z.infer<typeof phaseUpdateRequestSchema>;
+
+// testDeployment minimal schema (canonical doc §9)
+export const testDeploymentSchema = z.object({
+  status: z.enum(previewStatuses),
+  previewUrl: z.string().url().nullable(),
+  host: z.string().nullable(),
+  hostPort: z.int().nonnegative().nullable(),
+  internalPort: z.int().positive().nullable(),
+  expiresAt: z.string().datetime().nullable(),
+  updatedAt: z.string().datetime()
+});
+
+export const testDeploymentQueueRequestSchema = z.object({
+  internalPort: z.int().positive(),
+  ttlMinutes: z.int().positive().default(60),
+  runnerId: z.string().min(1)
+});
+
+export const testDeploymentQueueResponseSchema = z.object({
+  testDeployment: testDeploymentSchema
+});
+
+export const testDeploymentReadyRequestSchema = z.object({
+  previewUrl: z.string().url(),
+  host: z.string().min(1),
+  hostPort: z.int().nonnegative(),
+  runnerId: z.string().min(1)
+});
+
+export const testDeploymentStatusRequestSchema = z.object({
+  status: z.enum(["PROVISIONING", "READY", "FAILED", "EXPIRED"]),
+  runnerId: z.string().min(1)
+});
+
+export type TestDeployment = z.infer<typeof testDeploymentSchema>;
+export type TestDeploymentQueueRequest = z.infer<typeof testDeploymentQueueRequestSchema>;
+export type TestDeploymentQueueResponse = z.infer<typeof testDeploymentQueueResponseSchema>;
+export type TestDeploymentReadyRequest = z.infer<typeof testDeploymentReadyRequestSchema>;
+export type TestDeploymentStatusRequest = z.infer<typeof testDeploymentStatusRequestSchema>;
