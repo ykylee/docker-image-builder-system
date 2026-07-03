@@ -1,10 +1,11 @@
 # Skill: preview-readiness-checker
 
-- 문서 목적: build/preview status 응답 + (선택) container health probe + (선택) TTL 정보를 받아, 사용자가 "preview 가 준비됐어?" 라고 물을 때 즉시 읽을 수 있는 readiness 카드와 `next_action` 을 만든다. P0 skill `build-status-explainer` 의 `next_action` 결과를 입력으로 받으면 일관된 톤을 보장.
-- 범위: `readiness_state` (7종) 분류 + 카드 4-필드 합성 + `next_action` 매핑. **읽기 전용** — Build Server / Runner 호출 없음. 실제 조회는 caller 가 `buildId` / status 응답을 채워서 넘기는 형태.
+- 문서 목적: canonical `BuildStatusResponse` 의 test / lifecycle / image / deploy 블록 + (선택) container health probe + (선택) TTL 정보를 받아, 사용자가 "결과가 준비됐어?" 라고 물을 때 즉시 읽을 수 있는 readiness 카드와 `next_action` 을 만든다. P0 skill `build-status-explainer` 의 `next_action` 결과를 입력으로 받으면 일관된 톤을 보장.
+- 범위: `readiness_state` (7종) 분류 + 카드 4-필드 합성 + `next_action` canonical 매핑 (`OPEN_DEPLOYMENT` 사용). **읽기 전용** — Build Server / Runner 호출 없음. 실제 조회는 caller 가 `buildId` / status 응답을 채워서 넘기는 형태.
+- **canonical contract v2** (TASK-061 contract rename): canonical 입력 = `test.status` ∈ `executionStatuses` (5종). legacy `testDeployment` 키도 forward-compat 으로 받아서 canonical execution status 로 forward-map (READY→SUCCESS, QUEUED→NOT_STARTED, PROVISIONING→IN_PROGRESS, ...). 디렉터리 이름 (`preview_readiness_checker`) 은 import path 안정성을 위해 유지.
 - 대상 독자: AI agent, 사용자, Build Server / Runner 구현자
-- 상태: draft (v0.1.0)
-- 최종 수정일: 2026-07-03
+- 상태: stable (v2.0.0)
+- 최종 수정일: 2026-07-03 (TASK-061 contract rename)
 - 관련 문서:
   - canonical enum: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md) §5/§6/§9
   - PKG-006: [`docs/sdlc/07-implementation-backlog-baseline.md`](../../../../docs/sdlc/07-implementation-backlog-baseline.md) (preview readiness 흐름)

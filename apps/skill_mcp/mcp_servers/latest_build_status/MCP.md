@@ -2,14 +2,15 @@
 
 - 문서 목적: 동일 `userId + appName` 의 최신 build 상태를 Build Server 에서 한 번에 조회해, 비개발자 한국어 메시지 + `next_action` 까지 합쳐 반환한다. 내부적으로는 `GET /builds/{buildId}` 또는 `GET /builds?userId=...&appName=...` 후 `build-status-explainer.explain()` 위임이다.
 - 범위: Build Server query API (`PKG-002` + `PKG-004`) 호출, `build-status-explainer` 호출 또는 fixture 주입, 결정적 JSON 응답. 실제 Build Server 가 없으면 dry-run 모드 + fixture 로 동작한다.
+- **canonical contract v2** (TASK-061 contract rename): 응답의 canonical top-level key 는 `lifecycle` / `image` / `test` / `deploy` / `resultDelivery` / `lastError`. backend 가 legacy `testDeployment` / raw `error` 를 보내면 normalize 단계에서 canonical 로 forward-map. `_ACTIVE_BUILD_STATUSES` 는 canonical 9 in-flight 상태 + legacy 2 (`CLAIMED`, `TEST_READY`) forward-compat. explain() 결과의 `next_action` 은 항상 canonical (`OPEN_DEPLOYMENT` 포함).
 - 대상 독자: AI agent, Build Server caller, Skill/MCP 구현자
-- 상태: draft (v0.1.0)
-- 최종 수정일: 2026-07-03
+- 상태: stable (v2.0.0)
+- 최종 수정일: 2026-07-03 (TASK-061 contract rename)
 - 관련 문서:
   - canonical: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md) §9
   - API 응답 shape: [`docs/sdlc/design/03-api-contract-design.md`](../../../../docs/sdlc/design/03-api-contract-design.md)
   - 메시지 변환: [`apps/skill_mcp/skills/build_status_explainer/`](../../skills/build_status_explainer/SKILL.md)
-  - 후보 카탈로그: [`docs/sdlc/13-skills-and-mcp-plan.md`](../../../../docs/sdlc/13-skills-and-mcp-plan.md) §4.1
+  - candidate 카탈로그: [`docs/sdlc/13-skills-and-mcp-plan.md`](../../../../docs/sdlc/13-skills-and-mcp-plan.md) §4.1
   - PKG-002/004: `docs/sdlc/07-implementation-backlog-baseline.md`
 
 ## 1. Transport 상태

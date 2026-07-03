@@ -1,10 +1,11 @@
 # MCP: failure-summary
 
-- 문서 목적: build/preview failure 응답을 받아 P1 skill `failure-summary-shaper` 의 `shape()` 를 호출해 4-구조 한국어 사용자 메시지로 변환하고, AI agent 가 그대로 노출할 수 있는 `{ ok, summary, cause, next_step, buildId, next_action }` 형태로 반환한다. 사용자가 "왜 실패했어?" 라고 물을 때 사용.
-- 범위: `failure` / `previewFailure` 입력 → `failure-summary-shaper` 위임 → 4-구조 출력. live/dry-run 모두 지원. 실제 API 호출은 본 MCP 책임 아님 — caller 가 `failure` 객체를 채워서 넘기는 형태.
+- 문서 목적: build / test / deploy 단계의 failure 응답을 받아 P1 skill `failure-summary-shaper` 의 `shape()` 를 호출해 4-구조 한국어 사용자 메시지로 변환하고, AI agent 가 그대로 노출할 수 있는 `{ ok, summary, cause, next_step, buildId, stage, next_action }` 형태로 반환한다. 사용자가 "왜 실패했어?" 라고 물을 때 사용.
+- 범위: `error` / `lastError` / `failure` / `previewFailure` 입력 (canonical 우선) → `failure-summary-shaper` 위임 → 4-구조 출력. live/dry-run 모두 지원. 실제 API 호출은 본 MCP 책임 아님 — caller 가 입력 dict 를 채워서 넘기는 형태.
+- **canonical contract v2** (TASK-061 contract rename): 출력 envelope 의 `stage` ∈ {BUILD, TEST, DEPLOY, DELIVERY}. `next_action` 은 canonical (`OPEN_DEPLOYMENT` 포함). `source: build/preview` legacy 값은 forward-compat 으로 받지만 출력에는 더 이상 emit 하지 않는다.
 - 대상 독자: AI agent, 사용자, Build Server caller
-- 상태: draft (v0.1.0)
-- 최종 수정일: 2026-07-03
+- 상태: stable (v2.0.0)
+- 최종 수정일: 2026-07-03 (TASK-061 contract rename)
 - 관련 문서:
   - canonical: [`docs/sdlc/design/06-user-messaging-and-failure-handling.md`](../../../../docs/sdlc/design/06-user-messaging-and-failure-handling.md) §6
   - 위임 대상: [`apps/skill_mcp/skills/failure_summary_shaper/`](../../../../apps/skill_mcp/skills/failure_summary_shaper/)

@@ -58,12 +58,17 @@ class DelegationTests(unittest.TestCase):
         self.assertIn("이미지", r.cause)
 
     def test_delegates_preview_only(self):
+        # TASK-061: legacy `previewFailure` (preview-era) 은 canonical
+        # `stage: TEST` 로 forward-mapped. PREVIEW_CONTAINER_START_FAILED
+        # 같은 legacy error code 는 canonical ERROR_CODES 8종 union 밖 → warning.
         r = core.summarize({
             "previewFailure": {"errorCode": "PREVIEW_CONTAINER_START_FAILED", "nextAction": "RETRY"},
         })
         self.assertTrue(r.ok)
-        self.assertEqual(r.source, "unknown")
+        self.assertEqual(r.stage, "TEST")
         self.assertEqual(r.next_action, "RETRY")
+        # unknown legacy errorCode 는 warning 으로 노출
+        self.assertTrue(any(w["code"] == "UNKNOWN_ENUM" and w["field"] == "errorCode" for w in r.warnings))
 
     def test_dry_run_with_dict_fixture(self):
         fixture = {
@@ -116,16 +121,19 @@ class DelegationTests(unittest.TestCase):
 class ResultEnvelopeTests(unittest.TestCase):
     def test_to_dict_shape(self):
         r = core.summarize({
-            "failure": {"errorCode": "DOCKER_BUILD_FAILED", "nextAction": "FIX_DOCKERFILE"},
+            "stage": "BUILD",
+            "error": {"code": "DOCKER_BUILD_FAILED", "message": "..."},
+            "nextAction": "FIX_DOCKERFILE",
         })
         d = r.to_dict()
         for k in ("ok", "summary", "cause", "next_step", "buildId",
-                  "logs_excerpt", "next_action", "source", "error_code",
+                  "logs_excerpt", "next_action", "stage", "error_code",
                   "warnings", "errors", "ref"):
-            self.assertIn(k, d)
+            self.assertIn(k, d, msg=f"missing key {k}")
         self.assertEqual(d["ref"]["design_doc"], "docs/sdlc/design/06-user-messaging-and-failure-handling.md")
         self.assertEqual(d["ref"]["skill_doc"], "apps/skill_mcp/skills/failure_summary_shaper/SKILL.md")
-        self.assertEqual(d["ref"]["mcp_version"], "v1")
+        # TASK-061 bumped MCP_VERSION to v2.
+        self.assertEqual(d["ref"]["mcp_version"], "v2")
 
 
 # ---------------------------------------------------------------------------

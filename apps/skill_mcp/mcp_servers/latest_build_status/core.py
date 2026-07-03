@@ -16,17 +16,19 @@ from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlencode
 
+from apps.skill_mcp.contract import canonical as C
 from apps.skill_mcp.skills.build_status_explainer import (
     Explanation,
     explain as explain_status,
 )
 
-MCP_VERSION = "v1"
+MCP_VERSION = "v2"
 DEFAULT_TIMEOUT_SECONDS = 5.0
 
-# Build Server 응답의 canonical top-level keys (canonical contract §9).
-# 시간 키 (`createdAt` / `startedAt` / `finishedAt`) 도 포함하여 latest build 선택 시
-# 정렬 기준으로 쓸 수 있도록 한다.
+# Build Server 응답의 canonical top-level keys (BuildStatusResponse).
+# TASK-061: legacy `testDeployment` 은 canonical `test` 로 rename 됐고,
+# `error` 는 canonical `lastError` 로 이전. 둘 다 받아서 normalize 단계에서
+# forward-mapped 되도록 한다.
 _BUILD_TOP_KEYS = (
     "buildId",
     "userId",
@@ -36,26 +38,108 @@ _BUILD_TOP_KEYS = (
     "createdAt",
     "startedAt",
     "finishedAt",
+    "lifecycleStatus",
+    "lifecycle",
     "image",
-    "testDeployment",
-    "error",
+    "test",
+    "deploy",
+    "resultDelivery",
+    "lastError",
 )
 
-# active build status 집합 — explain_status.BUILD_STATUSES 와 동기화되어야 하지만
-# 본 MCP 의 우선순위 분기에서만 쓰므로 안전하게 inline 으로 둔다.
-_ACTIVE_BUILD_STATUSES = frozenset(
+# active (in-flight) build status — canonical 7종 + legacy forward-compat 2종.
+# explain_status 의 분류 분기와 같은 canonical contract 을 따른다.
+_ACTIVE_BUILD_STATUSES: frozenset[str] = frozenset(
     {
+        # canonical in-flight statuses
+        "RECEIVED",
         "QUEUED",
-        "PREPARING",
-        "VALIDATING",
+        "PREPARING_SOURCE",
         "BUILDING",
-        "IMAGE_BUILT",
-        "TEST_DEPLOYING",
+        "BUILD_SUCCESS",
+        "TESTING",
+        "TEST_SUCCESS",
+        "DEPLOYING",
+        "DEPLOY_SUCCESS",
+        # legacy adapter statuses (forward-compat shim during migration window)
+        "CLAIMED",
         "TEST_READY",
     }
 )
 
-_TERMINAL_BUILD_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
+_TERMINAL_BUILD_STATUSES: frozenset[str] = frozenset(
+    {
+        # canonical terminal
+        "COMPLETED",
+        "FAILED",
+        "CANCELLED",
+    }
+)
+
+# build.status 값 중 active / terminal 어느 쪽에도 못 들어가는 경우 canonical
+# 이 아닌 다른 status 로 정렬 fallback. canonical + legacy 합집합.
+_CANONICAL_OR_LEGACY_STATUSES: frozenset[str] = frozenset(
+    C.CANONICAL_BUILD_STATUSES | C.LEGACY_BUILD_STATUSES
+)
+
+# Backend 가 아직도 legacy preview-era 필드 (`testDeployment`, raw `error`) 를
+# 보내는 경우 canonical `test` / `lastError` 로 forward-map 한다. 이 단계는
+# normalize 단계에서 일어나며 explain() 은 항상 canonical payload 만 본다.
+def _normalize_legacy_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Legacy preview-era 필드를 canonical 로 forward-map."""
+    if not isinstance(payload, dict):
+        return {}
+    out = dict(payload)
+    # legacy `testDeployment` → canonical `test` (status 가 canonical
+    # executionStatuses 가 아니면 forward-map 시도).
+    if "testDeployment" in out and "test" not in out:
+        legacy_td = out.pop("testDeployment")
+        if isinstance(legacy_td, dict):
+            legacy_status = legacy_td.get("status")
+            legacy_map = {
+                "READY": "SUCCESS",
+                "QUEUED": "NOT_STARTED",
+                "PROVISIONING": "IN_PROGRESS",
+                "NOT_REQUESTED": "SKIPPED",
+            }
+            if isinstance(legacy_status, str):
+                execution = legacy_map.get(legacy_status, legacy_status)
+                mapped: dict[str, Any] = {"status": execution}
+                preview_url = legacy_td.get("previewUrl")
+                if isinstance(preview_url, str) and preview_url:
+                    mapped["containerRef"] = preview_url
+                # 보존될 raw execution 결과값들도 같이 (있다면) 옮긴다.
+                for flag in (
+                    "containerRunning",
+                    "healthCheckPassed",
+                    "portOpen",
+                    "stabilityWindowPassed",
+                ):
+                    if flag in legacy_td:
+                        mapped[flag] = legacy_td[flag]
+                out["test"] = mapped
+    # legacy `error` (top-level) → canonical `lastError`
+    if "error" in out and "lastError" not in out:
+        legacy_err = out.pop("error")
+        if isinstance(legacy_err, dict):
+            out["lastError"] = legacy_err
+    return out
+
+
+def _resolve_status(build: dict[str, Any]) -> str | None:
+    """Build 객체에서 canonical status 값을 추출. legacy adapter 도 포함."""
+    if not isinstance(build, dict):
+        return None
+    raw = build.get("status") or build.get("lifecycleStatus")
+    if not isinstance(raw, str):
+        return None
+    if raw in _CANONICAL_OR_LEGACY_STATUSES:
+        return raw
+    return raw  # unknown — caller 가 warning 으로 노출
+
+
+def _is_active(status: str | None) -> bool:
+    return status is not None and status in _ACTIVE_BUILD_STATUSES
 
 
 @dataclass
@@ -94,6 +178,7 @@ def _normalize_build(payload: Any) -> dict[str, Any] | None:
 
     - dict 가 `data` / `result` / `build` 키로 wrap 되어 있으면 unwrap.
     - top-level keys 중 알려진 것만 보존.
+    - legacy `testDeployment` / `error` 는 canonical `test` / `lastError` 로 forward-map.
     """
     if payload is None:
         return None
@@ -103,6 +188,7 @@ def _normalize_build(payload: Any) -> dict[str, Any] | None:
         if wrap_key in payload and isinstance(payload[wrap_key], dict):
             payload = payload[wrap_key]
             break
+    payload = _normalize_legacy_payload(payload)
     normalized: dict[str, Any] = {}
     for key in _BUILD_TOP_KEYS:
         if key in payload:
@@ -126,11 +212,13 @@ def _pick_latest_build(
         # 정렬 안정성: timestamp 가 빈 값이면 buildId 의 사전식 비교로 fallback.
         return (1 if ts else 0, ts + b.get("buildId", ""))
 
-    active = [b for b in builds if b.get("status") in _ACTIVE_BUILD_STATUSES]
+    def _status(b: dict[str, Any]) -> str | None:
+        return _resolve_status(b)
+
+    active = [b for b in builds if _is_active(_status(b))]
     if active:
         return sorted(active, key=_key, reverse=True)[0]
-    # terminal 만 있을 때
-    terminal = [b for b in builds if b.get("status") in _TERMINAL_BUILD_STATUSES]
+    terminal = [b for b in builds if _status(b) in _TERMINAL_BUILD_STATUSES]
     if terminal:
         return sorted(terminal, key=_key, reverse=True)[0]
     # 알 수 없는 status 만 있을 때 — 가장 최근 1건 그대로 반환

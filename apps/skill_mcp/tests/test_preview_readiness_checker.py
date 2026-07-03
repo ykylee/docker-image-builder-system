@@ -143,7 +143,8 @@ class ClassificationTests(unittest.TestCase):
             },
         })
         self.assertEqual(r.readiness_state, "READY")
-        self.assertEqual(r.card.next_action, "OPEN_PREVIEW")
+        # TASK-061: OPEN_PREVIEW → OPEN_DEPLOYMENT
+        self.assertEqual(r.card.next_action, "OPEN_DEPLOYMENT")
         self.assertEqual(r.card.subtitle, "http://preview.example.com:38124")
 
     def test_preview_ready_with_unhealthy_probe_is_degraded(self):
@@ -210,9 +211,10 @@ class CardContentTests(unittest.TestCase):
                 "previewUrl": "http://example.com:12345",
             },
         })
-        self.assertIn("미리보기 주소", r.card.title)
+        # TASK-061: card title evolved from "미리보기 주소" to "테스트 컨테이너"
+        self.assertIn("테스트 컨테이너", r.card.title)
         self.assertEqual(r.card.subtitle, "http://example.com:12345")
-        self.assertIn("이 주소로", r.card.body)
+        self.assertIn("결과", r.card.body)
 
     def test_non_ready_card_has_empty_subtitle(self):
         r = core.check_readiness({
@@ -331,7 +333,7 @@ class ResultEnvelopeTests(unittest.TestCase):
             self.assertIn(ck, d["card"])
         self.assertEqual(d["ref"]["contract_doc"], "docs/sdlc/contracts/01-shared-build-contract-baseline.md")
         self.assertEqual(d["ref"]["design_doc"], "docs/sdlc/design/06-user-messaging-and-failure-handling.md")
-        self.assertEqual(d["ref"]["skill_version"], "v1")
+        self.assertEqual(d["ref"]["skill_version"], "v2")
 
 
 # ---------------------------------------------------------------------------

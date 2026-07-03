@@ -1,7 +1,13 @@
-"""failure-summary core.
+"""failure-summary core (v2 — canonical contract aligned).
 
 `summarize(input_data)` 가 P1 skill `failure-summary-shaper` 의 `shape()` 를
 호출해 4-구조 한국어 사용자 메시지로 변환한다. thin wrapper.
+
+TASK-061 contract rename:
+- 출력 envelope 의 `source` (legacy build/preview) → `stage`
+  (canonical BUILD/TEST/DEPLOY/DELIVERY). skill 이 canonical stage
+  을 emit 하므로 MCP 도 그대로 통과시킨다.
+- MCP_VERSION v1 → v2.
 
 자세한 동작 규칙은 같은 디렉터리의 MCP.md §3 을 따른다.
 """
@@ -13,7 +19,7 @@ from typing import Any
 
 from apps.skill_mcp.skills.failure_summary_shaper import shape as skill_shape
 
-MCP_VERSION = "v1"
+MCP_VERSION = "v2"
 
 
 @dataclass
@@ -27,7 +33,7 @@ class FailureSummaryResult:
     build_id: str | None = None
     logs_excerpt: str | None = None
     next_action: str | None = None
-    source: str | None = None
+    stage: str | None = None
     error_code: str | None = None
     warnings: list[dict[str, str]] = field(default_factory=list)
     errors: list[dict[str, str]] = field(default_factory=list)
@@ -42,7 +48,7 @@ class FailureSummaryResult:
             "buildId": self.build_id,
             "logs_excerpt": self.logs_excerpt,
             "next_action": self.next_action,
-            "source": self.source,
+            "stage": self.stage,
             "error_code": self.error_code,
             "warnings": list(self.warnings),
             "errors": list(self.errors),
@@ -96,6 +102,17 @@ def summarize(input_data: Any) -> FailureSummaryResult:
     skill_result = skill_shape(shape_input)
 
     # warnings/errors 전달 (failure-summary-shaper 의 것을 그대로 노출)
+    # stage 가 canonical union 의 한 값인지 가볍게 검증 (skill 이 이미 검증하지만,
+    # MCP 표면에서 한 번 더 보고).
+    from apps.skill_mcp.contract import canonical as C
+    stage_value = skill_result.stage
+    if isinstance(stage_value, str) and stage_value not in C.CANONICAL_BUILD_STATUSES and stage_value not in {"BUILD", "TEST", "DEPLOY", "DELIVERY"}:
+        warnings.append({
+            "code": "UNKNOWN_ENUM",
+            "field": "stage",
+            "message": f"unexpected stage from skill: {stage_value!r}",
+        })
+
     return FailureSummaryResult(
         ok=skill_result.ok,
         summary=skill_result.summary,
@@ -104,7 +121,7 @@ def summarize(input_data: Any) -> FailureSummaryResult:
         build_id=skill_result.build_id,
         logs_excerpt=skill_result.logs_excerpt,
         next_action=skill_result.next_action,
-        source=skill_result.source,
+        stage=skill_result.stage,
         error_code=skill_result.error_code,
         warnings=list(skill_result.warnings) + warnings,
         errors=list(skill_result.errors) + errors,
