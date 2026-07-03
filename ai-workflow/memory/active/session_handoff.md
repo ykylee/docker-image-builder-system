@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 11: TASK-031/032/033 P1 잔여 3종 모두 추가, 83 tests, total 215)
+- Updated: 2026-07-03 (rev 12: PR #3 머지 반영, TASK-025~033 모두 main 합류, 후속 TASK-017 stdio transport 또는 P2 후보)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus

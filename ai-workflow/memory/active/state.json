@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "TASK-031 (failure-summary-shaper skill) + TASK-032 (failure-summary MCP) + TASK-033 (preview-readiness-checker skill) 3종 구현. 총 83 tests 추가 (25 + 16 + 42), 전체 215 tests OK. P0+P1 8종 (skill 5종 + MCP 3종) 모두 구현. OI-009 (실패 요약 책임) / OI-005 (preview 인증) / OI-006 (TTL) / OI-010 (concurrency) 는 P1 결정 사항으로 미결 유지.",
-  "purpose_digest_rev": "34",
+  "purpose_digest": "PR #3 머지 완료 (4307d83, TASK-025~033 일괄): P0+P1 8종 (skill 5종 + MCP 3종) + plan 1종 + skill-mcp cross-ref 정정 1건. 215 tests OK. 후속: P2 후보 (preview-ttl, dockerfile-template-suggest), TASK-017 stdio transport 활성화, contract-drift-checker 24건 drift 해소 (PKG-001 owner 결정 필요).",
+  "purpose_digest_rev": "35",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,8 +28,8 @@
   },
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-    "current_axis": "P1 후보 3종 (failure-summary-shaper / failure-summary / preview-readiness-checker) 모두 구현. P0+P1 8종 (skill 5종 + MCP 3종) 완성. 후속: PR #3 머지 (TASK-025~033 일괄), 또는 P2 후보 (preview-ttl, dockerfile-template-suggest), 또는 TASK-017 stdio transport.",
-    "current_focus": "TASK-031/032/033 P1 잔여 3종 모두 구현 완료 (skill 2종 + MCP 1종)",
+    "current_axis": "PR #3 머지 완료(squash 4307d83, 52 files, +7174/-10). 우리 시스템 skill 5종 + MCP 3종 + plan 1종이 main 합류. TASK-017 stdio transport 활성화 또는 P2 후보 (preview-ttl / dockerfile-template-suggest) 가 다음.",
+    "current_focus": "PR #3 (TASK-025~033) main 합류, 메타 동기화 마무리",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
@@ -114,6 +114,7 @@
     ]
   },
   "next_documents": [
+    "docs/sdlc/13-skills-and-mcp-plan.md",
     "ai-workflow/memory/active/state.json",
     "ai-workflow/memory/active/session_handoff.md",
     "ai-workflow/memory/active/work_backlog.md",
