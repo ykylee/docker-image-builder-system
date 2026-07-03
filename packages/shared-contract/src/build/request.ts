@@ -48,6 +48,14 @@ export const buildListQuerySchema = z
         description:
           "Optional status filter. Matches the canonical BuildStatus enum. Omitted = all."
       }),
+    requestedBy: z
+      .string()
+      .min(1)
+      .optional()
+      .meta({
+        description:
+          "Optional owner filter. Matches BuildRequest.requestedBy (canonical owner identity, same as IDENTITY_MODEL userId). Omitted = all."
+      }),
     limit: z
       .coerce
       .number()
@@ -71,7 +79,7 @@ export const buildListQuerySchema = z
   .meta({
     id: "BuildListQuery",
     description:
-      "Query string for GET /builds. status filter is optional, limit is server-capped, cursor is opaque (buildId-based)."
+      "Query string for GET /builds. status and requestedBy filters are optional, limit is server-capped, cursor is opaque (buildId-based)."
   });
 
 export type BuildListQuery = z.infer<typeof buildListQuerySchema>;

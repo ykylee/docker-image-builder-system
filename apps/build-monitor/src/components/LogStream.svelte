@@ -41,24 +41,24 @@
     accent-color: var(--color-accent-primary);
   }
   .stream {
-    background: #0b0c10; /* Always dark for terminal feel */
-    border: 1px solid var(--color-border-strong);
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
     border-radius: var(--radius-md);
     padding: var(--space-lg);
     font-family: var(--font-mono);
     font-size: var(--size-sm);
     line-height: var(--line-relaxed);
-    color: #e2e8f0;
+    color: var(--code-fg);
     margin: 0;
     max-height: 480px;
     overflow: auto;
     white-space: pre;
-    box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+    box-shadow: var(--code-inset-shadow);
   }
-  .stream.wrap { 
-    white-space: pre-wrap; 
-    word-break: break-word; 
+  .stream.wrap {
+    white-space: pre-wrap;
+    word-break: break-word;
   }
-  .at { color: #64748b; }
-  .phase { color: #38bdf8; font-weight: var(--weight-semibold); }
+  .at { color: var(--code-muted); }
+  .phase { color: var(--code-phase); font-weight: var(--weight-semibold); }
 </style>

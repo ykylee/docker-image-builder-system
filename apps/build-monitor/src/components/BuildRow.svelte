@@ -55,7 +55,9 @@
   .row td {
     border-bottom: 1px solid var(--color-border-subtle);
   }
-  .row:last-child td {
+  /* BuildRow 는 BuildsList 의 <table> 내부에서만 사용된다. 마지막 row
+     의 하단 border 는 table 의 border-radius 와 겹치지 않도록 제거. */
+  :global(tbody > tr.row:last-child) td {
     border-bottom: none;
   }
   td {

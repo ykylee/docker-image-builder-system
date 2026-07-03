@@ -58,8 +58,13 @@ export type BuildLogsResponse = {
   logs: BuildLogEntry[];
 };
 
+// listBuilds query params. requestedBy 는 IDENTITY_MODEL userId 와 같은
+// canonical owner key. generated openapi.d.ts 가 갱신되기 전까지는
+// BuildListQuery["requestedBy"] 가 없을 수 있어, listBuilds helper 에서는
+// 항상 raw string 으로 직렬화하고 type 은 자체 좁은 union 으로 둔다.
 export type ListBuildsParams = {
   status?: BuildListQuery["status"];
+  requestedBy?: string;
   limit?: BuildListQuery["limit"];
   cursor?: BuildListQuery["cursor"];
 };
@@ -67,10 +72,16 @@ export type ListBuildsParams = {
 export async function listBuilds(
   params: ListBuildsParams = {}
 ): Promise<BuildListResponse> {
+  // empty string 은 서버에 보내지 않는다.
+  const query: Record<string, string | number | undefined> = {};
+  if (params.status) query.status = params.status;
+  if (params.requestedBy) query.requestedBy = params.requestedBy;
+  if (params.limit !== undefined) query.limit = params.limit;
+  if (params.cursor) query.cursor = params.cursor;
   return (await apiGet(
     "/builds",
     "/builds",
-    { query: params }
+    { query }
   )) as BuildListResponse;
 }
 

@@ -12,6 +12,8 @@ export interface paths {
                 query?: {
                     /** @description Optional status filter. Matches the canonical BuildStatus enum. Omitted = all. */
                     status?: "QUEUED" | "BUILDING" | "COMPLETED" | "FAILED" | "PROVISIONING" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "TEST_READY" | "EXPIRED";
+                    /** @description Optional owner filter. Matches BuildRequest.requestedBy (canonical owner identity, same as IDENTITY_MODEL userId). Omitted = all. */
+                    requestedBy?: string;
                     /** @description Maximum number of summaries to return. Server cap is 200. Default 50. */
                     limit?: number;
                     /** @description Pagination cursor (buildId of the last item in the previous page). Omitted = first page. */
@@ -474,13 +476,15 @@ export interface components {
             reason: "ACTIVE_BUILD_EXISTS";
             build: components["schemas"]["BuildSummary"];
         };
-        /** @description Query string for GET /builds. status filter is optional, limit is server-capped, cursor is opaque (buildId-based). */
+        /** @description Query string for GET /builds. status and requestedBy filters are optional, limit is server-capped, cursor is opaque (buildId-based). */
         BuildListQuery: {
             /**
              * @description Optional status filter. Matches the canonical BuildStatus enum. Omitted = all.
              * @enum {string}
              */
             status?: "QUEUED" | "BUILDING" | "COMPLETED" | "FAILED" | "PROVISIONING" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "TEST_READY" | "EXPIRED";
+            /** @description Optional owner filter. Matches BuildRequest.requestedBy (canonical owner identity, same as IDENTITY_MODEL userId). Omitted = all. */
+            requestedBy?: string;
             /**
              * @description Maximum number of summaries to return. Server cap is 200. Default 50.
              * @default 50

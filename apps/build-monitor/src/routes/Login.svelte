@@ -31,13 +31,12 @@
     <form onsubmit={login}>
       <div class="input-group">
         <label for="userId">User ID</label>
-        <input 
-          id="userId" 
-          type="text" 
-          bind:value={userId} 
-          placeholder="e.g. admin or yklee" 
-          required 
-          autofocus
+        <input
+          id="userId"
+          type="text"
+          bind:value={userId}
+          placeholder="your-id"
+          required
         />
       </div>
       <button type="submit" class="btn-primary">Enter</button>
@@ -50,7 +49,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: calc(100vh - 120px);
+    /* header (64) + main padding-top (space-lg) + main padding-bottom (space-lg) */
+    min-height: calc(100vh - 64px - var(--space-lg) * 2);
     animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
   }
   @keyframes fadeIn {

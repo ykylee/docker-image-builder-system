@@ -1,19 +1,25 @@
 <script lang="ts">
-  import { link, push, location } from "svelte-spa-router";
+  import { onMount } from "svelte";
+  import { link, push } from "svelte-spa-router";
   import ThemeToggle from "./ThemeToggle.svelte";
 
   let userId = $state<string | null>(null);
 
-  // We check location to reactivity update userId when route changes
-  $effect(() => {
-    if ($location) {
-      userId = localStorage.getItem("userId");
-    }
+  // localStorage 와 컴포넌트 state 동기화. 라우트 변경에 의존하지 않고
+  // storage 이벤트로 다른 탭에서의 로그아웃까지 반영한다.
+  function readUserId(): void {
+    userId = localStorage.getItem("userId");
+  }
+
+  onMount(() => {
+    readUserId();
+    window.addEventListener("storage", readUserId);
+    return () => window.removeEventListener("storage", readUserId);
   });
 
   function logout() {
     localStorage.removeItem("userId");
-    userId = null;
+    readUserId();
     push("/");
   }
 </script>
@@ -49,6 +55,7 @@
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--glass-border);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
     transition: background-color var(--motion-duration-base) var(--motion-easing-standard);
   }
   .hdr-inner {

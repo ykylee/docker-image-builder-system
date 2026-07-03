@@ -89,27 +89,46 @@ spacing:
   lg: "16px"
   xl: "24px"
   xxl: "32px"
+  xxxl: "48px"
 
 # Radius
 radius:
-  sm: "4px"
-  md: "6px"
-  lg: "10px"
+  sm: "6px"
+  md: "10px"
+  lg: "16px"
   pill: "9999px"
 
-# Shadow
+# Shadow (dark mode)
 shadow:
-  card: "0 1px 2px rgba(0,0,0,0.4), 0 4px 8px rgba(0,0,0,0.2)"
-  modal: "0 8px 24px rgba(0,0,0,0.5)"
+  card: "0 4px 6px -1px rgba(0,0,0,0.5), 0 2px 4px -2px rgba(0,0,0,0.5)"
+  card-hover: "0 10px 15px -3px rgba(0,0,0,0.6), 0 4px 6px -4px rgba(0,0,0,0.6), 0 0 0 1px var(--color-accent-primary)"
+  modal: "0 20px 25px -5px rgba(0,0,0,0.6), 0 8px 10px -6px rgba(0,0,0,0.6)"
+  glow: "0 0 20px rgba(99,102,241,0.3)"
 
 # Motion
 motion:
   duration:
-    fast: "120ms"
-    base: "200ms"
-    slow: "320ms"
+    fast: "150ms"
+    base: "300ms"
+    slow: "500ms"
   easing:
-    standard: "cubic-bezier(0.2, 0, 0, 1)"
+    standard: "cubic-bezier(0.4, 0, 0.2, 1)"
+    bouncy: "cubic-bezier(0.34, 1.56, 0.64, 1)"
+
+# Code surface (terminal / log) — 양 테마 동일
+code:
+  bg: "#0b0c10"
+  fg: "#e2e8f0"
+  muted: "#64748b"
+  phase: "#38bdf8"
+  border: "var(--color-border-strong)"
+  inset-shadow: "inset 0 2px 4px rgba(0,0,0,0.5)"
+
+# Theme toggle
+# dark 가 default. light 모드 token override 는
+# apps/build-monitor/src/lib/tokens.css `:root[data-theme="light"]` 참조.
+# Build Server GET /builds 의 owner filter (`requestedBy`) 는 IDENTITY_MODEL
+# 의 userId 와 같은 canonical key 를 사용한다 (PR #8 server side).
 ```
 
 ## 2. Foundations

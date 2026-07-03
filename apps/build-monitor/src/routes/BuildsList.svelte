@@ -8,17 +8,21 @@
   let builds = $state<BuildSummary[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let userId = $state<string | null>(null);
 
   onMount(async () => {
-    userId = localStorage.getItem("userId");
-    if (!userId) {
+    const stored = localStorage.getItem("userId");
+    if (!stored) {
+      // 인증 정보 없음 → loading 해제 후 로그인으로 라우팅.
+      loading = false;
       push("/");
       return;
     }
-    
+
     try {
-      const result = await listBuilds();
+      // 서버 측 requestedBy 필터에 canonical owner key 를 그대로 넘긴다.
+      // (이전 PR 의 클라이언트 projectId.includes() 휴리스틱은 IDENTITY_MODEL
+      // 의 userId 정의와 어긋나 제거함.)
+      const result = await listBuilds({ requestedBy: stored });
       builds = result.builds;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
@@ -29,12 +33,12 @@
 
   // status filter chips
   let filter = $state<"ALL" | "BUILDING" | "COMPLETED" | "FAILED">("ALL");
-  
-  // filter by userId (matching projectId) and then by status
+
+  // status chip 만 클라이언트에서 적용 (서버는 requestedBy + status 동시
+  // 필터 가능하지만 status 는 응답 사이즈가 작은 편이고, 사용자 토글 반응
+  // 을 빠르게 주기 위해 chip 필터는 클라이언트에 둠).
   let visible = $derived(
-    builds
-      .filter((b) => !userId || b.projectId.includes(userId))
-      .filter((b) => filter === "ALL" || b.status === filter)
+    filter === "ALL" ? builds : builds.filter((b) => b.status === filter)
   );
 </script>
 

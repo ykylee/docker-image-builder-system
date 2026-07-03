@@ -26,6 +26,7 @@ import type {
 
 type StoredBuild = {
   summary: BuildSummary;
+  requestedBy: string;
   lastError: BuildError | null;
   logs: BuildLogEntry[];
   testDeployment: TestDeployment | null;
@@ -94,6 +95,7 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       builds.set(buildId, {
         summary,
+        requestedBy: input.requestedBy,
         lastError: null,
         logs: [logEntry],
         testDeployment: null
@@ -377,12 +379,22 @@ export function createMemoryBuildRepository(): BuildRepository {
     }
 ,
     async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
-      // Build summaries 를 (1) status filter, (2) cursor skip, (3) createdAt
-      // desc 정렬, (4) limit 적용. cursor 는 buildId 기준 opaque pointer.
-      let all = [...builds.values()].map((b) => b.summary);
+      // Build summaries 를 (1) status filter, (2) requestedBy filter,
+      // (3) cursor skip, (4) createdAt desc 정렬, (5) limit 적용. cursor 는
+      // buildId 기준 opaque pointer. requestedBy 는 StoredBuild 에 보관된
+      // canonical owner key 로 매칭 (BuildSummary 에는 노출되지 않음).
+      const stored = [...builds.values()];
+      let all = stored.map((b) => b.summary);
 
       if (query.status) {
         all = all.filter((b) => b.status === query.status);
+      }
+      if (query.requestedBy) {
+        const owner = query.requestedBy;
+        const allowed = new Set(
+          stored.filter((b) => b.requestedBy === owner).map((b) => b.summary.buildId)
+        );
+        all = all.filter((b) => allowed.has(b.buildId));
       }
 
       // Sort by createdAt desc (newest first) — primary stable order.

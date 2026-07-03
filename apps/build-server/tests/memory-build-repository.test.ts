@@ -209,6 +209,32 @@ describe("MemoryBuildRepository: listBuilds", () => {
     assert.equal(completed.builds[0]?.buildId, b.response.build.buildId);
   });
 
+  it("filters by requestedBy (owner)", async () => {
+    const repo = createMemoryBuildRepository();
+    await repo.createBuild({
+      ...baseRequest,
+      projectId: "p-a",
+      repositoryId: "r-a",
+      requestedBy: "yklee"
+    });
+    await repo.createBuild({
+      ...baseRequest,
+      projectId: "p-b",
+      repositoryId: "r-b",
+      requestedBy: "other-user"
+    });
+
+    const all = await repo.listBuilds({ limit: 50 });
+    assert.equal(all.builds.length, 2);
+
+    const mine = await repo.listBuilds({ limit: 50, requestedBy: "yklee" });
+    assert.equal(mine.builds.length, 1);
+    assert.equal(mine.builds[0]?.projectId, "p-a");
+
+    const others = await repo.listBuilds({ limit: 50, requestedBy: "unknown" });
+    assert.equal(others.builds.length, 0);
+  });
+
   it("paginates with limit and cursor", async () => {
     const repo = createMemoryBuildRepository();
     const ids: string[] = [];
