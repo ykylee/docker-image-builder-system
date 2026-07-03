@@ -1,30 +1,155 @@
 package hostclient
 
-import "context"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"time"
+)
 
+// BuildControlClient 는 Host Server 의 build control endpoint 들을 호출한다.
+// - ClaimNextBuild: POST /builds/claim
+// - ReportPhase: POST /builds/:buildId/phase
 type BuildControlClient interface {
 	ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error)
-	MarkBuildClaimed(ctx context.Context, buildID string) error
+	ReportPhase(ctx context.Context, buildID, phase, runnerID string) error
 }
 
+// ClaimedBuildResponse 는 Host Server POST /builds/claim 응답에서
+// claimed=true 일 때만 사용. claimed=false (NO_BUILD_AVAILABLE / ACTIVE_BUILD_EXISTS)
+// 일 때는 nil + error nil 로 표현.
 type ClaimedBuildResponse struct {
-	BuildID string
+	BuildID    string `json:"buildId"`
+	ProjectID  string `json:"projectId"`
+	RepositoryID string `json:"repositoryId"`
+	Status     string `json:"status"`
+	Phase      string `json:"phase"`
+	UpdatedAt  string `json:"updatedAt"`
 }
 
-type NoopBuildControlClient struct {
+type claimResponseBody struct {
+	Claimed bool                    `json:"claimed"`
+	Build   *buildStatusResponseBody `json:"build"`
+	Reason  string                  `json:"reason"`
+}
+
+// buildStatusResponseBody 는 Host Server BuildStatusResponse 의 한 단계 풀린 wrapper.
+// 실제로는 { build: BuildSummary, lastError } 이므로 그 한 단계 더 풀어야 함.
+type buildStatusResponseBody struct {
+	Build     *buildSummaryBody `json:"build"`
+	LastError any               `json:"lastError"`
+}
+
+type buildSummaryBody struct {
+	BuildID      string `json:"buildId"`
+	ProjectID    string `json:"projectId"`
+	RepositoryID string `json:"repositoryId"`
+	Status       string `json:"status"`
+	Phase        string `json:"phase"`
+	UpdatedAt    string `json:"updatedAt"`
+}
+
+type phaseRequestBody struct {
+	Phase    string `json:"phase"`
+	RunnerID string `json:"runnerId"`
+}
+
+// HTTPBuildControlClient 는 Host Server 와 HTTP 로 통신하는 client.
+type HTTPBuildControlClient struct {
 	baseURL string
+	http    *http.Client
+}
+
+func NewHTTPBuildControlClient(baseURL string) *HTTPBuildControlClient {
+	return &HTTPBuildControlClient{
+		baseURL: baseURL,
+		http:    &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error) {
+	body, _ := json.Marshal(map[string]any{"runnerId": "default-runner"})
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/builds/claim", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("claim failed: status=%d body=%s", res.StatusCode, string(raw))
+	}
+
+	var resp claimResponseBody
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return nil, fmt.Errorf("claim: failed to decode response: %w", err)
+	}
+
+	if !resp.Claimed {
+		// NO_BUILD_AVAILABLE / ACTIVE_BUILD_EXISTS 둘 다 nil 응답.
+		return nil, nil
+	}
+
+	if resp.Build == nil || resp.Build.Build == nil {
+		return nil, fmt.Errorf("claim: claimed=true but build is null")
+	}
+	inner := resp.Build.Build
+
+	return &ClaimedBuildResponse{
+		BuildID:      inner.BuildID,
+		ProjectID:    inner.ProjectID,
+		RepositoryID: inner.RepositoryID,
+		Status:       inner.Status,
+		Phase:        inner.Phase,
+		UpdatedAt:    inner.UpdatedAt,
+	}, nil
+}
+
+func (c *HTTPBuildControlClient) ReportPhase(ctx context.Context, buildID, phase, runnerID string) error {
+	body, _ := json.Marshal(phaseRequestBody{Phase: phase, RunnerID: runnerID})
+	url := fmt.Sprintf("%s/builds/%s/phase", c.baseURL, buildID)
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusOK {
+		return nil
+	}
+
+	raw, _ := io.ReadAll(res.Body)
+	return fmt.Errorf("report phase failed: buildID=%s phase=%s status=%d body=%s", buildID, phase, res.StatusCode, string(raw))
+}
+
+// NoopBuildControlClient 는 테스트 / dry-run 용. 모든 호출이 no-op.
+type NoopBuildControlClient struct {
+	BaseURL string
 }
 
 func NewNoopBuildControlClient(baseURL string) *NoopBuildControlClient {
-	return &NoopBuildControlClient{
-		baseURL: baseURL,
-	}
+	return &NoopBuildControlClient{BaseURL: baseURL}
 }
 
 func (c *NoopBuildControlClient) ClaimNextBuild(context.Context) (*ClaimedBuildResponse, error) {
 	return nil, nil
 }
 
-func (c *NoopBuildControlClient) MarkBuildClaimed(context.Context, string) error {
+func (c *NoopBuildControlClient) ReportPhase(context.Context, string, string, string) error {
 	return nil
 }
