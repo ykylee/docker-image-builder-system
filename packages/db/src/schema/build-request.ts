@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // v0.2 schema (TASK-045): appName 이 canonical identifier 다. legacy
@@ -11,14 +12,25 @@ export const buildRequestTable = pgTable("build_request", {
   requestedBy: text("requested_by").notNull(),
   status: text("status").notNull(),
   phase: text("phase").notNull(),
+  // Legacy preview-era field. Retained during TASK-053 so the current
+  // repository/service paths continue to work while build_test /
+  // deployment_attempt adoption is phased in.
   previewStatus: text("preview_status").notNull(),
+  phaseHistory: jsonb("phase_history")
+    .$type<Array<{ phase: string; completedAt: string }>>()
+    .notNull()
+    .default(sql`'[]'::jsonb`),
   sourceArchiveKey: text("source_archive_key").notNull(),
   sourceArchiveChecksumSha256: text("source_archive_checksum_sha256").notNull(),
   sourceArchiveSizeBytes: integer("source_archive_size_bytes").notNull(),
   entrypointPath: text("entrypoint_path").notNull(),
   dockerfilePath: text("dockerfile_path").notNull(),
+  // Legacy preview runtime retention knob. Canonical test lifecycle data
+  // moves to build_test; this stays until the route/service migration lands.
   previewTtlMinutes: integer("preview_ttl_minutes").notNull(),
   metadata: jsonb("metadata").$type<Record<string, string>>().notNull(),
+  // Legacy preview-era runtime URL. Canonical runtime/deploy refs will move
+  // into build_test.runtime_url / deployment_attempt.result_ref.
   previewUrl: text("preview_url"),
   lastErrorCode: text("last_error_code"),
   lastErrorMessage: text("last_error_message"),

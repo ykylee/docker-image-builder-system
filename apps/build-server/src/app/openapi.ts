@@ -24,14 +24,21 @@ import {
   adminUserListResponseSchema,
   buildErrorSchema,
   buildAcceptedResponseSchema,
+  buildCurrentPhaseSchema,
   buildDuplicateResponseSchema,
+  buildImageSchema,
+  buildLifecycleSchema,
   buildListQuerySchema,
   buildListResponseSchema,
   buildStatusResponseSchema,
   buildLogsResponseSchema,
   claimRequestSchema,
   claimResponseSchema,
+  containerTestResultSchema,
+  deploymentReportRequestSchema,
+  deploymentResultSchema,
   phaseUpdateRequestSchema,
+  resultDeliverySchema,
   testDeploymentSchema,
   testDeploymentQueueRequestSchema,
   testDeploymentQueueResponseSchema,
@@ -54,6 +61,13 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "BuildError", schema: buildErrorSchema },
   { id: "BuildAcceptedResponse", schema: buildAcceptedResponseSchema },
   { id: "BuildDuplicateResponse", schema: buildDuplicateResponseSchema },
+  { id: "BuildLifecycle", schema: buildLifecycleSchema },
+  { id: "BuildCurrentPhase", schema: buildCurrentPhaseSchema },
+  { id: "BuildImage", schema: buildImageSchema },
+  { id: "ContainerTestResult", schema: containerTestResultSchema },
+  { id: "DeploymentReportRequest", schema: deploymentReportRequestSchema },
+  { id: "DeploymentResult", schema: deploymentResultSchema },
+  { id: "ResultDelivery", schema: resultDeliverySchema },
   { id: "BuildListQuery", schema: buildListQuerySchema },
   { id: "BuildListResponse", schema: buildListResponseSchema },
   { id: "BuildStatusResponse", schema: buildStatusResponseSchema },
@@ -184,6 +198,19 @@ registry.registerPath({
   tags: ["Test Deployment"],
   request: { params: z.object({ buildId: z.string().uuid() }), body: { content: { "application/json": { schema: testDeploymentStatusRequestSchema } } } },
   responses: { 200: { description: "Status recorded." } }
+});
+registry.registerPath({
+  method: "post",
+  path: "/builds/{buildId}/deployment",
+  description: "Runner reports external deployment progress and final result.",
+  tags: ["Deployment"],
+  request: { params: z.object({ buildId: z.string().uuid() }), body: { content: { "application/json": { schema: deploymentReportRequestSchema } } } },
+  responses: {
+    200: {
+      description: "Deployment state recorded. Response carries the canonical BuildStatusResponse with the just-updated `deploy` and `resultDelivery` blocks.",
+      content: { "application/json": { schema: buildStatusResponseSchema } }
+    }
+  }
 });
 registry.registerPath({
   method: "get",

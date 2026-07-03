@@ -5,7 +5,7 @@
 - 대상 독자: 프로젝트 리드, 플랫폼 운영자, Build Server/Runner 설계자
 - 상태: baseline
 - 최종 수정일: 2026-07-02
-- 관련 문서: `docs/sdlc/SRS/05-open-issues-and-decisions.md`, `docs/PREVIEW_POLICY.md`, `docs/sdlc/design/05-build-and-preview-execution-flow.md`
+- 관련 문서: `docs/sdlc/SRS/05-open-issues-and-decisions.md`, `docs/sdlc/SRS/04-policy-and-constraints.md`, `docs/sdlc/design/05-build-and-preview-execution-flow.md`
 
 ## 1. 결정 ID
 
@@ -56,7 +56,7 @@ http://preview-host.example.com:38124
 
 ## 7. 영향 문서
 
-- `docs/PREVIEW_POLICY.md`
+- `docs/sdlc/SRS/04-policy-and-constraints.md`
 - `docs/sdlc/SRS/04-policy-and-constraints.md`
 - `docs/sdlc/design/01-system-context-and-responsibilities.md`
 - `docs/sdlc/design/03-api-contract-design.md`

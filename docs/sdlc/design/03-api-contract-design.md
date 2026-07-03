@@ -1,10 +1,10 @@
 # Step 04 Design 03 - API Contract Design
 
-- 문서 목적: Docker Build Preview Platform MVP의 외부 API 계약을 정의한다.
+- 문서 목적: Docker Build And Deployment Automation Platform MVP의 외부 API 계약을 정의한다.
 - 범위: build 요청, 상태 조회, 로그 조회, 오류 응답, 공통 응답 규칙
 - 대상 독자: 설계자, 구현 담당자, AI 에이전트, 프로젝트 리드
 - 상태: draft
-- 최종 수정일: 2026-07-02
+- 최종 수정일: 2026-07-03
 - 관련 문서: `docs/sdlc/design/01-system-context-and-responsibilities.md`, `docs/sdlc/design/02-domain-model-and-state-transitions.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`, `docs/sdlc/SRS/04-policy-and-constraints.md`
 
 ## Traceability
@@ -23,15 +23,15 @@
 - 어떤 endpoint가 필요한가
 - 요청/응답의 최소 필드는 무엇인가
 - 중복 build는 어떤 응답으로 표현하는가
-- 상태/로그/preview 정보는 어떤 구조로 노출하는가
+- build/test/deploy 정보는 어떤 구조로 노출하는가
 
 ## 2. API 설계 원칙
 
 - API는 Build Server가 system-of-record라는 전제를 따른다.
 - 사용자에게 직접 노출되는 세부값보다 AI 에이전트가 해석하기 좋은 구조를 우선한다.
-- build 상태와 preview 상태를 분리하되, 상태 조회 응답에서는 함께 제공할 수 있어야 한다.
-- URL 전략이 바뀌어도 API 스키마가 크게 흔들리지 않도록 `previewUrl`은 일반 문자열 필드로 둔다.
-- build 중복 차단과 preview service 자원 대기는 서로 다른 상태로 표현해야 한다.
+- build 상태, test 상태, deploy 상태를 분리하되 상태 조회 응답에서는 함께 제공할 수 있어야 한다.
+- 입력 채널이 달라도 내부 계약은 하나의 build job 표현으로 정규화되어야 한다.
+- build 중복 차단, 테스트 실행, 외부 배포 진행 중은 서로 다른 상태로 표현해야 한다.
 
 ## 3. MVP Endpoint 목록
 
@@ -48,8 +48,8 @@
 목적:
 
 - build 상태 조회
-- preview 상태/URL 조회
-- 오류 정보 조회
+- 컨테이너 테스트 상태 조회
+- 외부 배포 상태 조회
 
 ### 3.3 `GET /builds/{buildId}/logs`
 
@@ -57,16 +57,16 @@
 
 - build 실행 로그 조회
 
-### 3.4 `POST /builds/{buildId}/cancel`
+### 3.4 `GET /jobs/{jobId}`
 
 목적:
 
-- 향후 cancel 지원을 위한 예약 endpoint
+- 외부 시스템 또는 사용자 측 polling 상태 조회
 
 설계 메모:
 
-- MVP 필수 구현 범위에서는 `POST /builds`, `GET /builds/{buildId}`, `GET /builds/{buildId}/logs`를 우선한다.
-- `cancel`은 계약만 정의하고 실제 동작은 후순위 구현으로 둘 수 있다.
+- `jobId`는 `buildId`와 동일한 식별자를 공유해도 된다.
+- polling을 기본 전달 모델로 채택하면 `GET /jobs/{jobId}`는 `GET /builds/{buildId}`의 alias 또는 consumer-specific facade가 될 수 있다.
 
 ## 4. 공통 데이터 타입
 
@@ -79,7 +79,8 @@
 ### 4.2 상태 필드
 
 - `build.status`: build lifecycle 상태
-- `testDeployment.status`: preview lifecycle 상태
+- `test.status`: container validation lifecycle 상태
+- `deploy.status`: external deployment lifecycle 상태
 
 ### 4.3 시간 필드
 
@@ -106,7 +107,7 @@
 
 ### 5.1 요청 목적
 
-- AI 에이전트가 준비한 build 입력물을 Build Server에 등록한다.
+- AI 에이전트 또는 외부 사용자가 준비한 build 입력물을 Build Server에 등록한다.
 
 ### 5.2 요청 필드
 
@@ -114,13 +115,15 @@
 
 - `userId`
 - `appName`
-- `sourceArchiveRef`
+- `input`
+- `dockerfile`
 
 권장 필드:
 
-- `dockerfileMode`
-- `detectedAppType`
 - `runtimePort`
+- `healthCheck`
+- `deployTarget`
+- `callback`
 - `metadata`
 
 요청 예시:
@@ -129,13 +132,27 @@
 {
   "userId": "user001",
   "appName": "todo-app",
-  "sourceArchiveRef": "archive-20260702-0001",
-  "dockerfileMode": "provided",
-  "detectedAppType": "node-vite",
+  "input": {
+    "type": "git",
+    "gitRepositoryUrl": "https://github.com/example/todo-app.git"
+  },
+  "dockerfile": {
+    "mode": "inline",
+    "content": "FROM node:22-alpine ..."
+  },
   "runtimePort": 3000,
+  "healthCheck": {
+    "type": "http",
+    "path": "/health"
+  },
+  "deployTarget": {
+    "type": "http",
+    "endpoint": "https://deploy.example.com/api/images"
+  },
   "metadata": {
     "generatedBy": "docker-build-skill",
-    "dockerfilePath": "Dockerfile"
+    "dockerfilePath": "Dockerfile",
+    "sourceMode": "git"
   }
 }
 ```
@@ -151,7 +168,7 @@
     "buildId": "bld-20260702-000124",
     "userId": "user001",
     "appName": "todo-app",
-    "status": "QUEUED",
+    "status": "RECEIVED",
     "createdAt": "2026-07-02T10:18:00+09:00",
     "statusUrl": "/builds/bld-20260702-000124"
   }
@@ -169,7 +186,7 @@
     "buildId": "bld-20260702-000123",
     "userId": "user001",
     "appName": "todo-app",
-    "status": "BUILDING",
+    "status": "PREPARING_SOURCE",
     "createdAt": "2026-07-02T10:15:20+09:00",
     "statusUrl": "/builds/bld-20260702-000123"
   }
@@ -185,7 +202,7 @@
 
 ### 6.1 응답 목적
 
-- build 상태와 preview 상태를 한 번에 조회한다.
+- build 상태, test 상태, deploy 상태를 한 번에 조회한다.
 
 ### 6.2 기본 응답 구조
 
@@ -200,12 +217,23 @@
   "startedAt": "2026-07-02T10:19:00+09:00",
   "finishedAt": null,
   "image": null,
-  "testDeployment": null,
+  "test": {
+    "status": "NOT_STARTED",
+    "containerRunning": null,
+    "healthCheckPassed": null,
+    "portOpen": null,
+    "stabilityWindowPassed": null
+  },
+  "deploy": {
+    "status": "NOT_STARTED",
+    "targetType": "http",
+    "resultRef": null
+  },
   "error": null
 }
 ```
 
-### 6.3 preview 준비 완료 응답 예시
+### 6.3 테스트 성공 및 배포 완료 응답 예시
 
 ```json
 {
@@ -213,51 +241,59 @@
   "userId": "user001",
   "appName": "todo-app",
   "status": "COMPLETED",
-  "currentPhase": "preview ready",
+  "currentPhase": "deploy completed",
   "createdAt": "2026-07-02T10:18:00+09:00",
   "startedAt": "2026-07-02T10:19:00+09:00",
   "finishedAt": "2026-07-02T10:22:10+09:00",
   "image": {
-    "name": "preview.example.com/user001/todo-app",
+    "name": "deploy.example.com/user001/todo-app",
     "tag": "bld-20260702-000124",
     "digest": null
   },
-  "testDeployment": {
-    "status": "READY",
-    "previewUrl": "http://preview-host.example.com:38124",
-    "host": "preview-host.example.com",
-    "hostPort": 38124,
-    "internalPort": 3000,
-    "expiresAt": "2026-07-03T10:18:00+09:00"
+  "test": {
+    "status": "SUCCESS",
+    "containerRunning": true,
+    "healthCheckPassed": true,
+    "portOpen": true,
+    "stabilityWindowPassed": true
+  },
+  "deploy": {
+    "status": "SUCCESS",
+    "targetType": "http",
+    "resultRef": "deploy-20260702-001"
   },
   "error": null
 }
 ```
 
-### 6.4 preview service 대기 응답 예시
+### 6.4 테스트 성공 후 배포 진행 중 응답 예시
 
 ```json
 {
   "buildId": "bld-20260702-000124",
   "userId": "user001",
   "appName": "todo-app",
-  "status": "TEST_DEPLOYING",
-  "currentPhase": "preview service queued",
+  "status": "DEPLOYING",
+  "currentPhase": "external deployment",
   "createdAt": "2026-07-02T10:18:00+09:00",
   "startedAt": "2026-07-02T10:19:00+09:00",
   "finishedAt": null,
   "image": {
-    "name": "preview.example.com/user001/todo-app",
+    "name": "deploy.example.com/user001/todo-app",
     "tag": "bld-20260702-000124",
     "digest": null
   },
-  "testDeployment": {
-    "status": "QUEUED",
-    "previewUrl": null,
-    "host": null,
-    "hostPort": null,
-    "internalPort": 3000,
-    "expiresAt": null
+  "test": {
+    "status": "SUCCESS",
+    "containerRunning": true,
+    "healthCheckPassed": true,
+    "portOpen": true,
+    "stabilityWindowPassed": true
+  },
+  "deploy": {
+    "status": "IN_PROGRESS",
+    "targetType": "http",
+    "resultRef": null
   },
   "error": null
 }
@@ -276,7 +312,18 @@
   "startedAt": "2026-07-02T10:19:00+09:00",
   "finishedAt": "2026-07-02T10:21:00+09:00",
   "image": null,
-  "testDeployment": null,
+  "test": {
+    "status": "NOT_STARTED",
+    "containerRunning": null,
+    "healthCheckPassed": null,
+    "portOpen": null,
+    "stabilityWindowPassed": null
+  },
+  "deploy": {
+    "status": "NOT_STARTED",
+    "targetType": "http",
+    "resultRef": null
+  },
   "error": {
     "code": "DOCKER_BUILD_FAILED",
     "message": "Docker 이미지 빌드에 실패했습니다."
@@ -287,9 +334,10 @@
 ### 6.6 상태 조회 계약 원칙
 
 - `status`는 build 상태다.
-- preview 실행 정보는 `testDeployment` 아래에 둔다.
-- preview URL이 없더라도 `testDeployment.status`는 존재할 수 있다.
-- `testDeployment.status = QUEUED`는 build는 진행 중이지만 preview 실행 자원을 기다리는 상태를 뜻한다.
+- 컨테이너 검증 결과는 `test` 아래에 둔다.
+- 외부 시스템 배포 결과는 `deploy` 아래에 둔다.
+- 테스트가 아직 시작되지 않았더라도 `test.status`는 존재할 수 있다.
+- `deploy.status = IN_PROGRESS`는 build와 test는 통과했지만 외부 배포가 아직 끝나지 않은 상태를 뜻한다.
 - 실패 시 `error`는 nullable 구조를 유지한다.
 
 ## 7. `GET /builds/{buildId}/logs`
@@ -317,21 +365,10 @@
 - phase는 build 상태 모델과 호환되는 문자열을 사용한다.
 - 사용자 직접 노출보다 AI 에이전트/운영자 해석을 우선한다.
 
-## 8. `POST /builds/{buildId}/cancel`
-
-### 8.1 목적
-
-- 향후 build 취소 기능을 위한 확장 포인트
-
-### 8.2 현재 단계 정책
-
-- 계약은 예약해두되, MVP 필수 구현 범위에는 포함하지 않는다.
-- 실제 지원 전까지는 `NOT_IMPLEMENTED` 응답도 허용 가능하다.
-
-## 9. HTTP 상태 코드 원칙
+## 8. HTTP 상태 코드 원칙
 
 - `200 OK`: 상태 조회 성공, 기존 active build 응답 포함
-- `201 Created` 또는 `200 OK`: 신규 build 접수 성공
+- `202 Accepted` 또는 `200 OK`: 신규 build 접수 성공
 - `400 Bad Request`: 필수 필드 누락, 스키마 오류
 - `404 Not Found`: `buildId` 없음
 - `500 Internal Server Error`: 서버 내부 예외
@@ -341,7 +378,7 @@
 - active build 존재는 `409 Conflict` 대신 business response로 처리한다.
 - 이유: 사용자 경험상 오류라기보다 "이미 같은 작업이 진행 중"인 상태이기 때문이다.
 
-## 10. 공통 오류 응답 예시
+## 9. 공통 오류 응답 예시
 
 ```json
 {
@@ -352,19 +389,20 @@
 }
 ```
 
-## 11. API 계약과 도메인 모델 연결
+## 10. API 계약과 도메인 모델 연결
 
 - `build.status`는 `BuildRequest.status`와 직접 연결된다.
-- `testDeployment.status`는 `TestDeployment.status`와 직접 연결된다.
+- `test.status`는 `BuildTest.status` 또는 동등 검증 레코드와 직접 연결된다.
+- `deploy.status`는 `DeploymentAttempt.status` 또는 동등 배포 레코드와 직접 연결된다.
 - `buildId`, `userId`, `appName`은 모든 주요 응답에서 traceability를 위해 유지한다.
 
-## 12. 후속 설계 문서로 넘길 포인트
+## 11. 후속 설계 문서로 넘길 포인트
 
 - DB 필드 상세와 인덱스는 `04-data-model-design.md`
 - Runner 단계별 시퀀스와 phase 기록은 `05-build-and-preview-execution-flow.md`
 - 사용자 메시지 변환 규칙은 `06-user-messaging-and-failure-handling.md`
 
-## 13. 현 단계 결론
+## 12. 현 단계 결론
 
-- MVP API는 작고 명확한 세 개의 핵심 endpoint로 시작하는 것이 적절하다.
-- active build 응답, build 상태와 preview 상태 분리, preview URL 일반 문자열화가 이 계약의 핵심 결정이다.
+- MVP API는 작고 명확한 build intake + status polling 중심 endpoint로 시작하는 것이 적절하다.
+- active build 응답, build/test/deploy 상태 분리, 입력 채널 정규화, 외부 배포 결과 추적이 이 계약의 핵심 결정이다.

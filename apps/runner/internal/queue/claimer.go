@@ -8,6 +8,9 @@ import (
 
 type ClaimedBuild struct {
 	BuildID string
+	AppName string
+	Status  string
+	Phase   string
 }
 
 type Claimer interface {
@@ -36,5 +39,8 @@ func (c *HostServerClaimer) ClaimNext(ctx context.Context) (*ClaimedBuild, error
 
 	return &ClaimedBuild{
 		BuildID: response.BuildID,
+		AppName: response.AppName,
+		Status:  response.Status,
+		Phase:   response.Phase,
 	}, nil
 }

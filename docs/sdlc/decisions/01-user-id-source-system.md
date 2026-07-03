@@ -5,7 +5,7 @@
 - 대상 독자: 프로젝트 리드, API 설계자, Build Server 구현자, AI 에이전트
 - 상태: baseline
 - 최종 수정일: 2026-07-02
-- 관련 문서: `docs/sdlc/SRS/05-open-issues-and-decisions.md`, `docs/sdlc/design/02-domain-model-and-state-transitions.md`, `docs/IDENTITY_MODEL.md`
+- 관련 문서: `docs/sdlc/SRS/05-open-issues-and-decisions.md`, `docs/sdlc/design/02-domain-model-and-state-transitions.md`, `docs/sdlc/design/03-api-contract-design.md`
 
 ## 1. 결정 ID
 
@@ -68,7 +68,7 @@ userId + appName
 
 ## 7. 영향 문서
 
-- `docs/IDENTITY_MODEL.md`
+- `docs/sdlc/design/02-domain-model-and-state-transitions.md`
 - `docs/sdlc/SRS/04-policy-and-constraints.md`
 - `docs/sdlc/design/02-domain-model-and-state-transitions.md`
 - `docs/sdlc/design/03-api-contract-design.md`

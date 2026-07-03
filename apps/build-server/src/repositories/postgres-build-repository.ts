@@ -1,11 +1,13 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  buildTestTable,
   and,
   asc,
   buildLogTable,
   buildRequestTable,
   desc,
+  deploymentAttemptTable,
   sql,
   type DatabaseClient
 } from "@docker-image-builder-system/db";
@@ -27,6 +29,7 @@ import type {
   BuildStatus,
   BuildStatusResponse,
   BuildSummary,
+  DeploymentReportRequest,
   ErrorCode,
   PreviewStatus,
   TestDeployment
@@ -37,40 +40,41 @@ import type {
   ClaimNextBuildResult,
   CreateBuildResult,
   GetTestDeploymentResult,
+  PreviewStatusDetails,
   QueueTestDeploymentResult,
+  ReportDeploymentResult,
   ReportPreviewStatusResult,
   UpdatePhaseResult
 } from "./build-repository.js";
+import {
+  advancePhaseHistory,
+  toPhaseTimeline
+} from "./phase-history.js";
+import {
+  type BuildTestSnapshot,
+  type DeploymentAttemptSnapshot,
+  buildStatusResponseFromState,
+  enrichBuildSummary
+} from "./build-status-response.js";
 
 const activeBuildStatuses: BuildStatus[] = ["QUEUED", "CLAIMED", "BUILDING", "TEST_READY"];
 
 type BuildRequestRow = typeof buildRequestTable.$inferSelect;
 type BuildLogRow = typeof buildLogTable.$inferSelect;
+type BuildTestRow = typeof buildTestTable.$inferSelect;
+type DeploymentAttemptRow = typeof deploymentAttemptTable.$inferSelect;
 
 function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
-  // TODO (DB migration, follow-up): add an `appName text not null` column
-  // to build_request and read it directly. Until the migration ships,
-  // we surface appName through the metadata JSONB so the API contract
-  // already speaks appName end-to-end. Legacy rows written by PR #6 / #7
-  // still have the canonical appName under metadata.appName; new rows
-  // also write to metadata.appName via the insert below.
-  const metadata = (row.metadata ?? {}) as Record<string, string>;
-  const appName =
-    metadata["appName"] ??
-    // Belt-and-suspenders: legacy rows may also have stashed the value
-    // under snake_case keys if a prior client wrote them that way.
-    metadata["app_name"] ??
-    "";
-  return {
+  return enrichBuildSummary({
     buildId: row.id,
-    appName,
+    appName: row.appName,
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
     previewStatus: row.previewStatus as PreviewStatus,
     previewUrl: row.previewUrl,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
-  };
+  });
 }
 
 function mapBuildRowToLastError(row: BuildRequestRow): BuildError | null {
@@ -82,6 +86,72 @@ function mapBuildRowToLastError(row: BuildRequestRow): BuildError | null {
     code: row.lastErrorCode as ErrorCode,
     message: row.lastErrorMessage
   };
+}
+
+function mapBuildTestRowToSnapshot(row: BuildTestRow | null | undefined): BuildTestSnapshot | null {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    status: row.status as BuildTestSnapshot["status"],
+    containerRef: row.containerRef,
+    runtimeUrl: row.runtimeUrl,
+    healthCheckPassed: row.healthCheckPassed,
+    portOpen: row.portOpen,
+    stabilityWindowPassed: row.stabilityWindowPassed
+  };
+}
+
+function mapBuildTestRowToDeployment(
+  buildRow: BuildRequestRow,
+  testRow: BuildTestRow | null | undefined
+): TestDeployment | null {
+  if (buildRow.previewStatus === "NOT_REQUESTED") {
+    return null;
+  }
+
+  return {
+    status: buildRow.previewStatus as TestDeployment["status"],
+    previewUrl: testRow?.runtimeUrl ?? buildRow.previewUrl,
+    host: testRow?.host ?? null,
+    hostPort: testRow?.hostPort ?? null,
+    internalPort: testRow?.internalPort ?? null,
+    expiresAt: null,
+    updatedAt: buildRow.updatedAt.toISOString()
+  };
+}
+
+function mapDeploymentAttemptRowToSnapshot(
+  row: DeploymentAttemptRow | null | undefined
+): DeploymentAttemptSnapshot | null {
+  if (!row) {
+    return null;
+  }
+
+  return {
+    status: row.status as DeploymentAttemptSnapshot["status"],
+    targetType: row.targetType as DeploymentAttemptSnapshot["targetType"],
+    resultRef: row.resultRef,
+    finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null
+  };
+}
+
+function toBuildStatusResponse(
+  row: BuildRequestRow,
+  buildTestRow?: BuildTestRow | null,
+  deploymentAttemptRow?: DeploymentAttemptRow | null
+): BuildStatusResponse {
+  const summary = mapBuildRowToSummary(row);
+
+  return buildStatusResponseFromState({
+    summary,
+    lastError: mapBuildRowToLastError(row),
+    ...toPhaseTimeline(summary, row.phaseHistory),
+    testDeployment: mapBuildTestRowToDeployment(row, buildTestRow),
+    buildTest: mapBuildTestRowToSnapshot(buildTestRow),
+    deploymentAttempt: mapDeploymentAttemptRowToSnapshot(deploymentAttemptRow)
+  });
 }
 
 function mapBuildLogRow(row: BuildLogRow): BuildLogEntry {
@@ -177,22 +247,21 @@ export class PostgresBuildRepository implements BuildRepository {
 
       return {
         kind: "accepted",
-        response: {
-          build: mapBuildRowToSummary(createdBuild),
-          lastError: mapBuildRowToLastError(createdBuild),
-          phaseHistory: [{ phase: mapBuildRowToSummary(createdBuild).phase, completedAt: mapBuildRowToSummary(createdBuild).updatedAt }],
-          currentPhase: mapBuildRowToSummary(createdBuild).phase === "COMPLETED" || mapBuildRowToSummary(createdBuild).phase === "FAILED"
-            ? null
-            : { phase: mapBuildRowToSummary(createdBuild).phase, startedAt: mapBuildRowToSummary(createdBuild).updatedAt }
-        }
+        response: toBuildStatusResponse(createdBuild)
       };
     });
   }
 
   async getBuild(buildId: string): Promise<BuildStatusResponse | null> {
     const [row] = await this.db
-      .select()
+      .select({
+        build: buildRequestTable,
+        buildTest: buildTestTable,
+        deploymentAttempt: deploymentAttemptTable
+      })
       .from(buildRequestTable)
+      .leftJoin(buildTestTable, eq(buildTestTable.buildId, buildRequestTable.id))
+      .leftJoin(deploymentAttemptTable, eq(deploymentAttemptTable.buildId, buildRequestTable.id))
       .where(eq(buildRequestTable.id, buildId))
       .limit(1);
 
@@ -200,18 +269,7 @@ export class PostgresBuildRepository implements BuildRepository {
       return null;
     }
 
-    return {
-      build: mapBuildRowToSummary(row),
-      lastError: mapBuildRowToLastError(row),
-      // TASK-050: postgres repo 는 현재 phase transition history 를
-      // 별도 column 으로 들고 있지 않음 (TASK-051 후속). 일단
-      // current phase 1개만 completedAt = updatedAt 으로 history 에
-      // 두고, currentPhase 는 build.phase + updatedAt 으로 emit.
-      phaseHistory: [{ phase: mapBuildRowToSummary(row).phase, completedAt: mapBuildRowToSummary(row).updatedAt }],
-      currentPhase: mapBuildRowToSummary(row).phase === "COMPLETED" || mapBuildRowToSummary(row).phase === "FAILED"
-        ? null
-        : { phase: mapBuildRowToSummary(row).phase, startedAt: mapBuildRowToSummary(row).updatedAt }
-    };
+    return toBuildStatusResponse(row.build, row.buildTest, row.deploymentAttempt);
   }
 
   async getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null> {
@@ -247,19 +305,7 @@ export class PostgresBuildRepository implements BuildRepository {
         const activeSummary = mapBuildRowToSummary(activeRow);
         return {
           kind: "active_build_exists",
-          build: {
-            build: activeSummary,
-            lastError: mapBuildRowToLastError(activeRow),
-            // TASK-050: postgres repo 는 transition history 별도 column
-            // 없음 (TASK-051 후속). current phase 1개만 history 에 push.
-            phaseHistory: [
-              { phase: activeSummary.phase, completedAt: activeSummary.updatedAt }
-            ],
-            currentPhase:
-              activeSummary.phase === "COMPLETED" || activeSummary.phase === "FAILED"
-                ? null
-                : { phase: activeSummary.phase, startedAt: activeSummary.updatedAt }
-          }
+          build: toBuildStatusResponse(activeRow)
         };
       }
 
@@ -275,11 +321,19 @@ export class PostgresBuildRepository implements BuildRepository {
       }
 
       const timestamp = new Date();
+      const nextPhaseHistory = advancePhaseHistory(
+        (nextRow.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
+        nextRow.phase as BuildPhase,
+        "QUEUE_CLAIMED",
+        timestamp.toISOString()
+      );
+
       const [updated] = await tx
         .update(buildRequestTable)
         .set({
           status: "CLAIMED",
           phase: "QUEUE_CLAIMED",
+          phaseHistory: nextPhaseHistory,
           updatedAt: timestamp
         })
         .where(
@@ -305,14 +359,7 @@ export class PostgresBuildRepository implements BuildRepository {
 
       return {
         kind: "claimed",
-        response: {
-          build: mapBuildRowToSummary(updated),
-          lastError: mapBuildRowToLastError(updated),
-          phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
-          currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
-            ? null
-            : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
-        }
+        response: toBuildStatusResponse(updated)
       };
     });
   }
@@ -331,20 +378,17 @@ export class PostgresBuildRepository implements BuildRepository {
     if (row.phase === phase) {
       return {
         kind: "ok",
-        response: {
-          build: mapBuildRowToSummary(row),
-          lastError: mapBuildRowToLastError(row),
-          phaseHistory: [{ phase: mapBuildRowToSummary(row).phase, completedAt: mapBuildRowToSummary(row).updatedAt }],
-          currentPhase: mapBuildRowToSummary(row).phase === "COMPLETED" || mapBuildRowToSummary(row).phase === "FAILED"
-            ? null
-            : { phase: mapBuildRowToSummary(row).phase, startedAt: mapBuildRowToSummary(row).updatedAt }
-        }
+        response: toBuildStatusResponse(row)
       };
     }
 
     let nextStatus: BuildStatus = row.status as BuildStatus;
     if (phase === "DOCKER_BUILD_STARTED") {
       nextStatus = "BUILDING";
+    } else if (phase === "DEPLOYMENT_STARTED") {
+      nextStatus = "DEPLOYING";
+    } else if (phase === "DEPLOYMENT_COMPLETED") {
+      nextStatus = "DEPLOY_SUCCESS";
     } else if (phase === "COMPLETED") {
       nextStatus = "COMPLETED";
     } else if (phase === "FAILED") {
@@ -352,11 +396,19 @@ export class PostgresBuildRepository implements BuildRepository {
     }
 
     const timestamp = new Date();
+    const nextPhaseHistory = advancePhaseHistory(
+      (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
+      row.phase as BuildPhase,
+      phase as BuildPhase,
+      timestamp.toISOString()
+    );
+
     const [updated] = await this.db
       .update(buildRequestTable)
       .set({
         phase: phase as BuildPhase,
         status: nextStatus,
+        phaseHistory: nextPhaseHistory,
         updatedAt: timestamp
       })
       .where(eq(buildRequestTable.id, buildId))
@@ -376,14 +428,7 @@ export class PostgresBuildRepository implements BuildRepository {
 
     return {
       kind: "ok",
-      response: {
-        build: mapBuildRowToSummary(updated),
-        lastError: mapBuildRowToLastError(updated),
-        phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
-        currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
-          ? null
-          : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
-      }
+      response: toBuildStatusResponse(updated)
     };
   }
 
@@ -413,12 +458,20 @@ export class PostgresBuildRepository implements BuildRepository {
     const timestamp = new Date();
     const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
+    const nextPhaseHistory = advancePhaseHistory(
+      (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
+      row.phase as BuildPhase,
+      "PREVIEW_QUEUED",
+      timestamp.toISOString()
+    );
+
     const [updated] = await this.db
       .update(buildRequestTable)
       .set({
         phase: "PREVIEW_QUEUED",
         previewStatus: "QUEUED",
         previewUrl: null,
+        phaseHistory: nextPhaseHistory,
         updatedAt: timestamp
       })
       .where(eq(buildRequestTable.id, buildId))
@@ -427,6 +480,29 @@ export class PostgresBuildRepository implements BuildRepository {
     if (!updated) {
       return { kind: "not_found" };
     }
+
+    await this.db
+      .insert(buildTestTable)
+      .values({
+        id: randomUUID(),
+        buildId,
+        status: "IN_PROGRESS",
+        internalPort,
+        runtimeUrl: null,
+        createdAt: timestamp,
+        startedAt: timestamp,
+        finishedAt: null,
+        updatedAt: timestamp
+      })
+      .onConflictDoUpdate({
+        target: buildTestTable.buildId,
+        set: {
+          status: "IN_PROGRESS",
+          internalPort,
+          runtimeUrl: null,
+          updatedAt: timestamp
+        }
+      });
 
     await this.db.insert(buildLogTable).values({
       id: randomUUID(),
@@ -448,14 +524,7 @@ export class PostgresBuildRepository implements BuildRepository {
 
     return {
       kind: "queued",
-      response: {
-        build: mapBuildRowToSummary(updated),
-        lastError: mapBuildRowToLastError(updated),
-        phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
-        currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
-          ? null
-          : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
-      },
+      response: toBuildStatusResponse(updated),
       testDeployment
     };
   }
@@ -463,91 +532,290 @@ export class PostgresBuildRepository implements BuildRepository {
   async reportPreviewStatus(
     buildId: string,
     status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
-    details?: { previewUrl?: string; host?: string; hostPort?: number }
+    details?: PreviewStatusDetails
   ): Promise<ReportPreviewStatusResult> {
-    const [row] = await this.db
-      .select()
-      .from(buildRequestTable)
-      .where(eq(buildRequestTable.id, buildId))
-      .limit(1);
-
-    if (!row) {
-      return { kind: "not_found" };
-    }
-
     const timestamp = new Date();
-    let nextPhase: BuildPhase = row.phase as BuildPhase;
-    let nextStatus: BuildStatus = row.status as BuildStatus;
+    // Wrap build_request update + build_test upsert + build_log insert in a
+    // single transaction so that partial failures do not leave the build in a
+    // half-reported state (e.g. status updated but log line missing, or test
+    // snapshot stale relative to the latest phase transition).
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(buildRequestTable)
+        .where(eq(buildRequestTable.id, buildId))
+        .limit(1);
 
-    if (status === "PROVISIONING") {
-      nextPhase = "PREVIEW_QUEUED";
-      nextStatus = "BUILDING";
-    } else if (status === "READY") {
-      nextPhase = "PREVIEW_READY";
-      nextStatus = "TEST_READY";
-    } else if (status === "FAILED") {
-      nextPhase = "FAILED";
-      nextStatus = "FAILED";
-    }
+      if (!row) {
+        return { kind: "not_found" } as const;
+      }
 
-    const nextPreviewUrl = details?.previewUrl ?? row.previewUrl;
+      let nextPhase: BuildPhase = row.phase as BuildPhase;
+      let nextStatus: BuildStatus = row.status as BuildStatus;
 
-    const [updated] = await this.db
-      .update(buildRequestTable)
-      .set({
+      if (status === "PROVISIONING") {
+        nextPhase = "PREVIEW_QUEUED";
+        nextStatus = "BUILDING";
+      } else if (status === "READY") {
+        nextPhase = "PREVIEW_READY";
+        nextStatus = "TEST_READY";
+      } else if (status === "FAILED") {
+        nextPhase = "FAILED";
+        nextStatus = "FAILED";
+      }
+
+      const nextPreviewUrl = details?.previewUrl ?? row.previewUrl;
+      const nextPhaseHistory = advancePhaseHistory(
+        (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
+        row.phase as BuildPhase,
+        nextPhase,
+        timestamp.toISOString()
+      );
+
+      const [updated] = await tx
+        .update(buildRequestTable)
+        .set({
+          phase: nextPhase,
+          status: nextStatus,
+          previewStatus: status as PreviewStatus,
+          previewUrl: nextPreviewUrl,
+          phaseHistory: nextPhaseHistory,
+          updatedAt: timestamp
+        })
+        .where(eq(buildRequestTable.id, buildId))
+        .returning();
+
+      if (!updated) {
+        return { kind: "not_found" } as const;
+      }
+
+      await tx
+        .insert(buildTestTable)
+        .values({
+          id: randomUUID(),
+          buildId,
+          status:
+            status === "READY"
+              ? "SUCCESS"
+              : status === "FAILED"
+                ? "FAILED"
+                : "IN_PROGRESS",
+          host: details?.host ?? null,
+          hostPort: details?.hostPort ?? null,
+          containerRef: details?.containerRef ?? null,
+          runtimeUrl: nextPreviewUrl,
+          healthCheckPassed:
+            details?.healthCheckPassed ?? (status === "FAILED" ? false : null),
+          portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
+          stabilityWindowPassed:
+            details?.stabilityWindowPassed ?? (status === "EXPIRED" ? true : null),
+          errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
+          errorMessage: status === "FAILED" ? "Preview/test deployment failed." : null,
+          createdAt: timestamp,
+          startedAt: timestamp,
+          finishedAt: status === "READY" || status === "FAILED" ? timestamp : null,
+          updatedAt: timestamp
+        })
+        .onConflictDoUpdate({
+          target: buildTestTable.buildId,
+          set: {
+            status:
+              status === "READY"
+                ? "SUCCESS"
+                : status === "FAILED"
+                  ? "FAILED"
+                  : "IN_PROGRESS",
+            host: details?.host ?? null,
+            hostPort: details?.hostPort ?? null,
+            containerRef: details?.containerRef ?? null,
+            runtimeUrl: nextPreviewUrl,
+            healthCheckPassed:
+              details?.healthCheckPassed ?? (status === "FAILED" ? false : null),
+            portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
+            stabilityWindowPassed:
+              details?.stabilityWindowPassed ?? (status === "EXPIRED" ? true : null),
+            errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
+            errorMessage: status === "FAILED" ? "Preview/test deployment failed." : null,
+            finishedAt: status === "READY" || status === "FAILED" ? timestamp : null,
+            updatedAt: timestamp
+          }
+        });
+
+      await tx.insert(buildLogTable).values({
+        id: randomUUID(),
+        buildId,
         phase: nextPhase,
-        status: nextStatus,
-        previewStatus: status as PreviewStatus,
+        message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
+        createdAt: timestamp
+      });
+
+      const [buildTestRow] = await tx
+        .select()
+        .from(buildTestTable)
+        .where(eq(buildTestTable.buildId, buildId))
+        .limit(1);
+
+      const testDeployment: TestDeployment = {
+        status,
         previewUrl: nextPreviewUrl,
-        updatedAt: timestamp
-      })
-      .where(eq(buildRequestTable.id, buildId))
-      .returning();
+        host: details?.host ?? null,
+        hostPort: details?.hostPort ?? null,
+        internalPort: buildTestRow?.internalPort ?? null,
+        expiresAt: null,
+        updatedAt: timestamp.toISOString()
+      };
 
-    if (!updated) {
-      return { kind: "not_found" };
-    }
-
-    await this.db.insert(buildLogTable).values({
-      id: randomUUID(),
-      buildId,
-      phase: nextPhase,
-      message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
-      createdAt: timestamp
+      return {
+        kind: "ok",
+        response: toBuildStatusResponse(updated, buildTestRow),
+        testDeployment
+      } as const;
     });
+  }
 
-    const testDeployment: TestDeployment = {
-      status,
-      previewUrl: nextPreviewUrl,
-      host: details?.host ?? null,
-      hostPort: details?.hostPort ?? null,
-      internalPort: null,
-      expiresAt: null,
-      updatedAt: timestamp.toISOString()
-    };
+  async reportDeploymentResult(
+    buildId: string,
+    input: DeploymentReportRequest
+  ): Promise<ReportDeploymentResult> {
+    const timestamp = new Date();
+    // Wrap build_request update + deployment_attempt upsert + build_log insert
+    // + final left-join select in a single transaction so that the canonical
+    // `deploy` / `resultDelivery` blocks read in the response are always
+    // consistent with the just-written state.
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select()
+        .from(buildRequestTable)
+        .where(eq(buildRequestTable.id, buildId))
+        .limit(1);
 
-    return {
-      kind: "ok",
-      response: {
-        build: mapBuildRowToSummary(updated),
-        lastError: mapBuildRowToLastError(updated),
-        phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
-        currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
-          ? null
-          : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
-      },
-      testDeployment
-    };
+      if (!row) {
+        return { kind: "not_found" } as const;
+      }
+
+      const nextPhase =
+        input.status === "IN_PROGRESS"
+          ? "DEPLOYMENT_STARTED"
+          : input.status === "SUCCESS"
+            ? "DEPLOYMENT_COMPLETED"
+            : "FAILED";
+      const nextStatus =
+        input.status === "IN_PROGRESS"
+          ? "DEPLOYING"
+          : input.status === "SUCCESS"
+            ? "DEPLOY_SUCCESS"
+            : "FAILED";
+      const nextPhaseHistory = advancePhaseHistory(
+        (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
+        row.phase as BuildPhase,
+        nextPhase as BuildPhase,
+        timestamp.toISOString()
+      );
+
+      const [updated] = await tx
+        .update(buildRequestTable)
+        .set({
+          phase: nextPhase as BuildPhase,
+          status: nextStatus,
+          phaseHistory: nextPhaseHistory,
+          updatedAt: timestamp
+        })
+        .where(eq(buildRequestTable.id, buildId))
+        .returning();
+
+      if (!updated) {
+        return { kind: "not_found" } as const;
+      }
+
+      await tx
+        .insert(deploymentAttemptTable)
+        .values({
+          id: randomUUID(),
+          buildId,
+          status: input.status,
+          targetType: input.targetType,
+          targetRef: input.targetRef ?? null,
+          resultRef: input.resultRef ?? null,
+          responsePayloadJson: input.responsePayloadJson ?? null,
+          errorCode: input.errorCode ?? null,
+          errorMessage: input.errorMessage ?? null,
+          createdAt: timestamp,
+          startedAt: timestamp,
+          finishedAt:
+            input.status === "SUCCESS" || input.status === "FAILED" ? timestamp : null,
+          updatedAt: timestamp
+        })
+        .onConflictDoUpdate({
+          target: deploymentAttemptTable.buildId,
+          set: {
+            status: input.status,
+            targetType: input.targetType,
+            targetRef: input.targetRef ?? null,
+            resultRef: input.resultRef ?? null,
+            responsePayloadJson: input.responsePayloadJson ?? null,
+            errorCode: input.errorCode ?? null,
+            errorMessage: input.errorMessage ?? null,
+            finishedAt:
+              input.status === "SUCCESS" || input.status === "FAILED" ? timestamp : null,
+            updatedAt: timestamp
+          }
+        });
+
+      await tx.insert(buildLogTable).values({
+        id: randomUUID(),
+        buildId,
+        phase: nextPhase as BuildPhase,
+        message:
+          `Deployment status: ${input.status} targetType=${input.targetType}` +
+          (input.resultRef ? ` resultRef=${input.resultRef}` : ""),
+        createdAt: timestamp
+      });
+
+      // Final read inside the same transaction so the canonical `deploy` /
+      // `resultDelivery` blocks reflect the upsert we just performed.
+      const [joined] = await tx
+        .select({
+          build: buildRequestTable,
+          buildTest: buildTestTable,
+          deploymentAttempt: deploymentAttemptTable
+        })
+        .from(buildRequestTable)
+        .leftJoin(buildTestTable, eq(buildTestTable.buildId, buildRequestTable.id))
+        .leftJoin(
+          deploymentAttemptTable,
+          eq(deploymentAttemptTable.buildId, buildRequestTable.id)
+        )
+        .where(eq(buildRequestTable.id, buildId))
+        .limit(1);
+
+      return {
+        kind: "ok",
+        response: toBuildStatusResponse(
+          joined?.build ?? updated,
+          joined?.buildTest ?? null,
+          joined?.deploymentAttempt ?? null
+        )
+      } as const;
+    });
   }
 
   async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> {
+    // Left join build_test so the legacy TestDeployment response exposes the
+    // same host / hostPort / internalPort / runtimeUrl as the canonical
+    // ContainerTestResult block returned by getBuild. Without the join the
+    // runner-side host info recorded in build_test would be invisible here.
     const [row] = await this.db
       .select({
         previewStatus: buildRequestTable.previewStatus,
         previewUrl: buildRequestTable.previewUrl,
-        updatedAt: buildRequestTable.updatedAt
+        updatedAt: buildRequestTable.updatedAt,
+        buildTestHost: buildTestTable.host,
+        buildTestHostPort: buildTestTable.hostPort,
+        buildTestInternalPort: buildTestTable.internalPort,
+        buildTestRuntimeUrl: buildTestTable.runtimeUrl
       })
       .from(buildRequestTable)
+      .leftJoin(buildTestTable, eq(buildTestTable.buildId, buildRequestTable.id))
       .where(eq(buildRequestTable.id, buildId))
       .limit(1);
 
@@ -560,10 +828,10 @@ export class PostgresBuildRepository implements BuildRepository {
 
     const testDeployment: TestDeployment = {
       status: row.previewStatus as TestDeployment["status"],
-      previewUrl: row.previewUrl,
-      host: null,
-      hostPort: null,
-      internalPort: null,
+      previewUrl: row.buildTestRuntimeUrl ?? row.previewUrl,
+      host: row.buildTestHost ?? null,
+      hostPort: row.buildTestHostPort ?? null,
+      internalPort: row.buildTestInternalPort ?? null,
       expiresAt: null,
       updatedAt: row.updatedAt.toISOString()
     };

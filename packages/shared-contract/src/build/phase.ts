@@ -8,6 +8,8 @@ export const buildPhases = [
   "DOCKER_BUILD_COMPLETED",
   "PREVIEW_QUEUED",
   "PREVIEW_READY",
+  "DEPLOYMENT_STARTED",
+  "DEPLOYMENT_COMPLETED",
   "COMPLETED",
   "FAILED"
 ] as const;

@@ -10,11 +10,15 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   ClaimResponse,
+  DeploymentReportRequest,
   TestDeployment,
   TestDeploymentQueueResponse
 } from "@docker-image-builder-system/shared-contract";
 
-import type { BuildRepository } from "../repositories/build-repository.js";
+import type {
+  BuildRepository,
+  PreviewStatusDetails
+} from "../repositories/build-repository.js";
 
 export type ReportPhaseOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
@@ -28,6 +32,10 @@ export type QueuePreviewOutcome =
 
 export type ReportPreviewOutcome =
   | { kind: "ok"; response: BuildStatusResponse; testDeployment: TestDeployment }
+  | { kind: "not_found" };
+
+export type ReportDeploymentOutcome =
+  | { kind: "ok"; response: BuildStatusResponse }
   | { kind: "not_found" };
 
 export type GetTestDeploymentOutcome =
@@ -129,7 +137,7 @@ export class BuildService {
   async reportPreviewStatus(
     buildId: string,
     status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
-    details?: { previewUrl?: string; host?: string; hostPort?: number }
+    details?: PreviewStatusDetails
   ): Promise<ReportPreviewOutcome> {
     const result = await this.repository.reportPreviewStatus(buildId, status, details);
     if (result.kind === "not_found") {
@@ -140,6 +148,13 @@ export class BuildService {
       response: result.response,
       testDeployment: result.testDeployment
     };
+  }
+
+  async reportDeploymentResult(
+    buildId: string,
+    input: DeploymentReportRequest
+  ): Promise<ReportDeploymentOutcome> {
+    return this.repository.reportDeploymentResult(buildId, input);
   }
 
   async getTestDeployment(buildId: string): Promise<GetTestDeploymentOutcome> {

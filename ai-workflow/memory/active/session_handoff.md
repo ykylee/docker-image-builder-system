@@ -6,14 +6,87 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 34→35: CodeWhale overlay 배포 — standard_ai_workflow v0.11.22 의 CodeWhale 하네스 지원 (cf0060d, v0.10.4 SKILL.md) 을 본 저장소에 적용. `.codewhale/skills/codewhale-workflow/SKILL.md` 단일 파일 emit, project-local skill 형태로 Constitution additive rule 만 포함 (Constitution Article II/III/Regulations/Statutes 와 중복 주입 금지). 기본 검증 명령은 state.json 의 real commands 주입 (tsc --noEmit 4 packages + apps/runner go build). full bootstrap 우회 — 기존 AGENTS.md / MiniMax.md / state.json / session_handoff.md / work_backlog.md 보존. 회귀 영향 없음 (단일 신규 파일). 다음 후속: PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete), TASK-051 postgres phase_history column, TASK-052 CodeWhale overlay 검증, visual QA PNG baseline 실측, 운영자 마이그레이션 수동 적용.) PR #12 squash merge `1af82d0` main 합류. 회귀 352+ OK. 브랜치 codex/phase-progress-2026-07-03 정리. 다음: PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete).) shared-contract + 서버 repos + PhaseTimeline.svelte 재구현 (전체 phase 표시, 완료/진행/미진행 구분, completedAt / updatedAt 타임스탬프). 후속 PR #13 — TASK-017 stdio + TASK-037 sweeper + admin owner block-delete.) server schema + DELETE path param + createAdminAllowList seed validation (empty/non-conforming throw) + in-process add 검증 + client-side pre-check in AdminAdmins.svelte. capture.py 정리 (imports / add_init_script 위치 / dead ternary). baseline/ .gitkeep. 회귀 build-server 68/68 + build-monitor 46/46 + Go 13/13 + Python 215/215 = 342+ OK. 다음 후속: PR #11 merge, PR #12 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete), visual QA PNG baseline 실측, 운영자 마이그레이션 수동 적용.) commit/push — backend createAdminAllowList mutable Set + /admin/admins GET/POST/DELETE + frontend adminAllowListStore + Header auto-enable + AdminAdmins.svelte + visual QA capture.py. 회귀 build-server 61/61 + build-monitor 44/44 + Go 13/13 + Python 215/215 = 333+ OK. 다음 후속: (a) PR #11 merge, (b) PR #12 — TASK-017 stdio transport + TASK-037 sweeper + admin owner block-delete, (c) visual QA PNG baseline 실측, (d) 운영자 마이그레이션 수동 적용.). 회귀 319+ OK. 브랜치 codex/light-mode-qa-2026-07-03 정리. 다음 후속: (a) light mode visual QA (Playwright headless), (b) TASK-017 stdio, (c) TASK-037 sweeper, (d) admin owner block-delete.). Login/AdminLogin input border 흐릿 문제 토큰 1곳에서 해결. 회귀 319+ OK.). vitest 35→37. 회귀 272/272. PR #10 예정. 다음 후속: TASK-017 stdio / TASK-037 sweeper / admin owner block-delete.
+- Updated: 2026-07-03 (rev 34→35: CodeWhale overlay 배포 — standard_ai_workflow v0.11.22 의 CodeWhale 하네스 지원 (cf0060d, v0.10.4 SKILL.md) 을 본 저장소에 적용. `.codewhale/skills/codewhale-workflow/SKILL.md` 단일 파일 emit, project-local skill 형태로 Constitution additive rule 만 포함 (Constitution Article II/III/Regulations/Statutes 와 중복 주입 금지). 기본 검증 명령은 state.json 의 real commands 주입 (tsc --noEmit 4 packages + apps/runner go build). full bootstrap 우회 — 기존 AGENTS.md / MiniMax.md / state.json / session_handoff.md / work_backlog.md 보존. 회귀 영향 없음 (단일 신규 파일). 다음 후속: PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete), TASK-051 postgres phase_history column, TASK-065 CodeWhale overlay 검증, visual QA PNG baseline 실측, 운영자 마이그레이션 수동 적용.) PR #12 squash merge `1af82d0` main 합류. 회귀 352+ OK. 브랜치 codex/phase-progress-2026-07-03 정리. 다음: PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete).) shared-contract + 서버 repos + PhaseTimeline.svelte 재구현 (전체 phase 표시, 완료/진행/미진행 구분, completedAt / updatedAt 타임스탬프). 후속 PR #13 — TASK-017 stdio + TASK-037 sweeper + admin owner block-delete.) server schema + DELETE path param + createAdminAllowList seed validation (empty/non-conforming throw) + in-process add 검증 + client-side pre-check in AdminAdmins.svelte. capture.py 정리 (imports / add_init_script 위치 / dead ternary). baseline/ .gitkeep. 회귀 build-server 68/68 + build-monitor 46/46 + Go 13/13 + Python 215/215 = 342+ OK. 다음 후속: PR #11 merge, PR #12 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete), visual QA PNG baseline 실측, 운영자 마이그레이션 수동 적용.) commit/push — backend createAdminAllowList mutable Set + /admin/admins GET/POST/DELETE + frontend adminAllowListStore + Header auto-enable + AdminAdmins.svelte + visual QA capture.py. 회귀 build-server 61/61 + build-monitor 44/44 + Go 13/13 + Python 215/215 = 333+ OK. 다음 후속: (a) PR #11 merge, (b) PR #12 — TASK-017 stdio transport + TASK-037 sweeper + admin owner block-delete, (c) visual QA PNG baseline 실측, (d) 운영자 마이그레이션 수동 적용.). 회귀 319+ OK. 브랜치 codex/light-mode-qa-2026-07-03 정리. 다음 후속: (a) light mode visual QA (Playwright headless), (b) TASK-017 stdio, (c) TASK-037 sweeper, (d) admin owner block-delete.). Login/AdminLogin input border 흐릿 문제 토큰 1곳에서 해결. 회귀 319+ OK.). vitest 35→37. 회귀 272/272. PR #10 예정. 다음 후속: TASK-017 stdio / TASK-037 sweeper / admin owner block-delete.
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note
 - 본 세션은 사용자 요청 ('codewhale 용 배포를 docker-image-builder-system 에 하자') 으로 시작. 상위 standard_ai_workflow 가 v0.11.22 (cf0060d) 에서 추가한 CodeWhale 하네스를 본 저장소에 적용. `render_codewhale_skill()` 직접 호출 (full bootstrap 의 메모리 파일 overwrite 회피) 로 `.codewhale/skills/codewhale-workflow/SKILL.md` 단일 파일 emit. memory sync (state rev 61→62, handoff 34→35, work_backlog 35→36) 와 함께 단일 commit. 신규 code 없음, 회귀 영향 없음. 다음 PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete) 및 TASK-051 postgres phase_history column 진행 가능.
+- Updated: 2026-07-03 (rev 45→46: PR #13 squash merge 합류 sync. main HEAD `56727d3` (squash merge commit, 본래 squash 입력은 `dc45b60`). self-review follow-up 7건이 모두 amend 안에 들어가 머지 차단 이슈 0건. 다음: TASK-060 Build Monitor status/UI refactor (M4 진입) 또는 TASK-064 smoke/migration/visual QA baseline.)
+- Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
+
+## Session wrap-up note
+- 본 세션은 사용자 wrap-up 요청 ('작업 내역 정리하고 세션 종료 준비하자') 으로 시작. 신규 code 없음. main HEAD `7c7297f` (PR #12 squash merge sync) 에서 메타 동기화 (state rev 60→61, handoff 33→34, work_backlog 34→35, backlog §36) 만 commit 1건. 다음 PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete) 즉시 착수 가능.
+- 사용자 후속 요청으로 PR #13 (`codex/task-056-pr-prep-2026-07-03` → `main`, 87 files / +4546 / −4197, TASK-051~059 + TASK-063 묶음) 을 오픈한 뒤 self-review 를 진행. PR #13 에 self-review follow-up 보완 7건을 amend commit (`dc45b60`) 으로 묶어 머지 차단 이슈를 0건으로 닫고, gh pr merge --squash 로 main 에 합류 (`56727d3`). 본 sync commit 으로 workflow 메타 (state rev 66→67, handoff 45→46, work_backlog 38→39, backlog index 20→21 / latest 24→25) 를 main 에 동기화. 다음 세션 시작 포인트: TASK-060 (Build Monitor status/UI refactor, M4 진입) 또는 TASK-064 (smoke / migration / visual QA baseline).
+
+## Current Doc Cleanup Note
+- 사용자 요청에 따라 SDLC 문서 정리를 이어가며 preview-first 서사를 build -> container test -> external deployment -> result delivery 서사로 정렬했다.
+- 이번 정리에서 핵심 수정 문서는 `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/13-skills-and-mcp-plan.md`, `docs/sdlc/decisions/03-preview-auth-policy.md`, `docs/PROJECT_PROFILE.md`다.
+- `rtk grep` 재검증 결과 `docs/sdlc/03-requirements-baseline.md`의 preview URL 2건만 의도적으로 남겼다. 해당 문구는 "여전히 가능한 운영 모델이지만 핵심 MVP 산출물은 아님"이라는 예외 설명이다.
+- 2차 정리에서 `README.md`, legacy 루트 문서 6종, `docs/report/01-assignment-plan.md`, `docs/report/02-sdlc-review-report.html`, `ai-workflow/memory/active/repository_assessment.md`, 여러 SDLC 제목/관련 링크도 함께 정합화했다.
+
+## Current Planning Note
+- 문서 정합성 보정 이후, 구현 코드 refactor 와 기능 개발을 함께 관리하기 위해 `docs/sdlc/15-refactoring-roadmap-and-milestones.md`를 신설했다.
+- active roadmap 은 `M1 Contract Reset -> M2 Build Server Refactor -> M3 Runner Realignment -> M4 Consumer Refactor -> M5 Deployment Capability` 순서다.
+- 새 backlog 축은 `TASK-051`~`TASK-064`이며, `TASK-051`~`TASK-059`는 완료되었고 현재 추천 active queue 는 `TASK-060`, `TASK-061` 또는 현재 기준선 PR 정리다.
+
+## Current Implementation Note
+- `TASK-059`에서 external deployment adapter v1 을 추가했다.
+- `packages/shared-contract`는 `DEPLOYMENT_STARTED`, `DEPLOYMENT_COMPLETED`, `DeploymentReportRequest`를 받도록 확장됐다.
+- Build Server 는 `/builds/:buildId/deployment` route 와 `deployment_attempt` persistence 를 연결했고, `getBuild` read-path 도 `deployment_attempt` left join 으로 canonical `deploy` / `resultDelivery` block 을 실제 채운다.
+- Runner 는 `apps/runner/internal/deploy/client.go` skeleton adapter 를 통해 workspace 아래 `deploy-result.json`을 생성하고, deploy in-progress / success 를 Host Server 로 순차 보고한다.
+- OpenAPI regenerated 후 `apps/build-monitor/.generated/openapi.d.ts`를 갱신했고, build-monitor direct typecheck + `svelte-check`도 통과했다.
+- 회귀: shared-contract direct `tsc --noEmit` OK, `apps/runner` `go test ./...` 17 passed, build-server focused tests 52/52 OK, build-monitor direct `tsc --noEmit` OK, `svelte-check` 0/0.
+- `TASK-058`에서 container test result reporting 을 실제 데이터 기반으로 정리했다.
+- `packages/shared-contract/src/build/response.ts`의 `TestDeploymentReadyRequest`는 이제 `containerRef`, `healthCheckPassed`, `portOpen`, `stabilityWindowPassed`를 optional 로 받는다.
+- Runner `BuildService.ProcessClaim`은 READY 보고 시 위 필드를 함께 전송하고, Host client / service tests 기대값도 갱신했다.
+- Build Server `build-status-response.ts`는 previewStatus 추정값만 보지 않고 `build_test` snapshot 을 우선 사용해 canonical `test` block 을 채운다.
+- memory repository 는 queue/ready/fail 경로에서 `buildTest` snapshot 을 유지하고, postgres repository 는 `build_test` write/read-path (`left join`) 를 연결했다.
+- 회귀: shared-contract direct `tsc --noEmit` OK, `apps/runner` `go test ./...` 15 passed, build-server focused tests 49/49 OK.
+- `TASK-057`에서 Runner docker client 가 더 이상 no-op 이 아니게 됐다.
+- 기본 `RUNNER_DOCKER_BUILD_MODE=skeleton` 에선 workspace/source marker/Dockerfile/build-manifest 를 실제 생성한다.
+- `RUNNER_DOCKER_BUILD_MODE=cli` 로 바꾸면 같은 컨텍스트에 대해 `docker build`를 시도한다.
+- `apps/runner` 회귀는 `go test ./...` 기준 15 passed.
+- `TASK-056`에서 Runner claim/build flow 를 한 번 더 정리했다.
+- `apps/runner/internal/hostclient/build_control_client.go`는 이제 claim payload에 실제 `runnerId`를 보내고, claim 응답에서 `appName/lifecycleStatus`를 파싱한다.
+- `ProcessClaim`은 preview queue 를 1회만 호출하고, 그 위에 preview ready / completed 를 순서대로 보고한다.
+- `apps/runner` 회귀는 `go test ./...` 기준 13 passed.
+- `TASK-055`에서 memory backend build-server를 띄워 `/openapi.json` 기준 `apps/build-monitor/.generated/openapi.d.ts`를 재생성했다.
+- build-monitor `src/lib/api.ts`는 더 이상 hand-typed `BuildStatusResponse` mirror 를 쓰지 않고 generated component alias 를 직접 사용한다.
+- `TASK-054`에서 `apps/build-server/src/repositories/build-status-response.ts` helper 를 도입해 canonical `lifecycle/image/test/deploy/resultDelivery` 블록을 memory/postgres 응답에 실제 populate 하도록 정리했다.
+- postgres repository 는 `build_test`에 병행 write 를 시작했고, `build_request.preview_*`와 `test_deployment`는 migration shim 으로 계속 유지된다.
+- build-server focused 회귀 49/49 통과, build-monitor direct `tsc --noEmit` + `svelte-check` 통과.
+- build-monitor `vitest`는 현재 localStorage 미구성 환경으로 기존 실패가 재현된다. 이번 변경으로 새 failure 가 추가된 것은 아니다.
+- `TASK-053`에서 DB 레벨 canonical split 을 열었다. `packages/db/src/schema/build-test.ts`, `deployment-attempt.ts`, bootstrap DDL, `0003_build_test_and_deployment_attempt.sql`가 추가됐다.
+- `build_request.preview_status`, `preview_ttl_minutes`, `preview_url`는 아직 current repository/service code 가 의존하므로 legacy shim 주석과 함께 유지했다.
+- `test_deployment` 테이블도 현재 server migration 이 끝나지 않았기 때문에 bootstrap 에서 제거하지 않았다.
+- 검증: `packages/db` direct `tsc --noEmit` OK, `apps/build-server` direct `tsc --noEmit` OK, focused tests 28/28 OK.
+- `TASK-052`에서 shared-contract status/response 모델을 문서 기준의 build/test/deploy/result-delivery 서사로 넓혔다.
+- `packages/shared-contract/src/build/status.ts`에 canonical/legacy status union 과 generic execution status 를 추가했다.
+- `packages/shared-contract/src/build/response.ts`에 `BuildLifecycle`, `BuildImage`, `ContainerTestResult`, `DeploymentResult`, `ResultDelivery`와 `BuildStatusResponse.lifecycle/image/test/deploy/resultDelivery`를 추가했다.
+- 기존 `previewStatus`, `previewUrl`, `TestDeployment`는 deprecated migration shim 으로 유지해 현재 build-server/build-monitor 구현이 바로 깨지지 않게 했다.
+- 검증: `packages/shared-contract` direct `tsc --noEmit` OK, `apps/build-server/tests/shared-contract-response.test.ts` 3/3 OK, `apps/build-server` direct `tsc --noEmit` OK.
+- `TASK-051`에서 postgres fallback timeline 을 제거하고 `build_request.phase_history` persisted history 를 기준으로 `BuildStatusResponse.phaseHistory/currentPhase`를 구성하도록 정리했다.
+- `packages/db/src/schema/build-request.ts`, `packages/db/src/bootstrap.ts`, `apps/build-server/migrations/0002_phase_history.sql`가 같은 schema shape 를 가리키도록 맞췄다.
+- `apps/build-server/src/repositories/phase-history.ts` helper 를 기준으로 claim/phase update/preview queue/preview ready 흐름이 모두 같은 transition 규칙을 사용한다.
+- 회귀: `apps/build-server` package 기준 `phase-history`, `build-routes`, `memory-preview` tests 통과. `packages/db` direct `tsc --noEmit` 통과.
+- `pnpm exec` 기반 검증은 현재 workspace 의 `ERR_PNPM_IGNORED_BUILDS` 정책 때문에 install 단계에서 막히므로 direct binary 호출로 우회했다.
+
+## Current PR #13 Self-Review Follow-up
+- `reportPreviewStatus` 와 `reportDeploymentResult` 는 본래 transaction 밖에서 `build_request` update + `build_test` / `deployment_attempt` upsert + `build_log` insert 를 따로 실행. partial failure 시 build 가 half-reported 상태가 될 수 있어 두 함수 모두 `db.transaction` 으로 wrap. 동시에 마지막 read 도 transaction 안에서 `leftJoin` 한 번으로 통일해 응답의 canonical `test` / `deploy` / `resultDelivery` block 이 항상 가장 최근 upsert 와 정합하도록 보장.
+- `apps/build-server/migrations/0003_build_test_and_deployment_attempt.sql` 의 `build_test` / `deployment_attempt` 테이블에 `id UUID PRIMARY KEY DEFAULT gen_random_uuid()` 와 `build_id UUID NOT NULL REFERENCES build_request(id) ON DELETE CASCADE` 를 추가. Drizzle schema (`packages/db/src/schema/build-test.ts`, `deployment-attempt.ts`) 의 `defaultRandom()` 와 정합하고, build 가 삭제될 때 test / deployment row 도 함께 정리되어 orphaned row 가능성을 차단.
+- `apps/build-server/src/repositories/postgres-build-repository.ts` 의 `getTestDeployment` 가 `build_test` left join 으로 `host` / `hostPort` / `internalPort` / `runtimeUrl` 를 노출. `getBuild` 의 canonical `ContainerTestResult` 와 응답 정합.
+- `apps/runner/internal/hostclient/build_control_client.go` 의 `claimResponseBody.Reason` 에 `omitempty` 를 추가. server 의 `z.enum([...]).nullable()` 가 빈 string 을 invalid 로 거부하던 잠재 회귀 차단.
+- `apps/build-server/src/app/openapi.ts` 의 `POST /builds/{buildId}/deployment` 200 응답에 `buildStatusResponseSchema` ref 를 명시. 실제 응답은 `BuildStatusResponse` 이므로 spec 정확성 회복.
+- `apps/runner/internal/docker/client.go` 의 `BuildImage` 가 marker (`src/source-prepared.txt`) 기반 idempotent guard 로 변경. `BuildService.ProcessClaim` 의 happy path 에서는 `PrepareSource` 가 먼저 호출되어 marker 가 있으니 skip. 단독 호출 (테스트 등) 에서는 marker 가 없으니 `PrepareSource` 호출.
+- `apps/build-server/src/repositories/memory-build-repository.ts` 의 `reportPreviewStatus` EXPIRED case 주석 보강 — preview TTL 만료이지 build 자체의 terminal 이 아니며, phaseHistory 도 push 하지 않는다.
+- 회귀: TS 4 packages clean, Go 9 packages OK (docker 패키지는 marker guard 분기 추가로 재실행), build-server focused 52/52, build-monitor tsc + svelte-check 0/0. PR #13 의 머지 차단 이슈 0건.
 
 ## Current Focus
 
+- SDLC 문서의 중심 모델을 preview 제공에서 build, container test, external deployment, result delivery 폐루프로 전환했다.
+- Step 02 / Step 13 / baseline decision 03 / Project Profile 이 같은 용어 체계를 가리키도록 다시 맞췄다.
+- README, 보고 패키지, legacy 루트 문서를 더 이상 source-of-truth 경쟁자가 아니라 canonical 문서 포인터 또는 발표 자료로 역할 분리했다.
+- 이제 다음 작업의 중심은 Build Monitor status/UI refactor (`TASK-060`), Skill/MCP contract rename (`TASK-061`), 또는 현 상태 기준 PR 정리다.
 - 요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06~12 구현 세분화 문서가 모두 정리되었다.
 - Build Server P0 범위는 `PKG-001`~`PKG-004` 기준으로 구현 착수 가능한 수준까지 분해되었다.
 - SDLC 리뷰 문서, 과제 계획안, 보고용 HTML 자료가 추가되었다.

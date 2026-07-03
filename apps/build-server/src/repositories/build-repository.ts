@@ -8,6 +8,7 @@ import type {
   BuildLogEntry,
   BuildRequest,
   BuildStatusResponse,
+  DeploymentReportRequest,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
@@ -72,6 +73,25 @@ export type ReportPreviewStatusResult =
       kind: "not_found";
     };
 
+export type ReportDeploymentResult =
+  | {
+      kind: "ok";
+      response: BuildStatusResponse;
+    }
+  | {
+      kind: "not_found";
+    };
+
+export type PreviewStatusDetails = {
+  previewUrl?: string;
+  host?: string;
+  hostPort?: number;
+  containerRef?: string;
+  healthCheckPassed?: boolean;
+  portOpen?: boolean;
+  stabilityWindowPassed?: boolean;
+};
+
 export type GetTestDeploymentResult =
   | {
       kind: "found";
@@ -98,8 +118,12 @@ export interface BuildRepository {
   reportPreviewStatus(
     buildId: string,
     status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
-    details?: { previewUrl?: string; host?: string; hostPort?: number }
+    details?: PreviewStatusDetails
   ): Promise<ReportPreviewStatusResult>;
+  reportDeploymentResult(
+    buildId: string,
+    input: DeploymentReportRequest
+  ): Promise<ReportDeploymentResult>;
   getTestDeployment(buildId: string): Promise<GetTestDeploymentResult>;
   listBuilds(query: BuildListQuery): Promise<BuildListResponse>;
   // Admin-only operations (ADMIN-*). Both methods intentionally bypass

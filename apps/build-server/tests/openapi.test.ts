@@ -21,12 +21,13 @@ describe("openapi document", () => {
     assert.deepEqual(tagNames, [
       "Admin",
       "Builds",
+      "Deployment",
       "Health",
       "Runner Claim",
       "Test Deployment"
     ]);
 
-    // PKG-001~PKG-006 의 9개 Build 경로 + /health + GET /builds (list) = 10
+    // deployment path 가 추가되어 unique path key 가 13개다.
     // unique path keys. 같은 path (/builds) 에 GET + POST 가 merge 됨.
     const pathKeys = Object.keys(document.paths).sort();
     assert.deepEqual(pathKeys, [
@@ -35,6 +36,7 @@ describe("openapi document", () => {
       "/builds",
       "/builds/claim",
       "/builds/{buildId}",
+      "/builds/{buildId}/deployment",
       "/builds/{buildId}/logs",
       "/builds/{buildId}/phase",
       "/builds/{buildId}/preview",
@@ -62,6 +64,10 @@ describe("openapi document", () => {
     assert.ok(
       schemaKeys.includes("TestDeployment"),
       "TestDeployment schema must be registered"
+    );
+    assert.ok(
+      schemaKeys.includes("DeploymentReportRequest"),
+      "DeploymentReportRequest schema must be registered"
     );
     assert.ok(
       schemaKeys.includes("AdminListBuildsQuery"),
