@@ -4,19 +4,42 @@ import type {
   BuildDuplicateResponse,
   BuildError,
   BuildLogEntry,
+  BuildPhase,
   BuildRequest,
   BuildStatusResponse,
-  BuildSummary
+  BuildSummary,
+  TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
 import { nowIsoString } from "../lib/time.js";
-import type { BuildRepository, CreateBuildResult } from "./build-repository.js";
+import type {
+  BuildRepository,
+  ClaimNextBuildResult,
+  CreateBuildResult,
+  GetTestDeploymentResult,
+  QueueTestDeploymentResult,
+  ReportPreviewStatusResult,
+  UpdatePhaseResult
+} from "./build-repository.js";
 
 type StoredBuild = {
   summary: BuildSummary;
   lastError: BuildError | null;
   logs: BuildLogEntry[];
+  testDeployment: TestDeployment | null;
 };
+
+function emptyTestDeployment(updatedAt: string): TestDeployment {
+  return {
+    status: "NOT_REQUESTED",
+    previewUrl: null,
+    host: null,
+    hostPort: null,
+    internalPort: null,
+    expiresAt: null,
+    updatedAt
+  };
+}
 
 export function createMemoryBuildRepository(): BuildRepository {
   const builds = new Map<string, StoredBuild>();
@@ -70,7 +93,8 @@ export function createMemoryBuildRepository(): BuildRepository {
       builds.set(buildId, {
         summary,
         lastError: null,
-        logs: [logEntry]
+        logs: [logEntry],
+        testDeployment: null
       });
 
       return {
@@ -101,6 +125,253 @@ export function createMemoryBuildRepository(): BuildRepository {
       }
 
       return build.logs;
+    },
+
+    async claimNextBuild(): Promise<ClaimNextBuildResult> {
+      const queueOrder = [...builds.values()].sort((a, b) => {
+        return a.summary.createdAt.localeCompare(b.summary.createdAt);
+      });
+
+      const active = queueOrder.find((entry) =>
+        ["CLAIMED", "BUILDING", "TEST_READY"].includes(entry.summary.status)
+      );
+      if (active) {
+        return {
+          kind: "active_build_exists",
+          build: {
+            build: active.summary,
+            lastError: active.lastError
+          }
+        };
+      }
+
+      const next = queueOrder.find((entry) => entry.summary.status === "QUEUED");
+      if (!next) {
+        return { kind: "no_build_available" };
+      }
+
+      const timestamp = nowIsoString();
+      next.summary = {
+        ...next.summary,
+        status: "CLAIMED",
+        phase: "QUEUE_CLAIMED",
+        updatedAt: timestamp
+      };
+      builds.set(next.summary.buildId, next);
+
+      const claimLog: BuildLogEntry = {
+        id: randomUUID(),
+        buildId: next.summary.buildId,
+        phase: "QUEUE_CLAIMED",
+        message: "Build claimed by runner.",
+        createdAt: timestamp
+      };
+      next.logs.push(claimLog);
+
+      return {
+        kind: "claimed",
+        response: {
+          build: next.summary,
+          lastError: next.lastError
+        }
+      };
+    },
+
+    async updatePhase(buildId: string, phase: string): Promise<UpdatePhaseResult> {
+      const build = builds.get(buildId);
+      if (!build) {
+        return { kind: "not_found" };
+      }
+
+      const fromPhase = build.summary.phase;
+      if (fromPhase === phase) {
+        return {
+          kind: "ok",
+          response: {
+            build: build.summary,
+            lastError: build.lastError
+          }
+        };
+      }
+
+      const timestamp = nowIsoString();
+      let nextStatus = build.summary.status;
+      if (phase === "DOCKER_BUILD_STARTED") {
+        nextStatus = "BUILDING";
+      } else if (phase === "COMPLETED") {
+        nextStatus = "COMPLETED";
+      } else if (phase === "FAILED") {
+        nextStatus = "FAILED";
+      }
+
+      build.summary = {
+        ...build.summary,
+        phase: phase as BuildPhase,
+        status: nextStatus,
+        updatedAt: timestamp
+      };
+      builds.set(buildId, build);
+
+      const phaseLog: BuildLogEntry = {
+        id: randomUUID(),
+        buildId,
+        phase: phase as BuildPhase,
+        message: `Phase updated to ${phase}.`,
+        createdAt: timestamp
+      };
+      build.logs.push(phaseLog);
+
+      return {
+        kind: "ok",
+        response: {
+          build: build.summary,
+          lastError: build.lastError
+        }
+      };
+    },
+
+    async queueTestDeployment(
+      buildId: string,
+      internalPort: number,
+      ttlMinutes: number
+    ): Promise<QueueTestDeploymentResult> {
+      const build = builds.get(buildId);
+      if (!build) {
+        return { kind: "not_found" };
+      }
+
+      // only allow queue when build is in DOCKER_BUILD_COMPLETED or TEST_READY state
+      if (!["DOCKER_BUILD_COMPLETED", "TEST_READY"].includes(build.summary.phase) &&
+          !["BUILDING", "TEST_READY"].includes(build.summary.status)) {
+        return {
+          kind: "invalid_state",
+          reason: `cannot queue preview from phase=${build.summary.phase} status=${build.summary.status}`
+        };
+      }
+
+      const timestamp = nowIsoString();
+      const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
+
+      const testDeployment: TestDeployment = {
+        status: "QUEUED",
+        previewUrl: null,
+        host: null,
+        hostPort: null,
+        internalPort,
+        expiresAt,
+        updatedAt: timestamp
+      };
+      build.testDeployment = testDeployment;
+      build.summary = {
+        ...build.summary,
+        phase: "PREVIEW_QUEUED",
+        previewStatus: "QUEUED",
+        previewUrl: null,
+        updatedAt: timestamp
+      };
+      builds.set(buildId, build);
+
+      const log: BuildLogEntry = {
+        id: randomUUID(),
+        buildId,
+        phase: "PREVIEW_QUEUED",
+        message: `Preview queued: internalPort=${internalPort} ttlMinutes=${ttlMinutes}`,
+        createdAt: timestamp
+      };
+      build.logs.push(log);
+
+      return {
+        kind: "queued",
+        response: {
+          build: build.summary,
+          lastError: build.lastError
+        },
+        testDeployment
+      };
+    },
+
+    async reportPreviewStatus(
+      buildId: string,
+      status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
+      details?: { previewUrl?: string; host?: string; hostPort?: number }
+    ): Promise<ReportPreviewStatusResult> {
+      const build = builds.get(buildId);
+      if (!build) {
+        return { kind: "not_found" };
+      }
+
+      if (!build.testDeployment) {
+        build.testDeployment = emptyTestDeployment(nowIsoString());
+      }
+
+      const timestamp = nowIsoString();
+      const prev = build.testDeployment;
+      const next: TestDeployment = {
+        ...prev,
+        status,
+        previewUrl: details?.previewUrl ?? prev.previewUrl,
+        host: details?.host ?? prev.host,
+        hostPort: details?.hostPort ?? prev.hostPort,
+        updatedAt: timestamp
+      };
+      build.testDeployment = next;
+
+      // map previewStatus -> build.phase/status
+      let nextPhase = build.summary.phase;
+      let nextStatus = build.summary.status;
+      if (status === "PROVISIONING") {
+        nextPhase = "PREVIEW_QUEUED";
+        nextStatus = "BUILDING"; // still building until ready
+      } else if (status === "READY") {
+        nextPhase = "PREVIEW_READY";
+        nextStatus = "TEST_READY";
+      } else if (status === "FAILED") {
+        nextPhase = "FAILED";
+        nextStatus = "FAILED";
+      } else if (status === "EXPIRED") {
+        // preview expired; build remains TEST_READY (caller can call COMPLETED later)
+        nextPhase = build.summary.phase;
+        nextStatus = build.summary.status;
+      }
+
+      build.summary = {
+        ...build.summary,
+        previewStatus: status,
+        previewUrl: next.previewUrl,
+        phase: nextPhase as BuildPhase,
+        status: nextStatus,
+        updatedAt: timestamp
+      };
+      builds.set(buildId, build);
+
+      const log: BuildLogEntry = {
+        id: randomUUID(),
+        buildId,
+        phase: nextPhase as BuildPhase,
+        message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
+        createdAt: timestamp
+      };
+      build.logs.push(log);
+
+      return {
+        kind: "ok",
+        response: {
+          build: build.summary,
+          lastError: build.lastError
+        },
+        testDeployment: next
+      };
+    },
+
+    async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> {
+      const build = builds.get(buildId);
+      if (!build) {
+        return { kind: "not_found" };
+      }
+      if (!build.testDeployment) {
+        return { kind: "not_requested" };
+      }
+      return { kind: "found", testDeployment: build.testDeployment };
     }
   };
 }

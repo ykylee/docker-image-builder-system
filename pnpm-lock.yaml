@@ -11,6 +11,9 @@ importers:
       '@types/node':
         specifier: ^24.0.13
         version: 24.13.2
+      '@types/pg':
+        specifier: ^8.15.5
+        version: 8.20.0
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
@@ -44,7 +47,7 @@ importers:
         version: link:../shared-contract
       drizzle-orm:
         specifier: ^0.44.2
-        version: 0.44.7(pg@8.22.0)
+        version: 0.44.7(@types/pg@8.20.0)(pg@8.22.0)
       pg:
         specifier: ^8.16.3
         version: 8.22.0
@@ -545,6 +548,9 @@ packages:
 
   '@types/node@24.13.2':
     resolution: {integrity: sha512-fRa09kZTgu8o71KFcDjUFuc7F+dEbZYZmkI0mg5YBTRs0yMKjYHsq/c0urDKeDb+D5qVgXOdFcuu+DZPKOITwA==}
+
+  '@types/pg@8.20.0':
+    resolution: {integrity: sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==}
 
   abstract-logging@2.0.1:
     resolution: {integrity: sha512-2BjRTZxTPvheOvGbBslFSYOUkr+SjPtOnrLP33f+VIWLzezQpZcqVg7ja3L4dBXmzzgwT+a029jRx5PCi3JuiA==}
@@ -1159,6 +1165,12 @@ snapshots:
     dependencies:
       undici-types: 7.18.2
 
+  '@types/pg@8.20.0':
+    dependencies:
+      '@types/node': 24.13.2
+      pg-protocol: 1.15.0
+      pg-types: 2.2.0
+
   abstract-logging@2.0.1: {}
 
   ajv-formats@3.0.1(ajv@8.20.0):
@@ -1192,8 +1204,9 @@ snapshots:
       esbuild: 0.25.12
       tsx: 4.22.4
 
-  drizzle-orm@0.44.7(pg@8.22.0):
+  drizzle-orm@0.44.7(@types/pg@8.20.0)(pg@8.22.0):
     optionalDependencies:
+      '@types/pg': 8.20.0
       pg: 8.22.0
 
   esbuild@0.18.20:

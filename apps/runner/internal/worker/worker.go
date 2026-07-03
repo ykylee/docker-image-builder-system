@@ -13,18 +13,27 @@ import (
 )
 
 type Worker struct {
-	config   config.Config
-	claimer  queue.Claimer
-	services *services.BuildService
+	config  config.Config
+	claimer queue.Claimer
+	svc     *services.BuildService
 }
 
+// New 는 production HTTPBuildControlClient 로 wiring.
 func New(cfg config.Config) *Worker {
-	client := hostclient.NewNoopBuildControlClient(cfg.HostServerBaseURL)
-
+	client := hostclient.NewHTTPBuildControlClient(cfg.HostServerBaseURL)
 	return &Worker{
-		config:   cfg,
-		claimer:  queue.NewHostServerClaimer(client),
-		services: services.NewBuildService(client, docker.NewClient()),
+		config:  cfg,
+		claimer: queue.NewHostServerClaimer(client),
+		svc:     services.NewBuildService(client, docker.NewClient(), cfg.RunnerID),
+	}
+}
+
+// NewWithClient 는 testable wiring. BuildControlClient 를 주입한다.
+func NewWithClient(cfg config.Config, client hostclient.BuildControlClient) *Worker {
+	return &Worker{
+		config:  cfg,
+		claimer: queue.NewHostServerClaimer(client),
+		svc:     services.NewBuildService(client, docker.NewClient(), cfg.RunnerID),
 	}
 }
 
@@ -32,7 +41,7 @@ func (w *Worker) Run(ctx context.Context) error {
 	ticker := time.NewTicker(w.config.PollInterval)
 	defer ticker.Stop()
 
-	log.Printf("runner started with poll interval %s", w.config.PollInterval)
+	log.Printf("runner started: id=%s host=%s poll=%s", w.config.RunnerID, w.config.HostServerBaseURL, w.config.PollInterval)
 
 	for {
 		select {
@@ -42,11 +51,14 @@ func (w *Worker) Run(ctx context.Context) error {
 		case <-ticker.C:
 			claim, err := w.claimer.ClaimNext(ctx)
 			if err != nil {
-				return err
+				log.Printf("claim error: %v", err)
+				continue
 			}
-
-			if err := w.services.ProcessClaim(ctx, claim); err != nil {
-				return err
+			if claim == nil {
+				continue
+			}
+			if err := w.svc.ProcessClaim(ctx, claim); err != nil {
+				log.Printf("process claim error: buildID=%s err=%v", claim.BuildID, err)
 			}
 		}
 	}

@@ -6,7 +6,9 @@
   "scripts": {
     "build": "pnpm -r build",
     "check": "pnpm -r check",
-    "dev:build-server": "pnpm --filter @docker-image-builder-system/build-server dev"
+    "dev:build-server": "pnpm --filter @docker-image-builder-system/build-server dev",
+    "test:host": "pnpm --filter @docker-image-builder-system/build-server test",
+    "test:all": "pnpm --filter @docker-image-builder-system/build-server test && python3 -m unittest discover -s apps/skill_mcp/tests -t ."
   },
   "devDependencies": {
     "@types/node": "^24.0.13",

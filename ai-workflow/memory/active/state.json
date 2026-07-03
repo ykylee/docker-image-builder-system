@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "PR #3 머지 완료 (4307d83, TASK-025~033 일괄): P0+P1 8종 (skill 5종 + MCP 3종) + plan 1종 + skill-mcp cross-ref 정정 1건. 215 tests OK. 후속: P2 후보 (preview-ttl, dockerfile-template-suggest), TASK-017 stdio transport 활성화, contract-drift-checker 24건 drift 해소 (PKG-001 owner 결정 필요).",
-  "purpose_digest_rev": "35",
+  "purpose_digest": "TASK-036 (PKG-006 Preview Service Queue And Readiness) 완료. Host Server 에 preview 4 endpoint (POST /preview, POST /test-deployment/ready, POST /test-deployment/status, GET /test-deployment) 추가, Runner 가 queue + ready 자동 보고. end-to-end smoke 8 phase 자동 진행 (REQUEST_ACCEPTED → QUEUE_CLAIMED → SOURCE_PREPARED → DOCKER_BUILD_STARTED → DOCKER_BUILD_COMPLETED → PREVIEW_QUEUED → PREVIEW_READY → COMPLETED). TS 37 + Go 13 + Python 215 = 265 tests OK. 후속: TASK-037 (PKG-007 Preview Cleanup) 또는 docker.BuildImage 실제 구현.",
+  "purpose_digest_rev": "39",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,11 +28,14 @@
   },
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-    "current_axis": "PR #3 머지 완료(squash 4307d83, 52 files, +7174/-10). 우리 시스템 skill 5종 + MCP 3종 + plan 1종이 main 합류. TASK-017 stdio transport 활성화 또는 P2 후보 (preview-ttl / dockerfile-template-suggest) 가 다음.",
-    "current_focus": "PR #3 (TASK-025~033) main 합류, 메타 동기화 마무리",
+    "current_axis": "PKG-005 + PKG-006 end-to-end 동작. preview queue/ready 1차 골격 완성. 다음은 PKG-007 Preview Cleanup Policy Binding (TTL 만료 cleanup) 또는 docker.BuildImage 실제 구현.",
+    "current_focus": "TASK-036 완료, 후속 TASK-037 (cleanup) 또는 docker build 실통합",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-036 PKG-006 Preview Service Queue And Readiness — 4 endpoint + Runner queue/ready 자동 보고, e2e smoke 8 phase + TS 37/37 + Go 13/13 + Python 215/215 = 265 tests",
+      "TASK-035 Go Runner claim loop + phase call 구현 — HTTPBuildControlClient + BuildService 4-phase 자동 보고 + Worker loop, end-to-end smoke 6 phase 완료 + Go 10 tests",
+      "TASK-034 PKG-005 Runner Claim And Build Phase Skeleton 1차 골격 구현 — claim/phase endpoint 2종 + memory/postgres repo + zod 400 매핑, live smoke 7/7 + 회귀 215/215 PASS",
       "TASK-031 failure-summary-shaper skill 1종 구현 (apps/skill_mcp/skills/failure_summary_shaper, Python, 25 tests OK, total 157)",
       "TASK-032 failure-summary MCP 1종 구현 (apps/skill_mcp/mcp_servers/failure_summary, Python, 16 tests OK, total 173)",
       "TASK-033 preview-readiness-checker skill 1종 구현 (apps/skill_mcp/skills/preview_readiness_checker, Python, 42 tests OK, total 215)",
