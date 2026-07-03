@@ -1,8 +1,8 @@
 {
     "schema_version": "1",
-    "generated_at": "2026-07-03T08:30:00Z",
-    "purpose_digest": "ADMIN-* Admin UI (TASK-043), v0.2 schema migration (TASK-045), light mode contrast QA (TASK-046, PR #10) — main 합류. TASK-047/048/049 (PR #11) — admin allow-list management (backend createAdminAllowList mutable + GET/POST/DELETE /admin/admins) + frontend adminAllowListStore + Header auto-enable + AdminAdmins.svelte + visual QA scaffolding. review follow-up — adminId charset 정규식 (^[a-zA-Z0-9._-]+$) server + client + seed fail-fast. PR #11 squash merge `343f78c` main 합류. 회귀 build-server 68/68 + build-monitor 46/46 + Go 13/13 + Python 215/215 = 342+ OK. 브랜치 정리. 다음 후속: (a) PR #12 — PhaseTimeline 전체 phase 표시 + 완료/진행/미진행 구분 + completedAt / updatedAt 타임스탬프, (b) PR #13 — TASK-017 stdio + TASK-037 sweeper + admin owner block-delete, (c) visual QA PNG baseline 실측, (d) 운영자 마이그레이션 수동 적용 (TASK-045 v0.2 schema).",
-    "purpose_digest_rev": 57,
+    "generated_at": "2026-07-03T08:45:00Z",
+    "purpose_digest": "PR #12 (TASK-050 build phase progress timeline): shared-contract BuildStatusResponse 에 phaseHistory + currentPhase 추가, in-memory repo transition 관리, PhaseTimeline.svelte 재구현 (canonical 9 phases 전체, completed/current/pending 구분, completedAt + startedAt timestamp). 회귀 build-server 72/72 + build-monitor 51/51 + Go 13/13 + Python 215/215 + svelte-check 0/0 = 351+ OK. PR #12 review follow-up — terminal phase (COMPLETED/FAILED) 진입 시 history 에 terminal phase 도 push (PhaseTimeline 의 '마지막 phase pending' 시각화 버그 fix). PhaseTimeline.test.ts 의 screen unused import 제거. 회귀 build-server 73/73 + build-monitor 51/51 + Go 13/13 + Python 215/215 + svelte-check 0/0 = 352+ OK. 후속: (a) PR #12 squash merge, (b) PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete), (c) TASK-051 postgres phase_history column 추가, (d) visual QA PNG baseline 실측, (e) 운영자 마이그레이션 수동 적용 (TASK-045 v0.2 schema).",
+    "purpose_digest_rev": 59,
     "source_of_truth": {
         "project_profile_path": "docs/PROJECT_PROFILE.md",
         "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,8 +28,8 @@
     },
     "session": {
         "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-        "current_axis": "PR #11 merge 완료. 다음 PR #12 — BuildPhase timestamps (startedAt / completedAt) shared-contract + 서버 repos + PhaseTimeline.svelte 재구현. 그 후 PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete).",
-        "current_focus": "PR #11 squash merge `343f78c` main 합류 완료. 다음 PR #12 (codex/phase-progress-2026-07-03) — BuildPhase timeline 전체 phase 표시 + 완료/진행/미진행 구분 + completedAt / updatedAt 타임스탬프. 후속 PR #13 — TASK-017 stdio + TASK-037 sweeper + admin owner block-delete.",
+        "current_axis": "PR #12 follow-up commit/push → PR #12 merge. 다음 PR #13 — TASK-017 stdio transport + TASK-037 sweeper + admin owner block-delete.",
+        "current_focus": "PR #12 review follow-up — terminal phase push 보완 + screen unused import 제거 + 회귀 352+ OK. 다음: PR #12 squash merge → 브랜치 정리 → PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete) 시작.",
         "in_progress_items": [],
         "blocked_items": [],
         "recent_done_items": [

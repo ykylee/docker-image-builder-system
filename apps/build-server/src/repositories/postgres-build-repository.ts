@@ -179,7 +179,11 @@ export class PostgresBuildRepository implements BuildRepository {
         kind: "accepted",
         response: {
           build: mapBuildRowToSummary(createdBuild),
-          lastError: mapBuildRowToLastError(createdBuild)
+          lastError: mapBuildRowToLastError(createdBuild),
+          phaseHistory: [{ phase: mapBuildRowToSummary(createdBuild).phase, completedAt: mapBuildRowToSummary(createdBuild).updatedAt }],
+          currentPhase: mapBuildRowToSummary(createdBuild).phase === "COMPLETED" || mapBuildRowToSummary(createdBuild).phase === "FAILED"
+            ? null
+            : { phase: mapBuildRowToSummary(createdBuild).phase, startedAt: mapBuildRowToSummary(createdBuild).updatedAt }
         }
       };
     });
@@ -198,7 +202,15 @@ export class PostgresBuildRepository implements BuildRepository {
 
     return {
       build: mapBuildRowToSummary(row),
-      lastError: mapBuildRowToLastError(row)
+      lastError: mapBuildRowToLastError(row),
+      // TASK-050: postgres repo 는 현재 phase transition history 를
+      // 별도 column 으로 들고 있지 않음 (TASK-051 후속). 일단
+      // current phase 1개만 completedAt = updatedAt 으로 history 에
+      // 두고, currentPhase 는 build.phase + updatedAt 으로 emit.
+      phaseHistory: [{ phase: mapBuildRowToSummary(row).phase, completedAt: mapBuildRowToSummary(row).updatedAt }],
+      currentPhase: mapBuildRowToSummary(row).phase === "COMPLETED" || mapBuildRowToSummary(row).phase === "FAILED"
+        ? null
+        : { phase: mapBuildRowToSummary(row).phase, startedAt: mapBuildRowToSummary(row).updatedAt }
     };
   }
 
@@ -232,11 +244,21 @@ export class PostgresBuildRepository implements BuildRepository {
         .limit(1);
 
       if (activeRow) {
+        const activeSummary = mapBuildRowToSummary(activeRow);
         return {
           kind: "active_build_exists",
           build: {
-            build: mapBuildRowToSummary(activeRow),
-            lastError: mapBuildRowToLastError(activeRow)
+            build: activeSummary,
+            lastError: mapBuildRowToLastError(activeRow),
+            // TASK-050: postgres repo 는 transition history 별도 column
+            // 없음 (TASK-051 후속). current phase 1개만 history 에 push.
+            phaseHistory: [
+              { phase: activeSummary.phase, completedAt: activeSummary.updatedAt }
+            ],
+            currentPhase:
+              activeSummary.phase === "COMPLETED" || activeSummary.phase === "FAILED"
+                ? null
+                : { phase: activeSummary.phase, startedAt: activeSummary.updatedAt }
           }
         };
       }
@@ -285,7 +307,11 @@ export class PostgresBuildRepository implements BuildRepository {
         kind: "claimed",
         response: {
           build: mapBuildRowToSummary(updated),
-          lastError: mapBuildRowToLastError(updated)
+          lastError: mapBuildRowToLastError(updated),
+          phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
+          currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
+            ? null
+            : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
         }
       };
     });
@@ -307,7 +333,11 @@ export class PostgresBuildRepository implements BuildRepository {
         kind: "ok",
         response: {
           build: mapBuildRowToSummary(row),
-          lastError: mapBuildRowToLastError(row)
+          lastError: mapBuildRowToLastError(row),
+          phaseHistory: [{ phase: mapBuildRowToSummary(row).phase, completedAt: mapBuildRowToSummary(row).updatedAt }],
+          currentPhase: mapBuildRowToSummary(row).phase === "COMPLETED" || mapBuildRowToSummary(row).phase === "FAILED"
+            ? null
+            : { phase: mapBuildRowToSummary(row).phase, startedAt: mapBuildRowToSummary(row).updatedAt }
         }
       };
     }
@@ -348,7 +378,11 @@ export class PostgresBuildRepository implements BuildRepository {
       kind: "ok",
       response: {
         build: mapBuildRowToSummary(updated),
-        lastError: mapBuildRowToLastError(updated)
+        lastError: mapBuildRowToLastError(updated),
+        phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
+        currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
+          ? null
+          : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
       }
     };
   }
@@ -416,7 +450,11 @@ export class PostgresBuildRepository implements BuildRepository {
       kind: "queued",
       response: {
         build: mapBuildRowToSummary(updated),
-        lastError: mapBuildRowToLastError(updated)
+        lastError: mapBuildRowToLastError(updated),
+        phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
+        currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
+          ? null
+          : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
       },
       testDeployment
     };
@@ -492,7 +530,11 @@ export class PostgresBuildRepository implements BuildRepository {
       kind: "ok",
       response: {
         build: mapBuildRowToSummary(updated),
-        lastError: mapBuildRowToLastError(updated)
+        lastError: mapBuildRowToLastError(updated),
+        phaseHistory: [{ phase: mapBuildRowToSummary(updated).phase, completedAt: mapBuildRowToSummary(updated).updatedAt }],
+        currentPhase: mapBuildRowToSummary(updated).phase === "COMPLETED" || mapBuildRowToSummary(updated).phase === "FAILED"
+          ? null
+          : { phase: mapBuildRowToSummary(updated).phase, startedAt: mapBuildRowToSummary(updated).updatedAt }
       },
       testDeployment
     };
