@@ -97,10 +97,15 @@
     color: var(--color-text-primary);
     font-size: var(--size-sm);
     font-weight: var(--weight-semibold);
+    /* surface-elevated 는 light 모드 #f8fafc, dark 모드 #1a1d27.
+       surface (#fff / #13151c) 와의 미세한 contrast 차로 pill 의
+       실루엣이 살아남는다. 이전 light 모드 #ffffff 는 surface 와 동일해
+       border 만으로 구분됐는데, hover/disabled 가 더 잘 보이는 의미도
+       같이 살아남는다. (TASK-046 QA) */
     background: var(--color-bg-surface-elevated);
     padding: var(--space-xs) var(--space-md);
     border-radius: var(--radius-pill);
-    border: 1px solid var(--color-border-subtle);
+    border: 1px solid var(--color-border-strong);
     width: max-content;
   }
 </style>

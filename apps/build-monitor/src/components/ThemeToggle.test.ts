@@ -56,3 +56,16 @@ describe("ThemeToggle", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
 });
+  // TASK-046: color-scheme 가 document root 에 적용되어야 native form
+  // 컨트롤 (input, select, scrollbar) 이 현재 테마와 자연스럽게 어울린다.
+  it("sets color-scheme=dark on document root in default (dark) mode", () => {
+    render(ThemeToggle);
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+  });
+
+  it("sets color-scheme=light on document root after toggling to light", async () => {
+    render(ThemeToggle);
+    const btn = screen.getByRole("button", { name: /toggle theme/i });
+    await fireEvent.click(btn);
+    expect(document.documentElement.style.colorScheme).toBe("light");
+  });
