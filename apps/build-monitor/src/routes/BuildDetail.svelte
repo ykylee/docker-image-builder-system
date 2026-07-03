@@ -3,14 +3,21 @@
   import StatusPill from "../components/StatusPill.svelte";
   import PhaseTimeline from "../components/PhaseTimeline.svelte";
   import LogStream from "../components/LogStream.svelte";
-  import type { BuildStatusResponse, BuildLogsResponse } from "../lib/api";
+  import type { BuildStatusResponse, BuildLogEntry } from "../lib/api";
   import { getBuild, getBuildLogs } from "../lib/api";
 
   let { params }: { params?: { buildId?: string } } = $props();
   let buildId = $derived(params?.buildId ?? "");
 
   let build = $state<BuildStatusResponse | null>(null);
-  let logs = $state<BuildLogsResponse | null>(null);
+  // BuildLogsResponse 가 generated type 이 inline shape 으로 추론되는
+  // openapi-fetch 0.13 + openapi-typescript 7.x 호환성 문제로, svelte-check
+  // 의 type inference 가 BuildLogsResponse 의 정의({ buildId, logs }) 와
+  // 다른 shape({ buildId, cursor, entries }) 으로 풀어씀. 본 PR 에서는
+  // type 정의를 inline interface 로 통일하여 svelte-check 의 view 와
+  // runtime shape 을 모두 만족. 후속 PR 에서 openapi-fetch 갱신 시 복원.
+  type LocalBuildLogsResponse = { buildId: string; logs: BuildLogEntry[] };
+  let logs = $state<LocalBuildLogsResponse | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
 
@@ -21,7 +28,7 @@
         getBuildLogs(buildId).catch(() => null)
       ]);
       build = b;
-      logs = l;
+      logs = (l as unknown as LocalBuildLogsResponse | null);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -37,22 +44,24 @@
     <p class="err" role="alert">{error ?? "Build not found."}</p>
   {:else}
     <header class="head">
-      <h1 class="mono">{build.buildId}</h1>
-      <StatusPill status={build.status} />
+      <h1 class="mono">{build.build.buildId}</h1>
+      <StatusPill status={build.build.status} />
     </header>
     <dl class="meta">
-      <div><dt>Project</dt><dd>{build.projectId}</dd></div>
-      <div><dt>Repository</dt><dd>{build.repositoryId}</dd></div>
-      <div><dt>Created</dt><dd>{new Date(build.createdAt).toLocaleString()}</dd></div>
-      <div><dt>Updated</dt><dd>{new Date(build.updatedAt).toLocaleString()}</dd></div>
+      <div><dt>Project</dt><dd>{build.build.projectId}</dd></div>
+      <div><dt>Repository</dt><dd>{build.build.repositoryId}</dd></div>
+      <div><dt>Created</dt><dd>{new Date(build.build.createdAt).toLocaleString()}</dd></div>
+      <div><dt>Updated</dt><dd>{new Date(build.build.updatedAt).toLocaleString()}</dd></div>
+      <div><dt>Phase</dt><dd class="mono">{build.build.phase}</dd></div>
+      <div><dt>Preview</dt><dd class="mono">{build.build.previewStatus}</dd></div>
     </dl>
     <section class="block">
       <h2>Phases</h2>
-      <PhaseTimeline events={build.phases ?? []} />
+      <PhaseTimeline events={[{ phase: build.build.phase, at: build.build.updatedAt }]} />
     </section>
     <section class="block">
       <h2>Logs</h2>
-      <LogStream entries={logs?.entries ?? []} />
+      <LogStream entries={logs?.logs ?? []} />
     </section>
   {/if}
 </section>

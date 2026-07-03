@@ -25,7 +25,8 @@ describe("openapi document", () => {
       "Test Deployment"
     ]);
 
-    // PKG-001~PKG-006 의 9개 Build 경로 + /health = 10
+    // PKG-001~PKG-006 의 9개 Build 경로 + /health + GET /builds (list) = 10
+    // unique path keys. 같은 path (/builds) 에 GET + POST 가 merge 됨.
     const pathKeys = Object.keys(document.paths).sort();
     assert.deepEqual(pathKeys, [
       "/builds",
@@ -39,6 +40,10 @@ describe("openapi document", () => {
       "/builds/{buildId}/test-deployment/status",
       "/health"
     ]);
+
+    // /builds 는 GET (list) + POST (create) 두 method 를 가져야 함
+    const buildsMethods = Object.keys(document.paths["/builds"] ?? {}).sort();
+    assert.deepEqual(buildsMethods, ["get", "post"]);
 
     // 15 component schemas (BuildLogEntry 와 BuildSummary 는 zod parse 의
     // 응답 envelope 안에서 자동 emit 됨). 마지막 PR 에서 변동 가능.

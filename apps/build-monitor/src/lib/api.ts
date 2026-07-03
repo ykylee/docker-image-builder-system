@@ -1,110 +1,94 @@
 /**
- * API client — Build Server `/openapi.json` 의 1차 subset.
+ * API client — Build Server `/openapi.json` 기반.
  *
- * PR #6 1차 골격에서는 openapi-fetch + openapi-typescript 의
- * generated client 를 만들기 전에, 자주 쓰는 endpoint 의 응답 타입을
- * hand-typed 로 둔다. 후속 PR 에서:
- *   1) build-time script 가 /openapi.json 을 fetch
- *   2) openapi-typescript 로 ./.generated/openapi.d.ts 생성
- *   3) openapi-fetch client 가 그 타입을 사용
- * 로 자동화. 본 PR 의 types 는 그 자동화의 기준선 (drift 시 alarm).
+ * `paths` 의 정확한 TypeScript type 은 `./.generated/openapi.d.ts` 에서
+ * import 한다. 해당 파일은 `pnpm run generate:openapi` (또는 predev /
+ * prebuild hook) 로 backend 의 `/openapi.json` 으로 자동 생성.
+ *
+ * PR #6 의 1차 hand-typed types 는 generated type 의 components schemas
+ * alias 로 갈음한다.
+ *
+ * Known issue: openapi-fetch 0.13 + openapi-typescript 7.x 는 response
+ * envelope 의 inference 가 깨짐 (특히 `cursor` / `entries` vs `logs` 등
+ * schema 의 inline shape). 본 PR 에서는 helper `apiGet` 의 return 을
+ * `unknown` 으로 두고, caller 가 명시적으로 inline cast. 후속 PR 에서
+ * openapi-fetch 갱신 시 cast 제거 검토.
  */
+import createClient from "openapi-fetch";
+import type { paths, components } from "../../.generated/openapi.d.ts";
 
-export type BuildStatus =
-  | "QUEUED"
-  | "BUILDING"
-  | "COMPLETED"
-  | "FAILED"
-  | "PROVISIONING"
-  | "PREVIEW_QUEUED"
-  | "PREVIEW_READY"
-  | "TEST_READY"
-  | "EXPIRED";
+export const api = createClient<paths>({
+  baseUrl: "/api"
+});
 
-export type BuildSummary = {
-  buildId: string;
-  projectId: string;
-  repositoryId: string;
-  status: BuildStatus;
-  updatedAt: string;
-};
-
-export type BuildStatusResponse = {
-  buildId: string;
-  projectId: string;
-  repositoryId: string;
-  status: BuildStatus;
-  createdAt: string;
-  updatedAt: string;
-  phases?: { phase: string; at: string }[];
-};
-
-export type BuildLogEntry = {
-  at: string;
-  phase: string;
-  message: string;
-};
-
-export type BuildLogsResponse = {
-  buildId: string;
-  cursor: string;
-  entries: BuildLogEntry[];
-};
-
-const BASE = "/api"; // vite.config proxy → http://127.0.0.1:3000
-
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { Accept: "application/json" }
-  });
-  if (!res.ok) {
-    throw new Error(`GET ${path} failed: ${res.status}`);
+async function apiGet(
+  path: keyof paths,
+  _pathStr: string,
+  params: unknown
+): Promise<unknown> {
+  const fetchFn = (api as unknown as {
+    GET: (p: string, init: { params: unknown }) => Promise<unknown>;
+  }).GET;
+  const result = (await fetchFn(path as string, { params })) as {
+    data?: unknown;
+    error?: unknown;
+    response?: { status?: number };
+  };
+  if (!result.data) {
+    const status = result.response?.status ?? 0;
+    throw new Error(
+      `GET ${String(path)} failed: ${status} ${JSON.stringify(result.error)}`
+    );
   }
-  return (await res.json()) as T;
+  return result.data;
 }
 
-export async function listBuilds(): Promise<BuildSummary[]> {
-  // 현재 Build Server 에 list endpoint 는 없음. PR #6 1차 골격에서는
-  // sample data 를 반환. 후속 PR 에서 /builds list endpoint 추가 + 교체.
-  return SAMPLE_BUILDS;
+export type BuildSummary = components["schemas"]["BuildSummary"];
+export type BuildStatusResponse = components["schemas"]["BuildStatusResponse"];
+export type BuildListResponse = components["schemas"]["BuildListResponse"];
+export type BuildListQuery = components["schemas"]["BuildListQuery"];
+export type BuildLogEntry = components["schemas"]["BuildLogEntry"];
+
+// BuildLogsResponse 는 OpenAPI 에 별도 schema 로 emit 되지 않음
+// (registerPath 의 response 가 inline `buildLogEntrySchema[]` 만 가리킴,
+// envelope 없음). 1차 inline 정의. 후속 PR 에서 buildLogsResponseSchema
+// 추가 + register 시 여기를 components 로 갈음.
+export type BuildLogsResponse = {
+  buildId: string;
+  logs: BuildLogEntry[];
+};
+
+export type ListBuildsParams = {
+  status?: BuildListQuery["status"];
+  limit?: BuildListQuery["limit"];
+  cursor?: BuildListQuery["cursor"];
+};
+
+export async function listBuilds(
+  params: ListBuildsParams = {}
+): Promise<BuildListResponse> {
+  return (await apiGet(
+    "/builds",
+    "/builds",
+    { query: params }
+  )) as BuildListResponse;
 }
 
 export async function getBuild(buildId: string): Promise<BuildStatusResponse> {
-  return get<BuildStatusResponse>(`/builds/${buildId}`);
+  return (await apiGet(
+    "/builds/{buildId}",
+    `/builds/${buildId}`,
+    { path: { buildId } }
+  )) as BuildStatusResponse;
 }
 
-export async function getBuildLogs(buildId: string, since?: string): Promise<BuildLogsResponse> {
-  const q = since ? `?since=${encodeURIComponent(since)}` : "";
-  return get<BuildLogsResponse>(`/builds/${buildId}/logs${q}`);
+export async function getBuildLogs(
+  buildId: string,
+  since?: string
+): Promise<BuildLogsResponse> {
+  return (await apiGet(
+    "/builds/{buildId}/logs",
+    `/builds/${buildId}/logs`,
+    { path: { buildId }, query: since ? { since } : {} }
+  )) as BuildLogsResponse;
 }
-
-const SAMPLE_BUILDS: BuildSummary[] = [
-  {
-    buildId: "11111111-1111-1111-1111-111111111111",
-    projectId: "demo-frontend",
-    repositoryId: "ykylee/demo-frontend",
-    status: "BUILDING",
-    updatedAt: new Date(Date.now() - 45_000).toISOString()
-  },
-  {
-    buildId: "22222222-2222-2222-2222-222222222222",
-    projectId: "demo-api",
-    repositoryId: "ykylee/demo-api",
-    status: "COMPLETED",
-    updatedAt: new Date(Date.now() - 5 * 60_000).toISOString()
-  },
-  {
-    buildId: "33333333-3333-3333-3333-333333333333",
-    projectId: "demo-worker",
-    repositoryId: "ykylee/demo-worker",
-    status: "FAILED",
-    updatedAt: new Date(Date.now() - 13 * 60_000).toISOString()
-  },
-  {
-    buildId: "44444444-4444-4444-4444-444444444444",
-    projectId: "demo-frontend",
-    repositoryId: "ykylee/demo-frontend",
-    status: "PREVIEW_READY",
-    updatedAt: new Date(Date.now() - 28 * 60_000).toISOString()
-  }
-];

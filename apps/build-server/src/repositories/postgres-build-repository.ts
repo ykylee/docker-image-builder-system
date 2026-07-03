@@ -14,6 +14,8 @@ import { eq, inArray } from "@docker-image-builder-system/db";
 import type {
   BuildDuplicateResponse,
   BuildError,
+  BuildListQuery,
+  BuildListResponse,
   BuildLogEntry,
   BuildPhase,
   BuildRequest,
@@ -502,5 +504,48 @@ export class PostgresBuildRepository implements BuildRepository {
     };
 
     return { kind: "found", testDeployment };
+  }
+
+  async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
+    // (1) status filter, (2) cursor skip (createdAt < cursor.createdAt OR
+    //     (createdAt == cursor.createdAt AND id < cursor.id), id 기준
+    //     tiebreak), (3) createdAt desc, id desc, (4) limit.
+    // 1차 골격은 id(uuid) 만 cursor 로 사용 — createdAt 비교는 backend 가
+    // monotonic 하지 않을 수 있어 안정성 우선.
+    const cursorRow = query.cursor
+      ? (
+          await this.db
+            .select({ createdAt: buildRequestTable.createdAt })
+            .from(buildRequestTable)
+            .where(eq(buildRequestTable.id, query.cursor))
+            .limit(1)
+        )[0]
+      : undefined;
+
+    const conds = [];
+    if (query.status) {
+      conds.push(eq(buildRequestTable.status, query.status));
+    }
+    if (cursorRow) {
+      // Skip rows with the same createdAt as the cursor and id <= cursor.id.
+      // PostgreSQL: (createdAt, id) < (cursor.createdAt, cursor.id).
+      conds.push(
+        sql`(${buildRequestTable.createdAt}, ${buildRequestTable.id}) < (${cursorRow.createdAt}, ${buildRequestTable.id})`
+      );
+    }
+
+    const rows = await this.db
+      .select()
+      .from(buildRequestTable)
+      .where(conds.length > 0 ? and(...conds) : undefined)
+      .orderBy(desc(buildRequestTable.createdAt), desc(buildRequestTable.id))
+      .limit(query.limit + 1);
+
+    const hasMore = rows.length > query.limit;
+    const page = hasMore ? rows.slice(0, query.limit) : rows;
+    const summaries = page.map(mapBuildRowToSummary);
+    const nextCursor = hasMore ? (summaries[summaries.length - 1]?.buildId ?? null) : null;
+
+    return { builds: summaries, nextCursor };
   }
 }

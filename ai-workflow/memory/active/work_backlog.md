@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 21: PR #6 (Svelte 5 frontend 부착 1차 골격) — TASK-039, 회귀 273/273 OK)
+- 최종 수정일: 2026-07-03 (rev 22: PR #7 (Build Server list + openapi-typescript 자동 client) — TASK-040, 회귀 268/268 OK)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -59,3 +59,4 @@
 - [x] TASK-023: 백엔드 개발 계획 수립 및 문서화
 - [x] TASK-038: Build Server OpenAPI/Swagger UI + CORS + DESIGN.md 1차안 부착 (PR #5). Fastify 플러그인 3종 (swagger, swagger-ui, @asteasolutions/zod-to-openapi 8.5) 부착, 16 zod schema 의 .meta({ id, description }) 통일, hand-rolled CORS (onRequest + OPTIONS wildcard, @fastify/cors 제외 — ESM/fastify-plugin fp 호환성 문제), CORS_ORIGIN ENV 추가, /openapi.json 10 paths / 17 components.schemas / 4 tags, /docs Swagger UI, docs/DESIGN.md (Stitch v1 spec) 1차안, openapi snapshot test 1종. 회귀 266/266 OK (TS 38 + Go 13 + Python 215).
 - [x] TASK-039: Build Monitor frontend 부착 1차 골격 (PR #6). Svelte 5 + Vite + TypeScript 선정 (DESIGN.md §0 Stack), apps/build-monitor 골격 + DESIGN.md tokens.css CSS 변수화 + 4 컴포넌트 (StatusPill/BuildRow/PhaseTimeline/LogStream) + Header + 3 route + lib/api.ts hand-typed 1차 + Vite proxy /api → :3000 + vitest 7/7 (StatusPill 매핑) + svelte-check 0 + vite build OK (gzip 22KB). 회귀 273/273 OK (TS 38+7 + Go 13 + Python 215). openapi-typescript 자동 client / list endpoint / light mode 는 후속 PR.
+- [x] TASK-040: Build Server GET /builds list endpoint + openapi-typescript 자동 client (PR #7). Memory + postgres 양쪽 listBuilds (filter status, createdAt desc, cursor pagination, limit max 200). zod BuildListQuery/BuildListResponse schema + .meta. limit 의 z.coerce.number(). build-monitor 측 openapi-typescript 7 + openapi-fetch 0.13 + tsx script (predev/prebuild hook) 로 ./.generated/openapi.d.ts 자동 생성. lib/api.ts 재작성 (SAMPLE_BUILDS 제거, openapi-fetch helper apiGet, BuildLogsResponse inline). BuildDetail nested access (.build.buildId) 수정 + LogStream LogEntry.at → createdAt. svelte-check 0, vitest 8/8 (StatusPill 7 + BuildRow 1), vite build OK (gzip 24KB). 회귀 268/268 OK (TS 42+8 + Go 13 + Python 215). live e2e: vite proxy /api/builds → 3 builds, ?limit=2 → 2 + nextCursor, /api/openapi.json 200.

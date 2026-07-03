@@ -4,6 +4,8 @@ import { z } from "zod";
 import {
   buildAcceptedResponseSchema,
   buildDuplicateResponseSchema,
+  buildListQuerySchema,
+  buildListResponseSchema,
   buildLogsResponseSchema,
   buildPhases,
   buildRequestSchema,
@@ -35,6 +37,18 @@ export async function registerBuildRoutes(
   app: FastifyInstance,
   buildService: BuildService
 ): Promise<void> {
+  app.get("/builds", async (request, reply) => {
+    const queryResult = buildListQuerySchema.safeParse(request.query ?? {});
+    if (!queryResult.success) {
+      return reply.status(400).send({
+        message: "Invalid list query",
+        issues: queryResult.error.issues
+      });
+    }
+    const body = await buildService.listBuilds(queryResult.data);
+    return reply.status(200).send(body);
+  });
+
   app.post("/builds", async (request, reply) => {
     const payload = buildRequestSchema.parse(request.body);
     const result = await buildService.createBuild(payload);

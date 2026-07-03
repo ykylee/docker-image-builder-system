@@ -10,7 +10,10 @@
     "preview": "vite preview --port 4173",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "predev": "tsx scripts/generate-openapi.ts",
+    "prebuild": "tsx scripts/generate-openapi.ts",
+    "generate:openapi": "tsx scripts/generate-openapi.ts"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
@@ -23,7 +26,9 @@
     "tslib": "^2.7.0",
     "typescript": "^5.6.3",
     "vite": "^5.4.8",
-    "vitest": "^2.1.2"
+    "vitest": "^2.1.2",
+    "openapi-typescript": "^7.4.4",
+    "tsx": "^4.20.3"
   },
   "dependencies": {
     "openapi-fetch": "^0.13.5",

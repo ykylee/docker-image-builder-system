@@ -10,7 +10,8 @@
 
   onMount(async () => {
     try {
-      builds = await listBuilds();
+      const result = await listBuilds();
+      builds = result.builds;
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
