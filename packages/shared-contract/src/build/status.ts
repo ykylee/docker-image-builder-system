@@ -7,6 +7,8 @@ export const buildStatuses = [
   "FAILED"
 ] as const;
 
+export type BuildStatus = (typeof buildStatuses)[number];
+
 export const previewStatuses = [
   "NOT_REQUESTED",
   "QUEUED",
@@ -16,5 +18,4 @@ export const previewStatuses = [
   "EXPIRED"
 ] as const;
 
-export type BuildStatus = (typeof buildStatuses)[number];
 export type PreviewStatus = (typeof previewStatuses)[number];

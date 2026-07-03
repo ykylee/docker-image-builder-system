@@ -8,6 +8,7 @@ export type RuntimeSettings = {
   previewTtlMinutes: number;
   runnerPollIntervalMs: number;
   buildTimeoutSeconds: number;
+  corsOrigin: string | true | false;
 };
 
 export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
@@ -18,6 +19,7 @@ export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
     dbAutoBootstrap: env.DB_AUTO_BOOTSTRAP,
     previewTtlMinutes: env.PREVIEW_TTL_MINUTES,
     runnerPollIntervalMs: env.RUNNER_POLL_INTERVAL_MS,
-    buildTimeoutSeconds: env.BUILD_TIMEOUT_SECONDS
+    buildTimeoutSeconds: env.BUILD_TIMEOUT_SECONDS,
+    corsOrigin: env.CORS_ORIGIN
   };
 }

@@ -14,5 +14,8 @@
     "@types/node": "^24.0.13",
     "@types/pg": "^8.15.5",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.5.0"
   }
 }

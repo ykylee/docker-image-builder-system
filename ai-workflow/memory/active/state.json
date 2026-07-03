@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "PR #4 (TASK-034/035/036 PKG-005+006) main 합류. Host Server + Go Runner 가 canonical contract 위에서 build + preview 전체 lifecycle 8 phase (REQUEST_ACCEPTED → QUEUE_CLAIMED → SOURCE_PREPARED → DOCKER_BUILD_STARTED → DOCKER_BUILD_COMPLETED → PREVIEW_QUEUED → PREVIEW_READY → COMPLETED) end-to-end 동작. 회귀 265/265 OK (TS 37 + Go 13 + Python 215). 후속: TASK-037 (PKG-007 Preview Cleanup, TTL sweeper) 또는 docker.BuildImage 실제 구현 또는 TASK-017 stdio transport 활성화.",
-  "purpose_digest_rev": "40",
+  "purpose_digest": "PR #5 (Swagger UI + CORS + DESIGN.md) 1차안: Build Server 에 @fastify/swagger + @fastify/swagger-ui + @asteasolutions/zod-to-openapi 8.5 부착 (/openapi.json 10 paths + 17 components.schemas + 4 tags, /docs Swagger UI 활성화), hand-rolled CORS (onRequest hook + OPTIONS wildcard handler, @fastify/cors 는 ESM/fastify-plugin 호환성 문제로 제외), 16 zod schema 에 .meta({ id, description }) 부착, CORS_ORIGIN ENV (\"true\"|\"false\"|string) shared-config 에 추가, docs/DESIGN.md 신설 (Stitch v1 spec 형식, 1차안 — Build Monitor UI 기준), openapi snapshot test 1종 추가. 회귀 266/266 OK (TS 38 + Go 13 + Python 215). frontend 부착은 별도 PR. 후속: frontend Vite + React 작업 또는 TASK-017 stdio transport 활성화.",
+  "purpose_digest_rev": "41",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",

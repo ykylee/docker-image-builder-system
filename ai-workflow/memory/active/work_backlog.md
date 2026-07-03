@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 19: PR #4 머지 — TASK-034/035/036 일괄 main 합류, 회귀 265/265 OK)
+- 최종 수정일: 2026-07-03 (rev 20: PR #5 (Swagger UI + CORS + DESIGN.md) 1차안 — TASK-038, 회귀 266/266 OK)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -57,3 +57,4 @@
 - [x] TASK-021: 발표용 카피 압축 및 승인안 톤 보정
 - [x] TASK-022: 백엔드 착수용 기술스택 결정 보정
 - [x] TASK-023: 백엔드 개발 계획 수립 및 문서화
+- [x] TASK-038: Build Server OpenAPI/Swagger UI + CORS + DESIGN.md 1차안 부착 (PR #5). Fastify 플러그인 3종 (swagger, swagger-ui, @asteasolutions/zod-to-openapi 8.5) 부착, 16 zod schema 의 .meta({ id, description }) 통일, hand-rolled CORS (onRequest + OPTIONS wildcard, @fastify/cors 제외 — ESM/fastify-plugin fp 호환성 문제), CORS_ORIGIN ENV 추가, /openapi.json 10 paths / 17 components.schemas / 4 tags, /docs Swagger UI, docs/DESIGN.md (Stitch v1 spec) 1차안, openapi snapshot test 1종. 회귀 266/266 OK (TS 38 + Go 13 + Python 215).
