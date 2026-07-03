@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 36→37: 문서 정리 세션 진행 중. canonical SDLC 문서, README, legacy 루트 문서, 보고 자료, workflow 메타를 build -> container test -> external deployment -> result delivery 모델 기준으로 재정렬. **rev 37→38: PR #13 self-review follow-up 보완(transaction wrap / FK+DEFAULT / left join / omitempty / openapi 응답 / docker marker guard / EXPIRED 코멘트) 7건 amend commit 으로 봉인**)
+- 최종 수정일: 2026-07-03 (rev 36→37: 문서 정리 세션 진행 중. canonical SDLC 문서, README, legacy 루트 문서, 보고 자료, workflow 메타를 build -> container test -> external deployment -> result delivery 모델 기준으로 재정렬. **rev 37→38: PR #13 self-review follow-up 보완(transaction wrap / FK+DEFAULT / left join / omitempty / openapi 응답 / docker marker guard / EXPIRED 코멘트) 7건 amend commit 으로 봉인. rev 38→39: PR #13 squash merge 합류 sync (main HEAD `56727d3`).**)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙

@@ -6,12 +6,12 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 44→45: PR #13 self-review follow-up 보완 7건을 amend commit 으로 묶었다. `reportPreviewStatus` / `reportDeploymentResult` transaction wrap, `getTestDeployment` left join, `0003` SQL FK + DEFAULT, Go claim `Reason omitempty`, OpenAPI deployment 응답 `BuildStatusResponse` ref, `docker.BuildImage` marker 기반 idempotent guard, memory repo EXPIRED case 코멘트 보강. 회귀: TS 4 packages clean, Go 9 packages OK, build-server 52/52, build-monitor svelte-check 0/0. workflow meta 동기화 (state rev 65→66, handoff 44→45, work_backlog 37→38, backlog §46→47 + 새 §48) 같은 amend commit 에 포함.)
+- Updated: 2026-07-03 (rev 45→46: PR #13 squash merge 합류 sync. main HEAD `56727d3` (squash merge commit, 본래 squash 입력은 `dc45b60`). self-review follow-up 7건이 모두 amend 안에 들어가 머지 차단 이슈 0건. 다음: TASK-060 Build Monitor status/UI refactor (M4 진입) 또는 TASK-064 smoke/migration/visual QA baseline.)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note
 - 본 세션은 사용자 wrap-up 요청 ('작업 내역 정리하고 세션 종료 준비하자') 으로 시작. 신규 code 없음. main HEAD `7c7297f` (PR #12 squash merge sync) 에서 메타 동기화 (state rev 60→61, handoff 33→34, work_backlog 34→35, backlog §36) 만 commit 1건. 다음 PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete) 즉시 착수 가능.
-- 사용자 후속 요청으로 PR #13 (`codex/task-056-pr-prep-2026-07-03` → `main`, 87 files / +4546 / −4197, TASK-051~059 + TASK-063 묶음) 을 오픈한 뒤 self-review 를 진행. 본 handoff 작성 시점에 PR #13 에 self-review follow-up 보완 7건을 amend commit 으로 묶었다 (`f137aff` 의 amend hash). 머지 차단 이슈 0건, 다음은 squash merge 후 TASK-060 (Build Monitor status/UI refactor, M4 진입).
+- 사용자 후속 요청으로 PR #13 (`codex/task-056-pr-prep-2026-07-03` → `main`, 87 files / +4546 / −4197, TASK-051~059 + TASK-063 묶음) 을 오픈한 뒤 self-review 를 진행. PR #13 에 self-review follow-up 보완 7건을 amend commit (`dc45b60`) 으로 묶어 머지 차단 이슈를 0건으로 닫고, gh pr merge --squash 로 main 에 합류 (`56727d3`). 본 sync commit 으로 workflow 메타 (state rev 66→67, handoff 45→46, work_backlog 38→39, backlog index 20→21 / latest 24→25) 를 main 에 동기화. 다음 세션 시작 포인트: TASK-060 (Build Monitor status/UI refactor, M4 진입) 또는 TASK-064 (smoke / migration / visual QA baseline).
 
 ## Current Doc Cleanup Note
 - 사용자 요청에 따라 SDLC 문서 정리를 이어가며 preview-first 서사를 build -> container test -> external deployment -> result delivery 서사로 정렬했다.
