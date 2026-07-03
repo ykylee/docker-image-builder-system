@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-03T13:30:00Z",
+  "generated_at": "2026-07-03T13:40:00Z",
   "purpose_digest": "문서 정리와 리팩토링 세션을 이어가며 SDLC canonical 문서/README/workflow 메타를 build -> container test -> external deployment -> result delivery 모델로 맞춘 뒤, runtime skeleton 위에 container test result reporting(Task 58)과 external deployment adapter v1(Task 59)까지 반영했다. PR #13 self-review 에서 발견된 race / schema 정확성 / spec 일관성 결함 7건(transaction wrap, FK/DEFAULT, left join, omitempty, openapi 응답 schema, docker marker guard, EXPIRED 코멘트)을 amend commit 으로 묶어 PR 머지 차단 이슈를 0건으로 닫았고, PR #13 을 squash merge 로 main 에 합류시켰다.",
-  "purpose_digest_rev": 69,
+  "purpose_digest_rev": 70,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -29,10 +29,8 @@
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다. PR #13 (M1~M5 refactor alignment + self-review follow-up 7건) 이 squash merge 로 main 합류 완료. TASK-060 1차 PR (BuildDetail canonical block 4종 + StatusPill lifecycleStatus + legacy preview 분리) 가 브랜치 `codex/task-060-build-monitor-ui-refactor-2026-07-03` 에서 1차 변경 완료.",
     "current_axis": "M1~M5 의 핵심 backend/runtime 축에 external deployment adapter v1까지 반영하고, race / schema 정확성 / spec 일관성 보완까지 amend commit 으로 묶어 main 에 합류시켰다. TASK-060 1차 PR 은 M4 진입의 첫 단계로 BuildDetail 이 canonical block 4종 (lifecycle / container test / deployment / result delivery) 을 UI 에 노출. 다음 TASK-060 2차 PR 은 fixture / StatusPill·BuildRow 매핑 / Admin 라우트 status filter 정렬.",
-    "current_focus": "PR #14 self-review follow-up 보완 5건 amend 완료 (StatusPill 색상 매핑 / BuildDetail .kv breakpoint / section 이름 / Legacy preview 안내문 / BuildRow lifecycleStatus prop). 다음: amend commit + force push + squash merge → PR #14 squash merge sync. 이후 TASK-060 2차 PR (fixture + BuildList / AdminBuilds / AdminUsers status mapping 정렬) 또는 TASK-061 / TASK-062.",
-    "in_progress_items": [
-      "PR #14 self-review follow-up 보완 5건 amend 후 squash merge"
-    ],
+    "current_focus": "PR #14 squash merge 합류 완료. main HEAD `703600f` (squash merge commit, 본래 squash 입력은 `b0ce44f`, rebase 후 CodeWhale overlay `5e597c3` 위에서 합류). self-review follow-up 보완 5건(StatusPill 색상 통일 / BuildDetail .kv breakpoint / section 이름 차별화 / Legacy preview 안내문 명확화 / BuildRow lifecycleStatus) 이 모두 amend 안에 들어가 머지 차단 이슈 0건. 다음: TASK-060 2차 PR (fixture 갱신 + BuildList / AdminBuilds / AdminUsers status mapping 정렬) 또는 TASK-061 / TASK-062.",
+    "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
       "PR #14 self-review follow-up 보완 5건 — `StatusPill` canonical 12-state union 중 `BUILD_SUCCESS` / `TEST_SUCCESS` / `DEPLOY_SUCCESS` / `COMPLETED` 를 `--color-accent-success` 로 통일 (success 의미 색상), `BuildDetail.svelte` `.kv` grid 에 `@media (max-width: 640px)` 1컬럼 fallback 추가 (narrow viewport horizontal scroll 차단), `BuildDetail.svelte` canonical lifecycle section h2 를 `Lifecycle` → `Build lifecycle` 로 차별화 (meta row 의 짧은 라벨과 section 의 detail snapshot 분리), `BuildDetail.svelte` Legacy preview 안내문을 canonical section 참조 + removal plan 명시 형태로 명확화, `BuildRow.svelte` `BuildRowData` 에 `lifecycleStatus` optional prop 추가 + `StatusPill` 에 전달. 회귀: TS 4 packages clean, Go 17 passed / 9 packages, build-server focused 52/52, build-monitor tsc + svelte-check 0/0. workflow meta 동기화 (state rev 68→69, handoff 47→48, work_backlog 40→41, backlog §49 Result 봉인 + 새 §50) 같은 amend commit 에 포함.",
@@ -96,10 +94,10 @@
       "TASK-043 ADMIN-* Admin UI — ADMIN_IDS env (default admin,yky.lee) + /admin/builds + /admin/users + AdminLogin/AdminBuilds/AdminUsers + Header adminId 분기. 회귀 TS 53 + vitest 34 + svelte-check 0/0 + Go 13 + Python 215. live e2e: 401/403/200 + owner list + owner filter 정상"
     ],
     "environment_constraints": [],
-    "handoff_rev": 48,
+    "handoff_rev": 49,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 41,
-    "latest_rev": 69
+    "index_rev": 42,
+    "latest_rev": 70
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
@@ -141,8 +139,8 @@
       "TASK-021 발표용 카피 압축 및 승인안 톤 보정",
       "TASK-022 workflow 메타 정합성 보강 (commands placeholder, status assessment, report 인덱스, legacy 배너, 2026-07-02 백로그 봉인)"
     ],
-    "index_rev": "23",
-    "latest_rev": "27"
+    "index_rev": "24",
+    "latest_rev": "28"
   },
   "next_documents": [
     "docs/sdlc/13-skills-and-mcp-plan.md",
