@@ -110,4 +110,29 @@ describe("BuildsList", () => {
       ).toBeInTheDocument()
     );
   });
+
+  it("status chip matches canonical lifecycleStatus alongside legacy status", async () => {
+    localStorage.setItem("userId", "yklee");
+    listBuildsMock.mockResolvedValue({
+      builds: [
+        // legacy status = BUILDING + canonical lifecycleStatus = "DEPLOYING"
+        // — BUILDING chip 은 lifecycleStatus mismatch 여도 표시되어야 함.
+        sample("p-legacy-build", "BUILDING", "DEPLOYING"),
+        // canonical BUILD_SUCCESS → COMPLETED chip 에 매칭되어야 함.
+        sample("p-canonical-build-success", "BUILDING", "BUILD_SUCCESS"),
+        // 둘 다 legacy BUILDING — 기존 chip 동작.
+        sample("p-pure-legacy", "BUILDING", "BUILDING")
+      ],
+      nextCursor: null
+    });
+    render(BuildsList);
+    // 기본 ALL → 3건 렌더
+    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(3));
+    // BUILDING chip 클릭 → DEPLOYING (canonical) + BUILDING 둘 다 매칭 → 2건
+    await fireEvent.click(screen.getByRole("button", { name: "BUILDING" }));
+    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(2));
+    // COMPLETED chip 클릭 → BUILD_SUCCESS (canonical) 매칭 → 1건
+    await fireEvent.click(screen.getByRole("button", { name: "COMPLETED" }));
+    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(1));
+  });
 });

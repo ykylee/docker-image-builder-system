@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 50→51: PR #15 squash merge 합류 sync. main HEAD `fe7f639` (squash merge commit, 입력 `71ce207`). self-review 보완 필요 0건으로 amend 없이 squash merge. 다음: TASK-060 3차 PR (Admin 라우트 status filter canonical 정렬) 또는 TASK-061 (Skill/MCP contract rename) 또는 TASK-062 (stdio transport).)
+- Updated: 2026-07-03 (rev 51→52: TASK-060 3차 PR (PR #16) 진입. 브랜치 `codex/task-060-status-filter-canonical-2026-07-03` (main HEAD `b5b654b` 기준). `BuildsList.svelte` / `AdminBuilds.svelte` 의 `visible = $derived(...)` 가 canonical `lifecycleStatus` 와 legacy `status` 둘 다 매칭하도록 `matchesChip` helper 도입. canonical success 계열 (`BUILD_SUCCESS` / `TEST_SUCCESS` / `DEPLOY_SUCCESS`) 도 `COMPLETED` chip 에 매칭. `BuildsList.test.ts` 에 canonical 매칭 검증 case 추가. 회귀: TS 4 packages clean, Go 9 packages, build-server 52/52, build-monitor tsc + svelte-check 0 errors / 0 warnings. workflow meta 동기화 (state rev 72→73, handoff 51→52, work_backlog 44→45, backlog §51→52) 같은 commit 에 포함. 다음: commit + push + gh pr create + squash merge sync.)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note
