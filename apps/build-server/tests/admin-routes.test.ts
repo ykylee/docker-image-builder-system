@@ -304,3 +304,6 @@ describe("admin add/remove with charset validation (TASK-049 follow-up)", () => 
     await app.close();
   });
 });
+
+// (empty — keep file well-formed; the admin-routes.test.ts is a different file though,
+//  phase tests live in build-routes.test.ts or new file)

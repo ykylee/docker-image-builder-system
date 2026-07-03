@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 30→31: PR #11 squash merge `343f78c` main 합류. 브랜치 정리. 다음 PR #12 — BuildPhase timestamps + PhaseTimeline.svelte 재구현.) commit/push — admin allow-list backend + frontend + Header auto-enable + AdminAdmins.svelte + visual QA scaffolding. 회귀 333+ OK.). TASK-043/044 complete.
+- 최종 수정일: 2026-07-03 (rev 31→32: PR #12 (TASK-050) commit/push — BuildStatusResponse phaseHistory/currentPhase, in-memory repo transition, PhaseTimeline.svelte 재구현. 회귀 351+ OK.) commit/push — admin allow-list backend + frontend + Header auto-enable + AdminAdmins.svelte + visual QA scaffolding. 회귀 333+ OK.). TASK-043/044 complete.
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙

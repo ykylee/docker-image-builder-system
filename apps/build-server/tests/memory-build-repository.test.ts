@@ -267,3 +267,78 @@ describe("MemoryBuildRepository: listBuilds", () => {
     assert.equal(page3.nextCursor, null);
   });
 });
+
+describe("MemoryBuildRepository: phase timeline (TASK-050)", () => {
+  const request = {
+    appName: "p-tl",
+    requestedBy: "yklee",
+    sourceArchive: {
+      objectKey: "src/p-tl/r-1/abc.tar.gz",
+      checksumSha256: "deadbeef",
+      sizeBytes: 1024
+    },
+    entrypointPath: "src/index.ts"
+  };
+
+  it("createBuild 응답에 phaseHistory=[] 와 currentPhase=REQUEST_ACCEPTED 가 포함된다", async () => {
+    const repo = createMemoryBuildRepository();
+    const create = await repo.createBuild(request);
+    assert.equal(create.kind, "accepted");
+    if (create.kind !== "accepted") return;
+    assert.deepEqual(create.response.phaseHistory, []);
+    assert.deepEqual(create.response.currentPhase, {
+      phase: "REQUEST_ACCEPTED",
+      startedAt: create.response.build.createdAt
+    });
+  });
+
+  it("updatePhase 응답이 phaseHistory 에 직전 phase push + currentPhase 갱신", async () => {
+    const repo = createMemoryBuildRepository();
+    const create = await repo.createBuild(request);
+    if (create.kind !== "accepted") throw new Error("expected accepted");
+    const buildId = create.response.build.buildId;
+
+    // QUEUE_CLAIMED 로 transition.
+    const claimed = await repo.updatePhase(buildId, "QUEUE_CLAIMED");
+    assert.equal(claimed.kind, "ok");
+    if (claimed.kind !== "ok") return;
+    assert.deepEqual(claimed.response.phaseHistory, [
+      { phase: "REQUEST_ACCEPTED", completedAt: claimed.response.build.updatedAt }
+    ]);
+    assert.equal(claimed.response.currentPhase?.phase, "QUEUE_CLAIMED");
+
+    // SOURCE_PREPARED 로 transition.
+    const sourcePrepared = await repo.updatePhase(buildId, "SOURCE_PREPARED");
+    if (sourcePrepared.kind !== "ok") throw new Error("expected ok");
+    assert.equal(sourcePrepared.response.phaseHistory.length, 2);
+    assert.equal(sourcePrepared.response.phaseHistory[1].phase, "QUEUE_CLAIMED");
+    assert.equal(sourcePrepared.response.currentPhase?.phase, "SOURCE_PREPARED");
+  });
+
+  it("terminal phase (COMPLETED) 진입 시 currentPhase=null", async () => {
+    const repo = createMemoryBuildRepository();
+    const create = await repo.createBuild(request);
+    if (create.kind !== "accepted") throw new Error("expected accepted");
+    const buildId = create.response.build.buildId;
+    await repo.updatePhase(buildId, "DOCKER_BUILD_STARTED");
+    const done = await repo.updatePhase(buildId, "COMPLETED");
+    if (done.kind !== "ok") throw new Error("expected ok");
+    assert.equal(done.response.currentPhase, null);
+    // COMPLETED 가 history 의 마지막 entry.
+    const last = done.response.phaseHistory.at(-1);
+    assert.ok(last);
+    assert.equal(last?.phase, "DOCKER_BUILD_STARTED");
+  });
+
+  it("같은 phase 로 updatePhase 호출 시 phaseHistory 가 변하지 않는다", async () => {
+    const repo = createMemoryBuildRepository();
+    const create = await repo.createBuild(request);
+    if (create.kind !== "accepted") throw new Error("expected accepted");
+    const buildId = create.response.build.buildId;
+    const before = (await repo.getBuild(buildId))!;
+    // 동일 phase 로 한 번 더.
+    const same = await repo.updatePhase(buildId, "REQUEST_ACCEPTED");
+    if (same.kind !== "ok") throw new Error("expected ok");
+    assert.equal(same.response.phaseHistory.length, before.phaseHistory.length);
+  });
+});

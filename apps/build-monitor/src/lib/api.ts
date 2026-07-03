@@ -56,7 +56,26 @@ async function apiGet(
 }
 
 export type BuildSummary = components["schemas"]["BuildSummary"];
-export type BuildStatusResponse = components["schemas"]["BuildStatusResponse"];
+// BuildStatusResponse 는 server shared-contract 와 동기화되어야 하지만,
+// .generated/openapi.d.ts 가 backend 미실행 환경에선 stale 일 수 있어
+// hand-typed mirror 를 둔다. TASK-050 에서 phaseHistory + currentPhase
+// 두 필드를 추가했다. regenerator 가 다시 돌면 mirror 는 generated
+// type 으로 갈음 가능.
+// Mirrors packages/shared-contract/src/build/response.ts:buildStatusResponseSchema
+export type BuildPhaseHistoryEntry = {
+  phase: string;
+  completedAt: string;
+};
+export type BuildCurrentPhase = {
+  phase: string;
+  startedAt: string;
+} | null;
+export type BuildStatusResponse = {
+  build: components["schemas"]["BuildSummary"];
+  lastError: components["schemas"]["BuildError"] | null;
+  phaseHistory: BuildPhaseHistoryEntry[];
+  currentPhase: BuildCurrentPhase;
+};
 export type BuildListResponse = components["schemas"]["BuildListResponse"];
 export type BuildListQuery = components["schemas"]["BuildListQuery"];
 export type BuildLogEntry = components["schemas"]["BuildLogEntry"];

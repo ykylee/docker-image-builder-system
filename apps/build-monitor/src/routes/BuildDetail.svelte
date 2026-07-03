@@ -56,7 +56,10 @@
     </dl>
     <section class="block">
       <h2>Phases</h2>
-      <PhaseTimeline events={[{ phase: build.build.phase, at: build.build.updatedAt }]} />
+      <PhaseTimeline
+        phaseHistory={build.phaseHistory ?? []}
+        currentPhase={build.currentPhase ?? null}
+      />
     </section>
     <section class="block">
       <h2>Logs</h2>

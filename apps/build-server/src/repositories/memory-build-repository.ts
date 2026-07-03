@@ -35,6 +35,13 @@ type StoredBuild = {
   lastError: BuildError | null;
   logs: BuildLogEntry[];
   testDeployment: TestDeployment | null;
+  // phase lifecycle timeline (TASK-050). 매 phase transition 마다
+  // 직전 currentPhase 의 (phase, completedAt) 가 history 에 push 되고,
+  // 새 currentPhase 가 시작된다 (startedAt 갱신). terminal phase
+  // (COMPLETED, FAILED) 진입 시 currentPhaseStartedAt 은 null 로 —
+  // currentPhase 자체가 없음을 의미.
+  phaseHistory: { phase: BuildPhase; completedAt: string }[];
+  currentPhaseStartedAt: string | null;
 };
 
 function emptyTestDeployment(updatedAt: string): TestDeployment {
@@ -104,14 +111,23 @@ export function createMemoryBuildRepository(): BuildRepository {
         requestedBy: input.requestedBy,
         lastError: null,
         logs: [logEntry],
-        testDeployment: null
+        testDeployment: null,
+        phaseHistory: [],
+        // REQUEST_ACCEPTED 가 initial phase. transition 이벤트가 들어오기
+        // 전까지 in-flight.
+        currentPhaseStartedAt: timestamp
       });
 
       return {
         kind: "accepted",
         response: {
           build: summary,
-          lastError: null
+          lastError: null,
+          phaseHistory: [],
+          currentPhase: {
+            phase: "REQUEST_ACCEPTED",
+            startedAt: timestamp
+          }
         }
       };
     },
@@ -124,7 +140,17 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       return {
         build: build.summary,
-        lastError: build.lastError
+        lastError: build.lastError,
+        // phaseHistory 는 transition 시 push 된 종료 시각 모음. currentPhase
+        // 는 build 가 terminal (COMPLETED/FAILED) 가 아닐 때 in-flight phase
+        // 와 startedAt.
+        phaseHistory: build.phaseHistory,
+        currentPhase: isTerminalPhase(build.summary.phase)
+          ? null
+          : {
+              phase: build.summary.phase,
+              startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
+            }
       };
     },
 
@@ -150,7 +176,8 @@ export function createMemoryBuildRepository(): BuildRepository {
           kind: "active_build_exists",
           build: {
             build: active.summary,
-            lastError: active.lastError
+            lastError: active.lastError,
+            ...toPhaseTimeline(active)
           }
         };
       }
@@ -182,7 +209,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         kind: "claimed",
         response: {
           build: next.summary,
-          lastError: next.lastError
+          lastError: next.lastError,
+          ...toPhaseTimeline(next)
         }
       };
     },
@@ -199,7 +227,8 @@ export function createMemoryBuildRepository(): BuildRepository {
           kind: "ok",
           response: {
             build: build.summary,
-            lastError: build.lastError
+            lastError: build.lastError,
+            ...toPhaseTimeline(build)
           }
         };
       }
@@ -214,12 +243,25 @@ export function createMemoryBuildRepository(): BuildRepository {
         nextStatus = "FAILED";
       }
 
+      // TASK-050: phase transition 마다 직전 currentPhase 를 history 에 push.
+      // push 순서: 새 phase 의 startedAt 결정 → 직전 phase 의 completedAt 결정
+      // → history push → currentPhaseStartedAt 갱신. terminal (COMPLETED /
+      // FAILED) 진입 시 currentPhaseStartedAt = null.
+      const prevPhase = build.summary.phase;
+      const isTerminal = isTerminalPhase(phase);
+      if (prevPhase !== phase) {
+        build.phaseHistory.push({
+          phase: prevPhase,
+          completedAt: timestamp
+        });
+      }
       build.summary = {
         ...build.summary,
         phase: phase as BuildPhase,
         status: nextStatus,
         updatedAt: timestamp
       };
+      build.currentPhaseStartedAt = isTerminal ? null : timestamp;
       builds.set(buildId, build);
 
       const phaseLog: BuildLogEntry = {
@@ -235,7 +277,14 @@ export function createMemoryBuildRepository(): BuildRepository {
         kind: "ok",
         response: {
           build: build.summary,
-          lastError: build.lastError
+          lastError: build.lastError,
+          phaseHistory: build.phaseHistory,
+          currentPhase: isTerminal
+            ? null
+            : {
+                phase: build.summary.phase,
+                startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
+              }
         }
       };
     },
@@ -271,6 +320,11 @@ export function createMemoryBuildRepository(): BuildRepository {
         expiresAt,
         updatedAt: timestamp
       };
+      // TASK-050: PREVIEW_QUEUED 진입 시 직전 phase 의 completedAt 기록.
+      const prevPhase6 = build.summary.phase;
+      if (prevPhase6 !== "PREVIEW_QUEUED") {
+        build.phaseHistory.push({ phase: prevPhase6, completedAt: timestamp });
+      }
       build.testDeployment = testDeployment;
       build.summary = {
         ...build.summary,
@@ -279,6 +333,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         previewUrl: null,
         updatedAt: timestamp
       };
+      build.currentPhaseStartedAt = timestamp;
       builds.set(buildId, build);
 
       const log: BuildLogEntry = {
@@ -294,7 +349,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         kind: "queued",
         response: {
           build: build.summary,
-          lastError: build.lastError
+          lastError: build.lastError,
+          ...toPhaseTimeline(build)
         },
         testDeployment
       };
@@ -367,7 +423,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         kind: "ok",
         response: {
           build: build.summary,
-          lastError: build.lastError
+          lastError: build.lastError,
+          ...toPhaseTimeline(build)
         },
         testDeployment: next
       };
@@ -468,5 +525,31 @@ export function createMemoryBuildRepository(): BuildRepository {
         });
       return { users };
     }
+  };
+}
+
+
+// TASK-050: terminal phase 헬퍼. BuildStatusResponse 의 currentPhase 가
+// null 인지 (= build 가 terminal 상태인지) 결정한다. COMPLETED/FAILED 가
+// canonical terminal 이고, EXPIRED 는 preview 의 terminal 이지만 build
+// 자체는 COMPLETED/FAILED 로 끝나므로 여기선 두 phase 만 본다.
+function isTerminalPhase(phase: string): boolean {
+  return phase === "COMPLETED" || phase === "FAILED";
+}
+
+// TASK-050: StoredBuild → BuildStatusResponse 의 phase timeline 두 필드.
+// in-flight phase 와 startedAt, 또는 terminal 이면 null.
+function toPhaseTimeline(build: StoredBuild): {
+  phaseHistory: { phase: BuildPhase; completedAt: string }[];
+  currentPhase: { phase: BuildPhase; startedAt: string } | null;
+} {
+  return {
+    phaseHistory: build.phaseHistory,
+    currentPhase: isTerminalPhase(build.summary.phase)
+      ? null
+      : {
+          phase: build.summary.phase,
+          startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
+        }
   };
 }

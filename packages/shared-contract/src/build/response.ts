@@ -71,14 +71,73 @@ export const buildDuplicateResponseSchema = z
 
 export type BuildDuplicateResponse = z.infer<typeof buildDuplicateResponseSchema>;
 
+// Per-phase completion entry. Each entry captures the timestamp at which a
+// canonical BuildPhase transitioned OUT (completed or superseded by a later
+// phase). The current in-flight phase is NOT included in this list — see
+// `BuildCurrentPhase` below. Together they describe the build's full
+// progress without the caller having to know the canonical phase list.
+export const buildPhaseHistoryEntrySchema = z
+  .object({
+    phase: z.enum(buildPhases),
+    completedAt: z.string().datetime().meta({
+      description:
+        "ISO 8601 timestamp at which this phase completed (transitioned out, regardless of outcome)."
+    })
+  })
+  .meta({
+    id: "BuildPhaseHistoryEntry",
+    description:
+      "Single completed-phase record. Appended in transition order. The current in-flight phase is not represented here — see BuildCurrentPhase."
+  });
+
+export type BuildPhaseHistoryEntry = z.infer<typeof buildPhaseHistoryEntrySchema>;
+
+// In-flight phase. null when the build is in a terminal state
+// (COMPLETED, FAILED) or has not yet been claimed (REQUEST_ACCEPTED →
+// QUEUE_CLAIMED). For non-null entries, `startedAt` records when the
+// phase began. The phase is also exposed as the canonical `build.phase`
+// in BuildSummary, but this entry carries the timestamp.
+export const buildCurrentPhaseSchema = z
+  .object({
+    phase: z.enum(buildPhases),
+    startedAt: z.string().datetime().meta({
+      description:
+        "ISO 8601 timestamp at which the current in-flight phase began. Used by the build-monitor PhaseTimeline to render the \"now\" indicator."
+    })
+  })
+  .nullable()
+  .meta({
+    id: "BuildCurrentPhase",
+    description:
+      "The in-flight BuildPhase, or null when the build is in a terminal state. Mirrors build.phase + carry-over timestamp."
+  });
+
+export type BuildCurrentPhase = z.infer<typeof buildCurrentPhaseSchema>;
+
 export const buildStatusResponseSchema = z
   .object({
     build: buildSummarySchema,
-    lastError: buildErrorSchema.nullable()
+    lastError: buildErrorSchema.nullable(),
+    // phaseHistory 와 currentPhase 는 build lifecycle 전체의 timeline 을
+    // 표현한다. build-monitor 의 PhaseTimeline 가 이 두 필드를 받아
+    // canonical phase 리스트 대비 완료/진행/미진행을 시각화한다.
+    // - phaseHistory: 이미 종료된 phase 들 (terminal 단계 제외, 중간에
+    //   skip 된 phase 도 미포함).
+    // - currentPhase: 현재 진행 중인 phase. terminal (COMPLETED/FAILED)
+    //   상태면 null.
+    phaseHistory: z
+      .array(buildPhaseHistoryEntrySchema)
+      .default([])
+      .meta({
+        description:
+          "List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. PREVIEW_QUEUED → COMPLETED without PREVIEW_READY). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051)."
+      }),
+    currentPhase: buildCurrentPhaseSchema.default(null)
   })
   .meta({
     id: "BuildStatusResponse",
-    description: "Returned on GET /builds/:buildId and embedded in claim responses (2-depth nesting)."
+    description:
+      "Returned on GET /builds/:buildId and embedded in claim responses (2-depth nesting). phaseHistory + currentPhase describe the full lifecycle timeline; the build-monitor PhaseTimeline renders all canonical phases as completed/current/pending based on these."
   });
 
 export type BuildStatusResponse = z.infer<typeof buildStatusResponseSchema>;
