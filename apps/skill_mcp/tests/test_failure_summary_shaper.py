@@ -126,6 +126,7 @@ class ErrorCodeMappingTests(unittest.TestCase):
         ("QUEUE_CLAIM_FAILED", "RETRY", "빌드 큐"),
         ("DOCKER_BUILD_FAILED", "FIX_DOCKERFILE", "이미지"),
         ("PREVIEW_PROVISION_FAILED", "FIX_PORT", "준비"),
+        ("DEPLOYMENT_FAILED", "CONTACT_OPERATOR", "외부 배포"),
         ("ACTIVE_BUILD_EXISTS", "WAIT", "진행 중"),
         ("UNKNOWN_ERROR", "CONTACT_OPERATOR", "내부 오류"),
     ]
