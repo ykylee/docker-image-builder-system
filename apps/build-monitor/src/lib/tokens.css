@@ -1,0 +1,81 @@
+/* docs/DESIGN.md §1 Tokens 의 1차안을 CSS custom properties 로 옮긴 파일.
+ * PR #6 (apps/build-monitor) 에서 1차안 그대로 사용, 후속 PR 에서 디자인
+ * QA (contrast / spacing scale) 후 fine-tune 예정.
+ *
+ * Naming convention:
+ *   --color-{category}-{variant}
+ *   --space-{xs|sm|md|lg|xl|xxl}
+ *   --radius-{sm|md|lg|pill}
+ *   --shadow-{card|modal}
+ *   --motion-{duration|easing}
+ *   --font-{sans|mono}
+ *   --size-{xs|sm|md|lg|xl|xxl}
+ *   --weight-{regular|medium|semibold}
+ *   --line-{tight|normal|relaxed}
+ */
+
+:root {
+  /* Color */
+  --color-bg-canvas: #0F1115;
+  --color-bg-surface: #171A21;
+  --color-bg-surface-elevated: #1E222B;
+  --color-text-primary: #E6E8EC;
+  --color-text-secondary: #9AA1AC;
+  --color-text-muted: #5C6370;
+  --color-text-disabled: #3A3F4A;
+  --color-border-subtle: #232832;
+  --color-border-strong: #2E3440;
+  --color-accent-primary: #5B8DEF;
+  --color-accent-primary-hover: #7AA3FF;
+  --color-accent-success: #3FB950;
+  --color-accent-warning: #D29922;
+  --color-accent-danger: #F85149;
+  --color-accent-info: #79C0FF;
+  --color-focus-ring: #5B8DEF;
+
+  /* Typography */
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
+  --size-xs: 11px;
+  --size-sm: 12px;
+  --size-md: 14px;
+  --size-lg: 16px;
+  --size-xl: 20px;
+  --size-xxl: 28px;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --line-tight: 1.25;
+  --line-normal: 1.45;
+  --line-relaxed: 1.6;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 9999px;
+
+  /* Shadow */
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-modal: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  /* Motion */
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 200ms;
+  --motion-duration-slow: 320ms;
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+
+  /* z-index scale */
+  --z-header: 100;
+  --z-drawer: 200;
+  --z-modal: 300;
+  --z-toast: 400;
+}

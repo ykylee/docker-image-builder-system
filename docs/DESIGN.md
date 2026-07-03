@@ -2,7 +2,7 @@
 design_spec: stitch/v1
 project: docker-image-builder-system
 surface: build-monitor (future frontend)
-status: draft (P2 phase — frontend 부착은 별도 PR)
+status: draft (PR #6 frontend 부착 진행 중 — Svelte 5 + Vite + TypeScript)
 last_updated: 2026-07-03
 ---
 
@@ -10,11 +10,30 @@ last_updated: 2026-07-03
 
 이 문서는 Docker Image Builder System 의 Build Server Monitor UI 가
 따라야 할 design spec 의 1차안이다. Stitch 호환 YAML frontmatter 의
-tokens 섹션과 8개 markdown 섹션으로 구성된다. 본 PR (#5) 에서는
-`/openapi.json` 과 `/docs` (Swagger UI) 만 활성화되며, 실제 frontend
-(Vite + React) 부착과 design token 의 CSS 변수화는 별도 PR 에서 다룬다.
+tokens 섹션과 8개 markdown 섹션으로 구성된다. PR #5 에서는
+`/openapi.json` 과 `/docs` (Swagger UI) 만 활성화되었으며, 본 PR (#6) 부터는 실제 frontend
+(Svelte 5 + Vite + TypeScript) 부착과 design token 의 CSS 변수화는 PR #6 (frontend 부착) 에서 다룬다.
+
+## 0. Stack (PR #6 결정)
+
+```yaml
+framework: Svelte 5 (runes: $state, $derived, $effect)
+build: Vite 5 + @sveltejs/vite-plugin-svelte
+language: TypeScript 5.6
+routing: svelte-spa-router (or self-rolled hash router, 단일 페이지 1~2 화면)
+data_client: openapi-fetch + openapi-typescript (생성형: /openapi.json)
+testing: vitest + @testing-library/svelte
+styling: vanilla CSS + CSS custom properties from §1 Tokens
+```
+
+선정 근거: Build Monitor 는 internal single-page tool, dark-first + density
+높은 table UI, live data (status pill / phase timeline / log stream) 위주.
+Svelte 5 의 reactive primitives 가 적은 boilerplate 로 live UI 작성에 적합,
+bundle/cold-start 도 internal tool 에 더 맞음. React 대비 생태계는 좁지만
+internal tool 의 운영 부담이 더 중요하지 않다고 판단. 단계적 도입 가능.
 
 ## 1. Tokens
+
 
 ```yaml
 # Color
@@ -103,9 +122,9 @@ motion:
 - **Predictability**: 같은 phase / status 는 같은 색·같은 위치
   (좌측 status pill, 우측 updated time).
 
-## 3. Components
+## 3. Components (PR #6 Svelte 5 1차 골격)
 
-- **BuildRow**: `<tr>` 1 row. 좌측 status pill, 중앙 `buildId`
+- **BuildRow**: Svelte 5 `<tr>` 1 row. 좌측 status pill, 중앙 `buildId`
   (mono, click → detail drawer), 우측 `updatedAt` (relative time).
 - **StatusPill**: radius pill, 11px mono uppercase. 색은 token 의
   `accent.{status}` 매핑.
@@ -175,4 +194,8 @@ motion:
 - Stitch design spec v1: <https://stitch.withgoogle.com/docs/design-md/specification>
   (참조 형식 차용, 본 프로젝트는 Stitch 가 아님)
 - PR #5 (`codex/frontend-swagger-2026-07-03`) — Swagger UI / CORS
-  / OpenAPI snapshot. frontend 부착은 별도 PR 예정.
+  / OpenAPI snapshot.
+- PR #6 (`codex/frontend-attach-2026-07-03`, 진행 중) — Svelte 5 + Vite + TypeScript 기반
+  `apps/build-monitor` 골격 + DESIGN.md token CSS 변수화 + BuildRow /
+  StatusPill / PhaseTimeline / LogStream 컴포넌트 1차. `/openapi.json` 기반
+  client (`openapi-fetch`) 사용.
