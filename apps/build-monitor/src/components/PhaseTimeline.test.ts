@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { render } from "@testing-library/svelte";
 import PhaseTimeline from "./PhaseTimeline.svelte";
 
 // aria-label 의 substring 매치를 피하기 위해 data-phase + class 로 직접

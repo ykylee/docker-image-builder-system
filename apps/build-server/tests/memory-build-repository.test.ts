@@ -315,7 +315,7 @@ describe("MemoryBuildRepository: phase timeline (TASK-050)", () => {
     assert.equal(sourcePrepared.response.currentPhase?.phase, "SOURCE_PREPARED");
   });
 
-  it("terminal phase (COMPLETED) 진입 시 currentPhase=null", async () => {
+  it("terminal phase (COMPLETED) 진입 시 currentPhase=null + history 에 terminal 도 push (TASK-050 follow-up)", async () => {
     const repo = createMemoryBuildRepository();
     const create = await repo.createBuild(request);
     if (create.kind !== "accepted") throw new Error("expected accepted");
@@ -324,10 +324,31 @@ describe("MemoryBuildRepository: phase timeline (TASK-050)", () => {
     const done = await repo.updatePhase(buildId, "COMPLETED");
     if (done.kind !== "ok") throw new Error("expected ok");
     assert.equal(done.response.currentPhase, null);
-    // COMPLETED 가 history 의 마지막 entry.
+    // TASK-050 follow-up: terminal phase (COMPLETED) 도 history 에 push.
+    // PhaseTimeline 가 마지막 phase 를 completed 로 정확히 표시하려면 필수.
     const last = done.response.phaseHistory.at(-1);
     assert.ok(last);
-    assert.equal(last?.phase, "DOCKER_BUILD_STARTED");
+    assert.equal(last?.phase, "COMPLETED");
+    // 직전 in-flight phase (DOCKER_BUILD_STARTED) 도 여전히 history 에 있다.
+    const prevLast = done.response.phaseHistory.at(-2);
+    assert.ok(prevLast);
+    assert.equal(prevLast?.phase, "DOCKER_BUILD_STARTED");
+    // history 길이: REQUEST_ACCEPTED (in-flight initial → push on first update) + DOCKER_BUILD_STARTED + COMPLETED = 3
+    assert.equal(done.response.phaseHistory.length, 3);
+  });
+
+  it("terminal phase (FAILED) 도 history 에 push", async () => {
+    const repo = createMemoryBuildRepository();
+    const create = await repo.createBuild(request);
+    if (create.kind !== "accepted") throw new Error("expected accepted");
+    const buildId = create.response.build.buildId;
+    await repo.updatePhase(buildId, "DOCKER_BUILD_STARTED");
+    const done = await repo.updatePhase(buildId, "FAILED");
+    if (done.kind !== "ok") throw new Error("expected ok");
+    assert.equal(done.response.currentPhase, null);
+    const last = done.response.phaseHistory.at(-1);
+    assert.ok(last);
+    assert.equal(last?.phase, "FAILED");
   });
 
   it("같은 phase 로 updatePhase 호출 시 phaseHistory 가 변하지 않는다", async () => {

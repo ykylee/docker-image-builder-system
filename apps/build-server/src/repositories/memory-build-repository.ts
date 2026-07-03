@@ -243,15 +243,25 @@ export function createMemoryBuildRepository(): BuildRepository {
         nextStatus = "FAILED";
       }
 
-      // TASK-050: phase transition 마다 직전 currentPhase 를 history 에 push.
-      // push 순서: 새 phase 의 startedAt 결정 → 직전 phase 의 completedAt 결정
-      // → history push → currentPhaseStartedAt 갱신. terminal (COMPLETED /
-      // FAILED) 진입 시 currentPhaseStartedAt = null.
+      // TASK-050: phase transition 마다 history 갱신.
+      //   1) 직전 in-flight phase 의 (phase, completedAt) push. 같은 phase
+      //      로의 no-op transition 은 push 하지 않음.
+      //   2) terminal phase (COMPLETED/FAILED) 진입 시, terminal phase 자체도
+      //      history 에 push. 이렇게 해야 client (PhaseTimeline) 가 build 의
+      //      마지막 phase 를 "completed" 로 정확히 표시할 수 있다. terminal
+      //      phase 가 in-flight 가 아니므로 currentPhase 는 null 로 유지.
+      //   3) currentPhaseStartedAt 은 terminal 시 null, 그 외엔 timestamp.
       const prevPhase = build.summary.phase;
       const isTerminal = isTerminalPhase(phase);
       if (prevPhase !== phase) {
         build.phaseHistory.push({
           phase: prevPhase,
+          completedAt: timestamp
+        });
+      }
+      if (isTerminal) {
+        build.phaseHistory.push({
+          phase: phase as BuildPhase,
           completedAt: timestamp
         });
       }
