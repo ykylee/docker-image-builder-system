@@ -1,4 +1,8 @@
-<!-- source: /Users/yklee/Downloads/docker-build-preview-platform-concept.md -->
+<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+
+> **⚠ Superseded (2026-07-03)**
+> 이 문서는 초기 컨셉 단계의 잔재입니다. canonical 기준선은 [`docs/sdlc/01-mvp-onboarding.md`](../sdlc/01-mvp-onboarding.md)이며, 본 파일은 참고용으로만 보관합니다.
+> 자세한 인덱스: [`docs/report/README.md`](../report/README.md) 및 [`docs/review/01-sdlc-review.md`](../review/01-sdlc-review.md) §P2.
 
 # Docker Build Preview Platform MVP Onboarding
 

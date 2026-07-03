@@ -1,11 +1,11 @@
 # Docker Build Preview Platform SDLC Step 08 - Build Server Tech Stack Baseline
 
-- 문서 목적: Build Server 우선 구현 축과 Runner 실행 축을 위한 기술 스택 baseline recommendation을 정리한다.
+- 문서 목적: Build Server 우선 구현 축을 위한 기술 스택 baseline recommendation을 정리한다.
 - 범위: 언어, API 프레임워크, DB, queue 처리 방식, 런타임, 저장소 구조 방향
 - 대상 독자: 프로젝트 리드, Build Server 구현자, Runner 구현자, AI 에이전트
 - 상태: draft
-- 최종 수정일: 2026-07-02
-- 관련 문서: `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, `docs/sdlc/07-implementation-backlog-baseline.md`, `docs/sdlc/design/03-api-contract-design.md`, `docs/sdlc/design/04-data-model-design.md`
+- 최종 수정일: 2026-07-03 (rev 2: 리뷰 반영, Build Server=TS / Runner=Go baseline 으로 정렬, polyglot 보류항목 정리)
+- 관련 문서: `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, `docs/sdlc/07-implementation-backlog-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`, `docs/sdlc/design/03-api-contract-design.md`, `docs/sdlc/design/04-data-model-design.md`
 
 ## 1. 문서 목표
 
@@ -23,7 +23,7 @@
 - API 프레임워크는 `Fastify`를 우선 추천한다.
 - 관계형 DB는 `PostgreSQL`을 기준으로 둔다.
 - queue는 외부 broker를 바로 도입하지 않고 `PostgreSQL row locking` 기반으로 시작한다.
-- Runner는 `Go` 기반 별도 worker 프로세스로 분리하는 방향을 baseline으로 둔다.
+- Runner baseline 언어는 `Go`로 둔다. Build Server와 분리된 별도 process로 두고, Docker orchestration / long-running worker 강점을 활용한다.
 
 ## 3. 추천 스택
 
@@ -31,26 +31,34 @@
 | --- | --- |
 | Build Server Language | TypeScript |
 | Build Server Runtime | Node.js LTS |
+| Runner Language | Go |
+| Runner Runtime | Go toolchain (1.22+), 별도 process |
 | API Framework | Fastify |
 | Validation | Zod |
 | Database | PostgreSQL |
-| Query/Schema Layer | Drizzle ORM |
+| Query/Schema Layer | Drizzle ORM (Build Server 측) |
 | Queue Model | PostgreSQL `FOR UPDATE SKIP LOCKED` |
-| Runner Language | Go |
-| Runner Runtime | Go native binary |
+| Cross-Language Contract | `packages/shared-contract` (TS) ↔ `apps/runner` (Go) 가 동일한 JSON Schema/스펙 문서를 공유 |
 | Packaging Direction | monorepo with `apps/` and `packages/` |
 
-## 4. 왜 TypeScript인가
+## 4. 왜 Build Server는 TypeScript, Runner는 Go인가
+
+### 4.1 Build Server = TypeScript
 
 - Skill/MCP 계층이 앞으로 JavaScript/TypeScript와 자연스럽게 연결될 가능성이 높다.
-- shared contract의 request/status/error shape를 Build Server 계층에서 빠르게 고정하기 쉽다.
-- API contract, validation, response policy를 문서에서 코드로 옮기는 속도가 빠르다.
-- MVP 단계에서 Build Server는 Go보다 구현 속도와 문서-계약-코드 연결성이 더 좋다.
+- shared contract의 request/status/error shape를 타입으로 재사용하기 쉽다.
+- API surface(Fastify + Zod) 와 Drizzle 기반 persistence를 한 언어 안에서 맞출 수 있어 drift를 줄이기 좋다.
+
+### 4.2 Runner = Go
+
+- long-running worker 와 Docker orchestration 은 Go 가 강점을 갖는다.
+- Build Server 와 다른 런타임이지만 `packages/shared-contract` 가 단일 source-of-truth 이고, 동일 JSON Schema / contract spec 문서를 두 언어가 함께 참조하므로 cross-language drift 는 통제 가능하다.
+- Build Server 와의 통신은 PostgreSQL row locking 기반 queue 와 REST/JSON API 로만 둔다 (직접 in-process import 없음).
 
 비교 메모:
 
-- Go는 long-running worker와 Docker orchestration에는 강점이 있고, 이 강점은 Runner 축에서 직접 활용할 가치가 높다.
-- Python은 빠른 실험에는 유리하지만, 장기적으로 shared contract drift를 제어하는 면에서는 TypeScript 조합이 더 안정적이다.
+- 두 언어를 동시에 쓰는 만큼 contract / schema 의 단일 source-of-truth 와 contract test 가 필수다. 본 baseline 은 `packages/shared-contract` 가 그 역할을 한다.
+- Build Server 까지 Go 로 가는 안은 contract 고정 속도와 Skill/MCP 연결성 면에서 본 단계 baseline 으로는 보류한다.
 
 ## 5. 왜 Fastify인가
 
@@ -87,11 +95,11 @@
 
 - ORM이 queue semantics를 숨기지 않도록 queue claim query는 raw SQL 또는 명시적 query builder로 다루는 편이 좋다.
 
-## 8. Runner baseline 방향
+## 8. Runner baseline 방향 (Go)
 
-- Runner는 Build Server와 분리된 별도 process로 둔다.
-- 초기 MVP부터 `Go` 기반 실행 바이너리로 두고, monorepo 안에서 별도 앱으로 관리한다.
-- Runner가 책임질 범위:
+- Runner 는 Build Server 와 분리된 Go process 로 둔다. 같은 monorepo 안의 `apps/runner/` 에 위치하지만 runtime / 언어는 Build Server 와 다르다.
+- Build Server 와의 통신은 queue (PostgreSQL `FOR UPDATE SKIP LOCKED`) 와 shared contract 의 JSON shape 로만 한다. 직접 in-process import / gRPC 같은 강한 결합은 MVP 단계에서 보류한다.
+- Runner 가 책임질 범위:
   - build queue claim
   - source 준비
   - Docker build 실행
@@ -101,15 +109,8 @@
 이유:
 
 - Build Server는 system-of-record와 API에 집중하고, Runner는 비동기 실행 책임을 분리해야 한다.
-- Docker build, process lifecycle, long-running worker 성격은 Go 쪽이 더 안정적으로 다루기 좋다.
-- 추후 별도 container/service로 분리해도 Build Server와의 경계를 유지하기 쉽다.
-- contract 공유는 언어 공유가 아니라 `shared-contract` 문서/JSON schema/generated artifact 기준으로 묶는다.
-
-Runner 구현 원칙:
-
-- Go Runner는 상태 enum과 phase key를 새로 정의하지 않는다.
-- canonical contract source는 여전히 Build Server와 `docs/sdlc/contracts/01-shared-build-contract-baseline.md`다.
-- 필요하면 `packages/shared-contract`에서 JSON schema 또는 generated artifact를 만들어 Go Runner가 소비한다.
+- Runner 를 Go 로 두면 long-running worker / Docker orchestration 안정성을 우선할 수 있다.
+- contract 의 단일 source-of-truth 는 `packages/shared-contract` (TypeScript) 이고, Runner 는 동일 spec 문서를 기준으로 동작한다.
 
 ## 9. 저장소 구조 baseline
 
@@ -127,7 +128,7 @@ packages/
 설명:
 
 - `apps/build-server`: Fastify API
-- `apps/runner`: Go queue poller + Docker execution worker
+- `apps/runner`: queue poller + Docker execution worker
 - `packages/shared-contract`: request/status/error schema와 타입
 - `packages/shared-config`: env schema, 상수, 공통 설정
 
@@ -137,28 +138,33 @@ packages/
 - Kubernetes 기반 job orchestration
 - multi-runner autoscaling
 - service mesh / reverse proxy routing 최적화
-- polyglot runtime
+- Build Server 까지 Go/Python 으로 옮기는 안 — contract drift 위험을 본 단계에서는 감수하지 않는다.
+- Build Server 안에서 Node worker 를 띄워 queue 까지 같이 처리하는 안 — Runner 와 책임이 겹친다.
+- Build Server ↔ Runner 간 gRPC / 강한 in-process 결합 — MVP 단계에서는 DB queue + REST/JSON 으로 충분하다.
 
 이유:
 
 - 현재 단계의 핵심 리스크는 scale보다 contract drift와 lifecycle 복잡도다.
 - 외부 인프라를 너무 빨리 넣으면 문서에서 닫은 queue 모델을 검증하기 어려워진다.
+- Build Server 와 Runner 가 다른 언어여도 `packages/shared-contract` 가 단일 source-of-truth 이므로 cross-language 결합 자체는 보류 영역이 아니다.
 
 ## 11. 기술 스택이 backlog에 미치는 영향
 
-- `PKG-002`와 `PKG-004`는 Fastify + Zod 기준의 API shape로 구체화할 수 있다.
-- `PKG-003`, `PKG-005`, `PKG-006`, `PKG-007`은 PostgreSQL queue query를 전제로 세부 태스크를 쪼갤 수 있다.
-- `PKG-001` shared contract는 `packages/shared-contract`로 이어질 가능성이 높다.
-- Runner 패키지는 Go 기준으로 `apps/runner`에 별도 `go.mod`, queue client, Docker execution boundary를 두는 방향이 자연스럽다.
+- `PKG-002`와 `PKG-004`는 Fastify + Zod 기준의 API shape 로 구체화할 수 있다.
+- `PKG-003`은 PostgreSQL + Drizzle 기준의 persistence 로 구체화할 수 있다.
+- `PKG-005` `PKG-006` `PKG-007` 은 Go Runner 기준으로 세부 태스크를 쪼갠다. (`apps/runner/cmd`, `internal/queue`, `internal/jobs`, `internal/docker`)
+- `PKG-001` shared contract 는 `packages/shared-contract` (TypeScript) 로 두되, Build Server 와 Runner 가 동일 JSON Schema / spec 문서를 함께 참조한다.
 
 ## 12. 보류 또는 추후 재검토 항목
 
 - object storage 선택
-- Docker daemon 연결 방식
+- Docker daemon 연결 방식 (DinD vs DooD)
 - migration 도구 세부 선택
 - observability stack
+- Runner 의 Go module 모듈명 / internal package 경계 (예: `apps/runner/cmd/runner`, `internal/queue`, `internal/docker`)
 
 ## 13. 현 단계 결론
 
-- 현재 저장소 기준 baseline recommendation은 `TypeScript + Fastify + PostgreSQL + Drizzle` 기반 Build Server와 `Go Runner` 조합이다.
-- 이 조합은 Build Server의 빠른 contract-first 구현과 Runner의 안정적인 Docker orchestration을 함께 만족하는 절충안이다.
+- 현재 저장소 기준 baseline recommendation 은 `Build Server = TypeScript (Fastify + Drizzle)`, `Runner = Go`, 공통 계층 = `packages/shared-contract` (TS, JSON Schema/스펙 단일 source) 다.
+- Build Server 와 Runner 는 서로 다른 언어지만 `packages/shared-contract` 와 PostgreSQL queue 를 통해 결합하며, 직접 in-process import 는 두지 않는다.
+- 다음 단계는 `packages/shared-contract` 코드 스캐폴드와 `apps/runner` Go module 골격을 함께 닫는 것이다.
