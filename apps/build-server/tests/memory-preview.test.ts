@@ -4,8 +4,7 @@ import { describe, it } from "node:test";
 import { createMemoryBuildRepository } from "../src/repositories/memory-build-repository.js";
 
 const baseRequest = {
-  projectId: "p-1",
-  repositoryId: "r-1",
+  appName: "p-1",
   requestedBy: "yklee",
   sourceArchive: { objectKey: "k", checksumSha256: "s", sizeBytes: 1 },
   entrypointPath: "x"

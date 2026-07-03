@@ -2,7 +2,10 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
 
+  import { adminIdStore } from "../lib/session.js";
+
   let adminId = $state("");
+  let currentAdminId = $derived($adminIdStore);
 
   // Admin login is separate from the user login flow. The admin id is
   // stored under a distinct localStorage key (`adminId`) so the regular
@@ -11,8 +14,7 @@
   // Backend authorization is the source of truth: ADMIN_IDS in the
   // build-server env decides who can call /admin/*.
   onMount(() => {
-    const stored = localStorage.getItem("adminId");
-    if (stored) {
+    if (currentAdminId) {
       // Auto-forward to /admin/builds only after the user has already
       // signed in once this session. The backend still re-checks the
       // header on every request.
@@ -24,7 +26,9 @@
     e.preventDefault();
     const value = adminId.trim();
     if (value) {
-      localStorage.setItem("adminId", value);
+      // Bug 1: session store 경유로 set 해서 같은 탭의 Header 가
+      // 로그인 직후 admin pill / nav link 를 즉시 표시하도록 한다.
+      adminIdStore.set(value);
       push("/admin/builds");
     }
   }

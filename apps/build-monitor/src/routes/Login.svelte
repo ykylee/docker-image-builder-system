@@ -2,19 +2,26 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
 
+  import { userIdStore } from "../lib/session.js";
+
   let userId = $state("");
+  // currentUserId 는 store 와 동기화 — 이미 로그인된 상태에서 진입하면
+  // 입력 칸에 현재 id 를 채워서 보여준다.
+  let currentUserId = $derived($userIdStore);
 
   onMount(() => {
-    const stored = localStorage.getItem("userId");
-    if (stored) {
+    if (currentUserId) {
       push("/builds");
     }
   });
 
   function login(e: Event) {
     e.preventDefault();
-    if (userId.trim()) {
-      localStorage.setItem("userId", userId.trim());
+    const value = userId.trim();
+    if (value) {
+      // session store 가 localStorage 도 같이 쓴다. 같은 탭에서 Header
+      // 가 즉시 갱신되도록 writable store 경유 (Bug 1).
+      userIdStore.set(value);
       push("/builds");
     }
   }

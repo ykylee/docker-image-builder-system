@@ -15,8 +15,7 @@ function buildApp() {
 }
 
 const baseBody = {
-  projectId: "p-1",
-  repositoryId: "r-1",
+  appName: "p-1",
   requestedBy: "yklee",
   sourceArchive: { objectKey: "k", checksumSha256: "s", sizeBytes: 1 },
   entrypointPath: "x"

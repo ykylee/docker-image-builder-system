@@ -7,12 +7,11 @@ import { createMemoryBuildRepository } from "../src/repositories/memory-build-re
 import { makeAdminAuthenticator, registerAdminRoutes } from "../src/routes/admin-routes.js";
 import { BuildService } from "../src/services/build-service.js";
 
-const baseRequest = (requestedBy: string, projectId: string) => ({
-  projectId,
-  repositoryId: "r-1",
+const baseRequest = (requestedBy: string, appName: string) => ({
+  appName,
   requestedBy,
   sourceArchive: {
-    objectKey: `src/${projectId}/r-1/abc.tar.gz`,
+    objectKey: `src/${appName}/abc.tar.gz`,
     checksumSha256: "deadbeef",
     sizeBytes: 1024
   },
@@ -91,7 +90,7 @@ describe("admin guard (ADMIN-004)", () => {
     const body = res.json();
     assert.equal(body.builds.length, 2);
     for (const build of body.builds) {
-      assert.ok(build.projectId.startsWith("alice-"));
+      assert.ok(build.appName.startsWith("alice-"));
     }
 
     await app.close();

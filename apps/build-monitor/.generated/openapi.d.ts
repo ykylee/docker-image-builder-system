@@ -560,8 +560,10 @@ export interface components {
         BuildSummary: {
             /** Format: uuid */
             buildId: string;
-            projectId: string;
-            repositoryId: string;
+            /**
+             * @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI.
+             */
+            appName: string;
             /** @enum {string} */
             status: "QUEUED" | "CLAIMED" | "BUILDING" | "TEST_READY" | "COMPLETED" | "FAILED";
             /** @enum {string} */
@@ -575,7 +577,7 @@ export interface components {
             /** Format: date-time */
             updatedAt: string;
         };
-        /** @description Returned on POST /builds when an active build already exists for the same projectId (HTTP 409, not 4xx error). */
+        /** @description Returned on POST /builds when an active build already exists for the same appName (HTTP 409, not 4xx error). */
         BuildDuplicateResponse: {
             /** @enum {boolean} */
             accepted: false;
@@ -705,8 +707,10 @@ export interface components {
         };
         /** @description POST /builds payload (Skill → Host). */
         BuildRequest: {
-            projectId: string;
-            repositoryId: string;
+            /**
+             * @description Canonical application name. Used as the active-build deduplication key and rendered in the build list/detail UI.
+             */
+            appName: string;
             requestedBy: string;
             sourceArchive: components["schemas"]["SourceArchive"];
             entrypointPath: string;
@@ -752,8 +756,10 @@ export interface components {
         AdminUserBuildSummary: {
             /** Format: uuid */
             buildId: string;
-            projectId: string;
-            repositoryId: string;
+            /**
+             * @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI.
+             */
+            appName: string;
             /** @enum {string} */
             status: "QUEUED" | "CLAIMED" | "BUILDING" | "TEST_READY" | "COMPLETED" | "FAILED";
             /** @enum {string} */

@@ -58,8 +58,7 @@ describe("AdminUsers", () => {
       builds: [
         {
           buildId: "00000000-0000-0000-0000-000000000001",
-          projectId: "alice-app",
-          repositoryId: "r-1",
+          appName: "alice-app",
           status: "COMPLETED",
           phase: "DOCKER_BUILD_COMPLETED",
           previewStatus: "READY",

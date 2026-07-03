@@ -48,8 +48,7 @@
       <StatusPill status={build.build.status} />
     </header>
     <dl class="meta">
-      <div><dt>Project</dt><dd>{build.build.projectId}</dd></div>
-      <div><dt>Repository</dt><dd>{build.build.repositoryId}</dd></div>
+      <div><dt>App</dt><dd class="mono">{build.build.appName}</dd></div>
       <div><dt>Created</dt><dd>{new Date(build.build.createdAt).toLocaleString()}</dd></div>
       <div><dt>Updated</dt><dd>{new Date(build.build.updatedAt).toLocaleString()}</dd></div>
       <div><dt>Phase</dt><dd class="mono">{build.build.phase}</dd></div>

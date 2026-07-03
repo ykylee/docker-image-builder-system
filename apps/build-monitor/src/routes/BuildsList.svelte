@@ -70,8 +70,7 @@
         <tr>
           <th>Status</th>
           <th>Build</th>
-          <th>Project</th>
-          <th>Repository</th>
+          <th>App</th>
           <th class="r">Updated</th>
         </tr>
       </thead>

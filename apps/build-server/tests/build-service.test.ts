@@ -5,8 +5,7 @@ import { createMemoryBuildRepository } from "../src/repositories/memory-build-re
 import { BuildService } from "../src/services/build-service.js";
 
 const baseRequest = {
-  projectId: "p-1",
-  repositoryId: "r-1",
+  appName: "p-1",
   requestedBy: "yklee",
   sourceArchive: { objectKey: "k", checksumSha256: "s", sizeBytes: 1 },
   entrypointPath: "x"
@@ -39,7 +38,7 @@ describe("BuildService: claimNextBuild", () => {
     await service.createBuild(baseRequest);
     const first = await service.claimNextBuild();
     assert.equal(first.claimed, true);
-    await service.createBuild({ ...baseRequest, repositoryId: "r-2" });
+    await service.createBuild({ ...baseRequest, appName: "app-2" });
     const second = await service.claimNextBuild();
     assert.equal(second.claimed, false);
     assert.equal(second.reason, "ACTIVE_BUILD_EXISTS");

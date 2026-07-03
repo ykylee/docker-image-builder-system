@@ -3,12 +3,11 @@ import { describe, it } from "node:test";
 
 import { createMemoryBuildRepository } from "../src/repositories/memory-build-repository.js";
 
-const baseRequest = (requestedBy: string, projectId: string) => ({
-  projectId,
-  repositoryId: "r-1",
+const baseRequest = (requestedBy: string, appName: string) => ({
+  appName,
   requestedBy,
   sourceArchive: {
-    objectKey: `src/${projectId}/r-1/abc.tar.gz`,
+    objectKey: `src/${appName}/abc.tar.gz`,
     checksumSha256: "deadbeef",
     sizeBytes: 1024
   },
@@ -48,7 +47,7 @@ describe("MemoryBuildRepository: admin operations (ADMIN-003)", () => {
     });
     assert.equal(page.builds.length, 2);
     for (const build of page.builds) {
-      assert.equal(build.projectId.startsWith("alice-"), true);
+      assert.equal(build.appName.startsWith("alice-"), true);
       assert.equal(build.requestedBy, "alice");
     }
   });

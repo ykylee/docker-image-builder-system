@@ -15,8 +15,16 @@ export type SourceArchive = z.infer<typeof sourceArchiveSchema>;
 
 export const buildRequestSchema = z
   .object({
-    projectId: z.string().min(1),
-    repositoryId: z.string().min(1),
+    // appName is the canonical identity of the application being built.
+    // The previous (projectId, repositoryId) pair was collapsed into a
+    // single appName per the v0.2 spec simplification — the admin UI
+    // and the build server only ever need one identifier per build.
+    // Active-build de-duplication locks on appName only (1 active build
+    // per app). See apps/build-server/src/repositories/* for the lock.
+    appName: z.string().min(1).meta({
+      description:
+        "Canonical application name. Used as the active-build deduplication key and rendered in the build list/detail UI."
+    }),
     requestedBy: z.string().min(1),
     sourceArchive: sourceArchiveSchema,
     entrypointPath: z.string().min(1),

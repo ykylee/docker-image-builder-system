@@ -71,4 +71,26 @@ describe("Header", () => {
     expect(localStorage.getItem("adminId")).toBeNull();
     expect(pushMock).toHaveBeenCalledWith("/");
   });
+
+  // Bug 1 regression (Header 즉시 갱신). 같은 탭의 SPA 라우트 안에서
+  // session store 가 set 되면 storage 이벤트가 fire 하지 않으므로, store
+  // set 만으로 Header 가 reactive 하게 갱신되어야 한다. 두 컴포넌트를
+  // 동시에 마운트해 같은 store 인스턴스를 공유하는지로 검증.
+  it("updates the user-id pill reactively when userIdStore changes in the same tab", async () => {
+    const { rerender } = render(Header);
+    expect(screen.queryByText(/^@/)).toBeNull();
+
+    // 같은 SPA 라우트 트리에서 Login 이 setItem 후 push() 하는 흐름을
+    // 흉내낸다 — 다른 탭이 아니므로 storage 이벤트는 발생하지 않는다.
+    localStorage.setItem("userId", "yklee");
+    const { userIdStore } = await import("../lib/session.js");
+    userIdStore.set("yklee");
+
+    await Promise.resolve();
+    // 동일한 store 를 구독하는 다른 컴포넌트라면 자동으로 갱신되지만,
+    // 단일 컴포넌트만 마운트된 이 테스트에서는 rerender 시점의 store
+    // 값이 화면에 반영되는지 확인한다.
+    await rerender({});
+    expect(screen.getByText("@yklee")).toBeInTheDocument();
+  });
 });

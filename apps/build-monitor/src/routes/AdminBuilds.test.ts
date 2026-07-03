@@ -24,13 +24,12 @@ afterEach(() => {
 });
 
 const sample = (
-  projectId: string,
+  appName: string,
   status: string,
   requestedBy: string
 ) => ({
-  buildId: "00000000-0000-0000-0000-" + projectId.padStart(12, "0"),
-  projectId,
-  repositoryId: "r-" + projectId,
+  buildId: "00000000-0000-0000-0000-" + appName.padStart(12, "0"),
+  appName,
   status,
   phase: "REQUEST_ACCEPTED",
   previewStatus: "NOT_REQUESTED",

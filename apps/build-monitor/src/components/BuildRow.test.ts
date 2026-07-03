@@ -9,8 +9,7 @@ afterEach(() => {
 
 const sample: BuildSummary = {
   buildId: "11111111-1111-1111-1111-111111111111",
-  projectId: "demo-frontend",
-  repositoryId: "ykylee/demo-frontend",
+  appName: "demo-frontend",
   status: "BUILDING",
   phase: "DOCKER_BUILD_STARTED",
   previewStatus: "NOT_REQUESTED",
@@ -28,9 +27,8 @@ describe("BuildRow", () => {
     expect(
       screen.getByRole("status", { name: /Build status: BUILDING/i })
     ).toBeInTheDocument();
-    // project / repository 노출
+    // appName 노출 (legacy projectId/repositoryId 컬럼은 더 이상 렌더 안 함)
     expect(screen.getByText("demo-frontend")).toBeInTheDocument();
-    expect(screen.getByText("ykylee/demo-frontend")).toBeInTheDocument();
     // buildId prefix (앞 8자)
     expect(screen.getByText("11111111")).toBeInTheDocument();
   });

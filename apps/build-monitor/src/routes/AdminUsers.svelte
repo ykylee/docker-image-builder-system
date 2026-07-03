@@ -14,7 +14,7 @@
   // self-contained: the admin can pivot from owner list to owner
   // builds without a route change.
   let selectedUser = $state<string | null>(null);
-  let selectedBuilds = $state<{ buildId: string; projectId: string; status: string; updatedAt: string }[]>(
+  let selectedBuilds = $state<{ buildId: string; appName: string; status: string; updatedAt: string }[]>(
     []
   );
   let selectedLoading = $state(false);
@@ -51,7 +51,7 @@
       const result = await listAdminBuilds(adminId, { requestedBy: userId, limit: 50 });
       selectedBuilds = result.builds.map((b) => ({
         buildId: b.buildId,
-        projectId: b.projectId,
+        appName: b.appName,
         status: b.status,
         updatedAt: b.updatedAt
       }));
@@ -150,7 +150,7 @@
           {#each selectedBuilds as b (b.buildId)}
             <li>
               <span class="status mono">{b.status}</span>
-              <a class="project mono" href={`/builds/${b.buildId}`} target="_blank" rel="noopener">{b.projectId}</a>
+              <a class="project mono" href={`/builds/${b.buildId}`} target="_blank" rel="noopener">{b.appName}</a>
               <span class="muted small">{b.buildId.slice(0, 8)}</span>
               <span class="muted small r">{relativeTime(b.updatedAt)}</span>
             </li>

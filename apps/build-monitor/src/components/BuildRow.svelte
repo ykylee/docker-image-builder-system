@@ -9,8 +9,10 @@
   type BuildRowData = {
     buildId: string;
     status: string;
-    projectId: string;
-    repositoryId: string;
+    // appName is the canonical application identifier (v0.2 collapse of
+    // the legacy projectId/repositoryId pair). It is rendered as the App
+    // column in both the user-facing BuildsList and the admin builds view.
+    appName: string;
     updatedAt: string; // ISO 8601
     // Owner is optional so the user-facing BuildsList route can keep
     // using BuildRow without changes. AdminBuilds passes the canonical
@@ -44,8 +46,7 @@
   <td class="id-cell">
     <a use:link href={`/builds/${build.buildId}`} class="mono">{build.buildId.slice(0, 8)}</a>
   </td>
-  <td class="meta-cell">{build.projectId}</td>
-  <td class="meta-cell">{build.repositoryId}</td>
+  <td class="meta-cell mono" title={build.appName}>{build.appName}</td>
   {#if build.requestedBy}
     <td class="owner-cell mono">@{build.requestedBy}</td>
   {/if}

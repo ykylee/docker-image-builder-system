@@ -54,10 +54,12 @@ export function createMemoryBuildRepository(): BuildRepository {
 
   return {
     async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
+      // Active-build deduplication is keyed on appName only. The previous
+      // (projectId, repositoryId) pair was collapsed to appName in the
+      // BuildRequest schema — see shared-contract/src/build/request.ts.
       const activeBuild = [...builds.values()].find((entry) => {
         return (
-          entry.summary.projectId === input.projectId &&
-          entry.summary.repositoryId === input.repositoryId &&
+          entry.summary.appName === input.appName &&
           ["QUEUED", "CLAIMED", "BUILDING", "TEST_READY"].includes(entry.summary.status)
         );
       });
@@ -80,8 +82,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       const buildId = randomUUID();
       const summary: BuildSummary = {
         buildId,
-        projectId: input.projectId,
-        repositoryId: input.repositoryId,
+        appName: input.appName,
         status: "QUEUED",
         phase: "REQUEST_ACCEPTED",
         previewStatus: "NOT_REQUESTED",

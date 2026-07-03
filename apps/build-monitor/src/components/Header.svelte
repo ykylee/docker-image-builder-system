@@ -1,35 +1,23 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import { link, push } from "svelte-spa-router";
   import ThemeToggle from "./ThemeToggle.svelte";
+  import { userIdStore, adminIdStore } from "../lib/session.js";
 
-  let userId = $state<string | null>(null);
-  let adminId = $state<string | null>(null);
-
-  // localStorage 와 컴포넌트 state 동기화. 라우트 변경에 의존하지 않고
-  // storage 이벤트로 다른 탭에서의 로그아웃까지 반영한다.
-  function readState(): void {
-    userId = localStorage.getItem("userId");
-    adminId = localStorage.getItem("adminId");
-  }
-
-  onMount(() => {
-    readState();
-    window.addEventListener("storage", readState);
-    return () => window.removeEventListener("storage", readState);
-  });
+  // session.ts 의 writable store 가 localStorage 와 양방향 동기화를
+  // 담당한다 (Bug 1: 로그인 직후 Header 가 즉시 갱신되도록). 컴포넌트
+  // state 를 따로 두지 않고 store 값을 직접 구독한다.
+  let userId = $derived($userIdStore);
+  let adminId = $derived($adminIdStore);
 
   function logout() {
-    localStorage.removeItem("userId");
-    readState();
+    userIdStore.set(null);
     push("/");
   }
 
   function adminLogout() {
     // Admin session is independent from the user session so logging out
     // of the admin UI does not sign the user out of the build monitor.
-    localStorage.removeItem("adminId");
-    readState();
+    adminIdStore.set(null);
     push("/");
   }
 </script>

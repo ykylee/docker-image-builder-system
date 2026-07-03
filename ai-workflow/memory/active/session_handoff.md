@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 20: PR #7 (Build Server list + openapi-typescript 자동 client, TASK-040) 진행 중, 회귀 268/268 OK; 후속: light mode 또는 TASK-017 stdio transport 또는 TASK-037 sweeper)
+- Updated: 2026-07-03 (rev 21: Bug fix 2건 — (1) Header 즉시 갱신 (login 시 adminId/userId session store 경유), (2) BuildRequest/BuildSummary appName 단일 식별자 (projectId/repositoryId collapse). 회귀 270/270 (TS build-server 54 + TS build-monitor 35 + Go 13 + Python 215). 후속: DB schema migration (TODO 표시) 또는 light mode / TASK-017 / TASK-037 / admin owner block-delete)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus

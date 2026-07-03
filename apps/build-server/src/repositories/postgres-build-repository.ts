@@ -48,10 +48,22 @@ type BuildRequestRow = typeof buildRequestTable.$inferSelect;
 type BuildLogRow = typeof buildLogTable.$inferSelect;
 
 function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
+  // TODO (DB migration, follow-up): add an `appName text not null` column
+  // to build_request and read it directly. Until the migration ships,
+  // we surface appName through the metadata JSONB so the API contract
+  // already speaks appName end-to-end. Legacy rows written by PR #6 / #7
+  // still have the canonical appName under metadata.appName; new rows
+  // also write to metadata.appName via the insert below.
+  const metadata = (row.metadata ?? {}) as Record<string, string>;
+  const appName =
+    metadata["appName"] ??
+    // Belt-and-suspenders: legacy rows may also have stashed the value
+    // under snake_case keys if a prior client wrote them that way.
+    metadata["app_name"] ??
+    "";
   return {
     buildId: row.id,
-    projectId: row.projectId,
-    repositoryId: row.repositoryId,
+    appName,
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
     previewStatus: row.previewStatus as PreviewStatus,
@@ -88,24 +100,30 @@ export class PostgresBuildRepository implements BuildRepository {
   async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
     const buildId = randomUUID();
     const timestamp = new Date();
-    const lockKey = `${input.projectId}:${input.repositoryId}`;
+    // Lock keyed on appName only (1 active build per app). See
+    // shared-contract/src/build/request.ts — the legacy
+    // (projectId, repositoryId) pair was collapsed into appName.
+    const lockKey = input.appName;
 
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
 
+      // Active-build dedup is keyed on appName only. We probe via
+      // metadata->>'appName' until the dedicated column lands (see
+      // mapBuildRowToSummary TODO). For the new row we always write
+      // metadata.appName = input.appName below, so the probe matches
+      // deterministically.
       const [activeBuild] = await tx
         .select()
         .from(buildRequestTable)
         .where(
           and(
-            eq(buildRequestTable.projectId, input.projectId),
-            eq(buildRequestTable.repositoryId, input.repositoryId),
+            sql`${buildRequestTable.metadata}->>'appName' = ${input.appName}`,
             inArray(buildRequestTable.status, activeBuildStatuses)
           )
         )
         .orderBy(desc(buildRequestTable.createdAt))
         .limit(1);
-
       if (activeBuild) {
         const duplicate: BuildDuplicateResponse = {
           accepted: false,
@@ -124,8 +142,12 @@ export class PostgresBuildRepository implements BuildRepository {
         .insert(buildRequestTable)
         .values({
           id: buildId,
-          projectId: input.projectId,
-          repositoryId: input.repositoryId,
+          // appName is the canonical identity; projectId / repositoryId
+          // columns are kept empty until a follow-up DB migration drops
+          // them in favor of a dedicated appName text column. See
+          // mapBuildRowToSummary TODO for the migration plan.
+          projectId: input.appName,
+          repositoryId: "",
           requestedBy: input.requestedBy,
           status: "QUEUED",
           phase: "REQUEST_ACCEPTED",
