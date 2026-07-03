@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 14: TASK-034 1차 골격 완료, 후속 TASK-035 Runner claim loop 또는 TASK-036 preview queue 가능)
+- Updated: 2026-07-03 (rev 15: TASK-035 Go Runner claim loop + phase call 완료, 후속 TASK-036 PKG-006 preview queue 또는 docker build 실제 통합 가능)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
