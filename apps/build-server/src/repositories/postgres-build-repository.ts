@@ -507,9 +507,10 @@ export class PostgresBuildRepository implements BuildRepository {
   }
 
   async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
-    // (1) status filter, (2) cursor skip (createdAt < cursor.createdAt OR
-    //     (createdAt == cursor.createdAt AND id < cursor.id), id 기준
-    //     tiebreak), (3) createdAt desc, id desc, (4) limit.
+    // (1) status filter, (2) requestedBy filter, (3) cursor skip
+    //     (createdAt < cursor.createdAt OR (createdAt == cursor.createdAt
+    //     AND id < cursor.id), id 기준 tiebreak), (4) createdAt desc, id
+    //     desc, (5) limit.
     // 1차 골격은 id(uuid) 만 cursor 로 사용 — createdAt 비교는 backend 가
     // monotonic 하지 않을 수 있어 안정성 우선.
     const cursorRow = query.cursor
@@ -525,6 +526,9 @@ export class PostgresBuildRepository implements BuildRepository {
     const conds = [];
     if (query.status) {
       conds.push(eq(buildRequestTable.status, query.status));
+    }
+    if (query.requestedBy) {
+      conds.push(eq(buildRequestTable.requestedBy, query.requestedBy));
     }
     if (cursorRow) {
       // Skip rows with the same createdAt as the cursor and id <= cursor.id.

@@ -37,15 +37,17 @@
 <style>
   .pill {
     display: inline-block;
-    padding: 2px var(--space-sm);
+    padding: 4px var(--space-md);
     border-radius: var(--radius-pill);
-    background: color-mix(in srgb, var(--pill-color) 18%, transparent);
+    background: color-mix(in srgb, var(--pill-color) 15%, transparent);
     color: var(--pill-color);
+    border: 1px solid color-mix(in srgb, var(--pill-color) 30%, transparent);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--pill-color) 15%, transparent);
     font-family: var(--font-mono);
     font-size: var(--size-xs);
     font-weight: var(--weight-semibold);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.05em;
     line-height: var(--line-tight);
     white-space: nowrap;
   }

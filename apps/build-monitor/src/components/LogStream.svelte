@@ -20,23 +20,45 @@
 </div>
 
 <style>
-  .wrap { display: flex; flex-direction: column; gap: var(--space-sm); }
-  .toolbar { display: flex; gap: var(--space-md); color: var(--color-text-secondary); font-size: var(--size-sm); }
-  .stream {
+  .wrap { 
+    display: flex; 
+    flex-direction: column; 
+    gap: var(--space-md); 
+  }
+  .toolbar { 
+    display: flex; 
+    gap: var(--space-md); 
+    color: var(--color-text-secondary); 
+    font-size: var(--size-sm); 
+    align-items: center;
     background: var(--color-bg-canvas);
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-sm);
     border: 1px solid var(--color-border-subtle);
+    width: fit-content;
+  }
+  .toolbar input {
+    accent-color: var(--color-accent-primary);
+  }
+  .stream {
+    background: var(--code-bg);
+    border: 1px solid var(--code-border);
     border-radius: var(--radius-md);
-    padding: var(--space-md);
+    padding: var(--space-lg);
     font-family: var(--font-mono);
     font-size: var(--size-sm);
-    line-height: var(--line-normal);
-    color: var(--color-text-primary);
+    line-height: var(--line-relaxed);
+    color: var(--code-fg);
     margin: 0;
-    max-height: 360px;
+    max-height: 480px;
     overflow: auto;
     white-space: pre;
+    box-shadow: var(--code-inset-shadow);
   }
-  .stream.wrap { white-space: pre-wrap; word-break: break-word; }
-  .at { color: var(--color-text-muted); }
-  .phase { color: var(--color-accent-primary); }
+  .stream.wrap {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .at { color: var(--code-muted); }
+  .phase { color: var(--code-phase); font-weight: var(--weight-semibold); }
 </style>

@@ -1,81 +1,119 @@
-/* docs/DESIGN.md §1 Tokens 의 1차안을 CSS custom properties 로 옮긴 파일.
- * PR #6 (apps/build-monitor) 에서 1차안 그대로 사용, 후속 PR 에서 디자인
- * QA (contrast / spacing scale) 후 fine-tune 예정.
- *
- * Naming convention:
- *   --color-{category}-{variant}
- *   --space-{xs|sm|md|lg|xl|xxl}
- *   --radius-{sm|md|lg|pill}
- *   --shadow-{card|modal}
- *   --motion-{duration|easing}
- *   --font-{sans|mono}
- *   --size-{xs|sm|md|lg|xl|xxl}
- *   --weight-{regular|medium|semibold}
- *   --line-{tight|normal|relaxed}
- */
-
 :root {
-  /* Color */
-  --color-bg-canvas: #0F1115;
-  --color-bg-surface: #171A21;
-  --color-bg-surface-elevated: #1E222B;
-  --color-text-primary: #E6E8EC;
-  --color-text-secondary: #9AA1AC;
-  --color-text-muted: #5C6370;
-  --color-text-disabled: #3A3F4A;
-  --color-border-subtle: #232832;
-  --color-border-strong: #2E3440;
-  --color-accent-primary: #5B8DEF;
-  --color-accent-primary-hover: #7AA3FF;
-  --color-accent-success: #3FB950;
-  --color-accent-warning: #D29922;
-  --color-accent-danger: #F85149;
-  --color-accent-info: #79C0FF;
-  --color-focus-ring: #5B8DEF;
+  /* Default to dark mode (premium aesthetic) */
+  --color-bg-canvas: #0b0c10;
+  --color-bg-surface: #13151c;
+  --color-bg-surface-elevated: #1a1d27;
+  --color-text-primary: #f8f9fa;
+  --color-text-secondary: #a0a8b4;
+  --color-text-muted: #646b79;
+  --color-text-disabled: #3d4351;
+  
+  --color-border-subtle: #242936;
+  --color-border-strong: #333a4d;
+  
+  --color-accent-primary: #6366f1; /* Indigo */
+  --color-accent-primary-hover: #818cf8;
+  --color-accent-success: #10b981; /* Emerald */
+  --color-accent-warning: #f59e0b; /* Amber */
+  --color-accent-danger: #ef4444; /* Red */
+  --color-accent-info: #0ea5e9; /* Sky */
+  --color-focus-ring: rgba(99, 102, 241, 0.5);
+
+  --glass-bg: rgba(19, 21, 28, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.05);
 
   /* Typography */
-  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Consolas, monospace;
-  --size-xs: 11px;
-  --size-sm: 12px;
-  --size-md: 14px;
-  --size-lg: 16px;
-  --size-xl: 20px;
-  --size-xxl: 28px;
+  --size-xs: 0.75rem;
+  --size-sm: 0.875rem;
+  --size-md: 1rem;
+  --size-lg: 1.125rem;
+  --size-xl: 1.5rem;
+  --size-xxl: 2.25rem;
   --weight-regular: 400;
   --weight-medium: 500;
   --weight-semibold: 600;
   --line-tight: 1.25;
-  --line-normal: 1.45;
-  --line-relaxed: 1.6;
+  --line-normal: 1.5;
+  --line-relaxed: 1.625;
 
   /* Spacing */
-  --space-xs: 4px;
-  --space-sm: 8px;
-  --space-md: 12px;
-  --space-lg: 16px;
-  --space-xl: 24px;
-  --space-xxl: 32px;
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.75rem;
+  --space-lg: 1rem;
+  --space-xl: 1.5rem;
+  --space-xxl: 2rem;
+  --space-xxxl: 3rem;
 
   /* Radius */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 10px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
   --radius-pill: 9999px;
 
-  /* Shadow */
-  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 8px rgba(0, 0, 0, 0.2);
-  --shadow-modal: 0 8px 24px rgba(0, 0, 0, 0.5);
+  /* Code surface (terminal/log) */
+  --code-bg: #0b0c10;
+  --code-fg: #e2e8f0;
+  --code-muted: #64748b;
+  --code-phase: #38bdf8;
+  --code-border: var(--color-border-strong);
+  --code-inset-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+
+  /* Shadows for Dark Mode */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--color-accent-primary);
+  --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
 
   /* Motion */
-  --motion-duration-fast: 120ms;
-  --motion-duration-base: 200ms;
-  --motion-duration-slow: 320ms;
-  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-duration-fast: 150ms;
+  --motion-duration-base: 300ms;
+  --motion-duration-slow: 500ms;
+  --motion-easing-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-easing-bouncy: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-  /* z-index scale */
+  /* Z-Index */
   --z-header: 100;
   --z-drawer: 200;
   --z-modal: 300;
   --z-toast: 400;
+}
+
+:root[data-theme="light"] {
+  --color-bg-canvas: #f1f5f9;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-elevated: #ffffff;
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #94a3b8;
+  --color-text-disabled: #cbd5e1;
+  
+  --color-border-subtle: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  
+  --color-accent-primary: #4f46e5;
+  --color-accent-primary-hover: #4338ca;
+  --color-accent-success: #059669;
+  --color-accent-warning: #d97706;
+  --color-accent-danger: #dc2626;
+  --color-accent-info: #0284c7;
+  --color-focus-ring: rgba(79, 70, 229, 0.4);
+
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.05);
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--color-accent-primary);
+  --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.15);
+
+  /* Code surface (terminal/log) — 라이트 모드도 터미널 톤 유지 */
+  --code-bg: #0b0c10;
+  --code-fg: #e2e8f0;
+  --code-muted: #64748b;
+  --code-phase: #38bdf8;
+  --code-border: var(--color-border-strong);
+  --code-inset-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
 }

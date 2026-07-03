@@ -1,12 +1,13 @@
 <script lang="ts">
   import Router from "svelte-spa-router";
   import Header from "./components/Header.svelte";
+  import Login from "./routes/Login.svelte";
   import BuildsList from "./routes/BuildsList.svelte";
   import BuildDetail from "./routes/BuildDetail.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
   const routes = {
-    "/": BuildsList,
+    "/": Login,
     "/builds": BuildsList,
     "/builds/:buildId": BuildDetail,
     "*": NotFound
