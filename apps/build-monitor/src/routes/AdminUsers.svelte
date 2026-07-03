@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import StatusPill from "../components/StatusPill.svelte";
   import type { AdminUserSummary } from "../lib/api";
   import { listAdminBuilds, listAdminUsers } from "../lib/api";
 
@@ -13,10 +14,19 @@
   // their build history inline below the table. This keeps the page
   // self-contained: the admin can pivot from owner list to owner
   // builds without a route change.
+  // TASK-060 2차 (PR #15): recent builds panel 은 BuildRow 가 아닌 직접
+  // markup 으로 표시했는데, StatusPill 로 통일해 canonical lifecycleStatus
+  // 까지 노출. lifecycleStatus 는 optional 이라 fallback 이 안전.
   let selectedUser = $state<string | null>(null);
-  let selectedBuilds = $state<{ buildId: string; appName: string; status: string; updatedAt: string }[]>(
-    []
-  );
+  let selectedBuilds = $state<
+    {
+      buildId: string;
+      appName: string;
+      status: string;
+      lifecycleStatus?: string;
+      updatedAt: string;
+    }[]
+  >([]);
   let selectedLoading = $state(false);
 
   onMount(async () => {
@@ -53,6 +63,8 @@
         buildId: b.buildId,
         appName: b.appName,
         status: b.status,
+        // TASK-052 lifecycleStatus — StatusPill forwarding.
+        lifecycleStatus: b.lifecycleStatus,
         updatedAt: b.updatedAt
       }));
     } catch (e) {
@@ -149,7 +161,7 @@
         <ul class="build-list">
           {#each selectedBuilds as b (b.buildId)}
             <li>
-              <span class="status mono">{b.status}</span>
+              <StatusPill status={b.status} lifecycleStatus={b.lifecycleStatus} />
               <a class="project mono" href={`/builds/${b.buildId}`} target="_blank" rel="noopener">{b.appName}</a>
               <span class="muted small">{b.buildId.slice(0, 8)}</span>
               <span class="muted small r">{relativeTime(b.updatedAt)}</span>
@@ -278,13 +290,6 @@
     border-radius: var(--radius-md);
     background: var(--color-bg-canvas);
     border: 1px solid var(--color-border-subtle);
-  }
-  .status {
-    font-size: var(--size-xs);
-    font-weight: var(--weight-semibold);
-    color: var(--color-text-secondary);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
   }
   .project {
     color: var(--color-accent-primary);

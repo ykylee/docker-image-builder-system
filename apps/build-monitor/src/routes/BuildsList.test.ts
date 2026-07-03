@@ -26,10 +26,17 @@ afterEach(() => {
   cleanup();
 });
 
-const sample = (appName: string, status: string) => ({
+const sample = (
+  appName: string,
+  status: string,
+  lifecycleStatus?: string
+) => ({
   buildId: "00000000-0000-0000-0000-" + appName.padStart(12, "0"),
   appName,
   status,
+  // TASK-052 lifecycleStatus — canonical 12-state union optional.
+  // lifecycleStatus 가 emit 되면 StatusPill 이 우선 표시.
+  lifecycleStatus,
   phase: "REQUEST_ACCEPTED",
   previewStatus: "NOT_REQUESTED",
   previewUrl: null,
@@ -65,7 +72,11 @@ describe("BuildsList", () => {
   it("filters visible builds by status chip", async () => {
     localStorage.setItem("userId", "yklee");
     listBuildsMock.mockResolvedValue({
-      builds: [sample("p-1", "QUEUED"), sample("p-2", "BUILDING"), sample("p-3", "FAILED")],
+      builds: [
+        sample("p-1", "QUEUED", "QUEUED"),
+        sample("p-2", "BUILDING", "BUILDING"),
+        sample("p-3", "FAILED", "FAILED")
+      ],
       nextCursor: null
     });
     render(BuildsList);
@@ -80,5 +91,23 @@ describe("BuildsList", () => {
     // ALL 복귀 → 3건
     await fireEvent.click(screen.getByRole("button", { name: "ALL" }));
     await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(3));
+  });
+
+  it("prefers lifecycleStatus when emitted alongside legacy status", async () => {
+    localStorage.setItem("userId", "yklee");
+    listBuildsMock.mockResolvedValue({
+      builds: [
+        // canonical lifecycleStatus 만 emit, legacy status 는 동일값이지만
+        // canonical label 로 StatusPill 이 표시되는지 검증.
+        sample("p-canonical", "BUILDING", "DEPLOYING")
+      ],
+      nextCursor: null
+    });
+    render(BuildsList);
+    await waitFor(() =>
+      expect(
+        screen.getByRole("status", { name: /Build status: DEPLOYING/i })
+      ).toBeInTheDocument()
+    );
   });
 });

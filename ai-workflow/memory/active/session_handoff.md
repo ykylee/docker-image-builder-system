@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 48→49: PR #14 squash merge 합류 sync. main HEAD `703600f` (squash merge commit, 본래 squash 입력은 `b0ce44f`). rebase 가 `5e597c3` (CodeWhale overlay) 위에서 완료되어 session_handoff.md 의 Updated 라인이 통합됨. self-review follow-up 보완 5건이 모두 amend 안에 들어가 머지 차단 이슈 0건. 다음: TASK-060 2차 PR (fixture 갱신 + BuildList / AdminBuilds / AdminUsers status mapping 정렬) 또는 TASK-061 / TASK-062.)
+- Updated: 2026-07-03 (rev 49→50: TASK-060 2차 PR (PR #15) 진입. 브랜치 `codex/task-060-fixture-buildlist-2026-07-03` (main HEAD `651abf0` 기준). vitest 4 file (BuildRow / BuildsList / AdminBuilds / AdminUsers) sample data 에 `lifecycleStatus` 추가 — `BuildRow.test.ts` 에 lifecycleStatus 우선 + legacy fallback case 신규. `AdminUsers.svelte` recent builds panel 의 `<span class="status mono">{b.status}</span>` 을 `<StatusPill status={b.status} lifecycleStatus={b.lifecycleStatus} />` 로 교체 + 미사용 `.status` CSS 제거. 회귀: TS 4 packages clean, Go 9 packages, build-server 52/52, build-monitor tsc + svelte-check 0/0 (warning 도 해결). workflow meta 동기화 (state rev 70→71, handoff 49→50, work_backlog 42→43, backlog §50→51) 같은 PR commit 에 포함. 다음: commit + push + gh pr create + squash merge sync.)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note
