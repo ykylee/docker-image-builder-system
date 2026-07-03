@@ -27,6 +27,15 @@ import { buildListResponseSchema, buildSummarySchema } from "./response.js";
 // emitted refId in @asteasolutions/zod-to-openapi 8.5). It mirrors
 // BuildSummary field-for-field, adds requestedBy, and carries its own
 // .meta({ id }) so it can be registered as a separate component.
+//
+// BuildSummary evolution contract: this schema is derived from
+// `buildSummarySchema` via `.extend({...})`, so any new field
+// added to BuildSummary (status/phase/previewStatus family, etc.)
+// propagates to AdminUserBuildSummary automatically — the round
+// trip is intentional. When BuildSummary changes shape, verify
+// that (a) the admin routes still pass adminListBuildsResponseSchema
+// validation, and (b) the admin UI BuildRow component renders the
+// new field (or ignores it as an unknown property without crashing).
 export const adminUserBuildSummarySchema = buildSummarySchema
   .extend({
     requestedBy: z.string().min(1).meta({

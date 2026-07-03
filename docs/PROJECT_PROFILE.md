@@ -86,6 +86,7 @@
 - OpenAPI: `Admin` tag 가 추가됐고 `/admin/*` paths, `AdminListBuildsQuery` / `AdminListBuildsResponse` / `AdminUserBuildSummary` / `AdminUserListResponse` components 가 emit 된다. `/docs` Swagger UI 에서 확인 가능.
 - build-monitor 측 진입점: `/admin/login` → admin id 입력 → localStorage `adminId` 키에 저장 → `/admin/builds` 와 `/admin/users` 라우트. 일반 user 로그인 (`userId` 키) 과는 분리.
 - 회귀: backend 53/53 (TS unit), build-monitor 34/34 (vitest) + svelte-check 0/0 + vite build OK.
+- 운영 가이드 (운영 환경 배포 시 필수): `ADMIN_IDS` 는 시크릿처럼 취급 — 외부 저장소/PR description/issue 에 노출 금지, 운영에선 CORS wildcard (`CORS_ORIGIN=true`) 를 끄고 명시 origin 화이트리스트로 제한. admin 인증은 평문 id 비교이므로 SSO/JWT 로의 마이그레이션은 후속 ADMIN-* task group 에서 다룬다.
 
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함

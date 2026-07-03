@@ -617,6 +617,13 @@ export class PostgresBuildRepository implements BuildRepository {
     // max(createdAt) 를 한 번에 가져와 메모리 정렬. 빌드 수가 많아지면
     // (1) 페이지네이션, (2) createdAt 기준 인덱스 정밀화를 후속 PR 에서
     // 다룬다. 현 1차 골격은 전체 owner 를 한 번에 반환.
+    //
+    // TODO (ADMIN-006 follow-up): AdminListBuildsQuery 와 동일한
+    // `limit` + `cursor` 파라미터로 owner rollup 도 페이지네이션
+    // 한다. cursor 키는 (lastBuildAt, userId) tuple. 이 자리에
+    // `limit: query.limit ?? 100` 와 `.limit(...)` 절이 들어가고,
+    // 응답 envelope 에 nextCursor 가 추가되어야 한다. 스키마
+    // (adminUserListResponseSchema) 도 같이 evolve 한다.
     const rows = await this.db
       .select({
         userId: buildRequestTable.requestedBy,

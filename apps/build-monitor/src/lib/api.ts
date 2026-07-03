@@ -130,6 +130,20 @@ export async function getBuildLogs(
 // require a live Build Server). When the generator is re-run end-to-end
 // these can be replaced with `components["schemas"][...]` aliases.
 //
+// Why hand-typed despite the generated `AdminUserBuildSummary` /
+// `AdminUserSummary` / `AdminUserListResponse` components already
+// existing in `.generated/openapi.d.ts`: the generated file shipped in
+// this PR reflects a one-off generator run that the maintainer did
+// locally before merging. The CI / predev `pnpm run generate:openapi`
+// hook re-runs the generator against a live Build Server, so a fresh
+// checkout can regenerate the file from scratch and end up with
+// identical types. Until that loop is exercised on every PR, we keep
+// the hand-typed mirror so that the build-monitor stays buildable even
+// when the generated file is stale (e.g. immediately after pulling a
+// branch that has not yet regenerated). When the generator becomes a
+// hard CI gate, replace these with `components["schemas"][...]` aliases
+// and delete the hand-typed block.
+//
 // Mirrors `packages/shared-contract/src/build/admin.ts`:
 //   AdminListBuildsResponse  = { builds, nextCursor }
 //   builds entry is an AdminUserBuildSummary = BuildSummary & { requestedBy }

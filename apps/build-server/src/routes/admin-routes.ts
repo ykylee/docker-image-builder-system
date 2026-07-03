@@ -14,6 +14,14 @@ import type { BuildService } from "../services/build-service.js";
 // every request. The guard is intentionally a single helper so that any
 // future admin endpoint can opt in by calling `requireAdmin(...)` and
 // callers cannot accidentally bypass it.
+//
+// Snapshot semantics: the allow-list is frozen at the time this
+// factory is invoked (currently once in `createApp`). Hot-reload of
+// `ADMIN_IDS` env requires a process restart — callers MUST NOT
+// assume that mutating `process.env.ADMIN_IDS` mid-flight will be
+// picked up by subsequent admin requests. If hot-reload becomes a
+// requirement, prefer introducing a reloadable settings handle
+// rather than re-reading env on every request.
 export function makeAdminAuthenticator(adminIds: ReadonlyArray<string>) {
   // Lowercase comparison would be more permissive, but the canonical
   // userId is case-sensitive (matches BuildRequest.requestedBy and the
