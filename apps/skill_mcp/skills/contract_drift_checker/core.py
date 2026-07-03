@@ -34,6 +34,55 @@ PYTHON_CANONICAL_MAP: dict[str, tuple[str, str, str]] = {
 }
 PYTHON_CANONICAL_MODULE = "apps.skill_mcp.contract.canonical"
 
+# Go-side const ↔ TS export mapping for the Runner layer.
+# TASK-062 introduced `apps/runner/internal/contract/` as the Go-side
+# source-of-truth for phase / status / errorCode constants. Each
+# const block file holds `ConstName = "VALUE"` declarations that the
+# drift checker parses via regex and compares against the TS export.
+#
+# Group label `goXxx` distinguishes the Go sync group from Python
+# `skillXxx` groups in `by_enum`.
+#
+# Note: Go mirror is partial — Runner's `build_control_client` structs
+# also emit `status` / `lifecycleStatus` etc., but those are *fields*,
+# not enum-value sets; they're handled by TS-side zod schema and don't
+# need a Go enum mirror here.
+GO_CANONICAL_MAP: dict[str, tuple[str, str, str, str]] = {
+    # group_label -> (go_filename, ts_export, ts_filename, group_label)
+    # ts_filename is used to find the same TS source the other groups use.
+    "statusCanonical": (
+        "status.go",
+        "canonicalBuildStatuses",
+        "status.ts",
+        "goBuildStatuses",
+    ),
+    "statusLegacy": (
+        "status.go",
+        "legacyBuildStatuses",
+        "status.ts",
+        "goLegacyBuildStatuses",
+    ),
+    "executionStatuses": (
+        "status.go",
+        "executionStatuses",
+        "status.ts",
+        "goExecutionStatuses",
+    ),
+    "buildPhases": (
+        "phase.go",
+        "buildPhases",
+        "phase.ts",
+        "goBuildPhases",
+    ),
+    "errorCodes": (
+        "errors.go",
+        "errorCodes",
+        "errors.ts",
+        "goErrorCodes",
+    ),
+}
+GO_CANONICAL_DIR = Path("apps/runner/internal/contract")
+
 # canonical § 별 enum 매핑: (enum name, canonical_section, ts file, ts export)
 ENUM_TARGETS = [
     ("buildStatuses", "§5", "status.ts", "buildStatuses"),
@@ -279,6 +328,57 @@ def _get_py_frozenset(mod: Any, attr: str) -> frozenset[str] | None:
     return None
 
 
+# Go const block pattern: `IdentName = "VALUE"` 로 매 줄.
+# ident 는 Go 식별자 규칙 (대소문자 혼합 CamelCase / UPPER_SNAKE 둘 다 허용).
+# value 는 UPPER_SNAKE_CASE 만 매칭 (canonical enum 표면 일치).
+GO_CONST_LINE_RE = re.compile(
+    r'^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*"([A-Z][A-Z0-9_]*)"\s*$',
+    re.MULTILINE,
+)
+
+
+def _extract_go_consts(src: str) -> dict[str, str] | None:
+    """Go source 에서 `ConstName = "VALUE"` 매핑을 모두 추출.
+
+    `apps/runner/internal/contract/*.go` 의 모든 const 블록 (단일 / 다중) 을
+    모두 매칭. 매칭이 0건이면 None 반환.
+
+    다음 패턴은 의도적으로 매칭하지 않는다:
+    - quote 없이 bare 식별자만 있는 경우 (`MyConst = SomeOtherConst`)
+    - 숫자 / boolean / 함수 호출
+    - 따옴표 안에 UPPER_SNAKE 가 아닌 다른 문자가 섞인 경우
+    """
+    matches = GO_CONST_LINE_RE.findall(src)
+    if not matches:
+        return None
+    out: dict[str, str] = {}
+    for ident, value in matches:
+        # 동일 ident 가 같은 파일에 두 번 정의되면 후행 값으로 덮어쓰기.
+        out[ident] = value
+    return out
+
+
+def _resolve_go_value_set(consts: dict[str, str] | None, names: tuple[str, ...]) -> set[str] | None:
+    """ident list 의 value 를 union 해서 set 으로 반환.
+
+    `_extract_go_consts` 의 결과 dict 에서 주어진 ident name 들 (예:
+    `("StatusReceived", "StatusQueued", ...)`) 의 value 를 모은다.
+
+    ident 가 dict 에 없으면 무시 (drift 가 있을 수도 있으나 별도 표면).
+    모두 없으면 None 반환.
+    """
+    if not consts:
+        return None
+    found: set[str] = set()
+    for n in names:
+        v = consts.get(n)
+        if isinstance(v, str) and v:
+            found.add(v)
+    if not found:
+        return None
+    return found
+
+
 def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftReport:
     """drift 검사. `repo_root` 미지정 시 cwd 기준."""
     warnings: list[dict[str, str]] = []
@@ -302,6 +402,7 @@ def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftRepor
     )
     check_request = bool(input_data.get("checkRequest", True))
     check_python = bool(input_data.get("checkPython", True))
+    check_go = bool(input_data.get("checkGo", True))
 
     if not isinstance(enums_requested, list) or not all(
         isinstance(e, str) for e in enums_requested
@@ -573,6 +674,143 @@ def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftRepor
                 }
                 missing_total += len(missing)
                 extra_total += len(extra)
+
+    # Go-side canonical enums (`apps/runner/internal/contract/*.go`). Each
+    # const-block file's declared `IdentName = "VALUE"` lines are parsed
+    # and compared against the corresponding TS export. Parser is regex-
+    # based (no Go AST) but reliable for the simple `ConstName = "VALUE"`
+    # pattern that we maintain. Drift here means one of three layers
+    # (TS / Python / Go) is out of sync with another.
+    if check_go:
+        go_const_cache: dict[str, dict[str, str] | None] = {}
+        for go_filename in {m[0] for m in GO_CANONICAL_MAP.values()}:
+            go_path = _resolve_path(root, GO_CANONICAL_DIR / go_filename)
+            if not go_path.is_file():
+                warnings.append({
+                    "code": "PARSE_ERROR",
+                    "field": "goCanonical",
+                    "message": f"Go canonical file not found: {go_path}",
+                })
+                go_const_cache[go_filename] = None
+                continue
+            try:
+                go_src = _read_text(go_path)
+            except OSError as exc:
+                warnings.append({
+                    "code": "IO_ERROR",
+                    "field": "goCanonical",
+                    "message": str(exc),
+                })
+                go_const_cache[go_filename] = None
+                continue
+            go_const_cache[go_filename] = _extract_go_consts(go_src)
+
+        for group_key, (go_filename, ts_export, ts_filename, group_label) in GO_CANONICAL_MAP.items():
+            go_consts = go_const_cache.get(go_filename)
+            if go_consts is None:
+                by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                continue
+
+            # Get the TS values (cached re-read or just read fresh).
+            ts_path = contract_dir / ts_filename
+            if not ts_path.is_file():
+                warnings.append({
+                    "code": "PARSE_ERROR",
+                    "field": group_label,
+                    "message": f"TS file not found: {ts_path}",
+                })
+                by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                continue
+            try:
+                ts_src = _read_text(ts_path)
+            except OSError as exc:
+                warnings.append({
+                    "code": "IO_ERROR",
+                    "field": group_label,
+                    "message": str(exc),
+                })
+                by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                continue
+            ts_words = _extract_ts_enum(ts_src, ts_export)
+            if ts_words is None:
+                warnings.append({
+                    "code": "PARSE_ERROR",
+                    "field": group_label,
+                    "message": (
+                        f"could not locate `export const {ts_export}` in {ts_path}"
+                    ),
+                })
+                by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                continue
+            ts_set = set(ts_words)
+
+            # Identify which Go const identifiers map to this group.
+            # For statusCanonical/statusLegacy we walk the file's
+            # identifiers; for buildPhases/errorCodes/executionStatuses
+            # we collect values from the resolved const declarations.
+            if group_key == "statusCanonical":
+                wanted_idents = (
+                    "StatusReceived", "StatusQueued",
+                    "StatusPreparingSource", "StatusBuilding",
+                    "StatusBuildSuccess", "StatusTesting",
+                    "StatusTestSuccess", "StatusDeploying",
+                    "StatusDeploySuccess", "StatusCompleted",
+                    "StatusFailed", "StatusCancelled",
+                )
+            elif group_key == "statusLegacy":
+                wanted_idents = (
+                    "StatusLegacyClaimed", "StatusLegacyTestReady",
+                )
+            elif group_key == "executionStatuses":
+                wanted_idents = (
+                    "ExecutionStatusNotStarted",
+                    "ExecutionStatusInProgress",
+                    "ExecutionStatusSuccess",
+                    "ExecutionStatusFailed",
+                    "ExecutionStatusSkipped",
+                )
+            elif group_key == "buildPhases":
+                wanted_idents = tuple(p for p in go_consts if p.startswith("Phase"))
+            elif group_key == "errorCodes":
+                wanted_idents = tuple(p for p in go_consts if p.startswith("ErrorCode"))
+            else:
+                wanted_idents = ()
+
+            if wanted_idents:
+                go_value_set = _resolve_go_value_set(go_consts, wanted_idents) or set()
+            else:
+                go_value_set = set()
+
+            missing = go_value_set - ts_set  # Go only -> ts drift
+            extra = ts_set - go_value_set  # TS only -> Go drift
+            shared = go_value_set & ts_set
+
+            for v in sorted(go_value_set):
+                if v in missing:
+                    drift_items.append(DriftItem(
+                        kind="missing_in_code",
+                        enum=group_label,
+                        value=v,
+                        canonical_section="go",
+                    ))
+            for v in ts_words:
+                if v in extra:
+                    drift_items.append(DriftItem(
+                        kind="extra_in_code",
+                        enum=group_label,
+                        value=v,
+                        canonical_section="go",
+                    ))
+
+            by_enum[group_label] = {
+                "missing": len(missing),
+                "extra": len(extra),
+                "shared": len(shared),
+            }
+            missing_total += len(missing)
+            extra_total += len(extra)
+
+    total = missing_total + extra_total
 
     total = missing_total + extra_total
     summary = DriftSummary(
