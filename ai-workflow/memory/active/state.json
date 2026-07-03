@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "PR #2 (TASK-017 scaffold) 매지 완료: 61 files +3382/-72, main 에 걸치는 것 확정. Build Server=TS / Runner=Go / packages/shared-contract 고정. P0 skill 2종 + P0 MCP 2종 완료 상태 유지 (skills-mcp-dev 브랜치). 다음은 skills-mcp-dev 브랜치를 main 에 rebased PR 로 링크.",
-  "purpose_digest_rev": "31",
+  "purpose_digest": "TASK-025/026/027/028/029 모두 main 으로 진입 완료 (PR #3). 우리 시스템 P0 skill 2종 + P0 MCP 2종 모두 합출. 다음은 P1 skill (failure-summary-shaper) 하나 이어나 TASK-017 의 stdio transport 연결.",
+  "purpose_digest_rev": "32",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,11 +28,16 @@
   },
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-    "current_axis": "TASK-017 (Build Server=TS / Runner=Go scaffold) 이 PR #2 로 main 에 걸였고, TASK-026/027 (P0 skill 2종) + TASK-028/029 (P0 MCP 2종) 는 skills-mcp-dev 브랜치에 있다. 다음은 skills-mcp-dev 를 main 에 rebased PR 로 걸어 P0 4종 통합.",
-    "current_focus": "TASK-017 scaffold 매지 완료, skills-mcp-dev 브랜치를 main 으로 rebase/PR 연결",
+    "current_axis": "P0 후보 4종 (build-request-intake / build-status-explainer / latest-build-status / build-log-tail) 이 main 으로 걸어갔다. 다음은 두 가지 원치 중 하나: (a) P1 skill 하나 이어나 (failure-summary-shaper), (b) TASK-017 의 stdio transport 연결으로 MCP 가 4종이 real 프로세스로 동작하도록 했다.",
+    "current_focus": "PR #3 매지 완료, 다음은 P1 skill (failure-summary-shaper) 하나 이어나 TASK-017 stdio transport",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-025 우리 시스템 skill/MCP 후보 정리 및 개발 계획 (docs/sdlc/13, PROJECT_PROFILE §3.2, PKG-008/009 cross-ref)",
+      "TASK-026 build-request-intake skill 1종 구현 (apps/skill_mcp/skills/build_request_intake, Python, 14 tests OK)",
+      "TASK-027 build-status-explainer skill 2종 구현 (apps/skill_mcp/skills/build_status_explainer, Python, 22 tests OK)",
+      "TASK-028 latest-build-status MCP 1종 구현 (apps/skill_mcp/mcp_servers/latest_build_status, Python, 21 tests OK)",
+      "TASK-029 build-log-tail MCP 1종 구현 (apps/skill_mcp/mcp_servers/build_log_tail, Python, 50 tests OK)",
       "TASK-017 shared package / build-server / runner 골격 스캐폴드 및 1차 검증",
       "Build Server postgres persistence path 및 schema auto-bootstrap 연결",
       "Colima + Docker Postgres live smoke 통과 (insert/query/logs/duplicate 409)",
@@ -69,6 +74,11 @@
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
+      "TASK-025 우리 시스템 skill/MCP 후보 정리 및 개발 계획 (docs/sdlc/13, PROJECT_PROFILE §3.2, PKG-008/009 cross-ref)",
+      "TASK-026 build-request-intake skill 1종 구현 (apps/skill_mcp/skills/build_request_intake, Python, 14 tests OK)",
+      "TASK-027 build-status-explainer skill 2종 구현 (apps/skill_mcp/skills/build_status_explainer, Python, 22 tests OK)",
+      "TASK-028 latest-build-status MCP 1종 구현 (apps/skill_mcp/mcp_servers/latest_build_status, Python, 21 tests OK)",
+      "TASK-029 build-log-tail MCP 1종 구현 (apps/skill_mcp/mcp_servers/build_log_tail, Python, 50 tests OK)",
       "TASK-017 shared package / build-server / runner 골격 스캐폴드 및 1차 검증",
       "TASK-024 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)",
       "TASK-023 워크플로우 skill/MCP 셋업 (.codex/.agents 진입 메모, PROJECT_PROFILE §3.1 active/deferred 표)",
