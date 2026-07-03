@@ -1,12 +1,13 @@
 # Skill: build-status-explainer
 
-- 문서 목적: Build Server `GET /builds/{buildId}` 응답과 (선택) `GET /builds/{buildId}/logs` 마지막 N 줄을 받아, 비개발자 사용자가 즉시 읽을 수 있는 한국어 상태 메시지 + `next_action` 으로 변환한다.
-- 범위: `BuildStatus` (10종) / `PreviewStatus` (7종) / `Phase` (9종) / `ErrorCode` (10종) 의 canonical enum → 시스템/에이전트/사용자 3-tier 메시지. 실제 API 호출은 이 skill 의 책임이 아니다 (Build Server 가 canonical, 호출은 사용자가 직접 또는 `apps/skill_mcp/mcp_servers/latest-build-status` 후속 MCP).
+- 문서 목적: Build Server `GET /builds/{buildId}` 응답 (canonical BuildStatusResponse) 과 (선택) `GET /builds/{buildId}/logs` 마지막 N 줄을 받아, 비개발자 사용자가 즉시 읽을 수 있는 한국어 상태 메시지 + `next_action` 으로 변환한다.
+- 범위: **canonical contract v2** (TASK-061) — `canonicalBuildStatuses` (12) / `executionStatuses` (5) / `BuildPhase` (11) / canonical `ErrorCode` (8) 의 단일 source-of-truth = [`apps/skill_mcp/contract/canonical.py`](../../contract/canonical.py) (TS `packages/shared-contract/src/build/status.ts` 와 동기화, drift 검사 자동). 시스템/에이전트/사용자 3-tier 메시지. legacy preview-era 입력(`testDeployment` / raw `error`) 도 forward-compat 으로 받지만 출력은 canonical `OPEN_DEPLOYMENT` 만 사용.
 - 대상 독자: AI agent, 비개발자 build 요청자, Skill/MCP 구현자
-- 상태: draft (v0.1.0)
-- 최종 수정일: 2026-07-03
+- 상태: stable (v2.0.0)
+- 최종 수정일: 2026-07-03 (TASK-061 contract rename)
 - 관련 문서:
-  - canonical enum/phase/error: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md) §5/§6/§7/§8/§9
+  - canonical enum: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md) §5/§6/§7/§8/§9
+  - **Python source-of-truth**: [`apps/skill_mcp/contract/canonical.py`](../../contract/canonical.py)
   - 메시지 계층/실패 처리: [`docs/sdlc/design/06-user-messaging-and-failure-handling.md`](../../../../docs/sdlc/design/06-user-messaging-and-failure-handling.md) §2/§3/§4
   - 후보 카탈로그: [`docs/sdlc/13-skills-and-mcp-plan.md`](../../../../docs/sdlc/13-skills-and-mcp-plan.md) §3.2
   - API 응답 shape: [`docs/sdlc/design/03-api-contract-design.md`](../../../../docs/sdlc/design/03-api-contract-design.md)

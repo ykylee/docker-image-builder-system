@@ -195,3 +195,12 @@ PKG-005/006/007 (Runner / test runtime / cleanup)
 - 우리 시스템은 Build Server + Runner + container test + external deployment 라는 명확한 도메인 경계를 가지고 있어, 표준 워크플로우 키트와 별도의 skill/MCP 카탈로그가 필요하다.
 - 본 문서에서 정의한 skill 5종 / MCP 5종은 `PKG-008` / `PKG-009` 의 분해 기준이 되며, TASK-017 종료 시점에 active/deferred 가 한 번 더 결정된다.
 - 모든 후보는 `transport_ready=false` 인 동안 동일 입력/출력 계약의 수동 절차로 운영된다.
+
+## 10. TASK-061 contract rename (canonical v2)
+
+- **2026-07-03 (TASK-061)**: SKILL §3.2 (`build-status-explainer`) / §3.3 (`failure-summary-shaper`) / §3.4 (현재 디렉터리명 `preview-readiness_checker`, 내부 도메인은 `container-test-readiness-checker`) / §3.5 (`contract-drift-checker`) + MCP §4.1 (`latest-build-status`) / §4.3 (`failure-summary`) 5종 모두 canonical contract v2 로 정렬.
+  - 도입: `apps/skill_mcp/contract/canonical.py` — Python skill/MCP 측 canonical enum 단일 source-of-truth (TS `packages/shared-contract` 와 동기).
+  - 정렬 표면: canonical 12 `BuildStatus` / 5 `ExecutionStatus` / 11 `BuildPhase` / 8 `ErrorCode` / 8 `NextAction` / 7 `ReadinessState`. (legacy `OPEN_PREVIEW`, `source: build/preview` 는 forward-compat shim 으로만 consume.)
+  - `contract-drift-checker` 가 이제 TS↔canonical.md + Python↔TS 양쪽을 cross-check (drift 0 보장).
+  - 디렉터리명 `preview-readiness_checker` 는 import path 호환성 + CI smoke script 호환성을 위해 그대로 둠 (내부 도메인 이름만 container-test-readiness 로 정렬).
+- 회귀: 221 tests OK (전 TASK 누적 215 → +6). v1 → v2 contract_version / explanation_version / skill_version / mcp_version 동시 bump.

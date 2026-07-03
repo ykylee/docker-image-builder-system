@@ -1,4 +1,4 @@
-"""build-status-explainer core / cli 단위 테스트.
+"""build-status-explainer core / cli 단위 테스트 (v2 — canonical contract).
 
 `python3 -m unittest apps.skill_mcp.tests.test_build_status_explainer` 로 실행.
 """
@@ -17,6 +17,44 @@ from apps.skill_mcp.skills.build_status_explainer.cli import main as cli_main
 
 
 def _payload(**overrides):
+    """Build a canonical BuildStatusResponse payload.
+
+    Default `build.status = "BUILDING"` (an in-flight canonical status).
+    Pass `test=...` for the canonical test block, `error=...` for the
+    canonical error, `logs=...` for log tail. `currentPhase` is also at
+    the canonical BuildPhase union.
+    """
+    base = {
+        "build": {
+            "buildId": "b-1",
+            "userId": "u-1",
+            "appName": "demo-app",
+            "status": "BUILDING",
+            "phase": "DOCKER_BUILDING",
+            "lifecycleStatus": "BUILDING",
+            "currentPhase": "DOCKER_BUILDING",
+            "createdAt": "2026-07-03T01:00:00Z",
+            "updatedAt": "2026-07-03T01:00:10Z",
+        },
+        "lastError": None,
+        "phaseHistory": [],
+        "currentPhase": None,
+        "lifecycle": None,
+        "image": None,
+        "test": None,
+        "deploy": None,
+        "resultDelivery": None,
+    }
+    base.update(overrides)
+    return base
+
+
+def _legacy_payload(**overrides):
+    """Build a legacy preview-era payload (forward-compat input).
+
+    Skill still accepts legacy keys to keep integrators working during
+    the migration window. These tests stay aligned with that guarantee.
+    """
     base = {
         "buildId": "b-1",
         "userId": "u-1",
@@ -30,7 +68,9 @@ def _payload(**overrides):
     return base
 
 
-class ExplainCoreTests(unittest.TestCase):
+class CanonicalPayloadTests(unittest.TestCase):
+    """Canonical BuildStatusResponse payload path (lifecycle/image/test/deploy)."""
+
     def test_minimal_building_response(self) -> None:
         r = explain(_payload())
         self.assertTrue(r.ok)
@@ -38,65 +78,96 @@ class ExplainCoreTests(unittest.TestCase):
         self.assertEqual(r.explanation["next_action"], "WAIT")
         self.assertFalse(r.explanation["is_terminal"])
         self.assertIsNone(r.explanation["error_summary"])
-        # user / agent 가 비어있지 않은 한국어
         self.assertTrue(len(r.explanation["user"]) > 0)
         self.assertTrue(len(r.explanation["agent"]) > 0)
 
-    def test_in_flight_statuses_yield_wait(self) -> None:
-        for s in ("QUEUED", "PREPARING", "VALIDATING", "BUILDING", "IMAGE_BUILT", "TEST_DEPLOYING"):
-            r = explain(_payload(status=s))
+    def test_all_in_flight_canonical_statuses_yield_wait(self) -> None:
+        for s in (
+            "RECEIVED",
+            "QUEUED",
+            "PREPARING_SOURCE",
+            "BUILDING",
+            "BUILD_SUCCESS",
+            "TESTING",
+            "DEPLOYING",
+        ):
+            r = explain(_payload(**{"build": {"status": s}}))
             self.assertTrue(r.ok, s)
             self.assertEqual(r.explanation["next_action"], "WAIT", s)
             self.assertFalse(r.explanation["is_terminal"], s)
 
-    def test_test_ready_with_ready_preview_open_preview(self) -> None:
+    def test_test_success_yields_wait_with_runtime_url(self) -> None:
+        # canonical TEST_SUCCESS block with a runtime hint in test.containerRef
         r = explain(
             _payload(
-                status="TEST_READY",
-                testDeployment={"status": "READY", "previewUrl": "https://preview.example.com/x"},
+                **{"build": {"status": "TEST_SUCCESS"}},
+                test={
+                    "status": "SUCCESS",
+                    "containerRunning": True,
+                    "healthCheckPassed": True,
+                    "portOpen": True,
+                    "stabilityWindowPassed": True,
+                    "containerRef": "test-deploy://b-1",
+                },
             )
         )
         self.assertTrue(r.ok)
-        self.assertEqual(r.explanation["next_action"], "OPEN_PREVIEW")
-        self.assertFalse(r.explanation["is_terminal"])  # TEST_READY 는 active
-        self.assertIn("https://preview.example.com/x", r.explanation["user"])
-
-    def test_test_ready_with_starting_preview_yields_wait(self) -> None:
-        r = explain(
-            _payload(
-                status="TEST_READY",
-                testDeployment={"status": "STARTING"},
-            )
-        )
+        self.assertEqual(r.explanation["system"]["status"], "TEST_SUCCESS")
         self.assertEqual(r.explanation["next_action"], "WAIT")
-        self.assertFalse(r.explanation["is_terminal"])
+        self.assertIn("test-deploy://b-1", r.explanation["user"])
 
-    def test_completed_with_ready_preview_open_preview(self) -> None:
+    def test_deploy_success_yields_open_deployment(self) -> None:
         r = explain(
             _payload(
-                status="COMPLETED",
-                testDeployment={"status": "READY", "previewUrl": "https://p/x"},
+                **{"build": {"status": "DEPLOY_SUCCESS"}},
+                deploy={
+                    "status": "SUCCESS",
+                    "targetType": "HTTP_API",
+                    "resultRef": "https://prod.example.com/b-1",
+                },
             )
         )
         self.assertTrue(r.ok)
-        self.assertEqual(r.explanation["next_action"], "OPEN_PREVIEW")
+        self.assertEqual(r.explanation["system"]["status"], "DEPLOY_SUCCESS")
+        self.assertEqual(r.explanation["next_action"], "OPEN_DEPLOYMENT")
+
+    def test_completed_is_terminal_with_none_action(self) -> None:
+        r = explain(_payload(**{"build": {"status": "COMPLETED"}}))
+        self.assertTrue(r.ok)
+        self.assertEqual(r.explanation["next_action"], "NONE")
         self.assertTrue(r.explanation["is_terminal"])
 
-    def test_completed_with_expired_preview_yields_retry(self) -> None:
+    def test_cancelled_is_terminal_with_none_action(self) -> None:
+        r = explain(_payload(**{"build": {"status": "CANCELLED"}}))
+        self.assertTrue(r.ok)
+        self.assertEqual(r.explanation["next_action"], "NONE")
+        self.assertTrue(r.explanation["is_terminal"])
+
+    def test_test_failed_yields_retry(self) -> None:
         r = explain(
             _payload(
-                status="COMPLETED",
-                testDeployment={"status": "EXPIRED"},
+                **{"build": {"status": "TEST_SUCCESS"}},
+                test={
+                    "status": "FAILED",
+                    "containerRunning": True,
+                    "healthCheckPassed": False,
+                    "portOpen": False,
+                    "stabilityWindowPassed": False,
+                },
             )
         )
         self.assertEqual(r.explanation["next_action"], "RETRY")
-        self.assertTrue(r.explanation["is_terminal"])
+        self.assertIn("테스트", r.explanation["user"])
 
+
+class FailedTerminalTests(unittest.TestCase):
     def test_failed_with_docker_build_failed_yields_fix_dockerfile(self) -> None:
         r = explain(
             _payload(
-                status="FAILED",
-                error={"code": "DOCKER_BUILD_FAILED", "message": "..."},
+                **{
+                    "build": {"status": "FAILED"},
+                    "lastError": {"code": "DOCKER_BUILD_FAILED", "message": "build fail"},
+                },
                 logs={"tail": ["Step 1/3 : FROM node:20", "returned non-zero code: 1"]},
             )
         )
@@ -106,45 +177,90 @@ class ExplainCoreTests(unittest.TestCase):
         self.assertIsNotNone(r.explanation["error_summary"])
         self.assertIn("FROM node:20", r.explanation["error_summary"])
 
-    def test_failed_with_port_issue_yields_fix_port(self) -> None:
-        for code, expected in (
-            ("INVALID_RUNTIME_PORT", "FIX_PORT"),
-            ("PREVIEW_PORT_UNAVAILABLE", "FIX_PORT"),
-        ):
-            r = explain(_payload(status="FAILED", error={"code": code}))
-            self.assertEqual(r.explanation["next_action"], expected, code)
-            self.assertTrue(r.explanation["is_terminal"])
+    def test_failed_with_preview_provision_failed_yields_fix_port(self) -> None:
+        r = explain(
+            _payload(
+                **{
+                    "build": {"status": "FAILED"},
+                    "lastError": {"code": "PREVIEW_PROVISION_FAILED", "message": "..."},
+                },
+            )
+        )
+        self.assertEqual(r.explanation["next_action"], "FIX_PORT")
+        self.assertTrue(r.explanation["is_terminal"])
 
-    def test_failed_with_source_or_dockerfile_missing_yields_check_source(self) -> None:
-        for code in ("SOURCE_ARCHIVE_NOT_FOUND", "DOCKERFILE_NOT_FOUND", "INVALID_REQUEST"):
-            r = explain(_payload(status="FAILED", error={"code": code}))
+    def test_failed_with_source_or_request_issue_yields_check_source(self) -> None:
+        # INVALID_REQUEST 만 canonical error code 으로 남았고, SOURCE_ARCHIVE_NOT_FOUND
+        # / DOCKERFILE_NOT_FOUND 는 legacy 10종 세트로 통합되지 않은 canonical 그룹.
+        # canonical 코드 이름 매핑이 CHECK_SOURCE 가 되는 케이스만 검증한다.
+        for code in ("INVALID_REQUEST",):
+            r = explain(
+                _payload(
+                    **{
+                        "build": {"status": "FAILED"},
+                        "lastError": {"code": code, "message": "..."},
+                    },
+                )
+            )
             self.assertEqual(r.explanation["next_action"], "CHECK_SOURCE", code)
 
-    def test_failed_with_internal_error_yields_contact_operator(self) -> None:
-        r = explain(_payload(status="FAILED", error={"code": "INTERNAL_ERROR"}))
+    def test_failed_with_unknown_error_yields_contact_operator(self) -> None:
+        r = explain(
+            _payload(
+                **{
+                    "build": {"status": "FAILED"},
+                    "lastError": {"code": "UNKNOWN_ERROR", "message": "..."},
+                },
+            )
+        )
         self.assertEqual(r.explanation["next_action"], "CONTACT_OPERATOR")
 
     def test_failed_without_error_code_yields_contact_operator(self) -> None:
-        r = explain(_payload(status="FAILED", error=None))
+        r = explain(
+            _payload(**{"build": {"status": "FAILED"}}, lastError=None)
+        )
         self.assertEqual(r.explanation["next_action"], "CONTACT_OPERATOR")
         self.assertIsNone(r.explanation["error_summary"])
 
-    def test_cancelled_is_terminal_with_none_action(self) -> None:
-        r = explain(_payload(status="CANCELLED"))
-        self.assertTrue(r.ok)
-        self.assertEqual(r.explanation["next_action"], "NONE")
-        self.assertTrue(r.explanation["is_terminal"])
 
-    def test_preview_failed_with_no_build_failure_yields_retry(self) -> None:
+class LegacyCompatTests(unittest.TestCase):
+    """Legacy preview-era payload path. Forward-compat shims must still work."""
+
+    def test_legacy_status_in_flight_yields_wait(self) -> None:
+        r = explain(_legacy_payload())
+        self.assertTrue(r.ok)
+        self.assertEqual(r.explanation["next_action"], "WAIT")
+
+    def test_legacy_test_ready_with_ready_yields_open_deployment_alias(self) -> None:
+        # TEST_READY (legacy) 는 canonical TEST_SUCCESS 로 forward-mapped 되어도
+        # OPEN_DEPLOYMENT 는 아직 emit 하지 않는다 — TEST_SUCCESS 이므로 WAIT.
+        # legacy `previewUrl` 도 user 메시지에 노출되어야 한다.
         r = explain(
-            _payload(
+            _legacy_payload(
+                status="TEST_READY",
+                testDeployment={"status": "READY", "previewUrl": "https://preview.example.com/x"},
+            )
+        )
+        self.assertEqual(r.explanation["next_action"], "WAIT")
+        self.assertIn("https://preview.example.com/x", r.explanation["user"])
+
+    def test_legacy_completed_with_expired_preview_yields_retry(self) -> None:
+        r = explain(
+            _legacy_payload(
                 status="COMPLETED",
-                testDeployment={"status": "FAILED"},
+                testDeployment={"status": "EXPIRED"},
             )
         )
         self.assertEqual(r.explanation["next_action"], "RETRY")
-        self.assertIsNotNone(r.explanation["error_summary"])
+        self.assertTrue(r.explanation["is_terminal"])
 
+    def test_legacy_test_deployment_invalid_type_errors(self) -> None:
+        r = explain(_legacy_payload(testDeployment="not a dict"))
+        self.assertFalse(r.ok)
+        self.assertTrue(any(e["field"] == "testDeployment" for e in r.errors))
+
+
+class InputValidationTests(unittest.TestCase):
     def test_invalid_root_type(self) -> None:
         r = explain("not a dict")  # type: ignore[arg-type]
         self.assertFalse(r.ok)
@@ -152,34 +268,28 @@ class ExplainCoreTests(unittest.TestCase):
 
     def test_missing_status(self) -> None:
         data = _payload()
-        del data["status"]
+        del data["build"]["status"]
         r = explain(data)
         self.assertFalse(r.ok)
         self.assertTrue(any(e["code"] == "MISSING_FIELD" and e["field"] == "status" for e in r.errors))
 
     def test_unknown_enum_status_yields_warning_and_not_ok(self) -> None:
-        r = explain(_payload(status="MAGIC_STATE"))
+        r = explain(_payload(**{"build": {"status": "MAGIC_STATE"}}))
         self.assertFalse(r.ok)
         self.assertTrue(any(w["code"] == "UNKNOWN_ENUM" and w["field"] == "status" for w in r.warnings))
         self.assertEqual(r.explanation["next_action"], "NONE")
 
-    def test_invalid_test_deployment_type(self) -> None:
-        r = explain(_payload(testDeployment="not a dict"))
-        self.assertFalse(r.ok)
-        self.assertTrue(any(e["field"] == "testDeployment" for e in r.errors))
-
-    def test_to_dict_has_ref(self) -> None:
+    def test_to_dict_has_ref_v2(self) -> None:
         r = explain(_payload())
         d = r.to_dict()
         self.assertEqual(
             set(d.keys()),
             {"ok", "explanation", "warnings", "errors", "ref"},
         )
-        self.assertEqual(d["ref"]["contract_version"], "v1")
-        self.assertEqual(d["ref"]["explanation_version"], "v1")
-
-    def test_explanation_version_is_v1(self) -> None:
-        self.assertEqual(Explanation.explanation_version if False else "v1", "v1")  # type: ignore[comparison-overlap]
+        # TASK-061 bumped both contract_version and explanation_version to v2.
+        self.assertEqual(d["ref"]["contract_version"], "v2")
+        self.assertEqual(d["ref"]["explanation_version"], "v2")
+        self.assertEqual(Explanation.explanation_version, "v2")
 
 
 class CliTests(unittest.TestCase):

@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 52→53: PR #16 squash merge 합류 sync. main HEAD `bc3613d` (squash merge commit, 입력 `2fccef6`). self-review 보완 필요 0건으로 amend 없이 squash merge. TASK-060 의 마지막 frontend 조각 (status chip filter canonical 정렬) 닫힘. 다음: TASK-061 (Skill/MCP contract rename and payload refactor) 또는 TASK-062 (stdio transport 정리).)
+- Updated: 2026-07-03 (rev 54→55: TASK-061 self-review amend 4건 봉인 후 sync. PR #17 에 fix commit (single source-of-truth 보강 + dead branch 정리) 추가. 회귀 221/221 PASS 유지. 다음: PR #17 squash merge.)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note

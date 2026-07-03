@@ -1,14 +1,15 @@
 # Skill: failure-summary-shaper
 
-- 문서 목적: `BuildStatus=FAILED` 또는 `PreviewStatus=FAILED/DEGRADED` 응답과 (선택) 관련 로그 라인을 받아, `docs/sdlc/design/06-user-messaging-and-failure-handling.md` §6 의 4-구조 (결과 요약 / 원인 범주 / 다음 조치 / buildId) 로 한국어 사용자 메시지를 합성한다. `build-status-explainer` (P0) 의 `error_summary` + `next_action` 결과를 입력으로 받으면 일관된 톤을 보장한다.
-- 범위: 4-구조 합성 / 한국어 1~4 줄 / `next_action` enum 보존. **읽기 전용** — Build Server / Runner 호출 없음. P0 skill `build-status-explainer` 와 P0 MCP `latest-build-status` 의 출력 consumer.
+- 문서 목적: 빌드 / 테스트 / 배포 중 실패 응답과 (선택) 관련 로그 라인을 받아, `docs/sdlc/design/06-user-messaging-and-failure-handling.md` §6 의 4-구조 (결과 요약 / 원인 범주 / 다음 조치 / buildId) 로 한국어 사용자 메시지를 합성한다. `build-status-explainer` (P0) 의 `error_summary` + `next_action` 결과를 입력으로 받으면 일관된 톤을 보장한다.
+- 범위: 4-구조 합성 / 한국어 1~4 줄 / `next_action` canonical enum (`OPEN_DEPLOYMENT` 포함) 보존. **읽기 전용** — Build Server / Runner 호출 없음. P0 skill `build-status-explainer` 와 P0 MCP `latest-build-status` 의 출력 consumer.
+- **canonical contract v2** (TASK-061 contract rename): 입력 stage 는 `BUILD` / `TEST` / `DEPLOY` / `DELIVERY` 4종. errorCode 는 canonical 8종 (`apps/skill_mcp/contract/canonical.py` `ERROR_CODES` 와 동기). legacy `source: build/preview` 와 `OPEN_PREVIEW` 는 forward-compat 으로 받지만 출력은 canonical `stage` + `OPEN_DEPLOYMENT` 만 사용.
 - 대상 독자: AI agent, 사용자, Build Server / Runner 구현자
-- 상태: draft (v0.1.0)
-- 최종 수정일: 2026-07-03
+- 상태: stable (v2.0.0)
+- 최종 수정일: 2026-07-03 (TASK-061 contract rename)
 - 관련 문서:
   - 메시지 4-구조: [`docs/sdlc/design/06-user-messaging-and-failure-handling.md`](../../../../docs/sdlc/design/06-user-messaging-and-failure-handling.md) §6
   - 입력 source: [`apps/skill_mcp/skills/build_status_explainer/`](../../../../apps/skill_mcp/skills/build_status_explainer/) §1 (error_summary / next_action)
-  - canonical enum: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md) §5/§6/§8
+  - canonical enum: [`docs/sdlc/contracts/01-shared-build-contract-baseline.md`](../../../../docs/sdlc/contracts/01-shared-build-contract-baseline.md) §7/§8 + [`apps/skill_mcp/contract/canonical.py`](../../contract/canonical.py)
   - 후보 카탈로그: [`docs/sdlc/13-skills-and-mcp-plan.md`](../../../../docs/sdlc/13-skills-and-mcp-plan.md) §3.3
   - 미결: `OI-009` (실패 요약 생성 책임)
 

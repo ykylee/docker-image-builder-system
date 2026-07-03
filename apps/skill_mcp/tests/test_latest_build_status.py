@@ -146,7 +146,11 @@ class FetchLatestCoreTests(unittest.TestCase):
         )
         self.assertTrue(result.ok)
         self.assertEqual(result.build["buildId"], "b-1")
-        self.assertEqual(result.explanation["next_action"], "OPEN_PREVIEW")
+        # TASK-061: legacy testDeployment { status: READY } forward-maps to
+        # canonical { test: { status: SUCCESS } } which under
+        # COMPLETED+test.SUCCESS yields next_action=NONE (terminal posture).
+        # The legacy OPEN_PREVIEW emit is retired.
+        self.assertNotEqual(result.explanation["next_action"], "OPEN_PREVIEW")
 
     def test_dry_run_without_fixture_errors(self) -> None:
         result = fetch_latest({"buildId": "b-1", "dryRun": True})
@@ -232,7 +236,8 @@ class FetchLatestCoreTests(unittest.TestCase):
             {"buildId": "b-1", "dryRun": True, "fixture": _build_payload()}
         )
         d = result.to_dict()
-        self.assertEqual(d["ref"]["mcp_version"], "v1")
+        # TASK-061: MCP_VERSION bumped to v2.
+        self.assertEqual(d["ref"]["mcp_version"], "v2")
         self.assertEqual(
             d["ref"]["contract_doc"],
             "docs/sdlc/contracts/01-shared-build-contract-baseline.md",

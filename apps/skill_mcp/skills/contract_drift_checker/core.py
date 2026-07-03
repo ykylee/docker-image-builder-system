@@ -9,13 +9,30 @@ enum block / BuildRequest payload 표를 비교하고 drift 리포트를 만든�
 
 from __future__ import annotations
 
+import importlib
+import importlib.util
 import os
 import re
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-SKILL_VERSION = "v1"
+SKILL_VERSION = "v2"
+
+# Python-side frozenset ↔ TS export mapping for the skill/MCP layer.
+# TASK-061 introduced `apps/skill_mcp/contract/canonical.py` as the
+# skill/MCP-side source-of-truth. Each Python constant MUST mirror the
+# corresponding TS export; this mapping is what the drift checker cross-
+# verifies in `checkPython` mode (on by default).
+PYTHON_CANONICAL_MAP: dict[str, tuple[str, str, str]] = {
+    # python_attr -> (ts_export, ts_filename, group_label)
+    "CANONICAL_BUILD_STATUSES": ("canonicalBuildStatuses", "status.ts", "skillBuildStatuses"),
+    "EXECUTION_STATUSES": ("executionStatuses", "status.ts", "executionStatuses"),
+    "BUILD_PHASES": ("buildPhases", "phase.ts", "skillPhases"),
+    "ERROR_CODES": ("errorCodes", "errors.ts", "skillErrorCodes"),
+}
+PYTHON_CANONICAL_MODULE = "apps.skill_mcp.contract.canonical"
 
 # canonical § 별 enum 매핑: (enum name, canonical_section, ts file, ts export)
 ENUM_TARGETS = [
@@ -222,6 +239,46 @@ def _resolve_path(repo_root: Path, relative: str) -> Path:
     return repo_root / relative
 
 
+def _load_python_canonical(repo_root: Path):
+    """Dynamic-load `apps.skill_mcp.contract.canonical` from `repo_root`.
+
+    Uses spec_from_file_location so the call does NOT consult
+    ``sys.modules`` cache. This matters in tests where a fake temp
+    directory is used as repo_root: importing through the cache would
+    surface the real project module and miss test fixtures.
+
+    Returns the module on success, None on failure (warning, not hard
+    error — drift check still runs against TS / canonical markdown).
+    """
+    canonical_path = repo_root / "apps" / "skill_mcp" / "contract" / "canonical.py"
+    if not canonical_path.is_file():
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location(
+            f"{PYTHON_CANONICAL_MODULE}._at_{repo_root}", canonical_path
+        )
+        if spec is None or spec.loader is None:
+            return None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+    except Exception:
+        return None
+
+
+def _get_py_frozenset(mod: Any, attr: str) -> frozenset[str] | None:
+    """Return the frozenset (or plain set) bound to `mod.attr`, or None."""
+    try:
+        v = getattr(mod, attr)
+    except AttributeError:
+        return None
+    if isinstance(v, frozenset):
+        return v
+    if isinstance(v, set):
+        return frozenset(v)
+    return None
+
+
 def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftReport:
     """drift 검사. `repo_root` 미지정 시 cwd 기준."""
     warnings: list[dict[str, str]] = []
@@ -244,6 +301,7 @@ def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftRepor
         "enums", [t[0] for t in ENUM_TARGETS]
     )
     check_request = bool(input_data.get("checkRequest", True))
+    check_python = bool(input_data.get("checkPython", True))
 
     if not isinstance(enums_requested, list) or not all(
         isinstance(e, str) for e in enums_requested
@@ -416,6 +474,99 @@ def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftRepor
                         ))
 
                 by_enum["buildRequestFields"] = {
+                    "missing": len(missing),
+                    "extra": len(extra),
+                    "shared": len(shared),
+                }
+                missing_total += len(missing)
+                extra_total += len(extra)
+
+    # Python-side canonical enums (`apps/skill_mcp/contract/canonical.py`).
+    # Each Python frozenset MUST mirror the corresponding TS export. This
+    # block is the structural guarantee that the skill/MCP layer can't
+    # quietly re-introduce legacy pre-canonical values.
+    if check_python:
+        py_mod = _load_python_canonical(root)
+        if py_mod is None:
+            warnings.append({
+                "code": "PARSE_ERROR",
+                "field": "pythonCanonical",
+                "message": (
+                    f"could not import {PYTHON_CANONICAL_MODULE}; "
+                    "verify repo_root points to the project root"
+                ),
+            })
+        else:
+            for py_attr, (ts_export, ts_filename, group_label) in PYTHON_CANONICAL_MAP.items():
+                py_set = _get_py_frozenset(py_mod, py_attr)
+                if py_set is None:
+                    warnings.append({
+                        "code": "PARSE_ERROR",
+                        "field": group_label,
+                        "message": (
+                            f"could not read Python frozenset "
+                            f"{PYTHON_CANONICAL_MODULE}.{py_attr}"
+                        ),
+                    })
+                    by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                    continue
+
+                ts_path = contract_dir / ts_filename
+                if not ts_path.is_file():
+                    warnings.append({
+                        "code": "PARSE_ERROR",
+                        "field": group_label,
+                        "message": f"TS file not found: {ts_path}",
+                    })
+                    by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                    continue
+                try:
+                    ts_src = _read_text(ts_path)
+                except OSError as exc:
+                    warnings.append({
+                        "code": "IO_ERROR",
+                        "field": group_label,
+                        "message": str(exc),
+                    })
+                    by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                    continue
+
+                ts_words = _extract_ts_enum(ts_src, ts_export)
+                if ts_words is None:
+                    warnings.append({
+                        "code": "PARSE_ERROR",
+                        "field": group_label,
+                        "message": (
+                            f"could not locate `export const {ts_export}` "
+                            f"in {ts_path}"
+                        ),
+                    })
+                    by_enum[group_label] = {"missing": 0, "extra": 0, "shared": 0}
+                    continue
+                ts_set = set(ts_words)
+
+                missing = py_set - ts_set  # Python only -> ts drift
+                extra = ts_set - py_set    # TS only -> Python drift
+                shared = py_set & ts_set
+
+                for v in sorted(py_set):
+                    if v in missing:
+                        drift_items.append(DriftItem(
+                            kind="missing_in_code",
+                            enum=group_label,
+                            value=v,
+                            canonical_section="python",
+                        ))
+                for v in ts_words:
+                    if v in extra:
+                        drift_items.append(DriftItem(
+                            kind="extra_in_code",
+                            enum=group_label,
+                            value=v,
+                            canonical_section="python",
+                        ))
+
+                by_enum[group_label] = {
                     "missing": len(missing),
                     "extra": len(extra),
                     "shared": len(shared),
