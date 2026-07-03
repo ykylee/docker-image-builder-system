@@ -145,3 +145,65 @@ export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>;
 // admin list view reuses it. The imports above are intentionally limited
 // to the schemas needed by the admin endpoints.
 void buildSummarySchema;
+
+// ---------------------------------------------------------------------------
+// Admin allow-list management (TASK-049).
+//
+// GET /admin/admins returns the current admin allow-list snapshot — the same
+// frozen-at-boot list that isAdmin(...) checks. POST /admin/admins adds an
+// adminId, DELETE /admin/admins/:adminId removes one. These endpoints only
+// accept a caller that is already in the allow-list (caller guard is
+// enforced in admin-routes.ts; the schemas here only describe the payload).
+//
+// Mutations on a single process are visible to subsequent /admin/* requests
+// in the same process (the runtime settings allow-list is replaced, not
+// snapshotted twice). They do not persist across a process restart — the
+// canonical store for production is the ADMIN_IDS env var.
+// ---------------------------------------------------------------------------
+
+export const adminAllowListResponseSchema = z
+  .object({
+    admins: z.array(
+      z.string().min(1).meta({
+        description:
+          "Canonical admin id. Case-sensitive, matches the existing ADMIN_IDS env entries."
+      })
+    )
+  })
+  .meta({
+    id: "AdminAllowListResponse",
+    description:
+      "Response body for GET /admin/admins. The current admin allow-list snapshot used by the build server to gate /admin/* endpoints."
+  });
+
+export type AdminAllowListResponse = z.infer<typeof adminAllowListResponseSchema>;
+
+export const adminAllowListAddRequestSchema = z
+  .object({
+    adminId: z.string().min(1).meta({
+      description:
+        "Canonical admin id to add to the allow-list. Caller must already be in the list (the new admin is not given a grace period to mutate)."
+    })
+  })
+  .meta({
+    id: "AdminAllowListAddRequest",
+    description: "Request body for POST /admin/admins."
+  });
+
+export type AdminAllowListAddRequest = z.infer<typeof adminAllowListAddRequestSchema>;
+
+export const adminAllowListRemoveResponseSchema = z
+  .object({
+    removed: z.string().min(1).meta({
+      description: "The adminId that was just removed from the allow-list."
+    }),
+    admins: z.array(z.string().min(1)).meta({
+      description: "The updated admin allow-list after the removal."
+    })
+  })
+  .meta({
+    id: "AdminAllowListRemoveResponse",
+    description: "Response body for DELETE /admin/admins/:adminId."
+  });
+
+export type AdminAllowListRemoveResponse = z.infer<typeof adminAllowListRemoveResponseSchema>;

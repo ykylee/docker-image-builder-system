@@ -17,6 +17,45 @@ vi.mock("./ThemeToggle.svelte", () => ({
   }
 }));
 
+// admin-store 모킹. Header 가 onMount 시 adminAllowListStore.refresh 를
+// 부르지만, jsdom 의 fetch mock 은 별도로 세팅하기 번거로우니 writable
+// 의 inner 를 직접 set 해서 admin list 가 이미 채워진 상태로 시뮬레이션.
+// 테스트 케이스에서 setAdminAllowList([...]) 로 명시적으로 채운다.
+const adminAllowListRef: { value: string[] } = { value: [] };
+vi.mock("../lib/admin-store.js", () => {
+  // vi.mock factory 안에서는 ESM import 를 못 쓰므로 require 로 가져온다.
+  const inner = (require("svelte/store") as typeof import("svelte/store")).writable<string[]>([]);
+  // 외부에서 inner 를 set 할 수 있도록 helper 노출.
+  (inner as unknown as { __set: (v: string[]) => void }).__set = (v: string[]) => inner.set(v);
+  return {
+    adminAllowListStore: {
+      subscribe: inner.subscribe,
+      snapshot: () => adminAllowListRef.value,
+      contains: (id: string | null | undefined) => !!id && adminAllowListRef.value.includes(id),
+      refresh: async () => inner.set(adminAllowListRef.value),
+      add: async (_caller: string, newId: string) => {
+        const next = [...adminAllowListRef.value, newId];
+        adminAllowListRef.value = next;
+        inner.set(next);
+        return { admins: next };
+      },
+      remove: async (_caller: string, target: string) => {
+        const next = adminAllowListRef.value.filter((a) => a !== target);
+        adminAllowListRef.value = next;
+        inner.set(next);
+        return { removed: target, admins: next };
+      }
+    }
+  };
+});
+
+import { adminAllowListStore as _adminAllowListStore } from "../lib/admin-store.js";
+const setAdminAllowList = (v: string[]) => {
+  adminAllowListRef.value = v;
+  // svelte store 도 동일하게 set 해서 $derived 가 reactive 하게 갱신되게.
+  (_adminAllowListStore as unknown as { __set?: (v: string[]) => void }).__set?.(v);
+};
+
 beforeEach(() => {
   pushMock.mockReset();
   localStorage.clear();
@@ -92,5 +131,30 @@ describe("Header", () => {
     // 값이 화면에 반영되는지 확인한다.
     await rerender({});
     expect(screen.getByText("@yklee")).toBeInTheDocument();
+  });
+
+  // TASK-048: userId 가 admin allow-list 에 포함되면 admin 메뉴가
+  // 자동 노출된다 (별도 AdminLogin 단계 없이). adminId store 가 비어
+  // 있어도, allow-list 가 채워져 있고 userId 가 그 안에 있으면 Header
+  // 가 admin pill + admin nav links 를 보여준다.
+  it("auto-enables admin nav when userId is in the allow-list (TASK-048)", () => {
+    localStorage.setItem("userId", "yky.lee");
+    setAdminAllowList(["admin", "yky.lee"]);
+    render(Header);
+    // admin-id pill 은 🛡 prefix 로 unique.
+    expect(screen.getByText("🛡 @yky.lee")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin · Builds" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin · Users" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin · Admins" })).toBeInTheDocument();
+  });
+
+  it("hides admin nav when userId is set but not in the allow-list", () => {
+    localStorage.setItem("userId", "yklee");
+    setAdminAllowList(["admin"]);
+    render(Header);
+    // 일반 user pill 만 보이고 Admin 메뉴는 안 보인다.
+    expect(screen.getByText("@yklee")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Admin · Builds" })).toBeNull();
   });
 });

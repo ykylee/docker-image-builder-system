@@ -7,6 +7,7 @@
   import AdminLogin from "./routes/AdminLogin.svelte";
   import AdminBuilds from "./routes/AdminBuilds.svelte";
   import AdminUsers from "./routes/AdminUsers.svelte";
+  import AdminAdmins from "./routes/AdminAdmins.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
   const routes = {
@@ -19,6 +20,7 @@
     "/admin/login": AdminLogin,
     "/admin/builds": AdminBuilds,
     "/admin/users": AdminUsers,
+    "/admin/admins": AdminAdmins,
     "*": NotFound
   };
 </script>
