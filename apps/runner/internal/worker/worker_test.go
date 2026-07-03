@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/config"
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/hostclient"
 )
 
@@ -25,9 +26,9 @@ func (c *tickerClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedB
 		return &hostclient.ClaimedBuildResponse{
 			BuildID:         c.buildID,
 			AppName:         "todo-app",
-			Phase:           "QUEUE_CLAIMED",
-			Status:          "CLAIMED",
-			LifecycleStatus: "PREPARING_SOURCE",
+			Phase:           contract.PhaseQueueClaimed,
+			Status:          contract.StatusLegacyClaimed,
+			LifecycleStatus: contract.StatusPreparingSource,
 		}, nil
 	}
 	return nil, nil

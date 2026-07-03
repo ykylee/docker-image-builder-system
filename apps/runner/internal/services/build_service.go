@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/hostclient"
@@ -40,6 +41,9 @@ func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *doc
 // ProcessClaim: claim → SOURCE_PREPARED → DOCKER_BUILD_STARTED →
 // docker.BuildImage → DOCKER_BUILD_COMPLETED → queueTestDeployment →
 // PREVIEW_READY → DEPLOYMENT_STARTED/COMPLETED → COMPLETED.
+//
+// 모든 phase / status / errorCode string 은 `apps/runner/internal/contract`
+// canonical 상수를 통해 emit — drift structural 차단.
 func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBuild) error {
 	if claim == nil {
 		return nil
@@ -49,24 +53,24 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 	log.Printf("runner %s processing build %s", s.runnerID, buildID)
 
 	if err := s.docker.PrepareSource(ctx, buildID); err != nil {
-		_ = s.reportPhase(ctx, buildID, "FAILED")
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
-	if err := s.reportPhase(ctx, buildID, "SOURCE_PREPARED"); err != nil {
+	if err := s.reportPhase(ctx, buildID, contract.PhaseSourcePrepared); err != nil {
 		return err
 	}
 
-	if err := s.reportPhase(ctx, buildID, "DOCKER_BUILD_STARTED"); err != nil {
+	if err := s.reportPhase(ctx, buildID, contract.PhaseDockerBuildStarted); err != nil {
 		return err
 	}
 
 	if err := s.docker.BuildImage(ctx, buildID); err != nil {
-		_ = s.reportPhase(ctx, buildID, "FAILED")
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
-	if err := s.reportPhase(ctx, buildID, "DOCKER_BUILD_COMPLETED"); err != nil {
+	if err := s.reportPhase(ctx, buildID, contract.PhaseDockerBuildCompleted); err != nil {
 		return err
 	}
 
@@ -76,7 +80,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		TtlMinutes:   60,
 		RunnerID:     s.runnerID,
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, "FAILED")
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
@@ -94,48 +98,48 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		StabilityWindowPassed: true,
 		RunnerID:              s.runnerID,
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, "FAILED")
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
 	if err := s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
-		Status:     "IN_PROGRESS",
+		Status:     contract.ExecutionStatusInProgress,
 		TargetType: "DOCKER_REGISTRY",
 		RunnerID:   s.runnerID,
 		ResponsePayloadJSON: map[string]any{
 			"deliveryMode": "POLLING",
 		},
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, "FAILED")
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
 	deployResult, err := s.deployer.Deploy(ctx, buildID)
 	if err != nil {
 		_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
-			Status:       "FAILED",
+			Status:       contract.ExecutionStatusFailed,
 			TargetType:   "DOCKER_REGISTRY",
-			ErrorCode:    "DEPLOYMENT_FAILED",
+			ErrorCode:    contract.ErrorCodeDeploymentFailed,
 			ErrorMessage: err.Error(),
 			RunnerID:     s.runnerID,
 		})
-		_ = s.reportPhase(ctx, buildID, "FAILED")
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
 	if err := s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
-		Status:              "SUCCESS",
+		Status:              contract.ExecutionStatusSuccess,
 		TargetType:          deployResult.TargetType,
 		TargetRef:           deployResult.TargetRef,
 		ResultRef:           deployResult.ResultRef,
 		RunnerID:            s.runnerID,
 		ResponsePayloadJSON: deployResult.ResponsePayloadJSON,
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, "FAILED")
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
-	if err := s.reportPhase(ctx, buildID, "COMPLETED"); err != nil {
+	if err := s.reportPhase(ctx, buildID, contract.PhaseCompleted); err != nil {
 		return err
 	}
 

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/hostclient"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/queue"
@@ -27,9 +28,9 @@ func (f *fakeClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedBui
 	return &hostclient.ClaimedBuildResponse{
 		BuildID:         f.buildID,
 		AppName:         "todo-app",
-		Phase:           "QUEUE_CLAIMED",
-		Status:          "CLAIMED",
-		LifecycleStatus: "PREPARING_SOURCE",
+		Phase:           contract.PhaseQueueClaimed,
+		Status:          contract.StatusLegacyClaimed,
+		LifecycleStatus: contract.StatusPreparingSource,
 	}, nil
 }
 
@@ -85,10 +86,10 @@ func TestProcessClaim_ReportsFullHappyPath(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 	expected := []string{
-		"SOURCE_PREPARED",
-		"DOCKER_BUILD_STARTED",
-		"DOCKER_BUILD_COMPLETED",
-		"COMPLETED",
+		contract.PhaseSourcePrepared,
+		contract.PhaseDockerBuildStarted,
+		contract.PhaseDockerBuildCompleted,
+		contract.PhaseCompleted,
 	}
 	if len(fc.phases) != len(expected) {
 		t.Fatalf("expected %d phase reports, got %d: %v", len(expected), len(fc.phases), fc.phases)
@@ -141,10 +142,10 @@ func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
 	if len(fc.deployments) != 2 {
 		t.Fatalf("expected 2 deployment reports, got %d", len(fc.deployments))
 	}
-	if fc.deployments[0].Status != "IN_PROGRESS" {
+	if fc.deployments[0].Status != contract.ExecutionStatusInProgress {
 		t.Errorf("expected first deployment status IN_PROGRESS, got %s", fc.deployments[0].Status)
 	}
-	if fc.deployments[1].Status != "SUCCESS" {
+	if fc.deployments[1].Status != contract.ExecutionStatusSuccess {
 		t.Errorf("expected second deployment status SUCCESS, got %s", fc.deployments[1].Status)
 	}
 }

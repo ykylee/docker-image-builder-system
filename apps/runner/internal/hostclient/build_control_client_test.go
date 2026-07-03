@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 )
 
 func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
@@ -25,9 +27,9 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 				"build": map[string]any{
 					"buildId":         "b-1",
 					"appName":         "todo-app",
-					"status":          "CLAIMED",
-					"phase":           "QUEUE_CLAIMED",
-					"lifecycleStatus": "PREPARING_SOURCE",
+					"status":          contract.StatusLegacyClaimed,
+					"phase":           contract.PhaseQueueClaimed,
+					"lifecycleStatus": contract.StatusPreparingSource,
 					"updatedAt":       "2026-07-03T00:00:00Z",
 				},
 				"lastError": nil,
@@ -48,13 +50,13 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 	if resp.BuildID != "b-1" {
 		t.Errorf("expected buildId b-1, got %s", resp.BuildID)
 	}
-	if resp.Phase != "QUEUE_CLAIMED" {
+	if resp.Phase != contract.PhaseQueueClaimed {
 		t.Errorf("expected phase QUEUE_CLAIMED, got %s", resp.Phase)
 	}
 	if resp.AppName != "todo-app" {
 		t.Errorf("expected appName todo-app, got %s", resp.AppName)
 	}
-	if resp.LifecycleStatus != "PREPARING_SOURCE" {
+	if resp.LifecycleStatus != contract.StatusPreparingSource {
 		t.Errorf("expected lifecycleStatus PREPARING_SOURCE, got %s", resp.LifecycleStatus)
 	}
 }
@@ -93,19 +95,19 @@ func TestHTTPBuildControlClient_ReportPhase_OK(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("failed to decode body: %v", err)
 		}
-		if body.Phase != "DOCKER_BUILD_STARTED" {
+		if body.Phase != contract.PhaseDockerBuildStarted {
 			t.Errorf("expected phase DOCKER_BUILD_STARTED, got %s", body.Phase)
 		}
 		if body.RunnerID != "runner-1" {
 			t.Errorf("expected runnerId runner-1, got %s", body.RunnerID)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"build":{"buildId":"b-42","phase":"DOCKER_BUILD_STARTED","status":"BUILDING"}}`))
+		_, _ = w.Write([]byte(`{"build":{"buildId":"b-42","phase":contract.PhaseDockerBuildStarted,"status":"BUILDING"}}`))
 	}))
 	defer srv.Close()
 
 	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
-	err := c.ReportPhase(context.Background(), "b-42", "DOCKER_BUILD_STARTED", "runner-1")
+	err := c.ReportPhase(context.Background(), "b-42", contract.PhaseDockerBuildStarted, "runner-1")
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -189,7 +191,7 @@ func TestHTTPBuildControlClient_ReportPreviewReady_OK(t *testing.T) {
 			t.Errorf("expected all test result booleans true, got %+v", body)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"build":{"buildId":"b-200","status":"TEST_READY","phase":"PREVIEW_READY","lifecycleStatus":"TEST_SUCCESS"}}`))
+		_, _ = w.Write([]byte(`{"build":{"buildId":"b-200","status":contract.StatusLegacyTestReady,"phase":contract.PhasePreviewReady,"lifecycleStatus":contract.StatusTestSuccess}}`))
 	}))
 	defer srv.Close()
 
@@ -218,7 +220,7 @@ func TestHTTPBuildControlClient_ReportDeployment_OK(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
-		if body.Status != "SUCCESS" {
+		if body.Status != contract.ExecutionStatusSuccess {
 			t.Errorf("expected status SUCCESS, got %s", body.Status)
 		}
 		if body.TargetType != "DOCKER_REGISTRY" {
@@ -228,13 +230,13 @@ func TestHTTPBuildControlClient_ReportDeployment_OK(t *testing.T) {
 			t.Errorf("unexpected resultRef: %s", body.ResultRef)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"build":{"buildId":"b-300","status":"DEPLOY_SUCCESS","phase":"DEPLOYMENT_COMPLETED","lifecycleStatus":"DEPLOY_SUCCESS"}}`))
+		_, _ = w.Write([]byte(`{"build":{"buildId":"b-300","status":contract.StatusDeploySuccess,"phase":contract.PhaseDeploymentCompleted,"lifecycleStatus":contract.StatusDeploySuccess}}`))
 	}))
 	defer srv.Close()
 
 	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
 	err := c.ReportDeployment(context.Background(), "b-300", DeploymentReportRequest{
-		Status:     "SUCCESS",
+		Status:     contract.ExecutionStatusSuccess,
 		TargetType: "DOCKER_REGISTRY",
 		TargetRef:  "registry.example.com/test",
 		ResultRef:  "registry.example.com/test:build-1",
