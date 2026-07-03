@@ -26,11 +26,16 @@ afterEach(() => {
 const sample = (
   appName: string,
   status: string,
-  requestedBy: string
+  requestedBy: string,
+  lifecycleStatus?: string
 ) => ({
   buildId: "00000000-0000-0000-0000-" + appName.padStart(12, "0"),
   appName,
   status,
+  // TASK-052 lifecycleStatus — canonical 12-state union optional.
+  // AdminBuilds 의 <BuildRow> 가 lifecycleStatus 를 그대로 forwarding
+  // 하므로 fixture 가 optional 으로 노출되는 케이스를 함께 검증.
+  lifecycleStatus,
   phase: "REQUEST_ACCEPTED",
   previewStatus: "NOT_REQUESTED",
   previewUrl: null,

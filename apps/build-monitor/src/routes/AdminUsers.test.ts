@@ -60,6 +60,10 @@ describe("AdminUsers", () => {
           buildId: "00000000-0000-0000-0000-000000000001",
           appName: "alice-app",
           status: "COMPLETED",
+          // TASK-052 lifecycleStatus — AdminUsers 의 recent builds 패널도
+          // StatusPill 로 통일 (PR #15 follow-up). 동일값으로 canonical/legacy
+          // 둘 다 emit.
+          lifecycleStatus: "COMPLETED",
           phase: "DOCKER_BUILD_COMPLETED",
           previewStatus: "READY",
           previewUrl: null,
