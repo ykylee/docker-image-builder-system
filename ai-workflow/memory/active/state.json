@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "워크플로우 skill/MCP 셋업(TASK-023)으로 표준 키트 prototype을 active/deferred로 묶고 진입 메모를 정리했다. 다음 단계는 TASK-017 shared package 또는 API 스캐폴드다.",
-  "purpose_digest_rev": "24",
+  "purpose_digest": "리뷰 P1/P2를 반영해 08 baseline(TS+TS → TS+Go) 및 09 apps/runner Go 예시·의존방향·PKG-005~007 경로를 정합시켰다. 다음 단계는 TASK-017 shared package / apps/build-server / apps/runner 골격이다.",
+  "purpose_digest_rev": "25",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
   },
   "session": {
     "current_baseline": "요구사항 기준선, Step 04 설계 문서 6종, Step 05 baseline decision 5종, Step 06~12 구현 세분화 문서, SDLC 리뷰/계획/보고 패키지, 문서 정합성 보정, 프로젝트 기획안 재구성, 리더 소개용 HTML 보고자료 시각화, 오프라인 에셋 내장화, 승인안 톤 보정까지 정리되었다.",
-    "current_axis": "TASK-023 셋업으로 워크플로우 온보딩을 마무리하고, 직후 TASK-017 shared package 또는 API 스캐폴드로 이동.",
-    "current_focus": "TASK-023 워크플로우 skill/MCP 셋업 (TASK-017 prerequisite)",
+    "current_axis": "리뷰 P1/P2 반영으로 08/09 baseline 을 Build Server=TS / Runner=Go 로 정렬, polyglot 보류항목 정리. 직후 TASK-017 shared package / apps/build-server·apps/runner 골격으로 이동.",
+    "current_focus": "TASK-024 리뷰 반영 (Build Server=TS / Runner=Go baseline 정합) — TASK-017 prerequisite 보강",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-024 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)",
       "TASK-023 워크플로우 skill/MCP 셋업 (.codex/.agents 진입 메모, PROJECT_PROFILE §3.1 active/deferred 표)",
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
       "TASK-002 컨셉 고도화 및 정책 문서 정리",
@@ -63,6 +64,7 @@
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
+      "TASK-024 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)",
       "TASK-023 워크플로우 skill/MCP 셋업 (.codex/.agents 진입 메모, PROJECT_PROFILE §3.1 active/deferred 표)",
       "TASK-001 컨셉 기반 온보딩 및 MVP 작업축 정리",
       "TASK-002 컨셉 고도화 및 정책 문서 정리",

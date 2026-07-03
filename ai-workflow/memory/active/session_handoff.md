@@ -102,10 +102,16 @@
 - `docs/report/README.md` 신규 추가 (산출물 정체와 진화 이력 인덱스)
 - `docs/MVP_ONBOARDING.md`, `docs/CONCEPT_REFINEMENT.md` 상단에 superseded 배너 추가
 - `ai-workflow/memory/active/backlog/2026-07-02.md` TASK-013/014/016 본문 done 봉인 + 후속 세션 노트 추가
-- `ai-workflow/memory/active/work_backlog.md` TASK-022 추가
+- `ai-workflow/memory/active/session_handoff.md`의 `Next Actions`/`Risks & Blockers` 갱신, MiniMax overlay 후속 점검 1줄 추가
+- `docs/sdlc/08-build-server-tech-stack-baseline.md` rev 2: Build Server=TS / Runner=Go baseline 정합, polyglot 보류항목 정리
+- `docs/sdlc/09-repository-package-structure-baseline.md` rev 2: `apps/runner` Go (`go.mod`/`cmd/runner`/`internal/...`) 예시, 의존방향 cross-language 정합, PKG-005~007 Go 경로 갱신
+- `ai-workflow/memory/active/state.json` rev 25: current_focus=TASK-024, done 카운트 23
+- `ai-workflow/memory/active/work_backlog.md` TASK-024 추가, TASK-017 planned 유지
+- `ai-workflow/memory/active/backlog/2026-07-03.md` §8 TASK-024 섹션 추가
+- `ai-workflow/memory/active/session_handoff.md` rev 4: TASK-024 work status, Key Changes, Next Actions 보강
 ## Next Actions
 
-- [ ] TASK-017 `shared package` 또는 `apps/build-server` API 스캐폴드 진입 (TASK-023 prerequisite 통과)
+- [ ] TASK-017 `packages/shared-contract` (TS) + `apps/build-server` (TS, Fastify) + `apps/runner` (Go module) 골격 진입 (TASK-023 + TASK-024 prerequisite 통과)
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
 - [ ] `MiniMax.md`, `MiniMax_config.example.json` vendor-specific overlay 점검 (MiniMax 하네스 환경에서 별도 진행, 본 세션에서는 기록만)
 
