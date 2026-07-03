@@ -4,22 +4,32 @@
   import ThemeToggle from "./ThemeToggle.svelte";
 
   let userId = $state<string | null>(null);
+  let adminId = $state<string | null>(null);
 
   // localStorage 와 컴포넌트 state 동기화. 라우트 변경에 의존하지 않고
   // storage 이벤트로 다른 탭에서의 로그아웃까지 반영한다.
-  function readUserId(): void {
+  function readState(): void {
     userId = localStorage.getItem("userId");
+    adminId = localStorage.getItem("adminId");
   }
 
   onMount(() => {
-    readUserId();
-    window.addEventListener("storage", readUserId);
-    return () => window.removeEventListener("storage", readUserId);
+    readState();
+    window.addEventListener("storage", readState);
+    return () => window.removeEventListener("storage", readState);
   });
 
   function logout() {
     localStorage.removeItem("userId");
-    readUserId();
+    readState();
+    push("/");
+  }
+
+  function adminLogout() {
+    // Admin session is independent from the user session so logging out
+    // of the admin UI does not sign the user out of the build monitor.
+    localStorage.removeItem("adminId");
+    readState();
     push("/");
   }
 </script>
@@ -38,6 +48,16 @@
         <a use:link href="/builds">Builds</a>
         <button class="logout-btn" onclick={logout}>Logout</button>
       {/if}
+      {#if adminId}
+        <div class="divider"></div>
+        <span class="admin-id mono" title="Admin signed in">🛡 @{adminId}</span>
+        <a use:link href="/admin/builds">Admin · Builds</a>
+        <a use:link href="/admin/users">Admin · Users</a>
+        <button class="logout-btn" onclick={adminLogout}>Admin Logout</button>
+      {:else}
+        <a use:link href="/admin/login" class="admin-link">Admin</a>
+      {/if}
+      <div class="divider"></div>
       <a href="/openapi.json" target="_blank" rel="noopener">API</a>
       <a href="/docs" target="_blank" rel="noopener">Docs</a>
       <div class="divider"></div>

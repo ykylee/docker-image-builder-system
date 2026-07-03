@@ -12,6 +12,10 @@
     projectId: string;
     repositoryId: string;
     updatedAt: string; // ISO 8601
+    // Owner is optional so the user-facing BuildsList route can keep
+    // using BuildRow without changes. AdminBuilds passes the canonical
+    // requestedBy so the admin table can render the owner column.
+    requestedBy?: string;
   };
 
   let { build }: { build: BuildRowData } = $props();
@@ -42,6 +46,9 @@
   </td>
   <td class="meta-cell">{build.projectId}</td>
   <td class="meta-cell">{build.repositoryId}</td>
+  {#if build.requestedBy}
+    <td class="owner-cell mono">@{build.requestedBy}</td>
+  {/if}
   <td class="time-cell" title={build.updatedAt}>{updated}</td>
 </tr>
 
@@ -84,5 +91,15 @@
     font-size: var(--size-sm);
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .owner-cell {
+    color: var(--color-text-primary);
+    font-size: var(--size-sm);
+    font-weight: var(--weight-semibold);
+    background: var(--color-bg-surface-elevated);
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-subtle);
+    width: max-content;
   }
 </style>

@@ -9,6 +9,7 @@ export type RuntimeSettings = {
   runnerPollIntervalMs: number;
   buildTimeoutSeconds: number;
   corsOrigin: string | true | false;
+  adminIds: string[];
 };
 
 export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
@@ -20,6 +21,7 @@ export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
     previewTtlMinutes: env.PREVIEW_TTL_MINUTES,
     runnerPollIntervalMs: env.RUNNER_POLL_INTERVAL_MS,
     buildTimeoutSeconds: env.BUILD_TIMEOUT_SECONDS,
-    corsOrigin: env.CORS_ORIGIN
+    corsOrigin: env.CORS_ORIGIN,
+    adminIds: env.ADMIN_IDS
   };
 }

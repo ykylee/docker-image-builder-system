@@ -1,4 +1,7 @@
 import type {
+  AdminListBuildsQuery,
+  AdminListBuildsResponse,
+  AdminUserListResponse,
   BuildDuplicateResponse,
   BuildListQuery,
   BuildListResponse,
@@ -99,4 +102,10 @@ export interface BuildRepository {
   ): Promise<ReportPreviewStatusResult>;
   getTestDeployment(buildId: string): Promise<GetTestDeploymentResult>;
   listBuilds(query: BuildListQuery): Promise<BuildListResponse>;
+  // Admin-only operations (ADMIN-*). Both methods intentionally bypass
+  // owner filtering at the service layer; the admin route layer is the
+  // single guard that ensures the caller is in the configured ADMIN_IDS
+  // list.
+  listBuildsAcrossUsers(query: AdminListBuildsQuery): Promise<AdminListBuildsResponse>;
+  listBuildOwners(): Promise<AdminUserListResponse>;
 }

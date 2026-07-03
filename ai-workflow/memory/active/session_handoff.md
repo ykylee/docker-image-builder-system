@@ -150,6 +150,20 @@
 
 - [x] TASK-040: Build Server GET /builds list endpoint + openapi-typescript 자동 client (PR #7). Memory + postgres 양쪽 listBuilds (filter status, cursor pagination, limit max 200). zod BuildListQuery/BuildListResponse schema + .meta. build-monitor 측 openapi-typescript 7 + openapi-fetch 0.13 + tsx script (predev/prebuild hook) 로 ./.generated/openapi.d.ts 자동 생성. lib/api.ts 재작성 (SAMPLE_BUILDS 제거, openapi-fetch helper apiGet, BuildLogsResponse inline). 회귀 268/268 OK (TS 42+8 + Go 13 + Python 215). live e2e: vite proxy /api/builds → 3 builds, ?limit=2 → 2 + nextCursor.
 
+## Next Actions
+
+- [ ] memory fallback 을 계속 기본값으로 둘지, postgres 를 기본 개발 경로로 승격할지 결정
+- [ ] build-server 산출물 경로(`dist/apps/build-server/src/index.js`)를 단순화할지 검토
+- [ ] Runner 가 소비할 Host Server claim/report API shape 를 닫고 skeleton client를 실제 호출로 연결 (`PKG-005`)
+- [ ] `POST /builds`, `GET /builds/{id}`, `GET /builds/{id}/logs` 응답을 persistence 운영 기준으로 더 정교화 (`PKG-002`, `PKG-003`, `PKG-004`)
+- [ ] shared-contract 의 Go 측 generated binding 전략 결정
+- [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
+- [ ] `MiniMax.md`, `MiniMax_config.example.json` vendor-specific overlay 점검
+- [ ] TASK-037 PKG-007 Preview Cleanup Policy Binding (TTL 만료 sweeper)
+- [ ] docker.BuildImage 실제 구현
+- [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화
+- [ ] admin owner 차단/삭제/메모 (후속 결정)
+
 ## Risks & Blockers
 
 - 애플리케이션 코드와 실행 명령이 아직 없어서 구현 backlog가 문서 수준 추정치에 머물러 있다.

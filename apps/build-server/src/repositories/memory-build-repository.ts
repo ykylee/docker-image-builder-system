@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import type {
+  AdminListBuildsQuery,
+  AdminListBuildsResponse,
+  AdminUserBuildSummary,
+  AdminUserListResponse,
+  AdminUserSummary,
   BuildDuplicateResponse,
   BuildError,
   BuildListQuery,
@@ -414,6 +419,53 @@ export function createMemoryBuildRepository(): BuildRepository {
         all.length > query.limit && last ? last.buildId : null;
 
       return { builds: page, nextCursor };
+    },
+    // Admin-only methods (ADMIN-003). The admin guard is enforced at the
+    // route layer; this method reuses the same sort/filter/cursor logic
+    // as listBuilds, then enriches each summary with the requestedBy
+    // owner key (BuildSummary does not carry it because the user-facing
+    // endpoints infer ownership from the caller).
+    async listBuildsAcrossUsers(
+      query: AdminListBuildsQuery
+    ): Promise<AdminListBuildsResponse> {
+      const result = await this.listBuilds(query as BuildListQuery);
+      const stored = [...builds.values()];
+      const ownerById = new Map(stored.map((b) => [b.summary.buildId, b.requestedBy]));
+      const enriched: AdminUserBuildSummary[] = result.builds.map((b) => ({
+        ...b,
+        requestedBy: ownerById.get(b.buildId) ?? ""
+      }));
+      return { builds: enriched, nextCursor: result.nextCursor };
+    },
+    async listBuildOwners(): Promise<AdminUserListResponse> {
+      // Aggregate by requestedBy across the in-memory store. Owners with
+      // zero builds are not represented (they would have no row to derive
+      // lastBuildAt from). Sorted by lastBuildAt desc so the admin UI
+      // can show most-recent owners first.
+      const agg = new Map<string, { count: number; latest: string }>();
+      for (const entry of builds.values()) {
+        const cur = agg.get(entry.requestedBy);
+        if (!cur) {
+          agg.set(entry.requestedBy, { count: 1, latest: entry.summary.createdAt });
+        } else {
+          cur.count += 1;
+          if (entry.summary.createdAt > cur.latest) {
+            cur.latest = entry.summary.createdAt;
+          }
+        }
+      }
+      const users: AdminUserSummary[] = [...agg.entries()]
+        .map(([userId, info]) => ({
+          userId,
+          buildCount: info.count,
+          lastBuildAt: info.latest
+        }))
+        .sort((a, b) => {
+          const al = a.lastBuildAt ?? "";
+          const bl = b.lastBuildAt ?? "";
+          return bl.localeCompare(al);
+        });
+      return { users };
     }
   };
 }

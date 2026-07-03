@@ -9,6 +9,7 @@ import type { RuntimeSettings } from "@docker-image-builder-system/shared-config
 import { registerOpenApiRoutes } from "./openapi.js";
 import { createMemoryBuildRepository } from "../repositories/memory-build-repository.js";
 import { PostgresBuildRepository } from "../repositories/postgres-build-repository.js";
+import { registerAdminRoutes, makeAdminAuthenticator } from "../routes/admin-routes.js";
 import { registerBuildRoutes } from "../routes/build-routes.js";
 import { registerHealthRoute } from "../routes/health-route.js";
 import { BuildService } from "../services/build-service.js";
@@ -38,6 +39,12 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
 
   void registerHealthRoute(app);
   void registerBuildRoutes(app, buildService);
+
+  // Admin endpoints (ADMIN-004). The admin allow-list is captured at boot
+  // time so we do not re-parse env on every request, and so the runtime
+  // test snapshot matches what the request handlers see.
+  const isAdmin = makeAdminAuthenticator(runtime.adminIds);
+  await registerAdminRoutes(app, buildService, isAdmin);
 
   return app;
 }

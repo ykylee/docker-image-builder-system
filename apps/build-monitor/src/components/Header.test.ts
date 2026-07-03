@@ -48,4 +48,27 @@ describe("Header", () => {
     expect(localStorage.getItem("userId")).toBeNull();
     expect(pushMock).toHaveBeenCalledWith("/");
   });
+
+  it("shows the Admin entry link when no adminId is stored", () => {
+    render(Header);
+    expect(screen.getByRole("link", { name: "Admin" })).toBeInTheDocument();
+  });
+
+  it("shows the admin pill and admin nav links when adminId is stored", () => {
+    localStorage.setItem("adminId", "admin");
+    render(Header);
+    expect(screen.getByText(/@admin/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin · Builds" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin · Users" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /admin logout/i })).toBeInTheDocument();
+  });
+
+  it("removes adminId and routes to / on admin logout", async () => {
+    localStorage.setItem("adminId", "yky.lee");
+    render(Header);
+    const btn = screen.getByRole("button", { name: /admin logout/i });
+    await fireEvent.click(btn);
+    expect(localStorage.getItem("adminId")).toBeNull();
+    expect(pushMock).toHaveBeenCalledWith("/");
+  });
 });

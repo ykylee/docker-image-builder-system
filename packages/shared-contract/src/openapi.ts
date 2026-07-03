@@ -33,6 +33,11 @@ export const openapiTags = {
   Health: {
     name: "Health",
     description: "Liveness probe."
+  },
+  Admin: {
+    name: "Admin",
+    description:
+      "Admin-only endpoints. Available only to caller ids listed in the build-server ADMIN_IDS env (comma-separated). Powers the admin UI: list every build across all users and list the set of userIds that have build history."
   }
 } as const;
 

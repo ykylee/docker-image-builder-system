@@ -12,6 +12,11 @@ import {
 import { eq, inArray } from "@docker-image-builder-system/db";
 
 import type {
+  AdminListBuildsQuery,
+  AdminListBuildsResponse,
+  AdminUserBuildSummary,
+  AdminUserListResponse,
+  AdminUserSummary,
   BuildDuplicateResponse,
   BuildError,
   BuildListQuery,
@@ -551,5 +556,85 @@ export class PostgresBuildRepository implements BuildRepository {
     const nextCursor = hasMore ? (summaries[summaries.length - 1]?.buildId ?? null) : null;
 
     return { builds: summaries, nextCursor };
+  }
+
+  // Admin-only methods (ADMIN-003). Reuses the same filter+sort+cursor
+  // pipeline as listBuilds, then enriches each summary with the
+  // requestedBy owner key. The listBuilds path already selected
+  // requestedBy because mapBuildRowToSummary could surface it directly
+  // (or by adding a thin parallel projection). We re-fetch the rows
+  // here with the same predicates and read the column.
+  async listBuildsAcrossUsers(
+    query: AdminListBuildsQuery
+  ): Promise<AdminListBuildsResponse> {
+    const cursorRow = query.cursor
+      ? (
+          await this.db
+            .select({
+              createdAt: buildRequestTable.createdAt,
+              id: buildRequestTable.id
+            })
+            .from(buildRequestTable)
+            .where(eq(buildRequestTable.id, query.cursor))
+            .limit(1)
+        )[0]
+      : undefined;
+
+    const conds = [];
+    if (query.status) {
+      conds.push(eq(buildRequestTable.status, query.status));
+    }
+    if (query.requestedBy) {
+      conds.push(eq(buildRequestTable.requestedBy, query.requestedBy));
+    }
+    if (cursorRow) {
+      conds.push(
+        sql`(${buildRequestTable.createdAt}, ${buildRequestTable.id}) < (${cursorRow.createdAt}, ${buildRequestTable.id})`
+      );
+    }
+
+    const rows = await this.db
+      .select()
+      .from(buildRequestTable)
+      .where(conds.length > 0 ? and(...conds) : undefined)
+      .orderBy(desc(buildRequestTable.createdAt), desc(buildRequestTable.id))
+      .limit(query.limit + 1);
+
+    const hasMore = rows.length > query.limit;
+    const page = hasMore ? rows.slice(0, query.limit) : rows;
+    const enriched: AdminUserBuildSummary[] = page.map((row) => ({
+      ...mapBuildRowToSummary(row),
+      requestedBy: row.requestedBy
+    }));
+    const nextCursor = hasMore
+      ? enriched[enriched.length - 1]?.buildId ?? null
+      : null;
+    return { builds: enriched, nextCursor };
+  }
+
+  async listBuildOwners(): Promise<AdminUserListResponse> {
+    // GROUP BY requestedBy on the build_request table. count(*) +
+    // max(createdAt) 를 한 번에 가져와 메모리 정렬. 빌드 수가 많아지면
+    // (1) 페이지네이션, (2) createdAt 기준 인덱스 정밀화를 후속 PR 에서
+    // 다룬다. 현 1차 골격은 전체 owner 를 한 번에 반환.
+    const rows = await this.db
+      .select({
+        userId: buildRequestTable.requestedBy,
+        buildCount: sql<number>`count(*)::int`,
+        lastBuildAt: sql<string | null>`max(${buildRequestTable.createdAt})`
+      })
+      .from(buildRequestTable)
+      .groupBy(buildRequestTable.requestedBy)
+      .orderBy(sql`max(${buildRequestTable.createdAt}) DESC`);
+
+    const users: AdminUserSummary[] = rows.map((row) => ({
+      userId: row.userId,
+      buildCount: row.buildCount,
+      lastBuildAt: row.lastBuildAt
+        ? new Date(row.lastBuildAt as unknown as string | Date).toISOString()
+        : null
+    }));
+
+    return { users };
   }
 }
