@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 26→27: PR #10 squash merge `2dea6b1` main 합류 — TASK-046 light mode contrast QA (1차 + follow-up). 회귀 319+ OK. 브랜치 codex/light-mode-qa-2026-07-03 정리. 다음 후속: (a) light mode visual QA (Playwright headless), (b) TASK-017 stdio, (c) TASK-037 sweeper, (d) admin owner block-delete.). Login/AdminLogin input border 흐릿 문제 토큰 1곳에서 해결. 회귀 319+ OK.). vitest 35→37. 회귀 272/272. PR #10 예정. 다음 후속: TASK-017 stdio / TASK-037 sweeper / admin owner block-delete.
+- Updated: 2026-07-03 (rev 28→29: PR #11 follow-up — review Must 2건 + Should 3건 보완. Header.svelte adminLogout 4-space → 2-space. adminId charset 정규식 (^[a-zA-Z0-9._-]+$) server schema + DELETE path param + createAdminAllowList seed validation (empty/non-conforming throw) + in-process add 검증 + client-side pre-check in AdminAdmins.svelte. capture.py 정리 (imports / add_init_script 위치 / dead ternary). baseline/ .gitkeep. 회귀 build-server 68/68 + build-monitor 46/46 + Go 13/13 + Python 215/215 = 342+ OK. 다음 후속: PR #11 merge, PR #12 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete), visual QA PNG baseline 실측, 운영자 마이그레이션 수동 적용.) commit/push — backend createAdminAllowList mutable Set + /admin/admins GET/POST/DELETE + frontend adminAllowListStore + Header auto-enable + AdminAdmins.svelte + visual QA capture.py. 회귀 build-server 61/61 + build-monitor 44/44 + Go 13/13 + Python 215/215 = 333+ OK. 다음 후속: (a) PR #11 merge, (b) PR #12 — TASK-017 stdio transport + TASK-037 sweeper + admin owner block-delete, (c) visual QA PNG baseline 실측, (d) 운영자 마이그레이션 수동 적용.). 회귀 319+ OK. 브랜치 codex/light-mode-qa-2026-07-03 정리. 다음 후속: (a) light mode visual QA (Playwright headless), (b) TASK-017 stdio, (c) TASK-037 sweeper, (d) admin owner block-delete.). Login/AdminLogin input border 흐릿 문제 토큰 1곳에서 해결. 회귀 319+ OK.). vitest 35→37. 회귀 272/272. PR #10 예정. 다음 후속: TASK-017 stdio / TASK-037 sweeper / admin owner block-delete.
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -56,6 +56,10 @@
 - TASK-017 shared package / build-server / runner 골격 스캐폴드 및 1차 검증: done
 
 ## Key Changes
+
+- PR #11 follow-up (rev 29): Header.svelte adminLogout 4-space → 2-space. adminId charset 정규식 (^[a-zA-Z0-9._-]+$) server schema + DELETE path param + createAdminAllowList seed validation (empty/non-conforming throw) + in-process add 검증 + client-side pre-check. capture.py 정리 (dead imports / add_init_script 위치 / dead ternary). baseline/ .gitkeep 추가 (PNG binary 비tracked 명시). 회귀 342+ OK.
+
+- PR #11 (TASK-047/048/049) (rev 28): backend createAdminAllowList (mutable Set, seed[0] protected) + GET/POST/DELETE /admin/admins. frontend adminAllowListStore (Svelte writable + api helpers) + Header auto-enable (userId 가 admin list 에 포함되면 admin menu 자동 노출) + AdminAdmins.svelte (/admin/admins 라우트, add/remove UI, seed badge). TASK-047 visual QA capture.py (Playwright headless 두 모드 PNG diff) + baseline 디렉터리. 회귀 333+ OK.
 
 - PR #10 squash merge (rev 27): TASK-046 light mode contrast QA 1차 + follow-up. tokens 4종 (muted 5.36:1 AA 통과, border-strong 3.28:1 UI 통과, surface-elevated vs canvas 1.17:1, disabled 2.64:1) light contrast 완성. Login/AdminLogin input border 토큰 변경으로 해결. 회귀 319+ OK.
 

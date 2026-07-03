@@ -12,3 +12,8 @@ coverage/
 # Python 캐시 (skill/mcp Python 구현용)
 /__pycache__/
 *.pyc
+
+# Visual QA output (TASK-047). baseline/ 자체는 tracked 이지만 캡쳐
+# output 디렉터리는 .visual/ 로 local-only.
+.visual/
+apps/build-monitor/.visual/

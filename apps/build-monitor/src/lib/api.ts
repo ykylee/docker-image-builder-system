@@ -26,9 +26,11 @@ type ApiGetParams = {
   // the dynamic URL substitution and query encoding. We forward the
   // whole `params` shape from the helper. Admin helpers also include
   // `headers` for the X-Admin-Id guard; the underlying `api.GET`
-  // supports it.
+  // supports it. `body` is used by POST / DELETE helpers in this
+  // file (AdminAllowList mutations).
   params?: unknown;
   headers?: Record<string, string>;
+  body?: unknown;
 };
 
 async function apiGet(
@@ -209,4 +211,84 @@ export async function listAdminUsers(
     "/admin/users",
     { headers: { "x-admin-id": adminId } }
   )) as AdminUserListResponse;
+}
+
+// ---------------------------------------------------------------------------
+// Admin allow-list management (TASK-049).
+//
+// Mirrors the server-side AdminAllowListResponse / AdminAllowListAddRequest /
+// AdminAllowListRemoveResponse. The Build Server exposes:
+//   GET    /admin/admins             -> AdminAllowListResponse
+//   POST   /admin/admins             -> AdminAllowListResponse (200)
+//   DELETE /admin/admins/:adminId    -> AdminAllowListRemoveResponse
+// All three require X-Admin-Id set to a caller already in the allow-list.
+// ---------------------------------------------------------------------------
+
+export type AdminAllowListResponse = {
+  admins: string[];
+};
+
+export type AdminAllowListAddRequest = {
+  adminId: string;
+};
+
+export type AdminAllowListRemoveResponse = {
+  removed: string;
+  admins: string[];
+};
+
+export async function listAdminAllowList(
+  adminId: string
+): Promise<AdminAllowListResponse> {
+  return (await apiGet(
+    "/admin/admins",
+    "/admin/admins",
+    { headers: { "x-admin-id": adminId } }
+  )) as AdminAllowListResponse;
+}
+
+export async function addAdminToAllowList(
+  adminId: string,
+  newAdminId: string
+): Promise<AdminAllowListResponse> {
+  // POST /admin/admins is not modeled in openapi-typescript's `paths` yet
+  // (it lives in this hand-typed block until the next generator run).
+  // We call openapi-fetch's underlying POST helper directly to avoid
+  // forcing a type-cast on a non-existent path key.
+  const fetchFn = (api as unknown as {
+    POST: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).POST;
+  const result = (await fetchFn("/admin/admins", {
+    headers: {
+      "x-admin-id": adminId,
+      "content-type": "application/json"
+    },
+    body: { adminId: newAdminId }
+  })) as { data?: AdminAllowListResponse; response?: { status?: number } };
+  if (!result.data) {
+    const status = result.response?.status ?? 0;
+    throw new Error(
+      `POST /admin/admins failed: ${status}`
+    );
+  }
+  return result.data;
+}
+
+export async function removeAdminFromAllowList(
+  adminId: string,
+  target: string
+): Promise<AdminAllowListRemoveResponse> {
+  const fetchFn = (api as unknown as {
+    DELETE: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).DELETE;
+  const result = (await fetchFn(`/admin/admins/${target}`, {
+    headers: { "x-admin-id": adminId }
+  })) as { data?: AdminAllowListRemoveResponse; response?: { status?: number } };
+  if (!result.data) {
+    const status = result.response?.status ?? 0;
+    throw new Error(
+      `DELETE /admin/admins/${target} failed: ${status}`
+    );
+  }
+  return result.data;
 }

@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import Fastify, { type FastifyInstance } from "fastify";
 
 import { createMemoryBuildRepository } from "../src/repositories/memory-build-repository.js";
-import { makeAdminAuthenticator, registerAdminRoutes } from "../src/routes/admin-routes.js";
+import { createAdminAllowList, registerAdminRoutes } from "../src/routes/admin-routes.js";
 import { BuildService } from "../src/services/build-service.js";
 
 const baseRequest = (requestedBy: string, appName: string) => ({
@@ -23,7 +23,7 @@ async function buildAppWithService(
   service: BuildService
 ): Promise<FastifyInstance> {
   const app = Fastify({ logger: false });
-  await registerAdminRoutes(app, service, makeAdminAuthenticator(adminIds));
+  await registerAdminRoutes(app, service, createAdminAllowList(adminIds));
   return app;
 }
 
@@ -131,6 +131,176 @@ describe("GET /admin/users", () => {
       headers: { "x-admin-id": "alice" }
     });
     assert.equal(res.statusCode, 403);
+    await app.close();
+  });
+});
+
+describe("admin allow-list management (ADMIN-049)", () => {
+  it("GET /admin/admins returns the current allow-list for an admin caller", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin", "yky.lee"], service);
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/admins",
+      headers: { "x-admin-id": "admin" }
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.deepEqual(body.admins, ["admin", "yky.lee"]);
+    await app.close();
+  });
+
+  it("GET /admin/admins returns 403 for a non-admin caller", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/admins",
+      headers: { "x-admin-id": "alice" }
+    });
+    assert.equal(res.statusCode, 403);
+    await app.close();
+  });
+
+  it("POST /admin/admins adds a new admin to the live allow-list", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const addRes = await app.inject({
+      method: "POST",
+      url: "/admin/admins",
+      headers: { "x-admin-id": "admin", "content-type": "application/json" },
+      payload: { adminId: "alice" }
+    });
+    assert.equal(addRes.statusCode, 200);
+    assert.deepEqual(addRes.json().admins, ["admin", "alice"]);
+
+    // The new admin is immediately usable for /admin/builds (live mutation).
+    const buildsRes = await app.inject({
+      method: "GET",
+      url: "/admin/builds",
+      headers: { "x-admin-id": "alice" }
+    });
+    assert.equal(buildsRes.statusCode, 200);
+    await app.close();
+  });
+
+  it("POST /admin/admins is idempotent (no duplicate entries)", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin", "yky.lee"], service);
+    await app.inject({
+      method: "POST",
+      url: "/admin/admins",
+      headers: { "x-admin-id": "admin", "content-type": "application/json" },
+      payload: { adminId: "yky.lee" }
+    });
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/admins",
+      headers: { "x-admin-id": "admin" }
+    });
+    assert.equal(res.statusCode, 200);
+    assert.deepEqual(res.json().admins, ["admin", "yky.lee"]);
+    await app.close();
+  });
+
+  it("DELETE /admin/admins/:adminId removes a non-seed admin", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin", "yky.lee"], service);
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/admin/admins/yky.lee",
+      headers: { "x-admin-id": "admin" }
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.removed, "yky.lee");
+    assert.deepEqual(body.admins, ["admin"]);
+    await app.close();
+  });
+
+  it("DELETE /admin/admins/:adminId refuses to remove the protected seed id", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin", "yky.lee"], service);
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/admin/admins/admin",
+      headers: { "x-admin-id": "yky.lee" }
+    });
+    assert.equal(res.statusCode, 409);
+    await app.close();
+  });
+
+  it("DELETE /admin/admins/:adminId returns 409 for an unknown admin id", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/admin/admins/nobody",
+      headers: { "x-admin-id": "admin" }
+    });
+    assert.equal(res.statusCode, 409);
+    await app.close();
+  });
+});
+
+describe("createAdminAllowList seed validation (TASK-049 follow-up)", () => {
+  it("throws on empty seed", () => {
+    assert.throws(
+      () => createAdminAllowList([]),
+      /at least one admin id/
+    );
+  });
+
+  it("throws on seed with non-conforming id (whitespace)", () => {
+    assert.throws(
+      () => createAdminAllowList(["admin", "  yky.lee  "]),
+      /fails the admin id pattern/
+    );
+  });
+
+  it("throws on seed with non-conforming id (path-like)", () => {
+    assert.throws(
+      () => createAdminAllowList(["admin/../etc"]),
+      /fails the admin id pattern/
+    );
+  });
+
+  it("accepts letters, digits, dot, underscore, hyphen", () => {
+    const list = createAdminAllowList(["admin", "yky.lee", "user_1", "team-a"]);
+    assert.deepEqual(list.list(), ["admin", "yky.lee", "user_1", "team-a"]);
+  });
+});
+
+describe("admin add/remove with charset validation (TASK-049 follow-up)", () => {
+  it("POST /admin/admins rejects adminId that fails the pattern", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/admins",
+      headers: { "x-admin-id": "admin", "content-type": "application/json" },
+      payload: { adminId: "  bad id  " }
+    });
+    assert.equal(res.statusCode, 400);
+    await app.close();
+  });
+
+  it("add() helper throws on a non-conforming id (in-process mutation)", () => {
+    const list = createAdminAllowList(["admin"]);
+    assert.throws(() => list.add("a/b"), /fails the admin id pattern/);
+    assert.throws(() => list.add(""), /fails the admin id pattern/);
+  });
+
+  it("DELETE /admin/admins/:adminId returns 400 for non-conforming target", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin", "yky.lee"], service);
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/admin/admins/bad%20id",
+      headers: { "x-admin-id": "admin" }
+    });
+    // Path param 이 "bad id" 로 decode. 정규식 위반.
+    assert.equal(res.statusCode, 400);
     await app.close();
   });
 });

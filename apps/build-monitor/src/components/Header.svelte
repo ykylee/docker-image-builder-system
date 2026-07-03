@@ -1,7 +1,9 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { link, push } from "svelte-spa-router";
   import ThemeToggle from "./ThemeToggle.svelte";
   import { userIdStore, adminIdStore } from "../lib/session.js";
+  import { adminAllowListStore } from "../lib/admin-store.js";
 
   // session.ts 의 writable store 가 localStorage 와 양방향 동기화를
   // 담당한다 (Bug 1: 로그인 직후 Header 가 즉시 갱신되도록). 컴포넌트
@@ -9,16 +11,55 @@
   let userId = $derived($userIdStore);
   let adminId = $derived($adminIdStore);
 
+  // TASK-048: admin allow-list 캐시. userId 가 admin list 에 포함되어
+  // 있으면 admin 메뉴를 자동으로 노출한다 (별도 AdminLogin 단계 없이).
+  // 빈 배열은 "아직 fetch 안 됨" 또는 "fetch 실패" 상태이며, 이 경우
+  // auto-enable 도 false 로 두어 명시적 /admin/login 흐름을 유지한다.
+  let adminAllowList = $derived($adminAllowListStore);
+
+  // userId 가 adminAllowList 에 포함되면 admin 으로 auto-enable. 단,
+  // userId 가 없거나 allowList 가 비어있으면 false.
+  let autoAdminEnabled = $derived(
+    !!userId && adminAllowList.length > 0 && adminAllowList.includes(userId)
+  );
+
+  // 표시할 admin id 결정. 명시적 adminId (AdminLogin 통과) 가 있으면
+  // 그걸 우선하고, 없으면 auto-enable 인 경우 userId 로 admin session
+  // 을 암묵적으로 잡는다. logout 시 userIdStore 가 null 이 되면
+  // autoAdminEnabled 도 false 가 되어 admin 메뉴가 자연스럽게 사라진다.
+  let effectiveAdminId = $derived(adminId ?? (autoAdminEnabled ? userId : null));
+
   function logout() {
     userIdStore.set(null);
+    // userId 가 admin allow-list 에 있었더라도, logout 하면 더 이상
+    // admin 메뉴는 노출되지 않는다. admin session 도 같이 정리.
+    adminIdStore.set(null);
     push("/");
   }
+
+  // 부팅 시 userId 가 있으면 admin allow-list 를 prefetch 한다. userId 가
+  // admin list 에 속해 있으면 즉시 admin 메뉴가 노출되고, 아니면 AdminLogin
+  // 흐름이 그대로 유지된다. 실패 시 (offline / 비-401 응답) 캐시는 빈 배열
+  // 로 남고 explicit /admin/login 으로 fallback 가능.
+  onMount(async () => {
+    if (userId && adminAllowList.length === 0) {
+      try {
+        await adminAllowListStore.refresh(userId);
+      } catch {
+        // intentional: stale cache; user can still visit /admin/login.
+      }
+    }
+  });
 
   function adminLogout() {
     // Admin session is independent from the user session so logging out
     // of the admin UI does not sign the user out of the build monitor.
+    // 단, auto-enable 인 경우 (userId 가 admin 인 상태) 에는 user
+    // session 은 유지하되, admin 메뉴만 숨긴다.
     adminIdStore.set(null);
-    push("/");
+    if (!autoAdminEnabled) {
+      push("/");
+    }
   }
 </script>
 
@@ -36,11 +77,12 @@
         <a use:link href="/builds">Builds</a>
         <button class="logout-btn" onclick={logout}>Logout</button>
       {/if}
-      {#if adminId}
+      {#if effectiveAdminId}
         <div class="divider"></div>
-        <span class="admin-id mono" title="Admin signed in">🛡 @{adminId}</span>
+        <span class="admin-id mono" title="Admin session active">🛡 @{effectiveAdminId}</span>
         <a use:link href="/admin/builds">Admin · Builds</a>
         <a use:link href="/admin/users">Admin · Users</a>
+        <a use:link href="/admin/admins">Admin · Admins</a>
         <button class="logout-btn" onclick={adminLogout}>Admin Logout</button>
       {:else}
         <a use:link href="/admin/login" class="admin-link">Admin</a>

@@ -145,3 +145,82 @@ export type AdminUserListResponse = z.infer<typeof adminUserListResponseSchema>;
 // admin list view reuses it. The imports above are intentionally limited
 // to the schemas needed by the admin endpoints.
 void buildSummarySchema;
+
+// ---------------------------------------------------------------------------
+// Admin allow-list management (TASK-049).
+//
+// GET /admin/admins returns the current admin allow-list snapshot — the same
+// frozen-at-boot list that isAdmin(...) checks. POST /admin/admins adds an
+// adminId, DELETE /admin/admins/:adminId removes one. These endpoints only
+// accept a caller that is already in the allow-list (caller guard is
+// enforced in admin-routes.ts; the schemas here only describe the payload).
+//
+// Mutations on a single process are visible to subsequent /admin/* requests
+// in the same process (the runtime settings allow-list is replaced, not
+// snapshotted twice). They do not persist across a process restart — the
+// canonical store for production is the ADMIN_IDS env var.
+// ---------------------------------------------------------------------------
+
+export const adminAllowListResponseSchema = z
+  .object({
+    admins: z.array(
+      z.string().min(1).meta({
+        description:
+          "Canonical admin id. Case-sensitive, matches the existing ADMIN_IDS env entries."
+      })
+    )
+  })
+  .meta({
+    id: "AdminAllowListResponse",
+    description:
+      "Response body for GET /admin/admins. The current admin allow-list snapshot used by the build server to gate /admin/* endpoints."
+  });
+
+export type AdminAllowListResponse = z.infer<typeof adminAllowListResponseSchema>;
+
+// Canonical admin id pattern. 일반 userId (BuildRequest.requestedBy) 는
+// postel-style `z.string().min(1)` 만 강제하지만, admin 권한은 sensitive 한
+// surface 라 추가 charset 제약을 둔다. 보수적으로 letters / digits / dot /
+// underscore / hyphen 만 허용 — control character, whitespace, path
+// traversal 문자, log escape 가 필요한 문자가 admin id 로 등록되는 것을
+// 막는다. DELETE /admin/admins/:adminId 의 path param 도 같은 charset
+// 안에서만 매칭되도록 server-side 에서도 동등하게 검증한다.
+// 기존 DEFAULT_ADMIN_IDS_RAW ("admin,yky.lee") 는 이 regex 를 만족.
+const ADMIN_ID_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
+export const adminAllowListAddRequestSchema = z
+  .object({
+    adminId: z
+      .string()
+      .min(1)
+      .regex(ADMIN_ID_PATTERN, {
+        message:
+          "adminId must match /^[a-zA-Z0-9._-]+$/ (letters, digits, dot, underscore, hyphen)."
+      })
+      .meta({
+        description:
+          "Canonical admin id to add to the allow-list. Caller must already be in the list. Charset restricted to a conservative subset to keep path param / log / UI surface safe."
+      })
+  })
+  .meta({
+    id: "AdminAllowListAddRequest",
+    description: "Request body for POST /admin/admins."
+  });
+
+export type AdminAllowListAddRequest = z.infer<typeof adminAllowListAddRequestSchema>;
+
+export const adminAllowListRemoveResponseSchema = z
+  .object({
+    removed: z.string().min(1).meta({
+      description: "The adminId that was just removed from the allow-list."
+    }),
+    admins: z.array(z.string().min(1)).meta({
+      description: "The updated admin allow-list after the removal."
+    })
+  })
+  .meta({
+    id: "AdminAllowListRemoveResponse",
+    description: "Response body for DELETE /admin/admins/:adminId."
+  });
+
+export type AdminAllowListRemoveResponse = z.infer<typeof adminAllowListRemoveResponseSchema>;
