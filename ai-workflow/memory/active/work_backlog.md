@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 15: TASK-034 시작 — PKG-005 Runner Claim And Build Phase Skeleton, 브랜치 codex/backend-build-queue-2026-07-03)
+- 최종 수정일: 2026-07-03 (rev 16: TASK-034 1차 골격 완료 — claim/phase endpoint + memory/postgres repo + zod 400 매핑)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -39,7 +39,7 @@
 - [x] TASK-023: 워크플로우 skill/MCP 셋업 (워크플로우 온보딩 마무리)
 - [x] TASK-024: 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)
 - [x] TASK-033: preview-readiness-checker skill 1종 구현 (Python, 42 tests OK, total 215)
-- [ ] TASK-034: PKG-005 Runner Claim And Build Phase Skeleton — 브랜치 codex/backend-build-queue-2026-07-03 시작
+- [x] TASK-034: PKG-005 Runner Claim And Build Phase Skeleton 1차 골격 구현 (claim/phase endpoint 2종 + memory/postgres repo, live smoke 7/7 + 회귀 215/215 OK)
 - [x] TASK-032: failure-summary MCP 1종 구현 (Python, 16 tests OK, total 173)
 - [x] TASK-031: failure-summary-shaper skill 1종 구현 (Python, 25 tests OK, total 157)
 - [x] TASK-030: contract-drift-checker skill 1종 구현 (Python, 25 tests OK, total 132)

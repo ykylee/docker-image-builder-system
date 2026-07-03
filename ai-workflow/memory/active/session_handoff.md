@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 13: TASK-034 시작 — PKG-005 Runner Claim And Build Phase Skeleton, 브랜치 codex/backend-build-queue-2026-07-03)
+- Updated: 2026-07-03 (rev 14: TASK-034 1차 골격 완료, 후속 TASK-035 Runner claim loop 또는 TASK-036 preview queue 가능)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
