@@ -4,8 +4,7 @@ const bootstrapStatements = [
   `
     CREATE TABLE IF NOT EXISTS build_request (
       id UUID PRIMARY KEY,
-      project_id TEXT NOT NULL,
-      repository_id TEXT NOT NULL,
+      app_name TEXT NOT NULL,
       requested_by TEXT NOT NULL,
       status TEXT NOT NULL,
       phase TEXT NOT NULL,

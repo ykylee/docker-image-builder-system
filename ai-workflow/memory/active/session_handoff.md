@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 23: PR #9 squash merge `af2ade4` main 합류 완료. 회귀 270/270 재검증 OK. §27.5 hash amend + 메타 1단 bump. 다음 후속: DB schema migration (TASK-044 TODO) / light mode QA / TASK-017 stdio / TASK-037 sweeper / admin owner block-delete)
+- Updated: 2026-07-03 (rev 24: TASK-045 DB schema migration — packages/db 의 Drizzle schema + bootstrap.ts 의 CREATE TABLE v0.2 (app_name 단일) 정렬. brownfield 마이그레이션 SQL (apps/build-server/migrations/0001_app_name.sql) 신규. postgres repo 가 row.appName 직접 사용 (metadata JSONB fallback 제거). 회귀 270/270. 다음 후속: 운영자 수동 마이그레이션 적용 / light mode QA / TASK-017 stdio / TASK-037 sweeper / admin owner block-delete)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus

@@ -108,17 +108,15 @@ export class PostgresBuildRepository implements BuildRepository {
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
 
-      // Active-build dedup is keyed on appName only. We probe via
-      // metadata->>'appName' until the dedicated column lands (see
-      // mapBuildRowToSummary TODO). For the new row we always write
-      // metadata.appName = input.appName below, so the probe matches
-      // deterministically.
+      // Active-build dedup is keyed on appName (v0.2 schema). Probe is
+      // a direct column compare so the index (build_request_app_name_idx
+      // from migrations/0001) can serve it.
       const [activeBuild] = await tx
         .select()
         .from(buildRequestTable)
         .where(
           and(
-            sql`${buildRequestTable.metadata}->>'appName' = ${input.appName}`,
+            eq(buildRequestTable.appName, input.appName),
             inArray(buildRequestTable.status, activeBuildStatuses)
           )
         )
@@ -142,12 +140,10 @@ export class PostgresBuildRepository implements BuildRepository {
         .insert(buildRequestTable)
         .values({
           id: buildId,
-          // appName is the canonical identity; projectId / repositoryId
-          // columns are kept empty until a follow-up DB migration drops
-          // them in favor of a dedicated appName text column. See
-          // mapBuildRowToSummary TODO for the migration plan.
-          projectId: input.appName,
-          repositoryId: "",
+          // v0.2 schema (TASK-045): appName is the canonical identifier.
+          // metadata 에는 caller 가 함께 보낸 key-value (e.g. git commit
+          // hash, trigger id) 만 기록 — appName 중복 X.
+          appName: input.appName,
           requestedBy: input.requestedBy,
           status: "QUEUED",
           phase: "REQUEST_ACCEPTED",
