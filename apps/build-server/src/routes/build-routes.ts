@@ -19,6 +19,14 @@ import {
 
 import type { BuildService } from "../services/build-service.js";
 
+// Note: Fastify v5 + zod v4 do not accept zod schemas in `routeOptions.schema`
+// directly; the runtime validator (ajv) requires JSON schema with
+// `required` as an array, but zod-to-json-schema emits `required` as an
+// object under v4. Request validation is therefore handled inline by
+// each handler via `schema.safeParse(...)`. The OpenAPI document is
+// generated separately in `app/openapi.ts` from the same zod schemas
+// and exposed at /openapi.json and /docs.
+
 const buildIdParamsSchema = z.object({
   buildId: z.string().uuid()
 });

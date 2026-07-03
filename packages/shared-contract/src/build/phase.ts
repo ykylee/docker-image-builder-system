@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 export const buildPhases = [
   "REQUEST_ACCEPTED",
   "QUEUE_CLAIMED",
@@ -11,3 +13,11 @@ export const buildPhases = [
 ] as const;
 
 export type BuildPhase = (typeof buildPhases)[number];
+
+export const buildPhaseSchema = z
+  .enum(buildPhases)
+  .meta({
+    id: "BuildPhase",
+    description:
+      "Discrete build lifecycle phase reported by the Go Runner. Drives host-side status transitions and is the canonical state machine for PKG-005/006."
+  });
