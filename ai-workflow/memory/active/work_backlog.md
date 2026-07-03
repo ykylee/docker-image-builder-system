@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 17: TASK-035 완료 — Go Runner claim loop + phase call, 6 phase e2e smoke + Go 10/10 tests)
+- 최종 수정일: 2026-07-03 (rev 18: TASK-036 완료 — PKG-006 Preview Queue + Ready, 8 phase e2e smoke + TS 37 + Go 13 = 50/50 tests)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -41,6 +41,7 @@
 - [x] TASK-033: preview-readiness-checker skill 1종 구현 (Python, 42 tests OK, total 215)
 - [x] TASK-034: PKG-005 Runner Claim And Build Phase Skeleton 1차 골격 구현 (claim/phase endpoint 2종 + memory/postgres repo, live smoke 7/7 + 회귀 215/215 OK)
 - [x] TASK-035: Go Runner claim loop + phase call (HTTPBuildControlClient + BuildService 4-phase 자동 보고 + Worker loop, 6 phase e2e smoke + Go 10 tests)
+- [x] TASK-036: PKG-006 Preview Service Queue And Readiness (4 endpoint + Runner queue/ready 자동 보고, 8 phase e2e smoke + TS 14 + Go 3 신규 tests)
 - [x] TASK-032: failure-summary MCP 1종 구현 (Python, 16 tests OK, total 173)
 - [x] TASK-031: failure-summary-shaper skill 1종 구현 (Python, 25 tests OK, total 157)
 - [x] TASK-030: contract-drift-checker skill 1종 구현 (Python, 25 tests OK, total 132)
