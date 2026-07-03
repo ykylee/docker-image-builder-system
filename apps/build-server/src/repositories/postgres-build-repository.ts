@@ -24,7 +24,12 @@ import type {
   PreviewStatus
 } from "@docker-image-builder-system/shared-contract";
 
-import type { BuildRepository, CreateBuildResult } from "./build-repository.js";
+import type {
+  BuildRepository,
+  ClaimNextBuildResult,
+  CreateBuildResult,
+  UpdatePhaseResult
+} from "./build-repository.js";
 
 const activeBuildStatuses: BuildStatus[] = ["QUEUED", "CLAIMED", "BUILDING", "TEST_READY"];
 
@@ -186,5 +191,136 @@ export class PostgresBuildRepository implements BuildRepository {
       .orderBy(asc(buildLogTable.createdAt));
 
     return rows.map(mapBuildLogRow);
+  }
+
+  async claimNextBuild(): Promise<ClaimNextBuildResult> {
+    return this.db.transaction(async (tx) => {
+      const [activeRow] = await tx
+        .select()
+        .from(buildRequestTable)
+        .where(inArray(buildRequestTable.status, ["CLAIMED", "BUILDING", "TEST_READY"] as BuildStatus[]))
+        .orderBy(asc(buildRequestTable.createdAt))
+        .limit(1);
+
+      if (activeRow) {
+        return {
+          kind: "active_build_exists",
+          build: {
+            build: mapBuildRowToSummary(activeRow),
+            lastError: mapBuildRowToLastError(activeRow)
+          }
+        };
+      }
+
+      const [nextRow] = await tx
+        .select()
+        .from(buildRequestTable)
+        .where(eq(buildRequestTable.status, "QUEUED"))
+        .orderBy(asc(buildRequestTable.createdAt))
+        .limit(1);
+
+      if (!nextRow) {
+        return { kind: "no_build_available" };
+      }
+
+      const timestamp = new Date();
+      const [updated] = await tx
+        .update(buildRequestTable)
+        .set({
+          status: "CLAIMED",
+          phase: "QUEUE_CLAIMED",
+          updatedAt: timestamp
+        })
+        .where(
+          and(
+            eq(buildRequestTable.id, nextRow.id),
+            eq(buildRequestTable.status, "QUEUED")
+          )
+        )
+        .returning();
+
+      if (!updated) {
+        // raced: another runner won
+        return { kind: "no_build_available" };
+      }
+
+      await tx.insert(buildLogTable).values({
+        id: randomUUID(),
+        buildId: updated.id,
+        phase: "QUEUE_CLAIMED",
+        message: "Build claimed by runner.",
+        createdAt: timestamp
+      });
+
+      return {
+        kind: "claimed",
+        response: {
+          build: mapBuildRowToSummary(updated),
+          lastError: mapBuildRowToLastError(updated)
+        }
+      };
+    });
+  }
+
+  async updatePhase(buildId: string, phase: string): Promise<UpdatePhaseResult> {
+    const [row] = await this.db
+      .select()
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+
+    if (!row) {
+      return { kind: "not_found" };
+    }
+
+    if (row.phase === phase) {
+      return {
+        kind: "ok",
+        response: {
+          build: mapBuildRowToSummary(row),
+          lastError: mapBuildRowToLastError(row)
+        }
+      };
+    }
+
+    let nextStatus: BuildStatus = row.status as BuildStatus;
+    if (phase === "DOCKER_BUILD_STARTED") {
+      nextStatus = "BUILDING";
+    } else if (phase === "COMPLETED") {
+      nextStatus = "COMPLETED";
+    } else if (phase === "FAILED") {
+      nextStatus = "FAILED";
+    }
+
+    const timestamp = new Date();
+    const [updated] = await this.db
+      .update(buildRequestTable)
+      .set({
+        phase: phase as BuildPhase,
+        status: nextStatus,
+        updatedAt: timestamp
+      })
+      .where(eq(buildRequestTable.id, buildId))
+      .returning();
+
+    if (!updated) {
+      return { kind: "not_found" };
+    }
+
+    await this.db.insert(buildLogTable).values({
+      id: randomUUID(),
+      buildId,
+      phase: phase as BuildPhase,
+      message: `Phase updated to ${phase}.`,
+      createdAt: timestamp
+    });
+
+    return {
+      kind: "ok",
+      response: {
+        build: mapBuildRowToSummary(updated),
+        lastError: mapBuildRowToLastError(updated)
+      }
+    };
   }
 }

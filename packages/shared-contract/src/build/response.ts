@@ -59,3 +59,24 @@ export type BuildDuplicateResponse = z.infer<typeof buildDuplicateResponseSchema
 export type BuildStatusResponse = z.infer<typeof buildStatusResponseSchema>;
 export type BuildLogEntry = z.infer<typeof buildLogEntrySchema>;
 export type BuildLogsResponse = z.infer<typeof buildLogsResponseSchema>;
+
+export const claimRequestSchema = z.object({
+  runnerId: z.string().min(1),
+  capabilities: z.array(z.string().min(1)).default([])
+});
+
+export const claimResponseSchema = z.object({
+  claimed: z.boolean(),
+  build: buildStatusResponseSchema.nullable(),
+  reason: z.enum(["NO_BUILD_AVAILABLE", "ACTIVE_BUILD_EXISTS", "QUEUE_CLAIM_FAILED"]).nullable()
+});
+
+export const phaseUpdateRequestSchema = z.object({
+  phase: z.enum(buildPhases),
+  runnerId: z.string().min(1),
+  occurredAt: z.string().datetime().optional()
+});
+
+export type ClaimRequest = z.infer<typeof claimRequestSchema>;
+export type ClaimResponse = z.infer<typeof claimResponseSchema>;
+export type PhaseUpdateRequest = z.infer<typeof phaseUpdateRequestSchema>;
