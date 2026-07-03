@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 7: postgres live smoke 반영)
+- Updated: 2026-07-03 (rev 8: PR #2 (TASK-017 scaffold) squash 머지, 다음 단계는 skills-mcp-dev 브랜치 rebase PR)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
