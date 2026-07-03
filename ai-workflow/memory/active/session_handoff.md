@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 10: TASK-030 contract-drift-checker P1 skill 추가, 25 tests, total 132)
+- Updated: 2026-07-03 (rev 11: TASK-031/032/033 P1 잔여 3종 모두 추가, 83 tests, total 215)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
