@@ -8,3 +8,7 @@ node_modules/
 dist/
 coverage/
 *.tsbuildinfo
+
+# Python 캐시 (skill/mcp Python 구현용)
+/__pycache__/
+*.pyc

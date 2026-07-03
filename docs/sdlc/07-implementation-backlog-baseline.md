@@ -166,6 +166,7 @@ Done when:
   - 요청 실패의 재시도 여부
 - Refs: `MVP-FR-001`, `MVP-FR-002`, `MVP-FR-007`, `MVP-NFR-001`
 - Depends on: `PKG-002`, `PKG-004`
+- 후보 분해: `docs/sdlc/13-skills-and-mcp-plan.md` §3.1 (skill 5종) / §4 (MCP 5종) 와 1:1 매핑
 - Done when:
   - Skill/MCP 요청 경계와 서버 호출 책임이 정리된다
   - request 실패 시 사용자 안내의 입력 구조가 정해진다
@@ -179,6 +180,7 @@ Done when:
   - preview 대기/실패/준비 상태 안내
 - Refs: `MVP-FR-003`, `MVP-FR-012`, `MVP-FR-013`, `MVP-FR-019`, `MVP-NFR-002`, `MVP-NFR-008`
 - Depends on: `PKG-004`, `docs/sdlc/design/06-user-messaging-and-failure-handling.md`
+- 후보 분해: `docs/sdlc/13-skills-and-mcp-plan.md` §3 (`failure-summary-shaper`, `preview-readiness-checker`), §4 (`failure-summary`, `preview-ttl`, `dockerfile-template-suggest`) 와 정합
 - Done when:
   - 상태 조회 결과를 사용자 문구로 바꾸는 경계가 정리된다
   - 서버 책임과 Skill/MCP 책임이 메시지 레벨에서 분리된다
