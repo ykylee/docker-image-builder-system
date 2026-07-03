@@ -1,8 +1,8 @@
 {
     "schema_version": "1",
-    "generated_at": "2026-07-03T07:58:00Z",
-    "purpose_digest": "ADMIN-* Admin UI 완료 (TASK-043). Build Server ADMIN_IDS env (default admin,yky.lee) + X-Admin-Id 가드, /admin/builds (모든 owner) + /admin/users (per-user buildCount/lastBuildAt). shared-contract admin 4 schemas + openapi Admin tag + zod v4 .extend().meta() 함수 회피. BuildServer listBuildsAcrossUsers + listBuildOwners. build-monitor: AdminLogin/AdminBuilds/AdminUsers 라우트 + Header adminId 분기 + BuildRow requestedBy? optional. 회귀 272/272. TASK-046 light mode contrast QA 1차 (PR #10): tokens.css light 3 token (muted #94a3b8→#64748b 4.34:1 / surface-elevated #fff→#f8fafc / border-strong 유지) + theme.css color-scheme + StatusPill EXPIRED+UNKNOWN secondary + ThemeToggle js-side colorScheme. 1차 PR review 에서 3건 보완: TASK-046 follow-up: light token 4종 추가 조정 (muted #64748b→#57657f 5.36:1, border-strong #cbd5e1→#7a889e 3.28:1, surface-elevated #f8fafc→#dde4ed vs canvas 1.17:1 / vs surface 1.28:1, disabled #94a3b8→#8a99b0 2.64:1). Login/AdminLogin input border 흐릿 문제 토큰 1곳에서 해결. 회귀 272/272 유지 (build-server 54 + build-monitor 37 + Go 13 + Python 215 = 319+). 후속: PR #10 follow-up push + 머지, TASK-017 stdio, TASK-037 sweeper, admin owner block-delete, light mode visual QA (Playwright headless 캡쳐).",
-    "purpose_digest_rev": 53,
+    "generated_at": "2026-07-03T08:01:00Z",
+    "purpose_digest": "ADMIN-* Admin UI 완료 (TASK-043). Build Server ADMIN_IDS env (default admin,yky.lee) + X-Admin-Id 가드, /admin/builds + /admin/users. shared-contract admin 4 schemas + openapi Admin tag. BuildServer listBuildsAcrossUsers + listBuildOwners. build-monitor: AdminLogin/AdminBuilds/AdminUsers + Header adminId 분기 + BuildRow requestedBy? optional. TASK-045 v0.2 schema migration — app_name 단일 식별자 column 추가, brownfield 마이그레이션 SQL (idempotent) 추가, postgres repo 가 row.appName 직접 사용. 회귀 270/270. TASK-046 light mode contrast QA (PR #10) — 1차 + follow-up merge: tokens.css light 4 token 조정 (muted #64748b→#57657f 5.36:1 AA 통과, border-strong #cbd5e1→#7a889e 3.28:1 UI border 통과, surface-elevated #f8fafc→#dde4ed vs canvas 1.17:1 의미 있는 분리, disabled #94a3b8→#8a99b0 2.64:1 muted보다 옅게). Login/AdminLogin input border 흐릿 문제 토큰 1곳에서 해결. PR #10 squash merge `2dea6b1` main 합류, 회귀 319+ (build-server 54 + build-monitor 37 + Go 13 + Python 215). 브랜치 codex/light-mode-qa-2026-07-03 정리 (origin + local). 후속: (a) light mode visual QA (Playwright headless 두 모드 PNG diff), (b) TASK-017 stdio transport, (c) TASK-037 sweeper, (d) admin owner block-delete, (e) 운영자 마이그레이션 수동 적용.",
+    "purpose_digest_rev": 54,
     "source_of_truth": {
         "project_profile_path": "docs/PROJECT_PROFILE.md",
         "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,8 +28,8 @@
     },
     "session": {
         "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-        "current_axis": "TASK-046 light mode contrast QA follow-up — codex/light-mode-qa-2026-07-03 branch, PR #10 follow-up push. 다음 후속: PR #10 머지, TASK-017 stdio transport, TASK-037 sweeper, admin owner block-delete, light mode visual QA (Playwright).",
-        "current_focus": "TASK-046 light mode contrast QA follow-up — PR #10 리뷰 3건 (Login/AdminLogin input border 코드 미반영, --color-text-muted 4.34:1 AA 0.16 부족, --color-bg-surface-elevated #f8fafc canvas 위 1.05:1 사실상 분리 안 됨) 보완. tokens.css 4 token 조정 (muted #64748b→#57657f 5.36:1, border-strong #cbd5e1→#7a889e 3.28:1, surface-elevated #f8fafc→#dde4ed vs canvas 1.17:1, disabled #94a3b8→#8a99b0 2.64:1). Login/AdminLogin input border 코멘트도 토큰 변경 결과 반영으로 갱신. 회귀 319+ OK.",
+        "current_axis": "PR #10 merge 완료 — light mode contrast QA 1차/follow-up 모두 main 합류. 다음 후속: light mode visual QA 자동화, TASK-017 stdio transport, TASK-037 sweeper, admin owner block-delete.",
+        "current_focus": "PR #10 (TASK-046 light mode contrast QA) squash merge `2dea6b1` main 합류. tokens 4종 (muted 5.36:1, border-strong 3.28:1, surface-elevated vs canvas 1.17:1, disabled 2.64:1) light 모드 contrast 완성. 회귀 319+ (build-server 54 + build-monitor 37 + Go 13 + Python 215). 브랜치 정리 완료. 다음 후속: (a) light mode visual QA (Playwright), (b) TASK-017 stdio, (c) TASK-037 sweeper, (d) admin owner block-delete.",
         "in_progress_items": [],
         "blocked_items": [],
         "recent_done_items": [
