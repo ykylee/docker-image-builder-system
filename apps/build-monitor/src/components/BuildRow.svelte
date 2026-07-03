@@ -47,20 +47,35 @@
 
 <style>
   .row {
+    transition: background-color var(--motion-duration-fast) var(--motion-easing-standard);
+  }
+  .row:hover { 
+    background: var(--color-bg-surface-elevated); 
+  }
+  .row td {
     border-bottom: 1px solid var(--color-border-subtle);
   }
-  .row:hover { background: var(--color-bg-surface-elevated); }
+  .row:last-child td {
+    border-bottom: none;
+  }
   td {
-    padding: var(--space-sm) var(--space-md);
-    height: 36px;
+    padding: var(--space-md) var(--space-lg);
+    height: 48px;
     vertical-align: middle;
   }
   .id-cell .mono {
     font-size: var(--size-sm);
+    color: var(--color-accent-primary);
+    font-weight: var(--weight-medium);
+    transition: color var(--motion-duration-fast) var(--motion-easing-standard);
+  }
+  .id-cell .mono:hover {
+    color: var(--color-accent-primary-hover);
   }
   .meta-cell {
     color: var(--color-text-secondary);
     font-size: var(--size-sm);
+    font-weight: var(--weight-medium);
   }
   .time-cell {
     color: var(--color-text-muted);

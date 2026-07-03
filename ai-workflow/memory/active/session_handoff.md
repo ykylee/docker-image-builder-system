@@ -144,7 +144,9 @@
 - [ ] docker.BuildImage 실제 구현 (Docker SDK + SOURCE_PREPARED/DOCKER_BUILD_STARTED 사이 실제 image build) — 현재 noop
 - [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화 (1차 골격은 null 응답)
 
-- [x] TASK-039: Build Monitor frontend 부착 1차 골격 (PR #6). Svelte 5 + Vite + TypeScript 선정, apps/build-monitor 골격, DESIGN.md tokens.css, 4 컴포넌트 + 3 route + lib/api.ts, vitest 7/7 + svelte-check 0 + vite build OK. 회귀 273/273 OK. 후속: openapi-typescript 자동화, list endpoint, light mode.
+- [x] TASK-039: Build Monitor frontend 부착 1차 골격 (PR #6) 완료. Svelte 5 + Vite + TypeScript.
+- [x] TASK-041: Build Monitor 프론트엔드 프리미엄 디자인 적용 완료. Light/Dark 모드 대응, Glassmorphism, Micro-animations 추가 (theme.css, tokens.css 전면 개편 및 UI 컴포넌트 프리미엄화).
+- [x] TASK-042: 진입 페이지(Login.svelte) 추가. 사용자 ID 입력 및 `localStorage` 기반 간이 세션 구성, 헤더 내 사용자 ID 및 로그아웃 버튼 반영, 빌드 목록 필터링 연동.
 
 - [x] TASK-040: Build Server GET /builds list endpoint + openapi-typescript 자동 client (PR #7). Memory + postgres 양쪽 listBuilds (filter status, cursor pagination, limit max 200). zod BuildListQuery/BuildListResponse schema + .meta. build-monitor 측 openapi-typescript 7 + openapi-fetch 0.13 + tsx script (predev/prebuild hook) 로 ./.generated/openapi.d.ts 자동 생성. lib/api.ts 재작성 (SAMPLE_BUILDS 제거, openapi-fetch helper apiGet, BuildLogsResponse inline). 회귀 268/268 OK (TS 42+8 + Go 13 + Python 215). live e2e: vite proxy /api/builds → 3 builds, ?limit=2 → 2 + nextCursor.
 
