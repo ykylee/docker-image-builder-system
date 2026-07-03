@@ -585,7 +585,7 @@ export interface components {
         /** @description Standard error shape returned with 4xx/5xx responses. */
         BuildError: {
             /** @enum {string} */
-            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "PREVIEW_PROVISION_FAILED" | "UNKNOWN_ERROR";
+            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "PREVIEW_PROVISION_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
             message: string;
         };
         /** @description Returned on POST /builds when a new build is queued (HTTP 202). */
