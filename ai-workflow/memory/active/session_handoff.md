@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 49→50: TASK-060 2차 PR (PR #15) 진입. 브랜치 `codex/task-060-fixture-buildlist-2026-07-03` (main HEAD `651abf0` 기준). vitest 4 file (BuildRow / BuildsList / AdminBuilds / AdminUsers) sample data 에 `lifecycleStatus` 추가 — `BuildRow.test.ts` 에 lifecycleStatus 우선 + legacy fallback case 신규. `AdminUsers.svelte` recent builds panel 의 `<span class="status mono">{b.status}</span>` 을 `<StatusPill status={b.status} lifecycleStatus={b.lifecycleStatus} />` 로 교체 + 미사용 `.status` CSS 제거. 회귀: TS 4 packages clean, Go 9 packages, build-server 52/52, build-monitor tsc + svelte-check 0/0 (warning 도 해결). workflow meta 동기화 (state rev 70→71, handoff 49→50, work_backlog 42→43, backlog §50→51) 같은 PR commit 에 포함. 다음: commit + push + gh pr create + squash merge sync.)
+- Updated: 2026-07-03 (rev 50→51: PR #15 squash merge 합류 sync. main HEAD `fe7f639` (squash merge commit, 입력 `71ce207`). self-review 보완 필요 0건으로 amend 없이 squash merge. 다음: TASK-060 3차 PR (Admin 라우트 status filter canonical 정렬) 또는 TASK-061 (Skill/MCP contract rename) 또는 TASK-062 (stdio transport).)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note
