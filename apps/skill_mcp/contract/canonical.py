@@ -66,19 +66,70 @@ PUBLIC_BUILD_STATUSES: frozenset[str] = frozenset(
     CANONICAL_BUILD_STATUSES | LEGACY_BUILD_STATUSES
 )
 
-# Legacy preview/test-deployment states. Mirrors `previewStatuses` in
-# status.ts. Kept only because the build-server's legacy endpoints
-# still emit them during the migration. New code MUST prefer the
-# canonical `test` / `deploy` blocks (ContainerTestResult /
-# DeploymentResult) in BuildStatusResponse instead.
+# Legacy preview/test-deployment states. The TS contract (`previewStatuses`
+# in status.ts) lists 6 values; the Python migration shim keeps 3 additional
+# PKG-006-era historical statuses that the build-server emitted in earlier
+# versions but that the canonical contract dropped during the rename
+# refactor (TASK-052):
+#
+#   - "RESERVED"   — PKG-006 reservation phase
+#   - "STARTING"   — pre-canonical starting alias for PROVISIONING
+#   - "STOPPED"    — older teardown state (now superseded by EXPIRED)
+#
+# These three are Python-only legacy extras; the contract-drift-checker
+# reports them under the `extra_in_code` group (Python canonical vs TS).
+# Skills keep accepting them for caller forward-compat during the
+# migration window. New code MUST prefer the canonical `test` / `deploy`
+# blocks (ContainerTestResult / DeploymentResult) in BuildStatusResponse.
 LEGACY_PREVIEW_STATUSES: frozenset[str] = frozenset({
+    # TS-mirror subset (6)
     "NOT_REQUESTED",
     "QUEUED",
     "PROVISIONING",
     "READY",
     "FAILED",
     "EXPIRED",
+    # Python-only legacy extras (3) — PKG-006-era historical.
+    "RESERVED",
+    "STARTING",
+    "STOPPED",
 })
+
+# Forward-map legacy preview-status to canonical execution-status.
+# Mirrors the live build-status-explainer / latest-build-status /
+# preview-readiness-checker mapping. Single source-of-truth so the three
+# skills/MCPs that consume `testDeployment` stay aligned.
+LEGACY_PREVIEW_TO_EXECUTION: dict[str, str] = {
+    "READY": "SUCCESS",
+    "NOT_REQUESTED": "SKIPPED",
+    "QUEUED": "NOT_STARTED",
+    "PROVISIONING": "IN_PROGRESS",
+    # FAILED / EXPIRED / RESERVED / STARTING / STOPPED fall through as
+    # `execution = raw` — they're either canonical EXECUTION_STATUSES
+    # member (FAILED) or shim values handled per-case.
+}
+
+# Canonical 4-stage enum for failure-summary-shaper. Marks at which
+# build/test/deploy/result-delivery step a failure happened. Mirrors
+# the new narrative in docs/sdlc/02-concept-refinement.md and the
+# failure-shaper SKILL §1.2.
+CANONICAL_STAGES: frozenset[str] = frozenset({
+    "BUILD",
+    "TEST",
+    "DEPLOY",
+    "DELIVERY",
+})
+
+# Backward-compat: legacy `failure.source` (`build` / `preview` /
+# `deploy` / `delivery` / `unknown`) → canonical stage. "unknown"
+# defaults to BUILD (worst-case prior step) and surfaces a warning.
+LEGACY_SOURCE_TO_STAGE: dict[str, str] = {
+    "build": "BUILD",
+    "preview": "TEST",
+    "deploy": "DEPLOY",
+    "delivery": "DELIVERY",
+    "unknown": "BUILD",
+}
 
 # Build phase enum. Mirrors packages/shared-contract/src/build/phase.ts
 # `buildPhases`. Drives host-side status transitions.

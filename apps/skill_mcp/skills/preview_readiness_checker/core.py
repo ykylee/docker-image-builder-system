@@ -58,12 +58,10 @@ BUILDING_PHASES = frozenset({
 })
 
 # Legacy preview-status forward-mapping → canonical execution status.
-LEGACY_PREVIEW_TO_EXECUTION = {
-    "READY": "SUCCESS",
-    "NOT_REQUESTED": "SKIPPED",
-    "QUEUED": "NOT_STARTED",
-    "PROVISIONING": "IN_PROGRESS",
-}
+# Single source-of-truth lives in `apps.skill_mcp.contract.canonical`
+# so build-status-explainer / latest-build-status / preview-readiness-checker
+# stay aligned.
+LEGACY_PREVIEW_TO_EXECUTION = C.LEGACY_PREVIEW_TO_EXECUTION
 
 # canonical status 값에 따른 사용 안내 카드.
 CARD_BY_STATE = {
@@ -354,15 +352,16 @@ def check_readiness(input_data: Any) -> ReadinessResult:
             subtitle = ref
 
     next_action = card_data["next_action"]
-    if next_action not in NEXT_ACTIONS and next_action != "OPEN_PREVIEW":
+    if next_action not in NEXT_ACTIONS:
+        # CARD_BY_STATE only emits canonical next_action values, so this
+        # branch fires only on unknown enum — migrate-level safety nets
+        # for OPEN_PREVIEW etc. are no longer needed since the canonical
+        # NEXT_ACTIONS doesn't include them.
         warnings.append(_err(
             "UNKNOWN_ENUM", "next_action",
             f"unexpected next_action {next_action!r}; treated as NONE",
         ))
         next_action = "NONE"
-    if next_action == "OPEN_PREVIEW":
-        # migration safety net.
-        next_action = "OPEN_DEPLOYMENT"
 
     card = ReadinessCard(
         title=card_data["title"],

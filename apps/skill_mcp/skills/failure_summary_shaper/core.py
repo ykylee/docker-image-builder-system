@@ -32,18 +32,14 @@ SKILL_VERSION = "v2"
 ERROR_CODES = C.ERROR_CODES
 NEXT_ACTIONS = C.NEXT_ACTIONS
 
-# Canonical stage values — at which step the failure happened. Used in
-# SUMMARY_BY_STAGE and surfaced in output for traceability.
-CANONICAL_STAGES = frozenset({"BUILD", "TEST", "DEPLOY", "DELIVERY"})
+# Canonical stage values (BUILD / TEST / DEPLOY / DELIVERY) — at which
+# step the failure happened. Source-of-truth = `apps.skill_mcp.contract
+# .canonical.CANONICAL_STAGES`.
+CANONICAL_STAGES = C.CANONICAL_STAGES
 
 # Backward-compat: legacy `source: build/preview/unknown` mapping.
-LEGACY_SOURCE_TO_STAGE = {
-    "build": "BUILD",
-    "preview": "TEST",
-    "deploy": "DEPLOY",
-    "delivery": "DELIVERY",
-    "unknown": "BUILD",  # worst-case default; surfaced as warning.
-}
+# Source-of-truth = `apps.skill_mcp.contract.canonical.LEGACY_SOURCE_TO_STAGE`.
+LEGACY_SOURCE_TO_STAGE = C.LEGACY_SOURCE_TO_STAGE
 
 
 # Canonical stage → summary line.
@@ -164,7 +160,13 @@ def _coerce_legacy_preview_failure_dict(f: Any) -> dict[str, Any] | None:
 
 def _map_legacy_next_action(value: Any) -> str | None:
     """Legacy `OPEN_PREVIEW` → canonical `OPEN_DEPLOYMENT` mapping. Other
-    values pass through (caller 검증 함수가 unknown enum 을 잡는다)."""
+    values pass through (caller 검증 함수가 unknown enum 을 잡는다).
+
+    Note: this is INPUT forward-compat only. The skill's own output
+    emits canonical `OPEN_DEPLOYMENT` (or any other NEXT_ACTIONS
+    member) — `OPEN_PREVIEW` never appears in the outgoing
+    `next_action` field.
+    """
     if value == "OPEN_PREVIEW":
         return "OPEN_DEPLOYMENT"
     if isinstance(value, str):
@@ -192,8 +194,9 @@ def _pick_next_step(next_action: Any) -> str:
     if isinstance(next_action, str) and next_action in NEXT_STEP_BY_ACTION:
         return NEXT_STEP_BY_ACTION[next_action]
     if next_action == "OPEN_PREVIEW":
-        # legacy caller 가 여전히 OPEN_PREVIEW 를 보내는 마이그레이션 종료 시점:
-        # OPEN_DEPLOYMENT 와 같은 결과 안내.
+        # 입력 shim 경로 — _map_legacy_next_action 단계에서 OPEN_PREVIEW 가
+        # OPEN_DEPLOYMENT 로 forward-mapped 됐어야 하지만, 직접 호출도
+        # 안전하게 처리.
         return NEXT_STEP_BY_ACTION["OPEN_DEPLOYMENT"]
     return NEXT_STEP_BY_ACTION["NONE"]
 
@@ -335,6 +338,8 @@ def shape(input_data: Any) -> FailureSummary:
     if not isinstance(next_action, str) or not next_action:
         next_action = "NONE"
     if next_action not in NEXT_ACTIONS and next_action != "OPEN_PREVIEW":
+        # OPEN_PREVIEW 는 forward-compat shim 으로 OPEN_DEPLOYMENT 로 자동 매핑.
+        # 그 외 canonical NEXT_ACTIONS 외 값은 UNKNOWN_ENUM warning + NONE fallback.
         warnings.append(_err(
             "UNKNOWN_ENUM", "nextAction",
             f"unknown nextAction: {next_action!r}; treated as 'NONE'",

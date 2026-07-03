@@ -217,31 +217,25 @@ def _resolve_canonical_build_block(input_data: dict[str, Any]) -> tuple[dict[str
 
 def _execution_status_from_test(test_block: dict[str, Any] | None) -> str | None:
     """Canonical `test.status` ∈ EXECUTION_STATUSES, with legacy preview-
-    era values forward-mapped onto the same set.
+    era values forward-mapped onto the same set (single source-of-truth
+    = `apps.skill_mcp.contract.canonical.LEGACY_PREVIEW_TO_EXECUTION`).
 
-    Forward-map:
-      READY        → SUCCESS
-      QUEUED       → NOT_STARTED
-      PROVISIONING → IN_PROGRESS
-      FAILED/EXPIRED → 그대로 (canonical FAILED)
-      NOT_REQUESTED → SKIPPED
+    Canonical execution statuses pass through. Legacy preview statuses
+    are mapped via the canonical helper; values valid in both unions
+    (FAILED, EXPIRED / RESERVED / STARTING / STOPPED) keep raw. Unknown
+    enum values are returned raw so the caller can attach a warning.
     """
     if test_block is None:
         return None
     raw = test_block.get("status")
     if not isinstance(raw, str):
         return None
-    legacy_map = {
-        "READY": "SUCCESS",
-        "QUEUED": "NOT_STARTED",
-        "PROVISIONING": "IN_PROGRESS",
-        "NOT_REQUESTED": "SKIPPED",
-    }
     if raw in EXECUTION_STATUSES:
         return raw
-    if raw in legacy_map:
-        return legacy_map[raw]
-    # FAILED / EXPIRED are valid in BOTH unions — keep raw.
+    if raw in C.LEGACY_PREVIEW_TO_EXECUTION:
+        return C.LEGACY_PREVIEW_TO_EXECUTION[raw]
+    # FAILED / EXPIRED / STARTING / STOPPED / RESERVED 등 LEGACY_PREVIEW_STATUSES
+    # 나머지는 raw 그대로 (canonical executionStatuses 외 shim values).
     if raw in LEGACY_PREVIEW_STATUSES:
         return raw
     return raw  # unknown enum — surfaced as warning, not mapped

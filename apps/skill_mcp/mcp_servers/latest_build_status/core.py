@@ -86,7 +86,14 @@ _CANONICAL_OR_LEGACY_STATUSES: frozenset[str] = frozenset(
 # 보내는 경우 canonical `test` / `lastError` 로 forward-map 한다. 이 단계는
 # normalize 단계에서 일어나며 explain() 은 항상 canonical payload 만 본다.
 def _normalize_legacy_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Legacy preview-era 필드를 canonical 로 forward-map."""
+    """Legacy preview-era 필드를 canonical 로 forward-map.
+
+    Single source-of-truth for the legacy preview-status →
+    canonical execution-status mapping is
+    `apps.skill_mcp.contract.canonical.LEGACY_PREVIEW_TO_EXECUTION`
+    — same map used by build-status-explainer and
+    preview-readiness-checker so all three stay aligned.
+    """
     if not isinstance(payload, dict):
         return {}
     out = dict(payload)
@@ -96,14 +103,8 @@ def _normalize_legacy_payload(payload: dict[str, Any]) -> dict[str, Any]:
         legacy_td = out.pop("testDeployment")
         if isinstance(legacy_td, dict):
             legacy_status = legacy_td.get("status")
-            legacy_map = {
-                "READY": "SUCCESS",
-                "QUEUED": "NOT_STARTED",
-                "PROVISIONING": "IN_PROGRESS",
-                "NOT_REQUESTED": "SKIPPED",
-            }
             if isinstance(legacy_status, str):
-                execution = legacy_map.get(legacy_status, legacy_status)
+                execution = C.LEGACY_PREVIEW_TO_EXECUTION.get(legacy_status, legacy_status)
                 mapped: dict[str, Any] = {"status": execution}
                 preview_url = legacy_td.get("previewUrl")
                 if isinstance(preview_url, str) and preview_url:
