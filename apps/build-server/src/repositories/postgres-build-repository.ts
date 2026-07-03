@@ -12,6 +12,11 @@ import {
 import { eq, inArray } from "@docker-image-builder-system/db";
 
 import type {
+  AdminListBuildsQuery,
+  AdminListBuildsResponse,
+  AdminUserBuildSummary,
+  AdminUserListResponse,
+  AdminUserSummary,
   BuildDuplicateResponse,
   BuildError,
   BuildListQuery,
@@ -43,10 +48,22 @@ type BuildRequestRow = typeof buildRequestTable.$inferSelect;
 type BuildLogRow = typeof buildLogTable.$inferSelect;
 
 function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
+  // TODO (DB migration, follow-up): add an `appName text not null` column
+  // to build_request and read it directly. Until the migration ships,
+  // we surface appName through the metadata JSONB so the API contract
+  // already speaks appName end-to-end. Legacy rows written by PR #6 / #7
+  // still have the canonical appName under metadata.appName; new rows
+  // also write to metadata.appName via the insert below.
+  const metadata = (row.metadata ?? {}) as Record<string, string>;
+  const appName =
+    metadata["appName"] ??
+    // Belt-and-suspenders: legacy rows may also have stashed the value
+    // under snake_case keys if a prior client wrote them that way.
+    metadata["app_name"] ??
+    "";
   return {
     buildId: row.id,
-    projectId: row.projectId,
-    repositoryId: row.repositoryId,
+    appName,
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
     previewStatus: row.previewStatus as PreviewStatus,
@@ -83,24 +100,30 @@ export class PostgresBuildRepository implements BuildRepository {
   async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
     const buildId = randomUUID();
     const timestamp = new Date();
-    const lockKey = `${input.projectId}:${input.repositoryId}`;
+    // Lock keyed on appName only (1 active build per app). See
+    // shared-contract/src/build/request.ts — the legacy
+    // (projectId, repositoryId) pair was collapsed into appName.
+    const lockKey = input.appName;
 
     return this.db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`);
 
+      // Active-build dedup is keyed on appName only. We probe via
+      // metadata->>'appName' until the dedicated column lands (see
+      // mapBuildRowToSummary TODO). For the new row we always write
+      // metadata.appName = input.appName below, so the probe matches
+      // deterministically.
       const [activeBuild] = await tx
         .select()
         .from(buildRequestTable)
         .where(
           and(
-            eq(buildRequestTable.projectId, input.projectId),
-            eq(buildRequestTable.repositoryId, input.repositoryId),
+            sql`${buildRequestTable.metadata}->>'appName' = ${input.appName}`,
             inArray(buildRequestTable.status, activeBuildStatuses)
           )
         )
         .orderBy(desc(buildRequestTable.createdAt))
         .limit(1);
-
       if (activeBuild) {
         const duplicate: BuildDuplicateResponse = {
           accepted: false,
@@ -119,8 +142,12 @@ export class PostgresBuildRepository implements BuildRepository {
         .insert(buildRequestTable)
         .values({
           id: buildId,
-          projectId: input.projectId,
-          repositoryId: input.repositoryId,
+          // appName is the canonical identity; projectId / repositoryId
+          // columns are kept empty until a follow-up DB migration drops
+          // them in favor of a dedicated appName text column. See
+          // mapBuildRowToSummary TODO for the migration plan.
+          projectId: input.appName,
+          repositoryId: "",
           requestedBy: input.requestedBy,
           status: "QUEUED",
           phase: "REQUEST_ACCEPTED",
@@ -551,5 +578,92 @@ export class PostgresBuildRepository implements BuildRepository {
     const nextCursor = hasMore ? (summaries[summaries.length - 1]?.buildId ?? null) : null;
 
     return { builds: summaries, nextCursor };
+  }
+
+  // Admin-only methods (ADMIN-003). Reuses the same filter+sort+cursor
+  // pipeline as listBuilds, then enriches each summary with the
+  // requestedBy owner key. The listBuilds path already selected
+  // requestedBy because mapBuildRowToSummary could surface it directly
+  // (or by adding a thin parallel projection). We re-fetch the rows
+  // here with the same predicates and read the column.
+  async listBuildsAcrossUsers(
+    query: AdminListBuildsQuery
+  ): Promise<AdminListBuildsResponse> {
+    const cursorRow = query.cursor
+      ? (
+          await this.db
+            .select({
+              createdAt: buildRequestTable.createdAt,
+              id: buildRequestTable.id
+            })
+            .from(buildRequestTable)
+            .where(eq(buildRequestTable.id, query.cursor))
+            .limit(1)
+        )[0]
+      : undefined;
+
+    const conds = [];
+    if (query.status) {
+      conds.push(eq(buildRequestTable.status, query.status));
+    }
+    if (query.requestedBy) {
+      conds.push(eq(buildRequestTable.requestedBy, query.requestedBy));
+    }
+    if (cursorRow) {
+      conds.push(
+        sql`(${buildRequestTable.createdAt}, ${buildRequestTable.id}) < (${cursorRow.createdAt}, ${buildRequestTable.id})`
+      );
+    }
+
+    const rows = await this.db
+      .select()
+      .from(buildRequestTable)
+      .where(conds.length > 0 ? and(...conds) : undefined)
+      .orderBy(desc(buildRequestTable.createdAt), desc(buildRequestTable.id))
+      .limit(query.limit + 1);
+
+    const hasMore = rows.length > query.limit;
+    const page = hasMore ? rows.slice(0, query.limit) : rows;
+    const enriched: AdminUserBuildSummary[] = page.map((row) => ({
+      ...mapBuildRowToSummary(row),
+      requestedBy: row.requestedBy
+    }));
+    const nextCursor = hasMore
+      ? enriched[enriched.length - 1]?.buildId ?? null
+      : null;
+    return { builds: enriched, nextCursor };
+  }
+
+  async listBuildOwners(): Promise<AdminUserListResponse> {
+    // GROUP BY requestedBy on the build_request table. count(*) +
+    // max(createdAt) 를 한 번에 가져와 메모리 정렬. 빌드 수가 많아지면
+    // (1) 페이지네이션, (2) createdAt 기준 인덱스 정밀화를 후속 PR 에서
+    // 다룬다. 현 1차 골격은 전체 owner 를 한 번에 반환.
+    //
+    // TODO (ADMIN-006 follow-up): AdminListBuildsQuery 와 동일한
+    // `limit` + `cursor` 파라미터로 owner rollup 도 페이지네이션
+    // 한다. cursor 키는 (lastBuildAt, userId) tuple. 이 자리에
+    // `limit: query.limit ?? 100` 와 `.limit(...)` 절이 들어가고,
+    // 응답 envelope 에 nextCursor 가 추가되어야 한다. 스키마
+    // (adminUserListResponseSchema) 도 같이 evolve 한다.
+    const rows = await this.db
+      .select({
+        userId: buildRequestTable.requestedBy,
+        buildCount: sql<number>`count(*)::int`,
+        lastBuildAt: sql<string | null>`max(${buildRequestTable.createdAt})`
+      })
+      .from(buildRequestTable)
+      .groupBy(buildRequestTable.requestedBy)
+      .orderBy(sql`max(${buildRequestTable.createdAt}) DESC`);
+
+    const users: AdminUserSummary[] = rows.map((row) => ({
+      userId: row.userId,
+      buildCount: row.buildCount,
+      lastBuildAt: row.lastBuildAt
+        ? new Date(row.lastBuildAt as unknown as string | Date).toISOString()
+        : null
+    }));
+
+    return { users };
   }
 }

@@ -21,8 +21,15 @@ export type BuildError = z.infer<typeof buildErrorSchema>;
 export const buildSummarySchema = z
   .object({
     buildId: z.string().uuid(),
-    projectId: z.string().min(1),
-    repositoryId: z.string().min(1),
+    // appName replaces the legacy (projectId, repositoryId) pair — see
+    // BuildRequest comment. AdminUserBuildSummary (ADMIN-*) extends this
+    // shape with `requestedBy` via zod `.extend({...})`, so the evolve
+    // contract documented in packages/shared-contract/src/build/admin.ts
+    // continues to hold for this field too.
+    appName: z.string().min(1).meta({
+      description:
+        "Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI."
+    }),
     status: z.enum(buildStatuses),
     phase: z.enum(buildPhases),
     previewStatus: z.enum(previewStatuses),
@@ -59,7 +66,7 @@ export const buildDuplicateResponseSchema = z
   })
   .meta({
     id: "BuildDuplicateResponse",
-    description: "Returned on POST /builds when an active build already exists for the same projectId (HTTP 409, not 4xx error)."
+    description: "Returned on POST /builds when an active build already exists for the same appName (HTTP 409, not 4xx error)."
   });
 
 export type BuildDuplicateResponse = z.infer<typeof buildDuplicateResponseSchema>;

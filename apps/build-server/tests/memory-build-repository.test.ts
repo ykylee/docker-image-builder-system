@@ -4,8 +4,7 @@ import { describe, it } from "node:test";
 import { createMemoryBuildRepository } from "../src/repositories/memory-build-repository.js";
 
 const baseRequest = {
-  projectId: "p-1",
-  repositoryId: "r-1",
+  appName: "p-1",
   requestedBy: "yklee",
   sourceArchive: {
     objectKey: "src/p-1/r-1/abc.tar.gz",
@@ -41,7 +40,7 @@ describe("MemoryBuildRepository: claimNextBuild", () => {
     assert.equal(first.kind, "claimed");
 
     // enqueue a 2nd build for a different repoId so it isn't blocked by duplicate guard
-    await repo.createBuild({ ...baseRequest, repositoryId: "r-2" });
+    await repo.createBuild({ ...baseRequest, appName: "app-2" });
     const result = await repo.claimNextBuild();
     assert.equal(result.kind, "active_build_exists");
     if (result.kind !== "active_build_exists") return;
@@ -68,11 +67,11 @@ describe("MemoryBuildRepository: claimNextBuild", () => {
     const buildId = first.response.build.buildId;
     await repo.updatePhase(buildId, "DOCKER_BUILD_STARTED");
     await repo.updatePhase(buildId, "COMPLETED");
-    await repo.createBuild({ ...baseRequest, repositoryId: "r-2" });
+    await repo.createBuild({ ...baseRequest, appName: "app-2" });
     const result = await repo.claimNextBuild();
     assert.equal(result.kind, "claimed");
     if (result.kind !== "claimed") return;
-    assert.equal(result.response.build.repositoryId, "r-2");
+    assert.equal(result.response.build.appName, "app-2");
   });
 });
 
@@ -133,8 +132,7 @@ describe("MemoryBuildRepository: updatePhase", () => {
 
 describe("MemoryBuildRepository: listBuilds", () => {
   const baseRequest = {
-    projectId: "p-1",
-    repositoryId: "r-1",
+    appName: "p-1",
     requestedBy: "yklee",
     sourceArchive: {
       objectKey: "src/p-1/r-1/abc.tar.gz",
@@ -157,8 +155,7 @@ describe("MemoryBuildRepository: listBuilds", () => {
     await new Promise((r) => setTimeout(r, 5));
     const b = await repo.createBuild({
       ...baseRequest,
-      projectId: "p-2",
-      repositoryId: "r-2"
+      appName: "p-2"
     });
     assert.equal(a.kind, "accepted");
     assert.equal(b.kind, "accepted");
@@ -166,8 +163,8 @@ describe("MemoryBuildRepository: listBuilds", () => {
     const result = await repo.listBuilds({ limit: 50 });
     assert.equal(result.builds.length, 2);
     // b is newer than a → b first
-    assert.equal(result.builds[0]?.projectId, "p-2");
-    assert.equal(result.builds[1]?.projectId, "p-1");
+    assert.equal(result.builds[0]?.appName, "p-2");
+    assert.equal(result.builds[1]?.appName, "p-1");
     assert.equal(result.nextCursor, null);
   });
 
@@ -175,13 +172,11 @@ describe("MemoryBuildRepository: listBuilds", () => {
     const repo = createMemoryBuildRepository();
     const a = await repo.createBuild({
       ...baseRequest,
-      projectId: "p-a",
-      repositoryId: "r-a"
+      appName: "p-a"
     });
     const b = await repo.createBuild({
       ...baseRequest,
-      projectId: "p-b",
-      repositoryId: "r-b"
+      appName: "p-b"
     });
     if (a.kind !== "accepted" || b.kind !== "accepted") {
       throw new Error("seed failed");
@@ -213,14 +208,12 @@ describe("MemoryBuildRepository: listBuilds", () => {
     const repo = createMemoryBuildRepository();
     await repo.createBuild({
       ...baseRequest,
-      projectId: "p-a",
-      repositoryId: "r-a",
+      appName: "p-a",
       requestedBy: "yklee"
     });
     await repo.createBuild({
       ...baseRequest,
-      projectId: "p-b",
-      repositoryId: "r-b",
+      appName: "p-b",
       requestedBy: "other-user"
     });
 
@@ -229,7 +222,7 @@ describe("MemoryBuildRepository: listBuilds", () => {
 
     const mine = await repo.listBuilds({ limit: 50, requestedBy: "yklee" });
     assert.equal(mine.builds.length, 1);
-    assert.equal(mine.builds[0]?.projectId, "p-a");
+    assert.equal(mine.builds[0]?.appName, "p-a");
 
     const others = await repo.listBuilds({ limit: 50, requestedBy: "unknown" });
     assert.equal(others.builds.length, 0);
@@ -241,8 +234,7 @@ describe("MemoryBuildRepository: listBuilds", () => {
     for (let i = 0; i < 5; i++) {
       const result = await repo.createBuild({
         ...baseRequest,
-        projectId: `p-${i}`,
-        repositoryId: `r-${i}`
+        appName: `app-${i}`
       });
       if (result.kind !== "accepted") throw new Error("seed failed");
       ids.push(result.response.build.buildId);

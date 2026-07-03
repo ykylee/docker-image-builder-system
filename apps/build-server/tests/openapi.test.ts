@@ -19,6 +19,7 @@ describe("openapi document", () => {
 
     const tagNames = document.tags.map((t) => t.name).sort();
     assert.deepEqual(tagNames, [
+      "Admin",
       "Builds",
       "Health",
       "Runner Claim",
@@ -29,6 +30,8 @@ describe("openapi document", () => {
     // unique path keys. 같은 path (/builds) 에 GET + POST 가 merge 됨.
     const pathKeys = Object.keys(document.paths).sort();
     assert.deepEqual(pathKeys, [
+      "/admin/builds",
+      "/admin/users",
       "/builds",
       "/builds/claim",
       "/builds/{buildId}",
@@ -59,6 +62,22 @@ describe("openapi document", () => {
     assert.ok(
       schemaKeys.includes("TestDeployment"),
       "TestDeployment schema must be registered"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminListBuildsQuery"),
+      "AdminListBuildsQuery schema must be registered"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminListBuildsResponse"),
+      "AdminListBuildsResponse schema must be registered"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminUserBuildSummary"),
+      "AdminUserBuildSummary schema must be registered"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminUserListResponse"),
+      "AdminUserListResponse schema must be registered"
     );
   });
 });

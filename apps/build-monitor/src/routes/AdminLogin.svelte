@@ -2,61 +2,73 @@
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
 
-  import { userIdStore } from "../lib/session.js";
+  import { adminIdStore } from "../lib/session.js";
 
-  let userId = $state("");
-  // currentUserId 는 store 와 동기화 — 이미 로그인된 상태에서 진입하면
-  // 입력 칸에 현재 id 를 채워서 보여준다.
-  let currentUserId = $derived($userIdStore);
+  let adminId = $state("");
+  let currentAdminId = $derived($adminIdStore);
 
+  // Admin login is separate from the user login flow. The admin id is
+  // stored under a distinct localStorage key (`adminId`) so the regular
+  // build monitor session is not disturbed, and so the regular user
+  // login (in Login.svelte) cannot accidentally satisfy the admin guard.
+  // Backend authorization is the source of truth: ADMIN_IDS in the
+  // build-server env decides who can call /admin/*.
   onMount(() => {
-    if (currentUserId) {
-      push("/builds");
+    if (currentAdminId) {
+      // Auto-forward to /admin/builds only after the user has already
+      // signed in once this session. The backend still re-checks the
+      // header on every request.
+      push("/admin/builds");
     }
   });
 
   function login(e: Event) {
     e.preventDefault();
-    const value = userId.trim();
+    const value = adminId.trim();
     if (value) {
-      // session store 가 localStorage 도 같이 쓴다. 같은 탭에서 Header
-      // 가 즉시 갱신되도록 writable store 경유 (Bug 1).
-      userIdStore.set(value);
-      push("/builds");
+      // Bug 1: session store 경유로 set 해서 같은 탭의 Header 가
+      // 로그인 직후 admin pill / nav link 를 즉시 표시하도록 한다.
+      adminIdStore.set(value);
+      push("/admin/builds");
     }
   }
 </script>
 
-<section class="login-page">
+<section class="admin-login">
   <div class="card">
     <div class="logo-wrapper">
       <span class="logo" aria-hidden="true">⬢</span>
     </div>
-    <h1>Welcome to Build Monitor</h1>
-    <p class="subtitle">Enter your user ID to view your builds.</p>
-    
+    <h1>Admin Sign-in</h1>
+    <p class="subtitle">
+      Enter your admin id to manage every build and review user activity.
+    </p>
     <form onsubmit={login}>
       <div class="input-group">
-        <label for="userId">User ID</label>
+        <label for="adminId">Admin ID</label>
         <input
-          id="userId"
+          id="adminId"
           type="text"
-          bind:value={userId}
-          placeholder="your-id"
+          bind:value={adminId}
+          placeholder="admin"
           required
         />
       </div>
-      <button type="submit" class="btn-primary">Enter</button>
+      <button type="submit" class="btn-primary">Enter Admin</button>
     </form>
+    <p class="muted small">
+      The default admin ids are <code>admin</code> and <code>yky.lee</code>.
+      Operators can override the allow-list via the <code>ADMIN_IDS</code>
+      env on the build server.
+    </p>
   </div>
 </section>
 
 <style>
-  .login-page {
+  .admin-login {
     display: flex;
     align-items: center;
     justify-content: center;
-    /* header (64) + main padding-top (space-lg) + main padding-bottom (space-lg) */
     min-height: calc(100vh - 64px - var(--space-lg) * 2);
     animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
   }
@@ -88,11 +100,7 @@
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
     margin-bottom: var(--space-lg);
   }
-  .logo {
-    color: white;
-    font-size: var(--size-xxl);
-    line-height: 1;
-  }
+  .logo { color: white; font-size: var(--size-xxl); line-height: 1; }
   h1 {
     margin: 0 0 var(--space-xs);
     font-size: var(--size-xl);
@@ -154,7 +162,17 @@
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
     transform: translateY(-1px);
   }
-  .btn-primary:active {
-    transform: translateY(0);
+  .btn-primary:active { transform: translateY(0); }
+  .muted {
+    color: var(--color-text-muted);
+    margin-top: var(--space-lg);
+  }
+  .small { font-size: var(--size-xs); }
+  code {
+    background: var(--color-bg-surface-elevated);
+    padding: 0 4px;
+    border-radius: 4px;
+    font-family: var(--font-mono, monospace);
+    font-size: 0.9em;
   }
 </style>

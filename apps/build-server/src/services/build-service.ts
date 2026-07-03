@@ -1,4 +1,7 @@
 import type {
+  AdminListBuildsQuery,
+  AdminListBuildsResponse,
+  AdminUserListResponse,
   BuildAcceptedResponse,
   BuildDuplicateResponse,
   BuildListQuery,
@@ -145,5 +148,18 @@ export class BuildService {
 
   async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
     return this.repository.listBuilds(query);
+  }
+
+  // Admin-only operations (ADMIN-004). The repository methods bypass owner
+  // filtering; the route layer is the single guard that limits these calls
+  // to ids present in runtime.adminIds.
+  async listBuildsAcrossUsers(
+    query: AdminListBuildsQuery
+  ): Promise<AdminListBuildsResponse> {
+    return this.repository.listBuildsAcrossUsers(query);
+  }
+
+  async listBuildOwners(): Promise<AdminUserListResponse> {
+    return this.repository.listBuildOwners();
   }
 }

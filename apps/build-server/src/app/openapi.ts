@@ -18,6 +18,10 @@ import type { ZodTypeAny } from "zod";
 const projectRequire = createRequire(import.meta.url);
 
 import {
+  adminListBuildsQuerySchema,
+  adminListBuildsResponseSchema,
+  adminUserBuildSummarySchema,
+  adminUserListResponseSchema,
   buildErrorSchema,
   buildAcceptedResponseSchema,
   buildDuplicateResponseSchema,
@@ -63,14 +67,42 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "TestDeploymentReadyRequest", schema: testDeploymentReadyRequestSchema },
   { id: "TestDeploymentStatusRequest", schema: testDeploymentStatusRequestSchema },
   { id: "SourceArchive", schema: sourceArchiveSchema },
-  { id: "BuildRequest", schema: buildRequestSchema }
+  { id: "BuildRequest", schema: buildRequestSchema },
+  { id: "AdminListBuildsQuery", schema: adminListBuildsQuerySchema },
+  { id: "AdminListBuildsResponse", schema: adminListBuildsResponseSchema },
+  { id: "AdminUserBuildSummary", schema: adminUserBuildSummarySchema },
+  { id: "AdminUserListResponse", schema: adminUserListResponseSchema }
 ];
 
+// Component registry. We keep a Map from canonical component id to a
+// refId-bearing clone of each schema. @asteasolutions/zod-to-openapi 8.5
+// emits a schema under `components.schemas.<id>` only when the schema
+// passed to `register` was created (or cloned) by `.openapi(id)`. Calling
+// `.openapi()` returns a new zod instance, so we must use that clone both
+// for the registry and for any `registerPath` call that wants the path to
+// render as `$ref: '#/components/schemas/<id>'`. The component lookup
+// map is also reused in the admin path registrations below so the
+// `/admin/builds` query schema shares the `AdminListBuildsQuery` ref.
+type ZodWithOpenApi = {
+  openapi: (refId: string, meta?: Record<string, unknown>) => unknown;
+};
+const componentById = new Map<string, ZodTypeAny>();
 for (const { id, schema } of componentSchemas) {
-  // 8.x signature: `register(refId, zodSchema)`. The refId is the
-  // `components.schemas.<id>` key and must match the `.meta({ id })`.
-  registry.register(id, schema);
+  const description = (schema as { description?: string }).description;
+  const tagged = (schema as unknown as ZodWithOpenApi).openapi(
+    id,
+    description ? { description } : {}
+  );
+  componentById.set(id, tagged as ZodTypeAny);
+  registry.register(id, tagged as ZodTypeAny);
 }
+const component = (id: string): ZodTypeAny => {
+  const v = componentById.get(id);
+  if (!v) {
+    throw new Error(`Unknown component id: ${id}`);
+  }
+  return v;
+};
 
 // Path registrations: every route registered in `apps/build-server/src/routes`
 // is described here exactly once. The OpenAPI document is rebuilt on each
@@ -167,6 +199,42 @@ registry.registerPath({
   description: 'Liveness probe. Always 200 with `{ status: "ok" }`.',
   tags: ["Health"],
   responses: { 200: { description: "Service is alive." } }
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/admin/builds",
+  description:
+    "Admin-only. List build summaries across all owners. Requires the X-Admin-Id header to be in the build-server ADMIN_IDS env.",
+  tags: ["Admin"],
+  // registerPath's query typing in @asteasolutions/zod-to-openapi 8.5 is
+  // narrower than the ZodTypeAny we use internally. Cast through never
+  // (which is assignable to anything) so the runtime call still works.
+  request: { query: component("AdminListBuildsQuery") as never },
+  responses: {
+    200: {
+      description: "Page of build summaries across all owners.",
+      content: { "application/json": { schema: component("AdminListBuildsResponse") as never } }
+    },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." }
+  }
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/admin/users",
+  description:
+    "Admin-only. List userIds that have build history with per-user buildCount and lastBuildAt.",
+  tags: ["Admin"],
+  responses: {
+    200: {
+      description: "Owner rollup.",
+      content: { "application/json": { schema: component("AdminUserListResponse") as never } }
+    },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." }
+  }
 });
 
 export function getOpenApiDocument(): unknown {

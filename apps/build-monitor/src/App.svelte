@@ -4,12 +4,21 @@
   import Login from "./routes/Login.svelte";
   import BuildsList from "./routes/BuildsList.svelte";
   import BuildDetail from "./routes/BuildDetail.svelte";
+  import AdminLogin from "./routes/AdminLogin.svelte";
+  import AdminBuilds from "./routes/AdminBuilds.svelte";
+  import AdminUsers from "./routes/AdminUsers.svelte";
   import NotFound from "./routes/NotFound.svelte";
 
   const routes = {
     "/": Login,
     "/builds": BuildsList,
     "/builds/:buildId": BuildDetail,
+    // Admin routes (ADMIN-007). Each admin route reads the adminId
+    // from a distinct localStorage key; the user-facing Login / Header
+    // does not satisfy the admin guard.
+    "/admin/login": AdminLogin,
+    "/admin/builds": AdminBuilds,
+    "/admin/users": AdminUsers,
     "*": NotFound
   };
 </script>

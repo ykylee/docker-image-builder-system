@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 20: PR #7 (Build Server list + openapi-typescript 자동 client, TASK-040) 진행 중, 회귀 268/268 OK; 후속: light mode 또는 TASK-017 stdio transport 또는 TASK-037 sweeper)
+- Updated: 2026-07-03 (rev 22: PR #9 (ADMIN-* Admin UI + bug fix 2건) squash merge 대기. main 합류 후 backlog §27.5 의 merge commit hash 만 amend 하면 §28 PR 가 자동 complete. 회귀 270/270. 다음 후속: DB schema migration TODO / light mode QA / TASK-017 stdio / TASK-037 sweeper / admin owner block-delete)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -149,6 +149,20 @@
 - [x] TASK-042: 진입 페이지(Login.svelte) 추가. 사용자 ID 입력 및 `localStorage` 기반 간이 세션 구성, 헤더 내 사용자 ID 및 로그아웃 버튼 반영, 빌드 목록 필터링 연동.
 
 - [x] TASK-040: Build Server GET /builds list endpoint + openapi-typescript 자동 client (PR #7). Memory + postgres 양쪽 listBuilds (filter status, cursor pagination, limit max 200). zod BuildListQuery/BuildListResponse schema + .meta. build-monitor 측 openapi-typescript 7 + openapi-fetch 0.13 + tsx script (predev/prebuild hook) 로 ./.generated/openapi.d.ts 자동 생성. lib/api.ts 재작성 (SAMPLE_BUILDS 제거, openapi-fetch helper apiGet, BuildLogsResponse inline). 회귀 268/268 OK (TS 42+8 + Go 13 + Python 215). live e2e: vite proxy /api/builds → 3 builds, ?limit=2 → 2 + nextCursor.
+
+## Next Actions
+
+- [ ] memory fallback 을 계속 기본값으로 둘지, postgres 를 기본 개발 경로로 승격할지 결정
+- [ ] build-server 산출물 경로(`dist/apps/build-server/src/index.js`)를 단순화할지 검토
+- [ ] Runner 가 소비할 Host Server claim/report API shape 를 닫고 skeleton client를 실제 호출로 연결 (`PKG-005`)
+- [ ] `POST /builds`, `GET /builds/{id}`, `GET /builds/{id}/logs` 응답을 persistence 운영 기준으로 더 정교화 (`PKG-002`, `PKG-003`, `PKG-004`)
+- [ ] shared-contract 의 Go 측 generated binding 전략 결정
+- [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
+- [ ] `MiniMax.md`, `MiniMax_config.example.json` vendor-specific overlay 점검
+- [ ] TASK-037 PKG-007 Preview Cleanup Policy Binding (TTL 만료 sweeper)
+- [ ] docker.BuildImage 실제 구현
+- [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화
+- [ ] admin owner 차단/삭제/메모 (후속 결정)
 
 ## Risks & Blockers
 

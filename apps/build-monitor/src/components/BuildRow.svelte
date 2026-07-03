@@ -9,9 +9,15 @@
   type BuildRowData = {
     buildId: string;
     status: string;
-    projectId: string;
-    repositoryId: string;
+    // appName is the canonical application identifier (v0.2 collapse of
+    // the legacy projectId/repositoryId pair). It is rendered as the App
+    // column in both the user-facing BuildsList and the admin builds view.
+    appName: string;
     updatedAt: string; // ISO 8601
+    // Owner is optional so the user-facing BuildsList route can keep
+    // using BuildRow without changes. AdminBuilds passes the canonical
+    // requestedBy so the admin table can render the owner column.
+    requestedBy?: string;
   };
 
   let { build }: { build: BuildRowData } = $props();
@@ -40,8 +46,10 @@
   <td class="id-cell">
     <a use:link href={`/builds/${build.buildId}`} class="mono">{build.buildId.slice(0, 8)}</a>
   </td>
-  <td class="meta-cell">{build.projectId}</td>
-  <td class="meta-cell">{build.repositoryId}</td>
+  <td class="meta-cell mono" title={build.appName}>{build.appName}</td>
+  {#if build.requestedBy}
+    <td class="owner-cell mono">@{build.requestedBy}</td>
+  {/if}
   <td class="time-cell" title={build.updatedAt}>{updated}</td>
 </tr>
 
@@ -84,5 +92,15 @@
     font-size: var(--size-sm);
     text-align: right;
     font-variant-numeric: tabular-nums;
+  }
+  .owner-cell {
+    color: var(--color-text-primary);
+    font-size: var(--size-sm);
+    font-weight: var(--weight-semibold);
+    background: var(--color-bg-surface-elevated);
+    padding: var(--space-xs) var(--space-md);
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--color-border-subtle);
+    width: max-content;
   }
 </style>

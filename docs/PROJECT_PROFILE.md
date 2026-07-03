@@ -78,6 +78,16 @@
 - 키트 prototype의 실제 MCP transport 계층은 표준 키트 측에서 미구현 상태이며, 본 프로젝트는 `.codex/config.toml.example`을 additive로 유지한다 (`transport_ready=false` 명시).
 - 전역 `~/.codex/config.toml`에 프로젝트별 명령이나 backlog 경로를 직접 넣지 않는다 (`apply_guide.md` §2.3, §8).
 
+## 3.2 Admin 엔드포인트 (ADMIN-* task group)
+- Build Server 는 운영자용 admin 엔드포인트 2종을 노출한다.
+  - `GET /admin/builds` — 모든 owner 의 build summary 를 한 번에 조회 (BuildListQuery 호환, `requestedBy` filter 도 그대로 지원).
+  - `GET /admin/users` — 빌드 history 가 있는 userId 별 `buildCount` / `lastBuildAt` rollup.
+- 인증: `X-Admin-Id` header 가 build server 의 `ADMIN_IDS` env (default `admin,yky.lee`) 에 포함될 때만 허용. 미일치 시 401 (header 누락) / 403 (not in allow-list).
+- OpenAPI: `Admin` tag 가 추가됐고 `/admin/*` paths, `AdminListBuildsQuery` / `AdminListBuildsResponse` / `AdminUserBuildSummary` / `AdminUserListResponse` components 가 emit 된다. `/docs` Swagger UI 에서 확인 가능.
+- build-monitor 측 진입점: `/admin/login` → admin id 입력 → localStorage `adminId` 키에 저장 → `/admin/builds` 와 `/admin/users` 라우트. 일반 user 로그인 (`userId` 키) 과는 분리.
+- 회귀: backend 53/53 (TS unit), build-monitor 34/34 (vitest) + svelte-check 0/0 + vite build OK.
+- 운영 가이드 (운영 환경 배포 시 필수): `ADMIN_IDS` 는 시크릿처럼 취급 — 외부 저장소/PR description/issue 에 노출 금지, 운영에선 CORS wildcard (`CORS_ORIGIN=true`) 를 끄고 명시 origin 화이트리스트로 제한. admin 인증은 평문 id 비교이므로 SSO/JWT 로의 마이그레이션은 후속 ADMIN-* task group 에서 다룬다.
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함

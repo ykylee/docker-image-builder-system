@@ -1,11 +1,13 @@
 import { z } from "zod";
 
 import {
+  DEFAULT_ADMIN_IDS_RAW,
   DEFAULT_BUILD_TIMEOUT_SECONDS,
   DEFAULT_BUILD_REPOSITORY_BACKEND,
   DEFAULT_CORS_ORIGIN,
   DEFAULT_PREVIEW_TTL_MINUTES,
-  DEFAULT_RUNNER_POLL_INTERVAL_MS
+  DEFAULT_RUNNER_POLL_INTERVAL_MS,
+  parseAdminIds
 } from "./constants.js";
 
 export const runtimeEnvSchema = z.object({
@@ -30,7 +32,11 @@ export const runtimeEnvSchema = z.object({
         return false as const;
       }
       return value;
-    })
+    }),
+  ADMIN_IDS: z
+    .string()
+    .default(DEFAULT_ADMIN_IDS_RAW)
+    .transform((value) => parseAdminIds(value))
 });
 
 export type RuntimeEnv = z.infer<typeof runtimeEnvSchema>;

@@ -21,15 +21,25 @@ export const api = createClient<paths>({
   baseUrl: "/api"
 });
 
+type ApiGetParams = {
+  // openapi-fetch 0.13 expects `{ params: { query, path, ... } }` for
+  // the dynamic URL substitution and query encoding. We forward the
+  // whole `params` shape from the helper. Admin helpers also include
+  // `headers` for the X-Admin-Id guard; the underlying `api.GET`
+  // supports it.
+  params?: unknown;
+  headers?: Record<string, string>;
+};
+
 async function apiGet(
-  path: keyof paths,
+  path: keyof paths | string,
   _pathStr: string,
-  params: unknown
+  init: ApiGetParams = {}
 ): Promise<unknown> {
   const fetchFn = (api as unknown as {
-    GET: (p: string, init: { params: unknown }) => Promise<unknown>;
+    GET: (p: string, init: ApiGetParams) => Promise<unknown>;
   }).GET;
-  const result = (await fetchFn(path as string, { params })) as {
+  const result = (await fetchFn(path as string, init)) as {
     data?: unknown;
     error?: unknown;
     response?: { status?: number };
@@ -81,7 +91,7 @@ export async function listBuilds(
   return (await apiGet(
     "/builds",
     "/builds",
-    { query }
+    { params: { query } }
   )) as BuildListResponse;
 }
 
@@ -89,7 +99,7 @@ export async function getBuild(buildId: string): Promise<BuildStatusResponse> {
   return (await apiGet(
     "/builds/{buildId}",
     `/builds/${buildId}`,
-    { path: { buildId } }
+    { params: { path: { buildId } } }
   )) as BuildStatusResponse;
 }
 
@@ -100,6 +110,103 @@ export async function getBuildLogs(
   return (await apiGet(
     "/builds/{buildId}/logs",
     `/builds/${buildId}/logs`,
-    { path: { buildId }, query: since ? { since } : {} }
+    { params: { path: { buildId }, query: since ? { since } : {} } }
   )) as BuildLogsResponse;
+}
+
+// ---------------------------------------------------------------------------
+// Admin client (ADMIN-007).
+//
+// The admin endpoints live under /admin/* and require the X-Admin-Id
+// header to be set to a caller id in the build-server's ADMIN_IDS env.
+// The list helpers below only change the URL/header; the response
+// envelope is the same shape as the user-facing list endpoint so the
+// AdminBuilds route can reuse <BuildRow>.
+// ---------------------------------------------------------------------------
+
+// Admin response types are hand-typed here. The Build Server emits the
+// admin endpoints under /admin/* and the schema is small enough that we
+// can avoid a re-run of the openapi-typescript generator (which would
+// require a live Build Server). When the generator is re-run end-to-end
+// these can be replaced with `components["schemas"][...]` aliases.
+//
+// Why hand-typed despite the generated `AdminUserBuildSummary` /
+// `AdminUserSummary` / `AdminUserListResponse` components already
+// existing in `.generated/openapi.d.ts`: the generated file shipped in
+// this PR reflects a one-off generator run that the maintainer did
+// locally before merging. The CI / predev `pnpm run generate:openapi`
+// hook re-runs the generator against a live Build Server, so a fresh
+// checkout can regenerate the file from scratch and end up with
+// identical types. Until that loop is exercised on every PR, we keep
+// the hand-typed mirror so that the build-monitor stays buildable even
+// when the generated file is stale (e.g. immediately after pulling a
+// branch that has not yet regenerated). When the generator becomes a
+// hard CI gate, replace these with `components["schemas"][...]` aliases
+// and delete the hand-typed block.
+//
+// Mirrors `packages/shared-contract/src/build/admin.ts`:
+//   AdminListBuildsResponse  = { builds, nextCursor }
+//   builds entry is an AdminUserBuildSummary = BuildSummary & { requestedBy }
+//   AdminUserListResponse    = { users: AdminUserSummary[] }
+// AdminUserBuildSummary is a strict structural superset of BuildSummary
+// (which is the user-facing summary type emitted by the Build Server's
+// `/builds` endpoint). The status/phase/previewStatus fields use the
+// canonical string literal unions from BuildSummary so the admin type
+// is assignable wherever BuildSummary is expected. The extra
+// `requestedBy` field is the canonical owner key.
+export type AdminUserBuildSummary = BuildSummary & { requestedBy: string };
+
+export type AdminListBuildsQuery = {
+  status?: string;
+  requestedBy?: string;
+  limit?: number;
+  cursor?: string;
+};
+
+export type AdminListBuildsResponse = {
+  builds: AdminUserBuildSummary[];
+  nextCursor: string | null;
+};
+
+export type AdminUserSummary = {
+  userId: string;
+  buildCount: number;
+  lastBuildAt: string | null;
+};
+
+export type AdminUserListResponse = {
+  users: AdminUserSummary[];
+};
+
+export type AdminListBuildsParams = {
+  status?: AdminListBuildsQuery["status"];
+  requestedBy?: string;
+  limit?: AdminListBuildsQuery["limit"];
+  cursor?: AdminListBuildsQuery["cursor"];
+};
+
+export async function listAdminBuilds(
+  adminId: string,
+  params: AdminListBuildsParams = {}
+): Promise<AdminListBuildsResponse> {
+  const query: Record<string, string | number | undefined> = {};
+  if (params.status) query.status = params.status;
+  if (params.requestedBy) query.requestedBy = params.requestedBy;
+  if (params.limit !== undefined) query.limit = params.limit;
+  if (params.cursor) query.cursor = params.cursor;
+  return (await apiGet(
+    "/admin/builds",
+    "/admin/builds",
+    { params: { query }, headers: { "x-admin-id": adminId } }
+  )) as AdminListBuildsResponse;
+}
+
+export async function listAdminUsers(
+  adminId: string
+): Promise<AdminUserListResponse> {
+  return (await apiGet(
+    "/admin/users",
+    "/admin/users",
+    { headers: { "x-admin-id": adminId } }
+  )) as AdminUserListResponse;
 }

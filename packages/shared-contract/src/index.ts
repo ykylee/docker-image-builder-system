@@ -6,4 +6,5 @@ export * from "./build/phase.js";
 export * from "./build/request.js";
 export * from "./build/response.js";
 export * from "./build/status.js";
+export * from "./build/admin.js";
 export * from "./openapi.js";
