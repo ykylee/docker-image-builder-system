@@ -4,6 +4,12 @@
   box-sizing: border-box;
 }
 
+/* color-scheme: native form controls (input, select, scrollbar) 의
+   색을 우리 토큰과 맞춘다. dark 모드 에선 dark, light 모드 에선 light.
+   (TASK-046 QA) */
+:root { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
 html, body {
   margin: 0;
   padding: 0;

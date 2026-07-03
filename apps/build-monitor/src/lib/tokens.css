@@ -84,11 +84,19 @@
 :root[data-theme="light"] {
   --color-bg-canvas: #f1f5f9;
   --color-bg-surface: #ffffff;
-  --color-bg-surface-elevated: #ffffff;
+  /* surface-elevated: dark 모드 와 의미 반전. dark 모드는 elevated 가 더
+     어둡지만 (위 element 강조), light 모드 는 살짝 tint 된 회색으로
+     canvas/surface 와 구분. 그렇지 않으면 table row hover, ThemeToggle
+     hover, owner pill 등이 canvas 위에서 안 보임 (TASK-046 light mode
+     contrast QA). */
+  --color-bg-surface-elevated: #f8fafc;
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  --color-text-muted: #94a3b8;
-  --color-text-disabled: #cbd5e1;
+  /* muted: canvas (#f1f5f9) 위 4.5:1 contrast 확보. 이전 #94a3b8 은
+     ~2.7:1 로 WCAG AA fail — Admin/Login 의 `.muted` / placeholder 가
+     안 보였음. */
+  --color-text-muted: #64748b;
+  --color-text-disabled: #94a3b8;
   
   --color-border-subtle: #e2e8f0;
   --color-border-strong: #cbd5e1;

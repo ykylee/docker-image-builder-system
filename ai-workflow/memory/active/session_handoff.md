@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 24: TASK-045 DB schema migration — packages/db 의 Drizzle schema + bootstrap.ts 의 CREATE TABLE v0.2 (app_name 단일) 정렬. brownfield 마이그레이션 SQL (apps/build-server/migrations/0001_app_name.sql) 신규. postgres repo 가 row.appName 직접 사용 (metadata JSONB fallback 제거). 회귀 270/270. 다음 후속: 운영자 수동 마이그레이션 적용 / light mode QA / TASK-017 stdio / TASK-037 sweeper / admin owner block-delete)
+- Updated: 2026-07-03 (rev 25: TASK-046 light mode contrast QA — codex/light-mode-qa-2026-07-03 branch. 4 패치 (tokens light muted 2.7→4.5:1, surface-elevated #fff→#f8fafc, ThemeToggle color-scheme js-side, StatusPill EXPIRED+UNKNOWN secondary). vitest 35→37. 회귀 272/272. PR #10 예정. 다음 후속: TASK-017 stdio / TASK-037 sweeper / admin owner block-delete.
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus

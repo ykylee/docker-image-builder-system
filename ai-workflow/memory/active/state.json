@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-03T07:33:00Z",
+  "generated_at": "2026-07-03T07:48:00Z",
   "purpose_digest": "ADMIN-* Admin UI 완료 (TASK-043). Build Server ADMIN_IDS env (default admin,yky.lee) + X-Admin-Id 가드, /admin/builds (모든 owner) + /admin/users (per-user buildCount/lastBuildAt). shared-contract admin 4 schemas (AdminListBuildsQuery/Response, AdminUserBuildSummary, AdminUserListResponse) + openapi Admin tag + zod v4 .extend().meta() 함정 회피 (component helper Map 으로 refId 부착 clone 보존). BuildServer memory/postgres listBuildsAcrossUsers + listBuildOwners 구현. build-monitor: AdminLogin/AdminBuilds/AdminUsers 라우트 + Header adminId 분기 (localStorage.adminId 분리) + BuildRow requestedBy? optional. vitest 34 (AdminLogin 2 + AdminBuilds 4 + AdminUsers 3 + Header 6 + 기존 19) + svelte-check 0/0 + vite build OK. live e2e: x-admin-id admin 200, alice 403, no header 401; alice 2 / bob 1 lastBuildAt; /admin/builds?requestedBy=alice 2 builds. 회귀: TS 53 (build-server 49 → 53, +4 admin) + vitest 34 + svelte-check 0/0 + Go 13 + Python 215. 후속: light mode / TASK-017 stdio transport / TASK-037 sweeper / admin owner block-delete.",
-  "purpose_digest_rev": 51,
+  "purpose_digest_rev": 52,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,11 +28,12 @@
   },
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-    "current_axis": "TASK-045 DB schema migration (app_name 컬럼 추가 + project_id/repository_id drop) 코드 + 마이그레이션 SQL. 다음: light mode QA, TASK-017 stdio, TASK-037 sweeper, admin owner block-delete.",
-    "current_focus": "TASK-045 DB schema migration (TASK-044 의 follow-up) — packages/db 의 Drizzle schema + bootstrap.ts 의 CREATE TABLE 이 v0.2 (appName 단일) 로 정렬. brownfield 마이그레이션 SQL (apps/build-server/migrations/0001_app_name.sql) 신규 — 운영자 수동 적용용, idempotent. postgres repo 의 mapBuildRowToSummary / active-build probe / insert 모두 column 직접 사용으로 전환. 회귀 270/270.",
+    "current_axis": "TASK-046 light mode contrast QA — codex/light-mode-qa-2026-07-03 branch. PR #10 예정. 다음 후속: TASK-017 stdio, TASK-037 sweeper, admin owner block-delete.",
+    "current_focus": "TASK-046 light mode contrast QA — 4가지 contrast 깨짐 패치 (light 모드 --color-text-muted canvas 위 2.7:1 fail → 4.5:1 OK / --color-bg-surface-elevated 를 #fff → #f8fafc 로 살짝 tint / ThemeToggle 가 color-scheme 도 js-side set / StatusPill EXPIRED+UNKNOWN 을 muted → secondary). 회귀 272/272.",
     "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-046 light mode contrast QA — 4 패치 (tokens.css + theme.css + StatusPill + ThemeToggle). vitest 35→37 (TASK-046 신규 2). 회귀 272/272.",
       "TASK-045 DB schema migration — packages/db schema + bootstrap.ts 를 v0.2 (app_name column 직접) 로 정렬. brownfield 마이그레이션 SQL (idempotent) 신규. postgres repo 가 row.appName 직접 사용. 회귀 270/270.",
       "PR #9 squash merge `af2ade4` main 합류 (TASK-043 ADMIN-* + TASK-044 Bug fix 2건). 회귀 270/270. §27.5 placeholder → hash amend + 메타 rev 49→50 sync",
       "Bug fix 2건 — Header 즉시 갱신 (session store), appName 단일 식별자 (BuildRequest/BuildSummary, memory/postgres repo, build-monitor BuildRow/BuildsList/BuildDetail/AdminUsers). 회귀 TS 54 + vitest 35 + Go 13 + Python 215 = 270/270",
@@ -78,10 +79,10 @@
       "TASK-043 ADMIN-* Admin UI — ADMIN_IDS env (default admin,yky.lee) + /admin/builds + /admin/users + AdminLogin/AdminBuilds/AdminUsers + Header adminId 분기. 회귀 TS 53 + vitest 34 + svelte-check 0/0 + Go 13 + Python 215. live e2e: 401/403/200 + owner list + owner filter 정상"
     ],
     "environment_constraints": [],
-    "handoff_rev": 22,
+    "handoff_rev": 23,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 27,
-    "latest_rev": 28
+    "index_rev": 28,
+    "latest_rev": 29
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",

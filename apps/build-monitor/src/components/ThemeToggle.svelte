@@ -12,6 +12,13 @@
       isLight = true;
     }
     applyTheme(isLight);
+    // onMount 가 applyTheme 을 호출하지만, 첫 마운트 시점에 isLight 가
+    // 이미 true/false 로 결정된 후 라 style.colorScheme 도 같이 set.
+    // (applyTheme 안에서 set 하지만, isLight 가 false 인 경우 setAttribute
+    // 가 호출되지 않을 가능성 — onMount 끝에서 명시 보강.)
+    if (!isLight) {
+      document.documentElement.style.colorScheme = "dark";
+    }
   });
 
   function toggle() {
@@ -22,9 +29,15 @@
   function applyTheme(light: boolean) {
     if (light) {
       document.documentElement.setAttribute("data-theme", "light");
+      // TASK-046: native form 컨트롤 (input, select, scrollbar) 도
+      // light 모드에 맞춤. theme.css 의 :root[data-theme="light"] selector
+      // 가 css-side 에서 set 하지만, 일부 환경 (jsdom) 에서 computed
+      // style 검증이 필요할 때를 위해 js-side 에서도 명시.
+      document.documentElement.style.colorScheme = "light";
       localStorage.setItem("theme", "light");
     } else {
       document.documentElement.removeAttribute("data-theme");
+      document.documentElement.style.colorScheme = "dark";
       localStorage.setItem("theme", "dark");
     }
   }

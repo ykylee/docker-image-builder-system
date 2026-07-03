@@ -18,8 +18,10 @@
       case "PREVIEW_READY":
       case "TEST_READY":
         return "var(--color-accent-info)";
-      case "EXPIRED": return "var(--color-text-muted)";
-      default: return "var(--color-text-muted)";
+      case "EXPIRED": return "var(--color-text-secondary)";
+      // UNKNOWN 도 secondary — light 모드 에서 --color-text-muted 가
+      // 15% alpha-mix 시 canvas 에 거의 안 보임. (TASK-046 QA)
+      default: return "var(--color-text-secondary)";
     }
   }
 
