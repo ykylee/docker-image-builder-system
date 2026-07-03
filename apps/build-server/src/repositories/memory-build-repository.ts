@@ -15,6 +15,8 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   BuildSummary,
+  DeploymentReportRequest,
+  ExecutionStatus,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
@@ -24,10 +26,18 @@ import type {
   ClaimNextBuildResult,
   CreateBuildResult,
   GetTestDeploymentResult,
+  PreviewStatusDetails,
   QueueTestDeploymentResult,
+  ReportDeploymentResult,
   ReportPreviewStatusResult,
   UpdatePhaseResult
 } from "./build-repository.js";
+import {
+  type BuildTestSnapshot,
+  type DeploymentAttemptSnapshot,
+  buildStatusResponseFromState,
+  enrichBuildSummary
+} from "./build-status-response.js";
 
 type StoredBuild = {
   summary: BuildSummary;
@@ -35,6 +45,8 @@ type StoredBuild = {
   lastError: BuildError | null;
   logs: BuildLogEntry[];
   testDeployment: TestDeployment | null;
+  buildTest: BuildTestSnapshot | null;
+  deploymentAttempt: DeploymentAttemptSnapshot | null;
   // phase lifecycle timeline (TASK-050). 매 phase transition 마다
   // 직전 currentPhase 의 (phase, completedAt) 가 history 에 push 되고,
   // 새 currentPhase 가 시작된다 (startedAt 갱신). terminal phase
@@ -112,6 +124,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         lastError: null,
         logs: [logEntry],
         testDeployment: null,
+        buildTest: null,
+        deploymentAttempt: null,
         phaseHistory: [],
         // REQUEST_ACCEPTED 가 initial phase. transition 이벤트가 들어오기
         // 전까지 in-flight.
@@ -120,15 +134,18 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       return {
         kind: "accepted",
-        response: {
-          build: summary,
+        response: buildStatusResponseFromState({
+          summary,
           lastError: null,
           phaseHistory: [],
           currentPhase: {
             phase: "REQUEST_ACCEPTED",
             startedAt: timestamp
-          }
-        }
+          },
+          testDeployment: null,
+          buildTest: null,
+          deploymentAttempt: null
+        })
       };
     },
 
@@ -138,20 +155,14 @@ export function createMemoryBuildRepository(): BuildRepository {
         return null;
       }
 
-      return {
-        build: build.summary,
+      return buildStatusResponseFromState({
+        summary: build.summary,
         lastError: build.lastError,
-        // phaseHistory 는 transition 시 push 된 종료 시각 모음. currentPhase
-        // 는 build 가 terminal (COMPLETED/FAILED) 가 아닐 때 in-flight phase
-        // 와 startedAt.
-        phaseHistory: build.phaseHistory,
-        currentPhase: isTerminalPhase(build.summary.phase)
-          ? null
-          : {
-              phase: build.summary.phase,
-              startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
-            }
-      };
+        ...toPhaseTimeline(build),
+        testDeployment: build.testDeployment,
+        buildTest: build.buildTest,
+        deploymentAttempt: build.deploymentAttempt
+      });
     },
 
     async getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null> {
@@ -174,11 +185,14 @@ export function createMemoryBuildRepository(): BuildRepository {
       if (active) {
         return {
           kind: "active_build_exists",
-          build: {
-            build: active.summary,
+          build: buildStatusResponseFromState({
+            summary: active.summary,
             lastError: active.lastError,
-            ...toPhaseTimeline(active)
-          }
+            ...toPhaseTimeline(active),
+            testDeployment: active.testDeployment,
+            buildTest: active.buildTest,
+            deploymentAttempt: active.deploymentAttempt
+          })
         };
       }
 
@@ -189,7 +203,7 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       const timestamp = nowIsoString();
       next.summary = {
-        ...next.summary,
+        ...enrichBuildSummary(next.summary),
         status: "CLAIMED",
         phase: "QUEUE_CLAIMED",
         updatedAt: timestamp
@@ -207,11 +221,14 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       return {
         kind: "claimed",
-        response: {
-          build: next.summary,
+        response: buildStatusResponseFromState({
+          summary: next.summary,
           lastError: next.lastError,
-          ...toPhaseTimeline(next)
-        }
+          ...toPhaseTimeline(next),
+          testDeployment: next.testDeployment,
+          buildTest: next.buildTest,
+          deploymentAttempt: next.deploymentAttempt
+        })
       };
     },
 
@@ -225,11 +242,14 @@ export function createMemoryBuildRepository(): BuildRepository {
       if (fromPhase === phase) {
         return {
           kind: "ok",
-          response: {
-            build: build.summary,
+          response: buildStatusResponseFromState({
+            summary: build.summary,
             lastError: build.lastError,
-            ...toPhaseTimeline(build)
-          }
+            ...toPhaseTimeline(build),
+            testDeployment: build.testDeployment,
+            buildTest: build.buildTest,
+            deploymentAttempt: build.deploymentAttempt
+          })
         };
       }
 
@@ -237,6 +257,10 @@ export function createMemoryBuildRepository(): BuildRepository {
       let nextStatus = build.summary.status;
       if (phase === "DOCKER_BUILD_STARTED") {
         nextStatus = "BUILDING";
+      } else if (phase === "DEPLOYMENT_STARTED") {
+        nextStatus = "DEPLOYING";
+      } else if (phase === "DEPLOYMENT_COMPLETED") {
+        nextStatus = "DEPLOY_SUCCESS";
       } else if (phase === "COMPLETED") {
         nextStatus = "COMPLETED";
       } else if (phase === "FAILED") {
@@ -266,7 +290,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         });
       }
       build.summary = {
-        ...build.summary,
+        ...enrichBuildSummary(build.summary),
         phase: phase as BuildPhase,
         status: nextStatus,
         updatedAt: timestamp
@@ -285,8 +309,8 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       return {
         kind: "ok",
-        response: {
-          build: build.summary,
+        response: buildStatusResponseFromState({
+          summary: build.summary,
           lastError: build.lastError,
           phaseHistory: build.phaseHistory,
           currentPhase: isTerminal
@@ -294,8 +318,11 @@ export function createMemoryBuildRepository(): BuildRepository {
             : {
                 phase: build.summary.phase,
                 startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
-              }
-        }
+          },
+          testDeployment: build.testDeployment,
+          buildTest: build.buildTest,
+          deploymentAttempt: build.deploymentAttempt
+        })
       };
     },
 
@@ -336,8 +363,16 @@ export function createMemoryBuildRepository(): BuildRepository {
         build.phaseHistory.push({ phase: prevPhase6, completedAt: timestamp });
       }
       build.testDeployment = testDeployment;
+      build.buildTest = {
+        status: "IN_PROGRESS",
+        containerRef: null,
+        runtimeUrl: null,
+        healthCheckPassed: null,
+        portOpen: null,
+        stabilityWindowPassed: null
+      };
       build.summary = {
-        ...build.summary,
+        ...enrichBuildSummary(build.summary),
         phase: "PREVIEW_QUEUED",
         previewStatus: "QUEUED",
         previewUrl: null,
@@ -357,11 +392,14 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       return {
         kind: "queued",
-        response: {
-          build: build.summary,
+        response: buildStatusResponseFromState({
+          summary: build.summary,
           lastError: build.lastError,
-          ...toPhaseTimeline(build)
-        },
+          ...toPhaseTimeline(build),
+          testDeployment,
+          buildTest: build.buildTest,
+          deploymentAttempt: build.deploymentAttempt
+        }),
         testDeployment
       };
     },
@@ -369,7 +407,7 @@ export function createMemoryBuildRepository(): BuildRepository {
     async reportPreviewStatus(
       buildId: string,
       status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
-      details?: { previewUrl?: string; host?: string; hostPort?: number }
+      details?: PreviewStatusDetails
     ): Promise<ReportPreviewStatusResult> {
       const build = builds.get(buildId);
       if (!build) {
@@ -392,6 +430,26 @@ export function createMemoryBuildRepository(): BuildRepository {
       };
       build.testDeployment = next;
 
+      const nextBuildTestStatus: ExecutionStatus =
+        status === "READY" || status === "EXPIRED"
+          ? "SUCCESS"
+          : status === "FAILED"
+            ? "FAILED"
+            : "IN_PROGRESS";
+      build.buildTest = {
+        status: nextBuildTestStatus,
+        containerRef: details?.containerRef ?? build.buildTest?.containerRef ?? null,
+        runtimeUrl: next.previewUrl,
+        healthCheckPassed:
+          details?.healthCheckPassed ?? build.buildTest?.healthCheckPassed ?? null,
+        portOpen: details?.portOpen ?? build.buildTest?.portOpen ?? null,
+        stabilityWindowPassed:
+          details?.stabilityWindowPassed ??
+          (status === "EXPIRED"
+            ? true
+            : build.buildTest?.stabilityWindowPassed ?? null)
+      };
+
       // map previewStatus -> build.phase/status
       let nextPhase = build.summary.phase;
       let nextStatus = build.summary.status;
@@ -405,13 +463,18 @@ export function createMemoryBuildRepository(): BuildRepository {
         nextPhase = "FAILED";
         nextStatus = "FAILED";
       } else if (status === "EXPIRED") {
-        // preview expired; build remains TEST_READY (caller can call COMPLETED later)
+        // Preview TTL elapsed but the container itself ran to completion; the
+        // build stays at its current phase/status (typically PREVIEW_READY /
+        // TEST_READY) so the operator can decide whether to run another
+        // deployment cycle or to mark the build COMPLETED. We do NOT push
+        // the prior phase into phaseHistory because the preview state
+        // transition is orthogonal to the build lifecycle.
         nextPhase = build.summary.phase;
         nextStatus = build.summary.status;
       }
 
       build.summary = {
-        ...build.summary,
+        ...enrichBuildSummary(build.summary),
         previewStatus: status,
         previewUrl: next.previewUrl,
         phase: nextPhase as BuildPhase,
@@ -431,12 +494,91 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       return {
         kind: "ok",
-        response: {
-          build: build.summary,
+        response: buildStatusResponseFromState({
+          summary: build.summary,
           lastError: build.lastError,
-          ...toPhaseTimeline(build)
-        },
+          ...toPhaseTimeline(build),
+          testDeployment: next,
+          buildTest: build.buildTest,
+          deploymentAttempt: build.deploymentAttempt
+        }),
         testDeployment: next
+      };
+    },
+
+    async reportDeploymentResult(
+      buildId: string,
+      input: DeploymentReportRequest
+    ): Promise<ReportDeploymentResult> {
+      const build = builds.get(buildId);
+      if (!build) {
+        return { kind: "not_found" };
+      }
+
+      const timestamp = nowIsoString();
+      const nextPhase =
+        input.status === "IN_PROGRESS"
+          ? "DEPLOYMENT_STARTED"
+          : input.status === "SUCCESS"
+            ? "DEPLOYMENT_COMPLETED"
+            : "FAILED";
+      const nextStatus =
+        input.status === "IN_PROGRESS"
+          ? "DEPLOYING"
+          : input.status === "SUCCESS"
+            ? "DEPLOY_SUCCESS"
+            : "FAILED";
+
+      const prevPhase = build.summary.phase;
+      if (prevPhase !== nextPhase) {
+        build.phaseHistory.push({
+          phase: prevPhase,
+          completedAt: timestamp
+        });
+      }
+      if (nextPhase === "FAILED") {
+        build.phaseHistory.push({
+          phase: "FAILED",
+          completedAt: timestamp
+        });
+      }
+
+      build.deploymentAttempt = {
+        status: input.status,
+        targetType: input.targetType,
+        resultRef: input.resultRef ?? null,
+        finishedAt:
+          input.status === "SUCCESS" || input.status === "FAILED" ? timestamp : null
+      };
+      build.summary = {
+        ...enrichBuildSummary(build.summary),
+        phase: nextPhase,
+        status: nextStatus,
+        updatedAt: timestamp
+      };
+      build.currentPhaseStartedAt = nextPhase === "FAILED" ? null : timestamp;
+      builds.set(buildId, build);
+
+      build.logs.push({
+        id: randomUUID(),
+        buildId,
+        phase: nextPhase,
+        message:
+          `Deployment status: ${input.status} targetType=${input.targetType}` +
+          (input.resultRef ? ` resultRef=${input.resultRef}` : ""),
+        createdAt: timestamp
+      });
+
+      return {
+        kind: "ok",
+        response: buildStatusResponseFromState({
+          summary: build.summary,
+          lastError: build.lastError,
+          ...toPhaseTimeline(build),
+          testDeployment: build.testDeployment,
+          buildTest: build.buildTest,
+          deploymentAttempt: build.deploymentAttempt
+        })
       };
     },
 
@@ -457,7 +599,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       // buildId 기준 opaque pointer. requestedBy 는 StoredBuild 에 보관된
       // canonical owner key 로 매칭 (BuildSummary 에는 노출되지 않음).
       const stored = [...builds.values()];
-      let all = stored.map((b) => b.summary);
+      let all = stored.map((b) => enrichBuildSummary(b.summary));
 
       if (query.status) {
         all = all.filter((b) => b.status === query.status);

@@ -18,24 +18,28 @@ type BuildControlClient interface {
 	ReportPhase(ctx context.Context, buildID, phase, runnerID string) error
 	QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error
 	ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error
+	ReportDeployment(ctx context.Context, buildID string, req DeploymentReportRequest) error
 }
 
 // ClaimedBuildResponse 는 Host Server POST /builds/claim 응답에서
 // claimed=true 일 때만 사용. claimed=false (NO_BUILD_AVAILABLE / ACTIVE_BUILD_EXISTS)
 // 일 때는 nil + error nil 로 표현.
 type ClaimedBuildResponse struct {
-	BuildID    string `json:"buildId"`
-	ProjectID  string `json:"projectId"`
-	RepositoryID string `json:"repositoryId"`
-	Status     string `json:"status"`
-	Phase      string `json:"phase"`
-	UpdatedAt  string `json:"updatedAt"`
+	BuildID         string `json:"buildId"`
+	AppName         string `json:"appName"`
+	Status          string `json:"status"`
+	Phase           string `json:"phase"`
+	LifecycleStatus string `json:"lifecycleStatus"`
+	UpdatedAt       string `json:"updatedAt"`
 }
 
 type claimResponseBody struct {
 	Claimed bool                    `json:"claimed"`
 	Build   *buildStatusResponseBody `json:"build"`
-	Reason  string                  `json:"reason"`
+	// Reason is omitted from the wire when empty so the server-side zod
+	// `z.enum([...]).nullable()` does not reject a successful no-op
+	// (claimed=false) response with an empty reason string.
+	Reason string `json:"reason,omitempty"`
 }
 
 // buildStatusResponseBody 는 Host Server BuildStatusResponse 의 한 단계 풀린 wrapper.
@@ -46,12 +50,12 @@ type buildStatusResponseBody struct {
 }
 
 type buildSummaryBody struct {
-	BuildID      string `json:"buildId"`
-	ProjectID    string `json:"projectId"`
-	RepositoryID string `json:"repositoryId"`
-	Status       string `json:"status"`
-	Phase        string `json:"phase"`
-	UpdatedAt    string `json:"updatedAt"`
+	BuildID         string `json:"buildId"`
+	AppName         string `json:"appName"`
+	Status          string `json:"status"`
+	Phase           string `json:"phase"`
+	LifecycleStatus string `json:"lifecycleStatus"`
+	UpdatedAt       string `json:"updatedAt"`
 }
 
 type phaseRequestBody struct {
@@ -62,18 +66,20 @@ type phaseRequestBody struct {
 // HTTPBuildControlClient 는 Host Server 와 HTTP 로 통신하는 client.
 type HTTPBuildControlClient struct {
 	baseURL string
+	runnerID string
 	http    *http.Client
 }
 
-func NewHTTPBuildControlClient(baseURL string) *HTTPBuildControlClient {
+func NewHTTPBuildControlClient(baseURL, runnerID string) *HTTPBuildControlClient {
 	return &HTTPBuildControlClient{
 		baseURL: baseURL,
+		runnerID: runnerID,
 		http:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
 func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error) {
-	body, _ := json.Marshal(map[string]any{"runnerId": "default-runner"})
+	body, _ := json.Marshal(map[string]any{"runnerId": c.runnerID})
 	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/builds/claim", bytes.NewReader(body))
 	if err != nil {
 		return nil, err
@@ -107,12 +113,12 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 	inner := resp.Build.Build
 
 	return &ClaimedBuildResponse{
-		BuildID:      inner.BuildID,
-		ProjectID:    inner.ProjectID,
-		RepositoryID: inner.RepositoryID,
-		Status:       inner.Status,
-		Phase:        inner.Phase,
-		UpdatedAt:    inner.UpdatedAt,
+		BuildID:         inner.BuildID,
+		AppName:         inner.AppName,
+		Status:          inner.Status,
+		Phase:           inner.Phase,
+		LifecycleStatus: inner.LifecycleStatus,
+		UpdatedAt:       inner.UpdatedAt,
 	}, nil
 }
 
@@ -164,6 +170,10 @@ func (c *NoopBuildControlClient) ReportPreviewReady(context.Context, string, Pre
 	return nil
 }
 
+func (c *NoopBuildControlClient) ReportDeployment(context.Context, string, DeploymentReportRequest) error {
+	return nil
+}
+
 // QueueTestDeployment: POST /builds/:buildId/preview
 type QueueTestDeploymentRequest struct {
 	InternalPort int    `json:"internalPort"`
@@ -195,10 +205,25 @@ func (c *HTTPBuildControlClient) QueueTestDeployment(ctx context.Context, buildI
 
 // ReportPreviewReady: POST /builds/:buildId/test-deployment/ready
 type PreviewReadyRequest struct {
-	PreviewURL string `json:"previewUrl"`
-	Host       string `json:"host"`
-	HostPort   int    `json:"hostPort"`
-	RunnerID   string `json:"runnerId"`
+	PreviewURL            string `json:"previewUrl"`
+	Host                  string `json:"host"`
+	HostPort              int    `json:"hostPort"`
+	ContainerRef          string `json:"containerRef,omitempty"`
+	HealthCheckPassed     bool   `json:"healthCheckPassed"`
+	PortOpen              bool   `json:"portOpen"`
+	StabilityWindowPassed bool   `json:"stabilityWindowPassed"`
+	RunnerID              string `json:"runnerId"`
+}
+
+type DeploymentReportRequest struct {
+	Status              string         `json:"status"`
+	TargetType          string         `json:"targetType"`
+	TargetRef           string         `json:"targetRef,omitempty"`
+	ResultRef           string         `json:"resultRef,omitempty"`
+	ErrorCode           string         `json:"errorCode,omitempty"`
+	ErrorMessage        string         `json:"errorMessage,omitempty"`
+	RunnerID            string         `json:"runnerId"`
+	ResponsePayloadJSON map[string]any `json:"responsePayloadJson,omitempty"`
 }
 
 func (c *HTTPBuildControlClient) ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error {
@@ -221,4 +246,26 @@ func (c *HTTPBuildControlClient) ReportPreviewReady(ctx context.Context, buildID
 	}
 	raw, _ := io.ReadAll(res.Body)
 	return fmt.Errorf("report preview ready failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
+}
+
+func (c *HTTPBuildControlClient) ReportDeployment(ctx context.Context, buildID string, req DeploymentReportRequest) error {
+	body, _ := json.Marshal(req)
+	url := fmt.Sprintf("%s/builds/%s/deployment", c.baseURL, buildID)
+	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	res, err := c.http.Do(r)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusOK {
+		return nil
+	}
+	raw, _ := io.ReadAll(res.Body)
+	return fmt.Errorf("report deployment failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
 }

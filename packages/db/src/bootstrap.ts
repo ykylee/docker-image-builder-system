@@ -9,6 +9,7 @@ const bootstrapStatements = [
       status TEXT NOT NULL,
       phase TEXT NOT NULL,
       preview_status TEXT NOT NULL,
+      phase_history JSONB NOT NULL DEFAULT '[]'::jsonb,
       source_archive_key TEXT NOT NULL,
       source_archive_checksum_sha256 TEXT NOT NULL,
       source_archive_size_bytes INTEGER NOT NULL,
@@ -31,6 +32,60 @@ const bootstrapStatements = [
       message TEXT NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS build_test (
+      id UUID PRIMARY KEY,
+      build_id UUID NOT NULL,
+      status TEXT NOT NULL,
+      host TEXT,
+      host_port INTEGER,
+      internal_port INTEGER,
+      runtime_url TEXT,
+      container_ref TEXT,
+      health_check_passed BOOLEAN,
+      port_open BOOLEAN,
+      stability_window_passed BOOLEAN,
+      error_code TEXT,
+      error_message TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      started_at TIMESTAMPTZ,
+      finished_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX IF NOT EXISTS build_test_build_id_idx
+    ON build_test (build_id)
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS build_test_status_created_at_idx
+    ON build_test (status, created_at)
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS deployment_attempt (
+      id UUID PRIMARY KEY,
+      build_id UUID NOT NULL,
+      status TEXT NOT NULL,
+      target_type TEXT NOT NULL,
+      target_ref TEXT,
+      result_ref TEXT,
+      response_payload_json JSONB,
+      error_code TEXT,
+      error_message TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      started_at TIMESTAMPTZ,
+      finished_at TIMESTAMPTZ,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX IF NOT EXISTS deployment_attempt_build_id_idx
+    ON deployment_attempt (build_id)
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS deployment_attempt_status_created_at_idx
+    ON deployment_attempt (status, created_at)
   `,
   `
     CREATE TABLE IF NOT EXISTS test_deployment (

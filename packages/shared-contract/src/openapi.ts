@@ -30,6 +30,11 @@ export const openapiTags = {
     description:
       "Preview service queue and readiness endpoints. Consumed by the Go Runner to schedule, mark ready, and update preview service status (PKG-006)."
   },
+  Deployment: {
+    name: "Deployment",
+    description:
+      "External deployment reporting endpoints. Consumed by the Go Runner to mark deploy in-progress and final deploy result (M5 / TASK-059)."
+  },
   Health: {
     name: "Health",
     description: "Liveness probe."

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { buildStatuses } from "./status.js";
+
 export const sourceArchiveSchema = z
   .object({
     objectKey: z.string().min(1),
@@ -40,21 +42,11 @@ export type BuildRequest = z.infer<typeof buildRequestSchema>;
 export const buildListQuerySchema = z
   .object({
     status: z
-      .enum([
-        "QUEUED",
-        "BUILDING",
-        "COMPLETED",
-        "FAILED",
-        "PROVISIONING",
-        "PREVIEW_QUEUED",
-        "PREVIEW_READY",
-        "TEST_READY",
-        "EXPIRED"
-      ])
+      .enum(buildStatuses)
       .optional()
       .meta({
         description:
-          "Optional status filter. Matches the canonical BuildStatus enum. Omitted = all."
+          "Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all."
       }),
     requestedBy: z
       .string()

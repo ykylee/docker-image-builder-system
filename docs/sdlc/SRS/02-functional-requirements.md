@@ -4,7 +4,7 @@
 - 범위: 사용자 요청, Build Server, Runner, 상태 안내 기능
 - 대상 독자: 기획자, 설계자, 구현 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-02
+- 최종 수정일: 2026-07-03
 
 ## 1. 사용자 요청 및 입력 준비
 
@@ -16,7 +16,7 @@
   - 목적: 패키징 대상 경로 확정
 
 - `FR-003` 시스템은 앱 이름을 확인하거나 제안할 수 있어야 한다.
-  - 목적: `userId + appName` 기준 중복 판정 및 preview 식별
+  - 목적: `userId + appName` 기준 중복 판정 및 결과 식별
 
 - `FR-004` 시스템은 `Dockerfile` 존재 여부를 확인할 수 있어야 한다.
 
@@ -27,59 +27,70 @@
 
 - `FR-007` 시스템은 빌드에 필요한 소스와 metadata를 압축 또는 패키징할 수 있어야 한다.
 
+- `FR-008` 시스템은 Git Repository URL + Dockerfile 입력을 받아 build 요청으로 변환할 수 있어야 한다.
+
+- `FR-009` 시스템은 Source Code Zip File + Dockerfile 입력을 받아 build 요청으로 변환할 수 있어야 한다.
+
+- `FR-010` 시스템은 입력 채널이 달라도 내부 실행 계약은 공통 build job으로 정규화할 수 있어야 한다.
+
 ## 2. Build Server 기능
 
-- `FR-008` Build Server는 빌드 요청을 수신할 수 있어야 한다.
+- `FR-011` Build Server는 빌드 요청을 수신할 수 있어야 한다.
 
-- `FR-009` Build Server는 빌드 요청을 DB에 저장할 수 있어야 한다.
+- `FR-012` Build Server는 빌드 요청을 DB에 저장할 수 있어야 한다.
 
-- `FR-010` Build Server는 동일 `userId + appName` 기준 active build 존재 여부를 판정할 수 있어야 한다.
+- `FR-013` Build Server는 동일 `userId + appName` 기준 active build 존재 여부를 판정할 수 있어야 한다.
 
-- `FR-011` active build가 있으면 신규 build를 생성하지 않고 기존 작업 정보를 반환해야 한다.
+- `FR-014` active build가 있으면 신규 build를 생성하지 않고 기존 작업 정보를 반환해야 한다.
   - 반환 정보: `buildId`, 상태, 상태 조회 경로
 
-- `FR-012` active build가 없으면 신규 build를 `QUEUED` 상태로 등록해야 한다.
+- `FR-015` active build가 없으면 신규 build를 `RECEIVED` 또는 `QUEUED` 상태로 등록해야 한다.
 
-- `FR-013` Build Server는 build 상태를 조회할 수 있는 API를 제공해야 한다.
+- `FR-016` Build Server는 build 상태를 조회할 수 있는 API를 제공해야 한다.
 
-- `FR-014` Build Server는 build 로그를 조회할 수 있는 API를 제공해야 한다.
+- `FR-017` Build Server는 build 로그를 조회할 수 있는 API를 제공해야 한다.
 
-- `FR-015` Build Server는 preview URL과 preview 상태 정보를 반환할 수 있어야 한다.
+- `FR-018` Build Server는 컨테이너 테스트 결과와 외부 배포 결과를 조회 응답에 포함할 수 있어야 한다.
+
+- `FR-019` Build Server는 polling 기반 상태 조회를 지원할 수 있어야 한다.
 
 ## 3. Runner 기능
 
-- `FR-016` Runner는 `QUEUED` 상태의 작업을 순차적으로 가져올 수 있어야 한다.
+- `FR-020` Runner는 `QUEUED` 상태의 작업을 순차적으로 가져올 수 있어야 한다.
 
-- `FR-017` Runner는 작업 선점 시 상태를 적절히 전이시킬 수 있어야 한다.
+- `FR-021` Runner는 작업 선점 시 상태를 적절히 전이시킬 수 있어야 한다.
 
-- `FR-018` Runner는 소스 압축 해제와 작업 디렉터리 준비를 수행할 수 있어야 한다.
+- `FR-022` Runner는 Git clone 또는 소스 압축 해제와 작업 디렉터리 준비를 수행할 수 있어야 한다.
 
-- `FR-019` Runner는 Docker 이미지 빌드를 수행할 수 있어야 한다.
+- `FR-023` Runner는 Docker 이미지 빌드를 수행할 수 있어야 한다.
 
-- `FR-020` Runner는 빌드 로그를 저장할 수 있어야 한다.
+- `FR-024` Runner는 빌드 로그를 저장할 수 있어야 한다.
 
-- `FR-021` Runner는 빌드 성공 후 preview 컨테이너를 실행할 수 있어야 한다.
+- `FR-025` Runner는 빌드 성공 후 컨테이너를 실행하고 최소 동작 테스트를 수행할 수 있어야 한다.
 
-- `FR-022` Runner는 preview URL 생성에 필요한 host/port 정보를 기록할 수 있어야 한다.
+- `FR-026` Runner는 컨테이너 실행 가능 여부, health check, 지정 port open 여부, 일정 시간 정상 실행 여부를 기록할 수 있어야 한다.
 
-- `FR-023` Runner는 preview readiness를 확인할 수 있어야 한다.
+- `FR-027` Runner는 테스트 성공 시 외부 시스템 배포를 수행하거나 배포 어댑터를 호출할 수 있어야 한다.
 
-- `FR-024` Runner는 실패 시 오류 코드/메시지와 실패 단계를 기록할 수 있어야 한다.
+- `FR-028` Runner는 실패 시 오류 코드/메시지와 실패 단계를 기록할 수 있어야 한다.
 
-- `FR-028` 시스템은 preview 실행 슬롯이 부족할 때 preview 시작 요청을 별도 service queue에 대기시킬 수 있어야 한다.
+- `FR-029` 시스템은 테스트 실행 슬롯 또는 임시 runtime 실행 슬롯이 부족할 때 별도 service queue에 대기시킬 수 있어야 한다.
 
-- `FR-029` 시스템은 preview service queue에서 대기 중인 요청을 슬롯이 비는 순서에 맞춰 실행할 수 있어야 한다.
+- `FR-030` 시스템은 service queue에서 대기 중인 요청을 슬롯이 비는 순서에 맞춰 실행할 수 있어야 한다.
 
 ## 4. 사용자 상태 안내 기능
 
-- `FR-025` 시스템은 build 상태를 사용자 친화적 메시지로 번역할 수 있어야 한다.
+- `FR-031` 시스템은 build 상태를 사용자 친화적 메시지로 번역할 수 있어야 한다.
 
-- `FR-026` 시스템은 `TEST_READY` 또는 동등 상태에서 preview URL을 사용자에게 안내할 수 있어야 한다.
+- `FR-032` 시스템은 테스트 성공, 배포 성공, 배포 실패를 사용자에게 구분해서 안내할 수 있어야 한다.
 
-- `FR-027` 시스템은 실패 시 사용자에게 원인 요약과 다음 조치를 함께 안내할 수 있어야 한다.
+- `FR-033` 시스템은 실패 시 사용자에게 원인 요약과 다음 조치를 함께 안내할 수 있어야 한다.
+
+- `FR-034` 시스템은 이벤트 알림 방식이 선택되면 build 시작, build 완료, build 실패, test 성공, deploy 완료를 전송할 수 있어야 한다.
 
 ## 5. 기능 요구사항 메모
 
-- `FR-005`, `FR-023`, `FR-027`은 후속 정책 문서와 설계 문서에서 더 세분화가 필요하다.
-- `FR-028`, `FR-029`는 preview 동시 실행 상한 정책과 함께 닫혀야 한다.
+- `FR-005`, `FR-025`, `FR-027`, `FR-034`는 후속 정책 문서와 설계 문서에서 더 세분화가 필요하다.
+- `FR-029`, `FR-030`은 실행 자원 상한 정책과 함께 닫혀야 한다.
+- 입력 정규화 방식은 "Build Server가 Git/Zip을 직접 받는지"와 "전처리 계층이 source reference로 변환하는지" 중 하나로 닫아야 한다.
 - 기능 요구사항의 구현 순서는 우선순위 매트릭스와 함께 판단한다.

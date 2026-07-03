@@ -10,8 +10,8 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Optional status filter. Matches the canonical BuildStatus enum. Omitted = all. */
-                    status?: "QUEUED" | "BUILDING" | "COMPLETED" | "FAILED" | "PROVISIONING" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "TEST_READY" | "EXPIRED";
+                    /** @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all. */
+                    status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
                     /** @description Optional owner filter. Matches BuildRequest.requestedBy (canonical owner identity, same as IDENTITY_MODEL userId). Omitted = all. */
                     requestedBy?: string;
                     /** @description Maximum number of summaries to return. Server cap is 200. Default 50. */
@@ -357,6 +357,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/builds/{buildId}/deployment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Runner reports external deployment progress and final result. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    buildId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["DeploymentReportRequest"];
+                };
+            };
+            responses: {
+                /** @description Deployment state recorded. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/builds/{buildId}/test-deployment": {
         parameters: {
             query?: never;
@@ -440,8 +480,8 @@ export interface paths {
         get: {
             parameters: {
                 query?: {
-                    /** @description Optional status filter. Matches the canonical BuildStatus enum. Omitted = all. */
-                    status?: "QUEUED" | "BUILDING" | "COMPLETED" | "FAILED" | "PROVISIONING" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "TEST_READY" | "EXPIRED";
+                    /** @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all. */
+                    status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
                     /** @description Admin-only optional owner filter. Omitted = every owner. Caller id must be in ADMIN_IDS. */
                     requestedBy?: string;
                     /** @description Maximum number of summaries to return. Server cap is 200. Default 50. */
@@ -560,18 +600,30 @@ export interface components {
         BuildSummary: {
             /** Format: uuid */
             buildId: string;
-            /**
-             * @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI.
-             */
+            /** @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI. */
             appName: string;
+            /**
+             * @description Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility.
+             * @enum {string}
+             */
+            status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
             /** @enum {string} */
-            status: "QUEUED" | "CLAIMED" | "BUILDING" | "TEST_READY" | "COMPLETED" | "FAILED";
-            /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "COMPLETED" | "FAILED";
-            /** @enum {string} */
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            /**
+             * @description Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks.
+             * @enum {string}
+             */
             previewStatus: "NOT_REQUESTED" | "QUEUED" | "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description Legacy preview-era field. Represents the temporary runtime endpoint used by the current test-deployment adapter.
+             */
             previewUrl: string | null;
+            /**
+             * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
+             * @enum {string}
+             */
+            lifecycleStatus?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -587,13 +639,79 @@ export interface components {
             reason: "ACTIVE_BUILD_EXISTS";
             build: components["schemas"]["BuildSummary"];
         };
+        /** @description Canonical build lifecycle snapshot aligned with the document-first build/test/deploy/result-delivery model. */
+        BuildLifecycle: {
+            /** @enum {string} */
+            status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
+            /** Format: date-time */
+            startedAt?: string | null;
+            /** Format: date-time */
+            finishedAt?: string | null;
+        };
+        /** @description The in-flight BuildPhase, or null when the build is in a terminal state. Mirrors build.phase + carry-over timestamp. */
+        BuildCurrentPhase: {
+            /** @enum {string} */
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp at which the current in-flight phase began. Used by the build-monitor PhaseTimeline to render the "now" indicator.
+             */
+            startedAt: string;
+        } | null;
+        /** @description Image identity emitted after a successful docker build. Optional during the migration window. */
+        BuildImage: {
+            name: string;
+            tag: string;
+            digest: string | null;
+        };
+        /** @description Canonical container-test result block. Replaces preview-centric status interpretation for runtime validation. */
+        ContainerTestResult: {
+            /** @enum {string} */
+            status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
+            containerRunning: boolean | null;
+            healthCheckPassed: boolean | null;
+            portOpen: boolean | null;
+            stabilityWindowPassed: boolean | null;
+        };
+        /** @description POST /builds/:buildId/deployment payload (Runner → Host). Records external deployment progress and final result for the canonical deploy block. */
+        DeploymentReportRequest: {
+            /** @enum {string} */
+            status: "IN_PROGRESS" | "SUCCESS" | "FAILED";
+            /** @enum {string} */
+            targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "OTHER";
+            targetRef?: string | null;
+            resultRef?: string | null;
+            errorCode?: string | null;
+            errorMessage?: string | null;
+            runnerId: string;
+            responsePayloadJson?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** @description Canonical external deployment result block. Will replace preview-ready handoff fields after the server migration. */
+        DeploymentResult: {
+            /** @enum {string} */
+            status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
+            /** @enum {string|null} */
+            targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "OTHER" | null;
+            resultRef: string | null;
+        };
+        /** @description Result-delivery state for the final external notification or polling handoff. */
+        ResultDelivery: {
+            /** @enum {string} */
+            status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
+            /** @enum {string|null} */
+            mode: "POLLING" | "NOTIFICATION" | null;
+            /** Format: date-time */
+            deliveredAt: string | null;
+        };
         /** @description Query string for GET /builds. status and requestedBy filters are optional, limit is server-capped, cursor is opaque (buildId-based). */
         BuildListQuery: {
             /**
-             * @description Optional status filter. Matches the canonical BuildStatus enum. Omitted = all.
+             * @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all.
              * @enum {string}
              */
-            status?: "QUEUED" | "BUILDING" | "COMPLETED" | "FAILED" | "PROVISIONING" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "TEST_READY" | "EXPIRED";
+            status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
             /** @description Optional owner filter. Matches BuildRequest.requestedBy (canonical owner identity, same as IDENTITY_MODEL userId). Omitted = all. */
             requestedBy?: string;
             /**
@@ -616,10 +734,67 @@ export interface components {
              */
             nextCursor: string | null;
         };
-        /** @description Returned on GET /builds/:buildId and embedded in claim responses (2-depth nesting). */
+        /** @description Returned on GET /builds/:buildId and embedded in claim responses (2-depth nesting). phaseHistory + currentPhase preserve the existing timeline contract, while lifecycle/image/test/deploy/resultDelivery provide the new canonical build/test/deploy/result-delivery model. */
         BuildStatusResponse: {
             build: components["schemas"]["BuildSummary"];
             lastError: components["schemas"]["BuildError"] & unknown;
+            /**
+             * @description List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. PREVIEW_QUEUED → COMPLETED without PREVIEW_READY). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051).
+             * @default []
+             */
+            phaseHistory: components["schemas"]["BuildPhaseHistoryEntry"][];
+            currentPhase?: components["schemas"]["BuildCurrentPhase"];
+            /** @description Canonical lifecycle snapshot. Optional during the migration window while the server still emits preview-era top-level statuses. */
+            lifecycle?: {
+                /** @enum {string} */
+                status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
+                /** Format: date-time */
+                startedAt?: string | null;
+                /** Format: date-time */
+                finishedAt?: string | null;
+            };
+            /** @description Canonical build artifact identity. Optional until docker build metadata is persisted by the server. */
+            image?: {
+                name: string;
+                tag: string;
+                digest: string | null;
+            } | null;
+            /** @description Canonical container-test result block. Optional until TASK-054 wires runtime validation results into the API. */
+            test?: {
+                /** @enum {string} */
+                status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
+                containerRunning: boolean | null;
+                healthCheckPassed: boolean | null;
+                portOpen: boolean | null;
+                stabilityWindowPassed: boolean | null;
+            };
+            /** @description Canonical external deployment result block. Optional until the deployment adapter is connected. */
+            deploy?: {
+                /** @enum {string} */
+                status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
+                /** @enum {string|null} */
+                targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "OTHER" | null;
+                resultRef: string | null;
+            };
+            /** @description Canonical result-delivery block for polling/notification completion. Optional until final handoff tracking is implemented. */
+            resultDelivery?: {
+                /** @enum {string} */
+                status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
+                /** @enum {string|null} */
+                mode: "POLLING" | "NOTIFICATION" | null;
+                /** Format: date-time */
+                deliveredAt: string | null;
+            };
+        };
+        /** @description Single completed-phase record. Appended in transition order. The current in-flight phase is not represented here — see BuildCurrentPhase. */
+        BuildPhaseHistoryEntry: {
+            /** @enum {string} */
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            /**
+             * Format: date-time
+             * @description ISO 8601 timestamp at which this phase completed (transitioned out, regardless of outcome).
+             */
+            completedAt: string;
         };
         /** @description Returned on GET /builds/:buildId/logs. */
         BuildLogsResponse: {
@@ -634,7 +809,7 @@ export interface components {
             /** Format: uuid */
             buildId: string;
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             message: string;
             /** Format: date-time */
             createdAt: string;
@@ -655,12 +830,12 @@ export interface components {
         /** @description Runner phase report payload (PKG-005). */
         PhaseUpdateRequest: {
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             runnerId: string;
             /** Format: date-time */
             occurredAt?: string;
         };
-        /** @description Preview service state. Returned in BuildStatusResponse.testDeployment (PKG-006). */
+        /** @description Legacy preview/test-deployment state. Kept as a migration shim until the Build Server and Runner switch to the canonical container-test and deployment result blocks. */
         TestDeployment: {
             /** @enum {string} */
             status: "NOT_REQUESTED" | "QUEUED" | "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
@@ -685,12 +860,16 @@ export interface components {
         TestDeploymentQueueResponse: {
             testDeployment: components["schemas"]["TestDeployment"];
         };
-        /** @description POST /builds/:buildId/test-deployment/ready payload (Runner → Host). */
+        /** @description POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals. */
         TestDeploymentReadyRequest: {
             /** Format: uri */
             previewUrl: string;
             host: string;
             hostPort: number;
+            containerRef?: string;
+            healthCheckPassed?: boolean;
+            portOpen?: boolean;
+            stabilityWindowPassed?: boolean;
             runnerId: string;
         };
         /** @description POST /builds/:buildId/test-deployment/status payload (Runner → Host, PROVISIONING/FAILED/EXPIRED). */
@@ -707,9 +886,7 @@ export interface components {
         };
         /** @description POST /builds payload (Skill → Host). */
         BuildRequest: {
-            /**
-             * @description Canonical application name. Used as the active-build deduplication key and rendered in the build list/detail UI.
-             */
+            /** @description Canonical application name. Used as the active-build deduplication key and rendered in the build list/detail UI. */
             appName: string;
             requestedBy: string;
             sourceArchive: components["schemas"]["SourceArchive"];
@@ -726,10 +903,10 @@ export interface components {
         /** @description Query for GET /admin/builds. Same shape as BuildListQuery but the requestedBy filter is unrestricted (admin can filter by any owner or omit to see all). */
         AdminListBuildsQuery: {
             /**
-             * @description Optional status filter. Matches the canonical BuildStatus enum. Omitted = all.
+             * @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all.
              * @enum {string}
              */
-            status?: "QUEUED" | "BUILDING" | "COMPLETED" | "FAILED" | "PROVISIONING" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "TEST_READY" | "EXPIRED";
+            status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
             /** @description Admin-only optional owner filter. Omitted = every owner. Caller id must be in ADMIN_IDS. */
             requestedBy?: string;
             /**
@@ -756,18 +933,30 @@ export interface components {
         AdminUserBuildSummary: {
             /** Format: uuid */
             buildId: string;
-            /**
-             * @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI.
-             */
+            /** @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI. */
             appName: string;
+            /**
+             * @description Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility.
+             * @enum {string}
+             */
+            status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
             /** @enum {string} */
-            status: "QUEUED" | "CLAIMED" | "BUILDING" | "TEST_READY" | "COMPLETED" | "FAILED";
-            /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "COMPLETED" | "FAILED";
-            /** @enum {string} */
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            /**
+             * @description Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks.
+             * @enum {string}
+             */
             previewStatus: "NOT_REQUESTED" | "QUEUED" | "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
-            /** Format: uri */
+            /**
+             * Format: uri
+             * @description Legacy preview-era field. Represents the temporary runtime endpoint used by the current test-deployment adapter.
+             */
             previewUrl: string | null;
+            /**
+             * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
+             * @enum {string}
+             */
+            lifecycleStatus?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */

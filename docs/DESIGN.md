@@ -209,7 +209,7 @@ code:
   가 다루는 backend PKG-001~006 의 범위.
 - `docs/sdlc/08-build-server-tech-stack-baseline.md` — Build Server
   의 runtime 과 ENV (CORS_ORIGIN 포함).
-- `docs/REQUIREMENTS_BASELINE.md` — NFR (성능, 보안) 기준.
+- `docs/sdlc/03-requirements-baseline.md` — NFR (성능, 보안) 기준.
 - Stitch design spec v1: <https://stitch.withgoogle.com/docs/design-md/specification>
   (참조 형식 차용, 본 프로젝트는 Stitch 가 아님)
 - PR #5 (`codex/frontend-swagger-2026-07-03`) — Swagger UI / CORS

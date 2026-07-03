@@ -125,6 +125,9 @@ describe("POST /builds/:buildId/phase", () => {
     const body = res.json();
     assert.equal(body.build.phase, "DOCKER_BUILD_STARTED");
     assert.equal(body.build.status, "BUILDING");
+    assert.equal(body.build.lifecycleStatus, "BUILDING");
+    assert.equal(body.lifecycle.status, "BUILDING");
+    assert.equal(body.test.status, "NOT_STARTED");
     await app.close();
   });
 });
@@ -209,6 +212,10 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
         previewUrl: "http://preview.local/x",
         host: "preview.local",
         hostPort: 38124,
+        containerRef: "container-b-1",
+        healthCheckPassed: true,
+        portOpen: true,
+        stabilityWindowPassed: true,
         runnerId: "r-1"
       }
     });
@@ -218,6 +225,70 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
     assert.equal(body.build.previewStatus, "READY");
     assert.equal(body.build.phase, "PREVIEW_READY");
     assert.equal(body.build.previewUrl, "http://preview.local/x");
+    assert.equal(body.build.lifecycleStatus, "TEST_SUCCESS");
+    assert.equal(body.lifecycle.status, "TEST_SUCCESS");
+    assert.equal(body.test.status, "SUCCESS");
+    assert.equal(body.test.containerRunning, true);
+    assert.equal(body.test.healthCheckPassed, true);
+    assert.equal(body.test.portOpen, true);
+    assert.equal(body.test.stabilityWindowPassed, true);
+    assert.equal(body.deploy.status, "NOT_STARTED");
+    assert.equal(body.resultDelivery.status, "NOT_STARTED");
+    await app.close();
+  });
+});
+
+describe("POST /builds/:buildId/deployment", () => {
+  it("returns 200 after ready with DEPLOY_SUCCESS canonical block", async () => {
+    const { service, buildId } = await (async () => {
+      const repo = createMemoryBuildRepository();
+      const svc = new BuildService(repo);
+      const create = await svc.createBuild(baseBody);
+      if (!("accepted" in create) || !create.accepted) throw new Error("setup");
+      const id = create.build.buildId;
+      await svc.claimNextBuild();
+      await svc.reportPhase(id, "SOURCE_PREPARED");
+      await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
+      await svc.reportPhase(id, "DOCKER_BUILD_COMPLETED");
+      await svc.queueTestDeployment(id, 8080, 30);
+      await svc.reportPreviewStatus(id, "READY", {
+        previewUrl: "http://preview.local/x",
+        host: "preview.local",
+        hostPort: 38124,
+        healthCheckPassed: true,
+        portOpen: true,
+        stabilityWindowPassed: true
+      });
+      return { service: svc, buildId: id };
+    })();
+
+    const app = Fastify({ logger: false });
+    await registerBuildRoutes(app, service);
+    const res = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/deployment`,
+      payload: {
+        status: "SUCCESS",
+        targetType: "DOCKER_REGISTRY",
+        targetRef: "registry.example.com/todo-app",
+        resultRef: "registry.example.com/todo-app:build-1",
+        runnerId: "r-1",
+        responsePayloadJson: {
+          deliveryMode: "POLLING"
+        }
+      }
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.build.status, "DEPLOY_SUCCESS");
+    assert.equal(body.build.phase, "DEPLOYMENT_COMPLETED");
+    assert.equal(body.build.lifecycleStatus, "DEPLOY_SUCCESS");
+    assert.equal(body.lifecycle.status, "DEPLOY_SUCCESS");
+    assert.equal(body.deploy.status, "SUCCESS");
+    assert.equal(body.deploy.targetType, "DOCKER_REGISTRY");
+    assert.equal(body.deploy.resultRef, "registry.example.com/todo-app:build-1");
+    assert.equal(body.resultDelivery.mode, "POLLING");
+    assert.equal(body.resultDelivery.status, "IN_PROGRESS");
     await app.close();
   });
 });

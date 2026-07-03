@@ -1,10 +1,10 @@
 # Step 04 Design 02 - Domain Model And State Transitions
 
-- 문서 목적: Docker Build Preview Platform MVP의 핵심 도메인 엔티티와 상태 전이 규칙을 정의한다.
-- 범위: 식별자 모델, 엔티티 경계, build 상태, preview 상태, active build 판정, terminal 상태 규칙
+- 문서 목적: Docker Build And Deployment Automation Platform MVP의 핵심 도메인 엔티티와 상태 전이 규칙을 정의한다.
+- 범위: 식별자 모델, 엔티티 경계, build 상태, test/deploy 상태, active build 판정, terminal 상태 규칙
 - 대상 독자: 설계자, 구현 담당자, 프로젝트 리드, AI 에이전트
 - 상태: draft
-- 최종 수정일: 2026-07-02
+- 최종 수정일: 2026-07-03
 - 관련 문서: `docs/sdlc/design/01-system-context-and-responsibilities.md`, `docs/sdlc/SRS/06-mvp-must-requirements.md`, `docs/sdlc/SRS/04-policy-and-constraints.md`, `docs/sdlc/SRS/05-open-issues-and-decisions.md`
 
 ## Traceability
@@ -22,25 +22,27 @@
 
 - 어떤 엔티티를 별도로 관리해야 하는가
 - 어떤 식별자 조합이 도메인의 기준 축인가
-- build 상태와 preview 상태는 어떻게 분리되는가
+- build 상태와 test/deploy 상태는 어떻게 분리되는가
 - active build와 terminal 상태는 무엇인가
 - 어떤 상태 전이가 허용되는가
 
 ## 2. 도메인 모델 개요
 
-MVP에서 핵심 엔티티는 다음 세 가지다.
+MVP에서 핵심 엔티티는 다음 네 가지다.
 
 ```text
 BuildRequest
 BuildLog
-TestDeployment
+BuildTest
+DeploymentAttempt
 ```
 
 각 엔티티의 역할:
 
 - `BuildRequest`: 사용자의 배포 요청과 build lifecycle의 기준 레코드
 - `BuildLog`: build 실행 과정에서 누적되는 시간순 로그
-- `TestDeployment`: preview 실행 결과와 lifecycle의 기준 레코드
+- `BuildTest`: 컨테이너 실행 검증 결과의 기준 레코드
+- `DeploymentAttempt`: 외부 시스템 배포 결과의 기준 레코드
 
 ## 3. 식별자 모델
 
@@ -59,18 +61,18 @@ TestDeployment
   - 현재는 외부 인증 시스템과 매핑 가능한 문자열 식별자라는 임시 가정 사용
 
 - `appName`
-  - 사용자가 테스트하려는 앱 단위
+  - 사용자가 테스트/배포하려는 앱 단위
   - 사용자 표시 이름과 시스템 정규화 이름을 구분
 
 - `buildId`
   - 개별 build 작업의 전역 고유 식별자
-  - 상태 조회, 로그 조회, preview 연결의 기본 참조 키
+  - 상태 조회, 로그 조회, test/deploy 연결의 기본 참조 키
 
 ### 3.3 도메인 규칙
 
 - `userId + appName`은 "같은 앱의 연속 build 여부"를 판정하는 기준이다.
 - `buildId`는 개별 작업 단위의 식별자다.
-- MVP에서는 별도 `previewId` 없이 `buildId`가 preview 대표 참조 역할도 함께 수행한다.
+- MVP에서는 별도 `testId`나 `deploymentId`를 외부 API의 대표 식별자로 노출하지 않아도 된다.
 
 ## 4. 엔티티 정의
 
@@ -86,7 +88,8 @@ TestDeployment
 - `userId`
 - `appName`
 - `status`
-- `sourceArchiveRef` 또는 동등 참조
+- `inputType`
+- `sourceRef` 또는 동등 참조
 - `dockerfileMode`
 - `runtimePort`
 - `errorCode`
@@ -123,32 +126,55 @@ TestDeployment
 - 사용자/운영자용 로그 조회 기반 제공
 - 실패 시 어떤 단계에서 문제가 생겼는지 추적 가능하게 함
 
-### 4.3 TestDeployment
+### 4.3 BuildTest
 
 목적:
 
-- preview 실행 결과를 build와 별도로 추적
+- 컨테이너 실행 검증 결과를 build와 별도로 추적
 
 핵심 속성:
 
 - `buildId`
-- `userId`
-- `appName`
 - `status`
+- `containerRef`
 - `host`
 - `hostPort`
 - `internalPort`
-- `previewUrl`
-- `containerRef`
-- `expiresAt`
-- `stoppedAt`
+- `healthCheckPassed`
+- `portOpen`
+- `stabilityWindowPassed`
 - `errorCode`
 - `errorMessage`
+- `startedAt`
+- `finishedAt`
 
 책임:
 
-- preview lifecycle 보존
-- build 성공 이후 실행 가능성 여부를 별도로 표현
+- 컨테이너 테스트 lifecycle 보존
+- build 성공 이후 실제 실행 가능성 여부를 별도로 표현
+
+### 4.4 DeploymentAttempt
+
+목적:
+
+- 외부 시스템 배포 결과를 build와 별도로 추적
+
+핵심 속성:
+
+- `buildId`
+- `status`
+- `targetType`
+- `targetRef`
+- `resultRef`
+- `errorCode`
+- `errorMessage`
+- `startedAt`
+- `finishedAt`
+
+책임:
+
+- 배포 lifecycle 보존
+- 외부 시스템 전달 성공/실패 여부를 추적
 
 ## 5. Build 상태 모델
 
@@ -157,14 +183,14 @@ TestDeployment
 ```text
 RECEIVED
 QUEUED
-PREPARING
+PREPARING_SOURCE
 VALIDATING
 BUILDING
-IMAGE_BUILT
-TEST_DEPLOYING
-TEST_READY
-PUSHING
-REGISTERING
+BUILD_SUCCESS
+TESTING
+TEST_SUCCESS
+DEPLOYING
+DEPLOY_SUCCESS
 COMPLETED
 FAILED
 CANCELLED
@@ -173,15 +199,15 @@ CANCELLED
 ### 5.2 상태 의미
 
 - `RECEIVED`: 서버가 요청을 수신했지만 queue 등록 전 정리 단계
-- `QUEUED`: Runner 실행 대기 상태
-- `PREPARING`: 소스 준비와 작업 디렉터리 정리 단계
+- `QUEUED`: Worker 실행 대기 상태
+- `PREPARING_SOURCE`: Git clone 또는 Zip 해제 단계
 - `VALIDATING`: 요청값과 실행 조건 검토 단계
 - `BUILDING`: 이미지 빌드 실행 단계
-- `IMAGE_BUILT`: 이미지 생성 성공, preview는 아직 미기동
-- `TEST_DEPLOYING`: preview 실행 중
-- `TEST_READY`: preview URL 제공 가능 상태
-- `PUSHING`: 향후 registry 연동 확장 상태
-- `REGISTERING`: 향후 deployment registration 확장 상태
+- `BUILD_SUCCESS`: 이미지 생성 성공, 테스트는 아직 미완료
+- `TESTING`: 컨테이너 실행 및 최소 동작 테스트 수행 단계
+- `TEST_SUCCESS`: 컨테이너 테스트 성공 상태
+- `DEPLOYING`: 외부 시스템 배포 진행 단계
+- `DEPLOY_SUCCESS`: 외부 시스템 배포 성공 상태
 - `COMPLETED`: 전체 작업 종료
 - `FAILED`: 실패 종료
 - `CANCELLED`: 취소 종료
@@ -193,12 +219,14 @@ CANCELLED
 ```text
 RECEIVED
  -> QUEUED
- -> PREPARING
+ -> PREPARING_SOURCE
  -> VALIDATING
  -> BUILDING
- -> IMAGE_BUILT
- -> TEST_DEPLOYING
- -> TEST_READY
+ -> BUILD_SUCCESS
+ -> TESTING
+ -> TEST_SUCCESS
+ -> DEPLOYING
+ -> DEPLOY_SUCCESS
  -> COMPLETED
 ```
 
@@ -209,60 +237,51 @@ RECEIVED
 
 ### 5.4 상태 설계 원칙
 
-- `IMAGE_BUILT`와 `TEST_READY`를 분리해 "이미지 성공"과 "실행 가능"을 구분한다.
+- `BUILD_SUCCESS`, `TEST_SUCCESS`, `DEPLOY_SUCCESS`를 분리해 빌드/테스트/배포를 구분한다.
 - build 상태는 사용자 가치 변화가 발생하는 지점 기준으로 설계한다.
-- 향후 확장 상태는 모델에 포함하되 MVP 필수 경로로 강제하지 않는다.
+- `COMPLETED`는 최종 결과 전달까지 닫힌 뒤의 terminal 상태다.
 
-## 6. Preview 상태 모델
+## 6. Test / Deploy 상태 모델
 
-### 6.1 상태 목록
+### 6.1 BuildTest 상태 목록
 
 ```text
-QUEUED
-RESERVED
+NOT_STARTED
 STARTING
-READY
+RUNNING
+SUCCESS
 FAILED
-STOPPED
 EXPIRED
 ```
 
-### 6.2 상태 의미
-
-- `QUEUED`: preview 실행 슬롯 대기 상태
-- `RESERVED`: 포트 또는 실행 슬롯 확보
-- `STARTING`: 컨테이너 시작 중
-- `READY`: 사용자 접속 가능
-- `FAILED`: preview 실행 실패
-- `STOPPED`: 명시적 중지 또는 교체 종료
-- `EXPIRED`: TTL 만료 종료
-
-### 6.3 기본 전이
+### 6.2 DeploymentAttempt 상태 목록
 
 ```text
-QUEUED
- -> RESERVED
-RESERVED
- -> STARTING
- -> READY
- -> STOPPED
+NOT_STARTED
+IN_PROGRESS
+SUCCESS
+FAILED
 ```
 
-예외 전이:
-
-- `STARTING -> FAILED`
-- `READY -> EXPIRED`
-
-### 6.4 build와 preview 상태 분리 이유
+### 6.3 상태 분리 이유
 
 아래 상황을 표현해야 하기 때문이다.
 
 ```text
-build status = IMAGE_BUILT
-preview status = FAILED
+build status = BUILD_SUCCESS
+test status = FAILED
+deploy status = NOT_STARTED
 ```
 
-즉, 이미지 빌드는 성공했지만 사용자에게 테스트 가능한 실행 환경은 제공하지 못한 경우를 분리 표현해야 한다.
+또는
+
+```text
+build status = DEPLOYING
+test status = SUCCESS
+deploy status = IN_PROGRESS
+```
+
+즉, 이미지 빌드는 성공했지만 테스트 또는 배포는 실패했을 수 있으므로 분리 표현이 필요하다.
 
 ## 7. Active Build 규칙
 
@@ -273,14 +292,16 @@ active build는 동일 `userId + appName`에 대해 새 build 요청을 막아�
 ### 7.2 active 상태
 
 ```text
+RECEIVED
 QUEUED
-PREPARING
+PREPARING_SOURCE
 VALIDATING
 BUILDING
-IMAGE_BUILT
-TEST_DEPLOYING
-PUSHING
-REGISTERING
+BUILD_SUCCESS
+TESTING
+TEST_SUCCESS
+DEPLOYING
+DEPLOY_SUCCESS
 ```
 
 ### 7.3 terminal 상태
@@ -291,20 +312,15 @@ FAILED
 CANCELLED
 ```
 
-### 7.4 `TEST_READY`와 `COMPLETED`
+### 7.4 `DEPLOY_SUCCESS`와 `COMPLETED`
 
-`TEST_READY`는 preview URL이 준비되었음을 외부에 알리는 success handoff 상태다.
+`DEPLOY_SUCCESS`는 외부 시스템 전달이 성공했음을 나타내는 success handoff 상태다.
 
 권장 규칙:
 
-- `TEST_READY`는 짧은 성공 handoff 상태로 사용한다.
-- 사용자/에이전트에 성공 상태를 노출한 뒤 build는 `COMPLETED`로 닫는다.
-- 따라서 `TEST_READY`는 build queue를 계속 점유하는 active 상태로 유지하지 않는다.
-
-설계 메모:
-
-- preview가 계속 살아 있어도 build 자체는 완료될 수 있다.
-- 이후 preview lifecycle은 `TestDeployment`가 별도로 관리한다.
+- `DEPLOY_SUCCESS`는 짧은 성공 handoff 상태로 사용한다.
+- 사용자/외부 시스템에 성공 상태를 노출한 뒤 build는 `COMPLETED`로 닫는다.
+- 따라서 `DEPLOY_SUCCESS`는 build queue를 계속 점유하는 active 상태로 유지하지 않는다.
 
 ## 8. Aggregate 경계 제안
 
@@ -316,36 +332,31 @@ CANCELLED
 - build 메타데이터
 - active build 판정 기준 속성
 
-이유:
-
-- build lifecycle의 일관성을 한 곳에서 유지해야 함
-
-### 8.2 TestDeployment Aggregate
+### 8.2 BuildTest Aggregate
 
 포함 범위:
 
-- preview 실행 상태
-- preview URL 정보
-- preview 만료/중지 정보
+- 컨테이너 실행 상태
+- health/port/stability 검증 결과
 
-이유:
+### 8.3 DeploymentAttempt Aggregate
 
-- build 성공 이후의 실행 lifecycle을 독립적으로 관리해야 함
+포함 범위:
 
-### 8.3 BuildLog
+- 외부 배포 상태
+- target 정보
+- 결과 참조 정보
+
+### 8.4 BuildLog
 
 별도 append-only 이벤트 성격으로 취급
-
-이유:
-
-- 상태와 강결합시키기보다 sequence 기반으로 저장하는 편이 단순함
 
 ## 9. 현재 설계 가정
 
 - `userId`는 문자열 기반 외부 매핑 키다.
 - `appName`은 정규화된 시스템 이름을 저장한다고 가정한다.
 - `buildId`는 사람이 복사 가능한 문자열 형식을 사용한다.
-- preview는 `host + port` 기반 URL을 사용한다고 가정한다.
+- 테스트 실행 결과는 `host + port` 기반 URL을 가질 수 있지만, 이것이 최종 성공 기준은 아니다.
 
 ## 10. 후속 설계 문서로 넘길 포인트
 
@@ -355,5 +366,5 @@ CANCELLED
 
 ## 11. 현 단계 결론
 
-- 이 플랫폼의 핵심 도메인 포인트는 `BuildRequest`와 `TestDeployment`를 분리하고, `TEST_READY`를 success handoff 뒤 `COMPLETED`로 닫는 것이다.
-- 이 결정이 이후 API, 데이터 모델, preview 교체 정책의 안정성을 좌우한다.
+- 이 플랫폼의 핵심 도메인 포인트는 `BuildRequest`, `BuildTest`, `DeploymentAttempt`를 분리하고, `DEPLOY_SUCCESS` 이후 `COMPLETED`로 닫는 것이다.
+- 이 결정이 이후 API, 데이터 모델, 배포 어댑터 정책의 안정성을 좌우한다.

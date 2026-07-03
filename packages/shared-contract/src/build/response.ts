@@ -2,7 +2,12 @@ import { z } from "zod";
 
 import { errorCodes } from "./errors.js";
 import { buildPhases } from "./phase.js";
-import { buildStatuses, previewStatuses } from "./status.js";
+import {
+  buildStatuses,
+  canonicalBuildStatuses,
+  executionStatuses,
+  previewStatuses
+} from "./status.js";
 
 // All exported schemas carry a `.meta({ id, description })` so that
 // @asteasolutions/zod-to-openapi's OpenApiGeneratorV3 can lift them into
@@ -30,10 +35,23 @@ export const buildSummarySchema = z
       description:
         "Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI."
     }),
-    status: z.enum(buildStatuses),
+    status: z.enum(buildStatuses).meta({
+      description:
+        "Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility."
+    }),
     phase: z.enum(buildPhases),
-    previewStatus: z.enum(previewStatuses),
-    previewUrl: z.string().url().nullable(),
+    previewStatus: z.enum(previewStatuses).meta({
+      description:
+        "Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks."
+    }),
+    previewUrl: z.string().url().nullable().meta({
+      description:
+        "Legacy preview-era field. Represents the temporary runtime endpoint used by the current test-deployment adapter."
+    }),
+    lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
+      description:
+        "Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window."
+    }),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime()
   })
@@ -114,6 +132,111 @@ export const buildCurrentPhaseSchema = z
 
 export type BuildCurrentPhase = z.infer<typeof buildCurrentPhaseSchema>;
 
+export const buildLifecycleSchema = z
+  .object({
+    status: z.enum(canonicalBuildStatuses),
+    startedAt: z.string().datetime().nullable().optional(),
+    finishedAt: z.string().datetime().nullable().optional()
+  })
+  .meta({
+    id: "BuildLifecycle",
+    description:
+      "Canonical build lifecycle snapshot aligned with the document-first build/test/deploy/result-delivery model."
+  });
+
+export type BuildLifecycle = z.infer<typeof buildLifecycleSchema>;
+
+export const buildImageSchema = z
+  .object({
+    name: z.string().min(1),
+    tag: z.string().min(1),
+    digest: z.string().min(1).nullable()
+  })
+  .meta({
+    id: "BuildImage",
+    description:
+      "Image identity emitted after a successful docker build. Optional during the migration window."
+  });
+
+export type BuildImage = z.infer<typeof buildImageSchema>;
+
+export const containerTestResultSchema = z
+  .object({
+    status: z.enum(executionStatuses),
+    containerRunning: z.boolean().nullable(),
+    healthCheckPassed: z.boolean().nullable(),
+    portOpen: z.boolean().nullable(),
+    stabilityWindowPassed: z.boolean().nullable()
+  })
+  .meta({
+    id: "ContainerTestResult",
+    description:
+      "Canonical container-test result block. Replaces preview-centric status interpretation for runtime validation."
+  });
+
+export type ContainerTestResult = z.infer<typeof containerTestResultSchema>;
+
+export const deploymentResultSchema = z
+  .object({
+    status: z.enum(executionStatuses),
+    targetType: z.enum([
+      "HTTP_API",
+      "SCP",
+      "SFTP",
+      "SHARED_STORAGE",
+      "DOCKER_REGISTRY",
+      "OTHER"
+    ]).nullable(),
+    resultRef: z.string().min(1).nullable()
+  })
+  .meta({
+    id: "DeploymentResult",
+    description:
+      "Canonical external deployment result block. Will replace preview-ready handoff fields after the server migration."
+  });
+
+export type DeploymentResult = z.infer<typeof deploymentResultSchema>;
+
+export const deploymentReportRequestSchema = z
+  .object({
+    status: z.enum(["IN_PROGRESS", "SUCCESS", "FAILED"]),
+    targetType: z.enum([
+      "HTTP_API",
+      "SCP",
+      "SFTP",
+      "SHARED_STORAGE",
+      "DOCKER_REGISTRY",
+      "OTHER"
+    ]),
+    targetRef: z.string().min(1).nullable().optional(),
+    resultRef: z.string().min(1).nullable().optional(),
+    errorCode: z.string().min(1).nullable().optional(),
+    errorMessage: z.string().min(1).nullable().optional(),
+    runnerId: z.string().min(1),
+    responsePayloadJson: z.record(z.string(), z.unknown()).nullable().optional()
+  })
+  .meta({
+    id: "DeploymentReportRequest",
+    description:
+      "POST /builds/:buildId/deployment payload (Runner → Host). Records external deployment progress and final result for the canonical deploy block."
+  });
+
+export type DeploymentReportRequest = z.infer<typeof deploymentReportRequestSchema>;
+
+export const resultDeliverySchema = z
+  .object({
+    status: z.enum(executionStatuses),
+    mode: z.enum(["POLLING", "NOTIFICATION"]).nullable(),
+    deliveredAt: z.string().datetime().nullable()
+  })
+  .meta({
+    id: "ResultDelivery",
+    description:
+      "Result-delivery state for the final external notification or polling handoff."
+  });
+
+export type ResultDelivery = z.infer<typeof resultDeliverySchema>;
+
 export const buildStatusResponseSchema = z
   .object({
     build: buildSummarySchema,
@@ -132,12 +255,32 @@ export const buildStatusResponseSchema = z
         description:
           "List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. PREVIEW_QUEUED → COMPLETED without PREVIEW_READY). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051)."
       }),
-    currentPhase: buildCurrentPhaseSchema.default(null)
+    currentPhase: buildCurrentPhaseSchema.default(null),
+    lifecycle: buildLifecycleSchema.optional().meta({
+      description:
+        "Canonical lifecycle snapshot. Optional during the migration window while the server still emits preview-era top-level statuses."
+    }),
+    image: buildImageSchema.nullable().optional().meta({
+      description:
+        "Canonical build artifact identity. Optional until docker build metadata is persisted by the server."
+    }),
+    test: containerTestResultSchema.optional().meta({
+      description:
+        "Canonical container-test result block. Optional until TASK-054 wires runtime validation results into the API."
+    }),
+    deploy: deploymentResultSchema.optional().meta({
+      description:
+        "Canonical external deployment result block. Optional until the deployment adapter is connected."
+    }),
+    resultDelivery: resultDeliverySchema.optional().meta({
+      description:
+        "Canonical result-delivery block for polling/notification completion. Optional until final handoff tracking is implemented."
+    })
   })
   .meta({
     id: "BuildStatusResponse",
     description:
-      "Returned on GET /builds/:buildId and embedded in claim responses (2-depth nesting). phaseHistory + currentPhase describe the full lifecycle timeline; the build-monitor PhaseTimeline renders all canonical phases as completed/current/pending based on these."
+      "Returned on GET /builds/:buildId and embedded in claim responses (2-depth nesting). phaseHistory + currentPhase preserve the existing timeline contract, while lifecycle/image/test/deploy/resultDelivery provide the new canonical build/test/deploy/result-delivery model."
   });
 
 export type BuildStatusResponse = z.infer<typeof buildStatusResponseSchema>;
@@ -208,7 +351,8 @@ export const testDeploymentSchema = z
   })
   .meta({
     id: "TestDeployment",
-    description: "Preview service state. Returned in BuildStatusResponse.testDeployment (PKG-006)."
+    description:
+      "Legacy preview/test-deployment state. Kept as a migration shim until the Build Server and Runner switch to the canonical container-test and deployment result blocks."
   });
 
 export type TestDeployment = z.infer<typeof testDeploymentSchema>;
@@ -242,11 +386,16 @@ export const testDeploymentReadyRequestSchema = z
     previewUrl: z.string().url(),
     host: z.string().min(1),
     hostPort: z.int().nonnegative(),
+    containerRef: z.string().min(1).optional(),
+    healthCheckPassed: z.boolean().optional(),
+    portOpen: z.boolean().optional(),
+    stabilityWindowPassed: z.boolean().optional(),
     runnerId: z.string().min(1)
   })
   .meta({
     id: "TestDeploymentReadyRequest",
-    description: "POST /builds/:buildId/test-deployment/ready payload (Runner → Host)."
+    description:
+      "POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals."
   });
 
 export type TestDeploymentReadyRequest = z.infer<typeof testDeploymentReadyRequestSchema>;

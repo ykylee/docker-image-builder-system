@@ -823,7 +823,7 @@
               </p>
               <div class="meta">
                 <span>문서 목적: 리더 대상 소개 및 승인</span>
-                <span>핵심 가치: Preview URL 제공</span>
+                <span>핵심 가치: 테스트와 배포 결과 전달</span>
                 <span>현재 단계: 구현 착수 직전</span>
               </div>
             </div>
@@ -831,9 +831,9 @@
               <aside class="hero-panel">
                 <span class="label">한 줄 요약</span>
                 <div class="value">"배포해줘"를<br />실행 가능한 결과로</div>
-                <p>자연어 요청을 받아 Build Server와 Runner가 이미지를 빌드하고 preview URL까지 연결한다.</p>
+                <p>자연어 요청을 받아 Build Server와 Runner가 build, container test, external deployment까지 연결한다.</p>
               </aside>
-              <div class="hero-visual" aria-label="사용자 요청이 Build Server와 Runner를 거쳐 preview URL로 연결되는 개념도">
+              <div class="hero-visual" aria-label="사용자 요청이 Build Server와 Runner를 거쳐 테스트와 배포 결과로 연결되는 개념도">
                 <svg viewBox="0 0 540 280" role="img">
                   <defs>
                     <linearGradient id="heroPanelGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -866,7 +866,7 @@
                     <circle cx="161" cy="138" r="4" fill="#fff" />
                     <circle cx="364" cy="138" r="4" fill="#fff" />
                     <rect x="156" y="228" width="230" height="22" rx="11" fill="rgba(255,255,255,0.12)" />
-                    <text x="271" y="243" text-anchor="middle" font-size="11" letter-spacing="1.2" fill="rgba(255,255,255,0.88)">PREVIEW URL RETURNED TO USER</text>
+                    <text x="271" y="243" text-anchor="middle" font-size="11" letter-spacing="1.2" fill="rgba(255,255,255,0.88)">TEST AND DEPLOY RESULT RETURNED</text>
                   </g>
                 </svg>
               </div>
@@ -877,11 +877,11 @@
                 </div>
                 <div class="hero-pill">
                   <strong>핵심 처리</strong>
-                  <span>Build + Preview</span>
+                  <span>Build + Test + Deploy</span>
                 </div>
                 <div class="hero-pill">
                   <strong>최종 가치</strong>
-                  <span>실행 가능한 URL</span>
+                  <span>검증된 결과 전달</span>
                 </div>
               </div>
             </div>
@@ -916,9 +916,9 @@
             <article class="card metric-card">
               <div>
                 <div class="metric-label">핵심 처리</div>
-                <div class="metric-value">Build + Preview</div>
+                <div class="metric-value">Build + Deploy</div>
               </div>
-              <p>빌드 성공보다 테스트 가능한 preview URL 제공이 더 중요하다.</p>
+              <p>빌드 성공보다 테스트 검증과 배포 결과 전달까지 닫히는 것이 더 중요하다.</p>
             </article>
             <article class="card metric-card">
               <div>
@@ -975,7 +975,7 @@
                 </div>
                 <div class="mini-label">Step 04</div>
                 <h3>Runner 실행</h3>
-                <p>실제 Docker 이미지 빌드와 preview 실행을 수행한다.</p>
+                <p>실제 Docker 이미지 빌드, 컨테이너 테스트, 외부 시스템 배포를 수행한다.</p>
               </article>
               <article class="flow-card outcome">
                 <div class="flow-icon">
@@ -983,11 +983,11 @@
                 </div>
                 <div class="mini-label">Step 05</div>
                 <h3>결과 반환</h3>
-                <p>사용자는 preview URL 또는 실패 안내를 받는다.</p>
+                <p>사용자는 테스트 결과, 배포 결과, 또는 실패 안내를 받는다.</p>
               </article>
             </div>
             <div class="flow-note">
-              <p><strong>핵심 포인트:</strong> 사용자는 Docker 절차를 보지 않는다. 시스템이 복잡성을 숨기고 결과만 preview URL로 돌려준다.</p>
+              <p><strong>핵심 포인트:</strong> 사용자는 Docker 절차를 보지 않는다. 시스템이 복잡성을 숨기고 결과만 테스트/배포 상태로 전달한다.</p>
             </div>
           </div>
         </div>
@@ -1036,8 +1036,8 @@
                   <p>Runner가 소비할 작업 단위 관리</p>
                 </div>
                 <div class="subnode">
-                  <h4>Preview Metadata</h4>
-                  <p>preview URL과 테스트 실행 결과 정리</p>
+                  <h4>Result Metadata</h4>
+                  <p>테스트 결과, 임시 runtime 정보, 배포 결과 정리</p>
                 </div>
               </div>
             </div>
@@ -1046,12 +1046,12 @@
               <article class="stack-card">
                 <div class="mini-label">Execution Layer</div>
                 <h3>Runner</h3>
-                <p>`docker build`, `docker run`, 로그 적재, preview 수명 관리의 실행 주체다.</p>
+                <p>`docker build`, `docker run`, 로그 적재, 테스트와 배포 실행의 주체다.</p>
               </article>
               <article class="stack-card">
                 <div class="mini-label">Outcome</div>
-                <h3>Preview URL</h3>
-                <p>최종 결과물은 기술 로그가 아니라 사용자가 눌러볼 수 있는 실행 링크다.</p>
+                <h3>Result Delivery</h3>
+                <p>최종 결과물은 기술 로그가 아니라 사용자가 확인할 수 있는 테스트/배포 결과다.</p>
               </article>
             </div>
           </div>
@@ -1114,14 +1114,14 @@
               <h3>다음 단계로 미루는 것</h3>
               <ul>
                 <li>다중 Runner 병렬 처리</li>
-                <li>reverse proxy 기반 preview 라우팅 확장</li>
+                <li>runtime exposure 방식 고도화</li>
                 <li>registry push / deployment registration</li>
                 <li>운영 미결정 항목 전면 정리</li>
               </ul>
             </article>
           </div>
           <div class="statement">
-            <p><strong>범위 전략:</strong> 먼저 빌드 요청, 상태 관리, preview 연결의 최소 구조를 만들고 이후 운영 확장을 붙인다.</p>
+            <p><strong>범위 전략:</strong> 먼저 빌드 요청, 상태 관리, 테스트/배포 연결의 최소 구조를 만들고 이후 운영 확장을 붙인다.</p>
           </div>
         </div>
       </section>
@@ -1154,7 +1154,7 @@
             <article class="roadmap-step">
               <div class="mini-label">Phase 4</div>
               <h3>Runner 및 운영 정책 확장</h3>
-              <p>필요할 때만 preview queue, Runner claim, 후속 의사결정 항목을 닫아 확장한다.</p>
+              <p>필요할 때만 runtime queue, Runner claim, 후속 의사결정 항목을 닫아 확장한다.</p>
             </article>
           </div>
         </div>

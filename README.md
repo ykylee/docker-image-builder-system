@@ -1,8 +1,8 @@
 # Docker Image Builder System
 
-비개발자 사용자가 AI 에이전트에게 "배포해줘"라고 요청하면, 소스 준비부터 Docker 이미지 빌드와 테스트용 미리보기 URL 제공까지 이어지는 흐름을 지원하는 플랫폼이다.
+외부 사용자 또는 AI 에이전트가 "배포해줘"라고 요청하면, 소스 입력부터 Docker 이미지 빌드, 컨테이너 동작 테스트, 외부 시스템 배포, 결과 전달까지 이어지는 자동화 흐름을 지원하는 플랫폼이다.
 
-현재 저장소는 구현 전 온보딩 단계이며, 제품 컨셉과 MVP 범위를 먼저 문서화한 상태다.
+현재 저장소는 SDLC 기준선과 초기 구현 스캐폴드가 함께 존재하는 단계이며, `docs/sdlc/`가 제품/설계의 canonical source다.
 
 ## Product Direction
 
@@ -42,13 +42,13 @@
 
 ## MVP Scope
 
-- Track 1: Docker Image Build Server
+- Track 1: Docker Build And Deployment Server
 - Track 2: Docker Build Skill / MCP 세트
-- 공통 목표: Docker 지식이 없는 사용자에게 테스트 URL까지 이어지는 배포 경험 제공
+- 공통 목표: Docker 지식이 없는 사용자에게 build -> test -> deploy -> result delivery 경험 제공
 
 ## Current Focus
 
-- 외부 컨셉 문서를 저장소 기준 문서로 흡수
-- SDLC Step 04 설계 문서 6종과 Step 05 진입 기준 문서를 정리
-- build queue와 preview service queue를 분리하는 운영 모델 반영
-- SDLC 리뷰, 과제 계획안, 보고용 자료 초안까지 반영했고, 다음 단계는 shared package 또는 API 스캐폴드 진입이다
+- 외부 요구사항을 `docs/sdlc/` 기준 문서군으로 흡수
+- preview-first 서사를 build -> container test -> external deployment -> result delivery 모델로 재정렬
+- Build Server / Runner / Skill-MCP 경계를 구현 가능한 수준까지 문서화
+- 다음 단계는 문서 정합성 마감 후 shared package, API, Runner 연동 축을 계속 구현하는 것이다
