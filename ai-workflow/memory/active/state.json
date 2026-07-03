@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "PR #6 (TASK-039 frontend 부착 1차 골격) 진행 중: Svelte 5 + Vite + TypeScript 선정 (DESIGN.md §0 Stack), apps/build-monitor 골격 (package.json/vite.config/tsconfig/svelte.config/index.html/src/main.ts), DESIGN.md §1 Tokens 의 1차안을 src/lib/tokens.css 로 CSS custom properties 화 (color/typography/spacing/radius/shadow/motion/z-index), 4개 컴포넌트 (StatusPill/BuildRow/PhaseTimeline/LogStream) + Header + Header nav, 3개 route (BuildsList/BuildDetail/NotFound) + svelte-spa-router, lib/api.ts hand-typed BuildSummary/BuildStatusResponse/BuildLogsResponse (1차, openapi-typescript 자동화는 후속 PR), Vite proxy /api → 127.0.0.1:3000, vitest 7/7 OK (StatusPill status→color 매핑), vite build OK (gzip js 22KB + css 2KB). svelte-check 0 errors. 회귀 273/273 OK (TS build-server 38 + TS build-monitor 7 + Go 13 + Python 215). 후속: openapi-typescript 자동 client 생성, Build Server list endpoint 추가, light mode, TASK-017 stdio transport 또는 TASK-037 PKG-007 sweeper.",
-  "purpose_digest_rev": "43",
+  "purpose_digest": "PR #6 (TASK-039 Svelte 5 frontend 부착 1차 골격) main 합류 (squash merge 09ccd4d, 원격 브랜치 codex/frontend-attach-2026-07-03 삭제). apps/build-monitor/ 신설 (Svelte 5.1 + Vite 5.4 + TypeScript 5.6 + vitest 2.1), DESIGN.md §0 Stack 선정 (Svelte 5 vs React 비교), tokens.css 로 1차 tokens CSS 변수화, 4 컴포넌트 (StatusPill/BuildRow/PhaseTimeline/LogStream) + Header + 3 route + lib/api.ts hand-typed 1차, vitest 7/7, svelte-check 0 errors, vite build OK (gzip 22KB JS + 2KB CSS). 회귀 273/273 OK (TS 38+7 + Go 13 + Python 215). 후속: openapi-typescript 자동 client + Build Server list endpoint + light mode 또는 TASK-017 stdio transport 또는 TASK-037 sweeper.",
+  "purpose_digest_rev": "44",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
