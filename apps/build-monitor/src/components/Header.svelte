@@ -51,7 +51,7 @@
     }
   });
 
-    function adminLogout() {
+  function adminLogout() {
     // Admin session is independent from the user session so logging out
     // of the admin UI does not sign the user out of the build monitor.
     // 단, auto-enable 인 경우 (userId 가 admin 인 상태) 에는 user

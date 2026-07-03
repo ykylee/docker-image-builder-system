@@ -44,11 +44,20 @@
     }
   });
 
+  // canonical admin id pattern. server schema 와 동일하게 letter / digit /
+  // dot / underscore / hyphen 만 허용. client-side pre-check 로 잘못된
+  // 요청이 backend 까지 가지 않게 막는다.
+  const ADMIN_ID_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
   async function add() {
     if (!effectiveAdminId) return;
     const trimmed = newAdminId.trim();
     if (!trimmed) {
       error = "Admin id 는 비어 있을 수 없습니다.";
+      return;
+    }
+    if (!ADMIN_ID_PATTERN.test(trimmed)) {
+      error = `Admin id 는 letters / digits / dot / underscore / hyphen 만 가능합니다: ${trimmed}`;
       return;
     }
     if (admins.includes(trimmed)) {

@@ -132,3 +132,36 @@ describe("AdminAdmins (TASK-049)", () => {
     expect(adminAllowListRef.value).not.toContain("yky.lee");
   });
 });
+
+describe("AdminAdmins input validation (TASK-049 follow-up)", () => {
+  it("rejects an adminId that fails the canonical pattern", async () => {
+    localStorage.setItem("adminId", "admin");
+    setAdminAllowList(["admin"]);
+    render(AdminAdmins);
+    await Promise.resolve();
+    await Promise.resolve();
+    const input = screen.getByPlaceholderText("userId") as HTMLInputElement;
+    // 공백 포함 id — 정규식 위반.
+    await fireEvent.input(input, { target: { value: "bad id" } });
+    const submit = screen.getByRole("button", { name: /add admin/i });
+    await fireEvent.click(submit);
+    // store 는 그대로, error banner 노출.
+    expect(adminAllowListRef.value).toEqual(["admin"]);
+    expect(
+      screen.getByText(/letters \/ digits \/ dot \/ underscore \/ hyphen/)
+    ).toBeInTheDocument();
+  });
+
+  it("rejects a path-like adminId (slash)", async () => {
+    localStorage.setItem("adminId", "admin");
+    setAdminAllowList(["admin"]);
+    render(AdminAdmins);
+    await Promise.resolve();
+    await Promise.resolve();
+    const input = screen.getByPlaceholderText("userId") as HTMLInputElement;
+    await fireEvent.input(input, { target: { value: "a/b" } });
+    const submit = screen.getByRole("button", { name: /add admin/i });
+    await fireEvent.click(submit);
+    expect(adminAllowListRef.value).toEqual(["admin"]);
+  });
+});

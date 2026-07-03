@@ -178,12 +178,29 @@ export const adminAllowListResponseSchema = z
 
 export type AdminAllowListResponse = z.infer<typeof adminAllowListResponseSchema>;
 
+// Canonical admin id pattern. 일반 userId (BuildRequest.requestedBy) 는
+// postel-style `z.string().min(1)` 만 강제하지만, admin 권한은 sensitive 한
+// surface 라 추가 charset 제약을 둔다. 보수적으로 letters / digits / dot /
+// underscore / hyphen 만 허용 — control character, whitespace, path
+// traversal 문자, log escape 가 필요한 문자가 admin id 로 등록되는 것을
+// 막는다. DELETE /admin/admins/:adminId 의 path param 도 같은 charset
+// 안에서만 매칭되도록 server-side 에서도 동등하게 검증한다.
+// 기존 DEFAULT_ADMIN_IDS_RAW ("admin,yky.lee") 는 이 regex 를 만족.
+const ADMIN_ID_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
 export const adminAllowListAddRequestSchema = z
   .object({
-    adminId: z.string().min(1).meta({
-      description:
-        "Canonical admin id to add to the allow-list. Caller must already be in the list (the new admin is not given a grace period to mutate)."
-    })
+    adminId: z
+      .string()
+      .min(1)
+      .regex(ADMIN_ID_PATTERN, {
+        message:
+          "adminId must match /^[a-zA-Z0-9._-]+$/ (letters, digits, dot, underscore, hyphen)."
+      })
+      .meta({
+        description:
+          "Canonical admin id to add to the allow-list. Caller must already be in the list. Charset restricted to a conservative subset to keep path param / log / UI surface safe."
+      })
   })
   .meta({
     id: "AdminAllowListAddRequest",

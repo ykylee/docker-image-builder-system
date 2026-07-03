@@ -242,3 +242,65 @@ describe("admin allow-list management (ADMIN-049)", () => {
     await app.close();
   });
 });
+
+describe("createAdminAllowList seed validation (TASK-049 follow-up)", () => {
+  it("throws on empty seed", () => {
+    assert.throws(
+      () => createAdminAllowList([]),
+      /at least one admin id/
+    );
+  });
+
+  it("throws on seed with non-conforming id (whitespace)", () => {
+    assert.throws(
+      () => createAdminAllowList(["admin", "  yky.lee  "]),
+      /fails the admin id pattern/
+    );
+  });
+
+  it("throws on seed with non-conforming id (path-like)", () => {
+    assert.throws(
+      () => createAdminAllowList(["admin/../etc"]),
+      /fails the admin id pattern/
+    );
+  });
+
+  it("accepts letters, digits, dot, underscore, hyphen", () => {
+    const list = createAdminAllowList(["admin", "yky.lee", "user_1", "team-a"]);
+    assert.deepEqual(list.list(), ["admin", "yky.lee", "user_1", "team-a"]);
+  });
+});
+
+describe("admin add/remove with charset validation (TASK-049 follow-up)", () => {
+  it("POST /admin/admins rejects adminId that fails the pattern", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const res = await app.inject({
+      method: "POST",
+      url: "/admin/admins",
+      headers: { "x-admin-id": "admin", "content-type": "application/json" },
+      payload: { adminId: "  bad id  " }
+    });
+    assert.equal(res.statusCode, 400);
+    await app.close();
+  });
+
+  it("add() helper throws on a non-conforming id (in-process mutation)", () => {
+    const list = createAdminAllowList(["admin"]);
+    assert.throws(() => list.add("a/b"), /fails the admin id pattern/);
+    assert.throws(() => list.add(""), /fails the admin id pattern/);
+  });
+
+  it("DELETE /admin/admins/:adminId returns 400 for non-conforming target", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin", "yky.lee"], service);
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/admin/admins/bad%20id",
+      headers: { "x-admin-id": "admin" }
+    });
+    // Path param 이 "bad id" 로 decode. 정규식 위반.
+    assert.equal(res.statusCode, 400);
+    await app.close();
+  });
+});

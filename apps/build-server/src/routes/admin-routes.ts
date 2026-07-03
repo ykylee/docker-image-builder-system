@@ -48,7 +48,27 @@ export interface AdminAllowList {
   isRemovable(adminId: string): boolean;
 }
 
+// canonical admin id pattern (TASK-049 follow-up). admin allow-list 는
+// 민감 surface 라 보존적으로 검증. 일반 userId (BuildRequest.requestedBy)
+// 는 postel-style 이지만 admin id 는 letter / digit / dot / underscore /
+// hyphen 만 허용. seed 가 비어있거나 (ADMIN_IDS=""), 정규식 위반이면
+// boot 단계에서 throw — env 가 잘못 셋업된 채로 admin API 가 노출되는
+// 사고를 방지.
+const ADMIN_ID_PATTERN = /^[a-zA-Z0-9._-]+$/;
+
 export function createAdminAllowList(seed: ReadonlyArray<string>): AdminAllowList {
+  if (seed.length === 0) {
+    throw new Error(
+      "createAdminAllowList: seed must contain at least one admin id. Set ADMIN_IDS env to a non-empty, comma-separated list."
+    );
+  }
+  for (const id of seed) {
+    if (!ADMIN_ID_PATTERN.test(id)) {
+      throw new Error(
+        `createAdminAllowList: seed id "${id}" fails the admin id pattern /^[a-zA-Z0-9._-]+$/. Set ADMIN_IDS env to a comma-separated list of valid ids.`
+      );
+    }
+  }
   // The seed preserves its order; mutators only append to or remove from
   // the live set. `seed[0]` is captured at construction time and is the
   // single protected id (the process can never be fully de-admined).
@@ -68,6 +88,13 @@ export function createAdminAllowList(seed: ReadonlyArray<string>): AdminAllowLis
       return allow.has(callerId);
     },
     add(adminId) {
+      // in-process mutation 도 정규식 검증. 환경변수 외 경로로 admin id
+      // 가 추가될 때도 동일 제약을 강제.
+      if (!ADMIN_ID_PATTERN.test(adminId)) {
+        throw new Error(
+          `adminId "${adminId}" fails the admin id pattern /^[a-zA-Z0-9._-]+$/.`
+        );
+      }
       allow.add(adminId);
     },
     remove(adminId) {
@@ -245,6 +272,17 @@ export async function registerAdminRoutes(
         });
       }
       const target = request.params.adminId;
+      // DELETE path param 도 동일한 정규식 검증. Fastify route 자체는
+      // 어떤 문자열이든 받지만 (default 가 *), admin id charset 밖의
+      // 값은 allowList 에 들어있을 리 없고 isRemovable 도 false 라
+      // 결과적으로 409 로 떨어지지만, 명시적 400 으로 더 분명하게.
+      if (!ADMIN_ID_PATTERN.test(target)) {
+        return reply.status(400).send({
+          message:
+            "Target adminId fails the admin id pattern /^[a-zA-Z0-9._-]+$/.",
+          target
+        });
+      }
       if (!allowList.isRemovable(target)) {
         // Either the protected seed id or a not-in-list id. Both fall
         // under 409 Conflict: the resource exists in the conceptual
