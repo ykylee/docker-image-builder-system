@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03
+- 최종 수정일: 2026-07-03 (rev 2: TASK-023 셋업 반영)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -36,6 +36,7 @@
 - [x] TASK-015: SDLC 리뷰 및 보고 패키지 작성
 - [x] TASK-016: 문서 정합성 보정 및 스캐폴드 진입 준비
 - [x] TASK-022: workflow 메타 정합성 보강 (commands placeholder, status assessment, report 인덱스, legacy 배너, 2026-07-02 백로그 봉인)
+- [x] TASK-023: 워크플로우 skill/MCP 셋업 (워크플로우 온보딩 마무리)
 - [ ] TASK-017: shared package 또는 API 스캐폴드 착수
 - [x] TASK-018: 보고자료 재구성 및 기획안 재작성
 - [x] TASK-019: 리더 소개용 HTML 보고자료 시각화 재작성

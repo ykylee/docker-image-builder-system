@@ -51,6 +51,30 @@
 - 격리 테스트: `docker compose -f compose.dev.yaml up --abort-on-container-exit` (Build Server + Postgres 통합, 결정 후 확정)
 - 실행 확인: `docs/PROJECT_PROFILE.md`, `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus, 작업 상태, 참조 경로 정합성 점검
 - 출처: `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`
+- 메모: 현 placeholder 값은 TASK-017 `shared package` 또는 `apps/build-server` API 스캐폴드와 함께 실제 명령으로 좁히며, 본 셋업은 TASK-023에서 진행한다.
+
+## 3.1 활성 워크플로우 자산 (Active Skills / MCPs)
+- 본 프로젝트가 표준 워크플로우 키트(`ai-workflow/`)에서 active로 채택한 자산을 정리한다. 미채택 prototype은 명시적으로 deferred 처리한다.
+- 출처: `docs/PROJECT_PROFILE.md` §2 문서 경로, `ai-workflow/harnesses/codex/apply_guide.md` §2.1/§2.2, `ai-workflow/skills/README.md`, `ai-workflow/mcp_servers/README.md`
+- 관련 결정: TASK-023 workflow skill/MCP 셋업
+
+### 3.1.1 Active Skills (`ai-workflow/skills/`)
+- `session-start` — 세션 시작 시 `ai-workflow/memory/active/` 핵심 문서 + 본 프로젝트 문서 경로를 자동 복원
+- `backlog-update` — `work_backlog.md` ↔ `backlog/<date>.md` 동기화
+- `doc-sync` — 변경 파일에 영향받는 `docs/` 후보 추천 및 링크/메타 점검
+
+### 3.1.2 Active MCP Servers (`ai-workflow/mcp_servers/`)
+- `latest-backlog` — 가장 최신 날짜의 backlog markdown 경로 조회
+- `check-doc-links` — 상대 링크 무결성 검사
+- `check-doc-metadata` — markdown 메타데이터 누락 검사
+
+### 3.1.3 Deferred (현재 미채택)
+- Skills: `merge-doc-reconcile`, `validation-plan`, `code-index-update` — 본 프로젝트는 아직 merge conflict/대규모 인덱싱 단계가 아니므로 보류
+- MCP: `create-backlog-entry`, `suggest-impacted-docs`, `check-quickstart-stale-links` — 위 active 3종으로 먼저 운영 자동화를 검증한 뒤 활성 검토
+
+### 3.1.4 Transport / 노출 상태
+- 키트 prototype의 실제 MCP transport 계층은 표준 키트 측에서 미구현 상태이며, 본 프로젝트는 `.codex/config.toml.example`을 additive로 유지한다 (`transport_ready=false` 명시).
+- 전역 `~/.codex/config.toml`에 프로젝트별 명령이나 backlog 경로를 직접 넣지 않는다 (`apply_guide.md` §2.3, §8).
 
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함

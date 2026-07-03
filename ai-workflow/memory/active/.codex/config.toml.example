@@ -1,0 +1,34 @@
+# Codex MCP snippet (additive example) for Docker Image Builder System.
+# 표준 워크플로우 키트 `ai-workflow/mcp_servers/` 3종을 노출하는 예시.
+# 출처: ai-workflow/harnesses/codex/apply_guide.md §2.2, §9
+# 적용 시 주의:
+# 1) 이 파일은 예시다. 실제로는 `~/.codex/config.toml` 의 `[mcp_servers]` 테이블에
+#    스니펫을 그대로 복사하거나, 프로젝트 로컬 설정이 Codex 측에서 지원되는 경우
+#    그 경로에 둔다.
+# 2) 전역 기본값(model, provider, 일반 safety 정책)은 절대 덮어쓰지 않는다.
+# 3) 표준 키트 prototype의 실제 transport 계층은 아직 준비 전이므로,
+#    각 서버의 `transport_ready = false` 를 그대로 둔다.
+
+[mcp_servers.standardAiWorkflowLatestBacklog]
+command = "python3"
+args = ["-m", "workflow_kit.server.read_only_jsonrpc", "--stdio-lines"]
+PYTHONPATH = "/ABSOLUTE/PATH/TO/ai-workflow/workflow_kit"
+STANDARD_AI_WORKFLOW_ROOT = "/ABSOLUTE/PATH/TO/REPO_ROOT"
+MCP_SERVER_NAME = "latest-backlog"
+TRANSPORT_READY = false
+
+[mcp_servers.standardAiWorkflowCheckDocLinks]
+command = "python3"
+args = ["-m", "workflow_kit.server.read_only_jsonrpc", "--stdio-lines"]
+PYTHONPATH = "/ABSOLUTE/PATH/TO/ai-workflow/workflow_kit"
+STANDARD_AI_WORKFLOW_ROOT = "/ABSOLUTE/PATH/TO/REPO_ROOT"
+MCP_SERVER_NAME = "check-doc-links"
+TRANSPORT_READY = false
+
+[mcp_servers.standardAiWorkflowCheckDocMetadata]
+command = "python3"
+args = ["-m", "workflow_kit.server.read_only_jsonrpc", "--stdio-lines"]
+PYTHONPATH = "/ABSOLUTE/PATH/TO/ai-workflow/workflow_kit"
+STANDARD_AI_WORKFLOW_ROOT = "/ABSOLUTE/PATH/TO/REPO_ROOT"
+MCP_SERVER_NAME = "check-doc-metadata"
+TRANSPORT_READY = false
