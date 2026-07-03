@@ -27,3 +27,51 @@ export const buildRequestSchema = z
   .meta({ id: "BuildRequest", description: "POST /builds payload (Skill → Host)." });
 
 export type BuildRequest = z.infer<typeof buildRequestSchema>;
+
+
+export const buildListQuerySchema = z
+  .object({
+    status: z
+      .enum([
+        "QUEUED",
+        "BUILDING",
+        "COMPLETED",
+        "FAILED",
+        "PROVISIONING",
+        "PREVIEW_QUEUED",
+        "PREVIEW_READY",
+        "TEST_READY",
+        "EXPIRED"
+      ])
+      .optional()
+      .meta({
+        description:
+          "Optional status filter. Matches the canonical BuildStatus enum. Omitted = all."
+      }),
+    limit: z
+      .coerce
+      .number()
+      .int()
+      .positive()
+      .max(200)
+      .default(50)
+      .meta({
+        description:
+          "Maximum number of summaries to return. Server cap is 200. Default 50."
+      }),
+    cursor: z
+      .string()
+      .uuid()
+      .optional()
+      .meta({
+        description:
+          "Pagination cursor (buildId of the last item in the previous page). Omitted = first page."
+      })
+  })
+  .meta({
+    id: "BuildListQuery",
+    description:
+      "Query string for GET /builds. status filter is optional, limit is server-capped, cursor is opaque (buildId-based)."
+  });
+
+export type BuildListQuery = z.infer<typeof buildListQuerySchema>;

@@ -1,6 +1,8 @@
 import type {
   BuildAcceptedResponse,
   BuildDuplicateResponse,
+  BuildListQuery,
+  BuildListResponse,
   BuildLogsResponse,
   BuildRequest,
   BuildStatusResponse,
@@ -139,5 +141,9 @@ export class BuildService {
 
   async getTestDeployment(buildId: string): Promise<GetTestDeploymentOutcome> {
     return this.repository.getTestDeployment(buildId);
+  }
+
+  async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
+    return this.repository.listBuilds(query);
   }
 }

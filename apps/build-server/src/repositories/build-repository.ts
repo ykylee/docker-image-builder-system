@@ -1,5 +1,7 @@
 import type {
   BuildDuplicateResponse,
+  BuildListQuery,
+  BuildListResponse,
   BuildLogEntry,
   BuildRequest,
   BuildStatusResponse,
@@ -96,4 +98,5 @@ export interface BuildRepository {
     details?: { previewUrl?: string; host?: string; hostPort?: number }
   ): Promise<ReportPreviewStatusResult>;
   getTestDeployment(buildId: string): Promise<GetTestDeploymentResult>;
+  listBuilds(query: BuildListQuery): Promise<BuildListResponse>;
 }

@@ -21,6 +21,8 @@ import {
   buildErrorSchema,
   buildAcceptedResponseSchema,
   buildDuplicateResponseSchema,
+  buildListQuerySchema,
+  buildListResponseSchema,
   buildStatusResponseSchema,
   buildLogsResponseSchema,
   claimRequestSchema,
@@ -48,6 +50,8 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "BuildError", schema: buildErrorSchema },
   { id: "BuildAcceptedResponse", schema: buildAcceptedResponseSchema },
   { id: "BuildDuplicateResponse", schema: buildDuplicateResponseSchema },
+  { id: "BuildListQuery", schema: buildListQuerySchema },
+  { id: "BuildListResponse", schema: buildListResponseSchema },
   { id: "BuildStatusResponse", schema: buildStatusResponseSchema },
   { id: "BuildLogsResponse", schema: buildLogsResponseSchema },
   { id: "ClaimRequest", schema: claimRequestSchema },
@@ -72,6 +76,16 @@ for (const { id, schema } of componentSchemas) {
 // is described here exactly once. The OpenAPI document is rebuilt on each
 // `/openapi.json` request, so all paths must be present in the registry at
 // call time. Order matches `apps/build-server/src/routes/build-routes.ts`.
+registry.registerPath({
+  method: "get",
+  path: "/builds",
+  description: "List build summaries in createdAt-desc order with optional status filter and cursor pagination.",
+  tags: ["Builds"],
+  request: { query: buildListQuerySchema },
+  responses: {
+    200: { description: "Page of build summaries.", content: { "application/json": { schema: buildListResponseSchema } } }
+  }
+});
 registry.registerPath({
   method: "post",
   path: "/builds",

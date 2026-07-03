@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 19: PR #6 (Svelte 5 frontend 부착 1차 골격, TASK-039) 진행 중, 회귀 273/273 OK; 후속: openapi-typescript 자동화 / list endpoint / light mode 또는 TASK-017 stdio transport)
+- Updated: 2026-07-03 (rev 20: PR #7 (Build Server list + openapi-typescript 자동 client, TASK-040) 진행 중, 회귀 268/268 OK; 후속: light mode 또는 TASK-017 stdio transport 또는 TASK-037 sweeper)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -145,6 +145,8 @@
 - [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화 (1차 골격은 null 응답)
 
 - [x] TASK-039: Build Monitor frontend 부착 1차 골격 (PR #6). Svelte 5 + Vite + TypeScript 선정, apps/build-monitor 골격, DESIGN.md tokens.css, 4 컴포넌트 + 3 route + lib/api.ts, vitest 7/7 + svelte-check 0 + vite build OK. 회귀 273/273 OK. 후속: openapi-typescript 자동화, list endpoint, light mode.
+
+- [x] TASK-040: Build Server GET /builds list endpoint + openapi-typescript 자동 client (PR #7). Memory + postgres 양쪽 listBuilds (filter status, cursor pagination, limit max 200). zod BuildListQuery/BuildListResponse schema + .meta. build-monitor 측 openapi-typescript 7 + openapi-fetch 0.13 + tsx script (predev/prebuild hook) 로 ./.generated/openapi.d.ts 자동 생성. lib/api.ts 재작성 (SAMPLE_BUILDS 제거, openapi-fetch helper apiGet, BuildLogsResponse inline). 회귀 268/268 OK (TS 42+8 + Go 13 + Python 215). live e2e: vite proxy /api/builds → 3 builds, ?limit=2 → 2 + nextCursor.
 
 ## Risks & Blockers
 

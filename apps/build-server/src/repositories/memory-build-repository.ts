@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import type {
   BuildDuplicateResponse,
   BuildError,
+  BuildListQuery,
+  BuildListResponse,
   BuildLogEntry,
   BuildPhase,
   BuildRequest,
@@ -372,6 +374,34 @@ export function createMemoryBuildRepository(): BuildRepository {
         return { kind: "not_requested" };
       }
       return { kind: "found", testDeployment: build.testDeployment };
+    }
+,
+    async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
+      // Build summaries 를 (1) status filter, (2) cursor skip, (3) createdAt
+      // desc 정렬, (4) limit 적용. cursor 는 buildId 기준 opaque pointer.
+      let all = [...builds.values()].map((b) => b.summary);
+
+      if (query.status) {
+        all = all.filter((b) => b.status === query.status);
+      }
+
+      // Sort by createdAt desc (newest first) — primary stable order.
+      all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+      // Cursor: skip up to and including the row with this buildId.
+      if (query.cursor) {
+        const idx = all.findIndex((b) => b.buildId === query.cursor);
+        if (idx >= 0) {
+          all = all.slice(idx + 1);
+        }
+      }
+
+      const page = all.slice(0, query.limit);
+      const last = page[page.length - 1];
+      const nextCursor =
+        all.length > query.limit && last ? last.buildId : null;
+
+      return { builds: page, nextCursor };
     }
   };
 }

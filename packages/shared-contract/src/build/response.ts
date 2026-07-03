@@ -196,3 +196,24 @@ export const testDeploymentStatusRequestSchema = z
   });
 
 export type TestDeploymentStatusRequest = z.infer<typeof testDeploymentStatusRequestSchema>;
+
+
+export const buildListResponseSchema = z
+  .object({
+    builds: z.array(buildSummarySchema),
+    nextCursor: z
+      .string()
+      .uuid()
+      .nullable()
+      .meta({
+        description:
+          "Cursor to fetch the next page (buildId of the last item in this page). null = no more pages."
+      })
+  })
+  .meta({
+    id: "BuildListResponse",
+    description:
+      "Page of build summaries returned by GET /builds. nextCursor is null when the caller has reached the end."
+  });
+
+export type BuildListResponse = z.infer<typeof buildListResponseSchema>;

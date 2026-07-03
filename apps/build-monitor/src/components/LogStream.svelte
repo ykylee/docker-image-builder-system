@@ -4,7 +4,7 @@
    * Monospace, since cursor 기반 증분 fetch (PR #6 1차 골격은 sample data).
    * auto-scroll 토글 후속.
    */
-  type LogEntry = { at: string; phase: string; message: string };
+  type LogEntry = { id?: string; buildId?: string; phase: string; message: string; createdAt: string };
 
   let { entries }: { entries: LogEntry[] } = $props();
   let wrap = $state(false);
@@ -16,7 +16,7 @@
       <input type="checkbox" bind:checked={wrap} /> wrap
     </label>
   </div>
-  <pre class="stream" class:wrap>{#each entries as e (e.at + e.message)}<span class="entry"><span class="at mono">{e.at.slice(11, 19)}</span> <span class="phase mono">[{e.phase}]</span> {e.message}{'\n'}</span>{/each}</pre>
+  <pre class="stream" class:wrap>{#each entries as e (e.createdAt + e.message)}<span class="entry"><span class="at mono">{e.createdAt.slice(11, 19)}</span> <span class="phase mono">[{e.phase}]</span> {e.message}{'\n'}</span>{/each}</pre>
 </div>
 
 <style>
