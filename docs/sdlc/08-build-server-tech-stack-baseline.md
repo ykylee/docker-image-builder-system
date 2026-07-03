@@ -1,6 +1,6 @@
 # Docker Build Preview Platform SDLC Step 08 - Build Server Tech Stack Baseline
 
-- 문서 목적: Build Server 우선 구현 축을 위한 기술 스택 baseline recommendation을 정리한다.
+- 문서 목적: Build Server 우선 구현 축과 Runner 실행 축을 위한 기술 스택 baseline recommendation을 정리한다.
 - 범위: 언어, API 프레임워크, DB, queue 처리 방식, 런타임, 저장소 구조 방향
 - 대상 독자: 프로젝트 리드, Build Server 구현자, Runner 구현자, AI 에이전트
 - 상태: draft
@@ -23,32 +23,33 @@
 - API 프레임워크는 `Fastify`를 우선 추천한다.
 - 관계형 DB는 `PostgreSQL`을 기준으로 둔다.
 - queue는 외부 broker를 바로 도입하지 않고 `PostgreSQL row locking` 기반으로 시작한다.
-- Runner는 초기에는 같은 언어권의 별도 worker 프로세스로 두는 방향을 추천한다.
+- Runner는 `Go` 기반 별도 worker 프로세스로 분리하는 방향을 baseline으로 둔다.
 
 ## 3. 추천 스택
 
 | 영역 | baseline |
 | --- | --- |
-| Language | TypeScript |
-| Runtime | Node.js LTS |
+| Build Server Language | TypeScript |
+| Build Server Runtime | Node.js LTS |
 | API Framework | Fastify |
 | Validation | Zod |
 | Database | PostgreSQL |
 | Query/Schema Layer | Drizzle ORM |
 | Queue Model | PostgreSQL `FOR UPDATE SKIP LOCKED` |
-| Worker Runtime | Node.js worker process |
+| Runner Language | Go |
+| Runner Runtime | Go native binary |
 | Packaging Direction | monorepo with `apps/` and `packages/` |
 
 ## 4. 왜 TypeScript인가
 
 - Skill/MCP 계층이 앞으로 JavaScript/TypeScript와 자연스럽게 연결될 가능성이 높다.
-- shared contract의 request/status/error shape를 타입으로 재사용하기 쉽다.
-- Build Server와 Runner를 같은 타입 시스템 안에서 맞출 수 있어 drift를 줄이기 좋다.
-- MVP 단계에서 Go보다 구현 속도와 문서-계약-코드 연결성이 더 좋다.
+- shared contract의 request/status/error shape를 Build Server 계층에서 빠르게 고정하기 쉽다.
+- API contract, validation, response policy를 문서에서 코드로 옮기는 속도가 빠르다.
+- MVP 단계에서 Build Server는 Go보다 구현 속도와 문서-계약-코드 연결성이 더 좋다.
 
 비교 메모:
 
-- Go는 long-running worker와 Docker orchestration에는 강점이 있지만, 현재는 공통 계약을 빨리 고정하고 문서에서 구현으로 넘기는 속도가 더 중요하다.
+- Go는 long-running worker와 Docker orchestration에는 강점이 있고, 이 강점은 Runner 축에서 직접 활용할 가치가 높다.
 - Python은 빠른 실험에는 유리하지만, 장기적으로 shared contract drift를 제어하는 면에서는 TypeScript 조합이 더 안정적이다.
 
 ## 5. 왜 Fastify인가
@@ -89,7 +90,7 @@
 ## 8. Runner baseline 방향
 
 - Runner는 Build Server와 분리된 별도 process로 둔다.
-- 다만 초기 MVP에서는 같은 monorepo와 같은 TypeScript 런타임을 유지한다.
+- 초기 MVP부터 `Go` 기반 실행 바이너리로 두고, monorepo 안에서 별도 앱으로 관리한다.
 - Runner가 책임질 범위:
   - build queue claim
   - source 준비
@@ -100,7 +101,15 @@
 이유:
 
 - Build Server는 system-of-record와 API에 집중하고, Runner는 비동기 실행 책임을 분리해야 한다.
-- 추후 별도 container/service로 분리해도 contract 공유가 쉽다.
+- Docker build, process lifecycle, long-running worker 성격은 Go 쪽이 더 안정적으로 다루기 좋다.
+- 추후 별도 container/service로 분리해도 Build Server와의 경계를 유지하기 쉽다.
+- contract 공유는 언어 공유가 아니라 `shared-contract` 문서/JSON schema/generated artifact 기준으로 묶는다.
+
+Runner 구현 원칙:
+
+- Go Runner는 상태 enum과 phase key를 새로 정의하지 않는다.
+- canonical contract source는 여전히 Build Server와 `docs/sdlc/contracts/01-shared-build-contract-baseline.md`다.
+- 필요하면 `packages/shared-contract`에서 JSON schema 또는 generated artifact를 만들어 Go Runner가 소비한다.
 
 ## 9. 저장소 구조 baseline
 
@@ -118,7 +127,7 @@ packages/
 설명:
 
 - `apps/build-server`: Fastify API
-- `apps/runner`: queue poller + Docker execution worker
+- `apps/runner`: Go queue poller + Docker execution worker
 - `packages/shared-contract`: request/status/error schema와 타입
 - `packages/shared-config`: env schema, 상수, 공통 설정
 
@@ -140,10 +149,10 @@ packages/
 - `PKG-002`와 `PKG-004`는 Fastify + Zod 기준의 API shape로 구체화할 수 있다.
 - `PKG-003`, `PKG-005`, `PKG-006`, `PKG-007`은 PostgreSQL queue query를 전제로 세부 태스크를 쪼갤 수 있다.
 - `PKG-001` shared contract는 `packages/shared-contract`로 이어질 가능성이 높다.
+- Runner 패키지는 Go 기준으로 `apps/runner`에 별도 `go.mod`, queue client, Docker execution boundary를 두는 방향이 자연스럽다.
 
 ## 12. 보류 또는 추후 재검토 항목
 
-- Go 기반 Runner 분리 여부
 - object storage 선택
 - Docker daemon 연결 방식
 - migration 도구 세부 선택
@@ -151,5 +160,5 @@ packages/
 
 ## 13. 현 단계 결론
 
-- 현재 저장소 기준 baseline recommendation은 `TypeScript + Fastify + PostgreSQL + Drizzle + Node worker` 조합이다.
-- 이 조합은 shared contract 재사용, queue 모델 구현, 문서 기반 SDLC에서 코드 착수로 넘어가는 속도를 가장 균형 있게 만족한다.
+- 현재 저장소 기준 baseline recommendation은 `TypeScript + Fastify + PostgreSQL + Drizzle` 기반 Build Server와 `Go Runner` 조합이다.
+- 이 조합은 Build Server의 빠른 contract-first 구현과 Runner의 안정적인 Docker orchestration을 함께 만족하는 절충안이다.

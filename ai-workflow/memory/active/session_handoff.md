@@ -20,6 +20,8 @@
 - 보고용 HTML 자료를 리더 소개용 slide deck 구조로 다시 재작성하고 개요/구성/흐름 도식을 추가했다.
 - 보고용 HTML 자료에 CSS 시각 강화와 인라인 SVG 에셋을 추가해 오프라인 완결형 자료로 보강했다.
 - 보고용 HTML 자료의 카피를 더 짧은 승인안 톤으로 압축했다.
+- 백엔드 착수 기준 기술스택을 Build Server TypeScript/Fastify, Runner Go 조합으로 보정했다.
+- Build Server TypeScript / Runner Go 기준의 백엔드 개발 계획 문서를 추가했다.
 - 현재 다음 착수점은 shared package 또는 API 스캐폴드다.
 
 ## Work Status
@@ -45,6 +47,8 @@
 - TASK-019 리더 소개용 HTML 보고자료 시각화 재작성: done
 - TASK-020 HTML 시각화 보강 및 오프라인 에셋 내장화: done
 - TASK-021 발표용 카피 압축 및 승인안 톤 보정: done
+- TASK-022 백엔드 착수용 기술스택 결정 보정: done
+- TASK-023 백엔드 개발 계획 수립 및 문서화: done
 - TASK-017 shared package 또는 API 스캐폴드 착수: planned
 
 ## Key Changes
@@ -84,6 +88,8 @@
 - `docs/report/02-sdlc-review-report.html` 리더 브리프형 slide deck으로 전면 재작성
 - `docs/report/02-sdlc-review-report.html` CSS 및 인라인 SVG 기반 오프라인 완결형 시각 자료로 보강
 - `docs/report/02-sdlc-review-report.html` 발표용 승인안 카피로 압축
+- `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`를 Build Server TypeScript / Runner Go 기준으로 보정
+- `docs/sdlc/13-backend-development-plan.md` 추가
 - `docs/GLOSSARY_AND_STATE_MODEL.md` 정합성 보정
 - `docs/IDENTITY_MODEL.md` 정합성 보정
 - `docs/sdlc/SRS/04-policy-and-constraints.md` stale 제약 보정

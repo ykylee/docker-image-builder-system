@@ -9,7 +9,7 @@
 
 ## 1. 문서 목표
 
-이 문서는 Step 08에서 정한 `TypeScript + Fastify + PostgreSQL + Drizzle + Node worker` baseline을 실제 저장소 구조로 내리기 위한 기준선이다.
+이 문서는 Step 08에서 정한 `TypeScript + Fastify + PostgreSQL + Drizzle` 기반 Build Server와 `Go Runner` baseline을 실제 저장소 구조로 내리기 위한 기준선이다.
 
 이 문서가 답해야 하는 질문:
 
@@ -111,6 +111,12 @@ apps/runner/
 - `repositories/`: DB access
 - `docker/`: Docker daemon interaction boundary
 - `lib/`: runner-local helpers
+
+언어 메모:
+
+- `apps/runner`는 Go 앱 기준으로 해석한다.
+- 위 구조는 책임 기준 예시이며 실제 디렉터리명은 Go 관례에 맞춰 `cmd/`, `internal/`, `pkg/` 등으로 조정할 수 있다.
+- 중요한 것은 Build Server와 분리된 실행 단위, 그리고 shared contract/DB 경계 준수다.
 
 ## 5. 패키지 구조
 
