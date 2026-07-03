@@ -16,6 +16,8 @@ import (
 type BuildControlClient interface {
 	ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error)
 	ReportPhase(ctx context.Context, buildID, phase, runnerID string) error
+	QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error
+	ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error
 }
 
 // ClaimedBuildResponse 는 Host Server POST /builds/claim 응답에서
@@ -152,4 +154,71 @@ func (c *NoopBuildControlClient) ClaimNextBuild(context.Context) (*ClaimedBuildR
 
 func (c *NoopBuildControlClient) ReportPhase(context.Context, string, string, string) error {
 	return nil
+}
+
+func (c *NoopBuildControlClient) QueueTestDeployment(context.Context, string, QueueTestDeploymentRequest) error {
+	return nil
+}
+
+func (c *NoopBuildControlClient) ReportPreviewReady(context.Context, string, PreviewReadyRequest) error {
+	return nil
+}
+
+// QueueTestDeployment: POST /builds/:buildId/preview
+type QueueTestDeploymentRequest struct {
+	InternalPort int    `json:"internalPort"`
+	TtlMinutes   int    `json:"ttlMinutes"`
+	RunnerID     string `json:"runnerId"`
+}
+
+func (c *HTTPBuildControlClient) QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error {
+	body, _ := json.Marshal(req)
+	url := fmt.Sprintf("%s/builds/%s/preview", c.baseURL, buildID)
+	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	res, err := c.http.Do(r)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusAccepted || res.StatusCode == http.StatusOK {
+		return nil
+	}
+	raw, _ := io.ReadAll(res.Body)
+	return fmt.Errorf("queue preview failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
+}
+
+// ReportPreviewReady: POST /builds/:buildId/test-deployment/ready
+type PreviewReadyRequest struct {
+	PreviewURL string `json:"previewUrl"`
+	Host       string `json:"host"`
+	HostPort   int    `json:"hostPort"`
+	RunnerID   string `json:"runnerId"`
+}
+
+func (c *HTTPBuildControlClient) ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error {
+	body, _ := json.Marshal(req)
+	url := fmt.Sprintf("%s/builds/%s/test-deployment/ready", c.baseURL, buildID)
+	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	r.Header.Set("Content-Type", "application/json")
+
+	res, err := c.http.Do(r)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode == http.StatusOK {
+		return nil
+	}
+	raw, _ := io.ReadAll(res.Body)
+	return fmt.Errorf("report preview ready failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
 }

@@ -34,6 +34,14 @@ func (c *tickerClient) ReportPhase(ctx context.Context, buildID, phase, runnerID
 	return nil
 }
 
+func (c *tickerClient) QueueTestDeployment(ctx context.Context, buildID string, req hostclient.QueueTestDeploymentRequest) error {
+	return nil
+}
+
+func (c *tickerClient) ReportPreviewReady(ctx context.Context, buildID string, req hostclient.PreviewReadyRequest) error {
+	return nil
+}
+
 func TestWorker_StopsOnContextCancel(t *testing.T) {
 	fc := &tickerClient{buildID: "b-1"}
 	cfg := config.Config{
