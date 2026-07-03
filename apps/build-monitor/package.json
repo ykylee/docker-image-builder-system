@@ -1,0 +1,32 @@
+{
+  "name": "@docker-image-builder-system/build-monitor",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Svelte 5 + Vite + TypeScript frontend for the Docker Image Builder Build Server Monitor. PR #6 1차 골격. Token CSS 변수화, /openapi.json 기반 client, BuildRow/StatusPill/PhaseTimeline/LogStream 컴포넌트.",
+  "scripts": {
+    "dev": "vite --port 5173",
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^4.0.0",
+    "@testing-library/svelte": "^5.2.4",
+    "@testing-library/jest-dom": "^6.5.0",
+    "@tsconfig/svelte": "^5.0.4",
+    "jsdom": "^25.0.1",
+    "svelte": "^5.1.0",
+    "svelte-check": "^4.0.4",
+    "tslib": "^2.7.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.8",
+    "vitest": "^2.1.2"
+  },
+  "dependencies": {
+    "openapi-fetch": "^0.13.5",
+    "svelte-spa-router": "^4.0.1"
+  }
+}

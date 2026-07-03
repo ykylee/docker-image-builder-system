@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 18: PR #5 (Swagger UI + CORS + DESIGN.md) 1차안, 회귀 266/266 OK; 후속: frontend Vite+React 부착 또는 TASK-017 stdio transport)
+- Updated: 2026-07-03 (rev 19: PR #6 (Svelte 5 frontend 부착 1차 골격, TASK-039) 진행 중, 회귀 273/273 OK; 후속: openapi-typescript 자동화 / list endpoint / light mode 또는 TASK-017 stdio transport)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -143,6 +143,8 @@
 - [x] TASK-038: Build Server OpenAPI/Swagger UI + CORS + DESIGN.md 1차안 부착 (PR #5). /openapi.json 10 paths + 17 components.schemas + 4 tags, /docs Swagger UI, hand-rolled CORS, DESIGN.md 1차안. 회귀 266/266 OK. 후속: frontend Vite+React 작업 또는 TASK-017 stdio transport 활성화.
 - [ ] docker.BuildImage 실제 구현 (Docker SDK + SOURCE_PREPARED/DOCKER_BUILD_STARTED 사이 실제 image build) — 현재 noop
 - [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화 (1차 골격은 null 응답)
+
+- [x] TASK-039: Build Monitor frontend 부착 1차 골격 (PR #6). Svelte 5 + Vite + TypeScript 선정, apps/build-monitor 골격, DESIGN.md tokens.css, 4 컴포넌트 + 3 route + lib/api.ts, vitest 7/7 + svelte-check 0 + vite build OK. 회귀 273/273 OK. 후속: openapi-typescript 자동화, list endpoint, light mode.
 
 ## Risks & Blockers
 
