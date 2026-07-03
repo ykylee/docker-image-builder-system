@@ -127,11 +127,11 @@
     padding: var(--space-md);
     border-radius: var(--radius-md);
     border: 1px solid var(--color-border-strong);
-    /* TASK-046: light 모드 에서 --color-border-strong (#cbd5e1) 만으론
-       canvas (#f1f5f9) 위 1.5:1 — border 가 흐릿. 명시적으로 살짝
-       진한 톤으로 한 단계 강조. */
-    /* color-scheme: light 가 적용되면 webkit native input border 가
-       사라지므로 우리 border 가 살아남는다. */
+    /* TASK-046 follow-up: light 모드 --color-border-strong 을
+       #cbd5e1 (1.36:1) → #7a889e (3.28:1) 로 올림. Login input 의 흐릿
+       한 border 가 토큰 한 곳에서 해결됨. color-scheme: light 가 적용
+       되면 webkit native input border 가 사라지므로 우리 border 가
+       살아남는다. */
     background: var(--color-bg-canvas);
     color: var(--color-text-primary);
     font-family: var(--font-sans);

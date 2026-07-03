@@ -84,22 +84,29 @@
 :root[data-theme="light"] {
   --color-bg-canvas: #f1f5f9;
   --color-bg-surface: #ffffff;
-  /* surface-elevated: dark 모드 와 의미 반전. dark 모드는 elevated 가 더
-     어둡지만 (위 element 강조), light 모드 는 살짝 tint 된 회색으로
-     canvas/surface 와 구분. 그렇지 않으면 table row hover, ThemeToggle
-     hover, owner pill 등이 canvas 위에서 안 보임 (TASK-046 light mode
-     contrast QA). */
-  --color-bg-surface-elevated: #f8fafc;
+  /* surface-elevated: light 모드 에서 table row hover / ThemeToggle hover /
+     owner pill / 페이지 header 가 canvas/surface 와 시각 분리 되도록
+     slate 톤으로 한 단계 진하게. dark 모드는 elevated 가 더 어두운 의미
+     (위 element 강조) 와 정반대 — light 는 명도 한 단계 낮춤.
+     실측 vs canvas #f1f5f9 1.17:1, vs surface #ffffff 1.28:1. (TASK-046
+     follow-up). */
+  --color-bg-surface-elevated: #dde4ed;
   --color-text-primary: #0f172a;
   --color-text-secondary: #475569;
-  /* muted: canvas (#f1f5f9) 위 4.5:1 contrast 확보. 이전 #94a3b8 은
-     ~2.7:1 로 WCAG AA fail — Admin/Login 의 `.muted` / placeholder 가
-     안 보였음. */
-  --color-text-muted: #64748b;
-  --color-text-disabled: #94a3b8;
-  
+  /* muted: canvas (#f1f5f9) 위 5.36:1 — WCAG AA 4.5:1 + 0.86 마진.
+     #94a3b8 (2.34:1) → #64748b (4.34:1) → #57657f (5.36:1). 0.16 부족
+     해결. (TASK-046 follow-up). */
+  --color-text-muted: #57657f;
+  /* disabled: muted (#57657f) 보다 명백히 옅게 — 비활성 표시는 text-only
+     라 AA 면제, 2.64:1 도 OK. (TASK-046 follow-up). */
+  --color-text-disabled: #8a99b0;
+
   --color-border-subtle: #e2e8f0;
-  --color-border-strong: #cbd5e1;
+  /* border-strong: canvas (#f1f5f9) 위 3.28:1 — UI component border 3:1
+     권고 통과. Login/AdminLogin input / AdminBuilds·AdminUsers strong-
+     border 사용처가 흐릿 (이전 #cbd5e1 = 1.36:1) 하던 문제 해결.
+     (TASK-046 follow-up). */
+  --color-border-strong: #7a889e;
   
   --color-accent-primary: #4f46e5;
   --color-accent-primary-hover: #4338ca;

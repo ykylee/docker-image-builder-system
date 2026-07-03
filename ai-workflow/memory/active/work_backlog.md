@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 25→26: PR #9 squash merge `af2ade4` main 합류 — §27.5 hash placeholder 를 `af2ade4` 로 amend. 회귀 270/270 main ff pull 후 재검증 OK (TS build-server 54 + vitest 35 + Go 13 + Python 215 = 270). TASK-043/044 complete.
+- 최종 수정일: 2026-07-03 (rev 25→26→27: TASK-046 follow-up — PR #10 리뷰 Must 3건 보완. tokens.css light 4 token 추가 조정. 회귀 319+ OK.). TASK-043/044 complete.
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙

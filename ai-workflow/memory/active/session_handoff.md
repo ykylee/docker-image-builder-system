@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 25: TASK-046 light mode contrast QA — codex/light-mode-qa-2026-07-03 branch. 4 패치 (tokens light muted 2.7→4.5:1, surface-elevated #fff→#f8fafc, ThemeToggle color-scheme js-side, StatusPill EXPIRED+UNKNOWN secondary). vitest 35→37. 회귀 272/272. PR #10 예정. 다음 후속: TASK-017 stdio / TASK-037 sweeper / admin owner block-delete.
+- Updated: 2026-07-03 (rev 25→26: TASK-046 light mode contrast QA follow-up — PR #10 리뷰 Must 3건 보완. tokens.css 4 token 조정 (muted #64748b→#57657f 5.36:1 AA 통과, border-strong #cbd5e1→#7a889e 3.28:1 UI border 통과, surface-elevated #f8fafc→#dde4ed vs canvas 1.17:1 의미 있는 분리, disabled #94a3b8→#8a99b0 2.64:1 muted보다 옅게). Login/AdminLogin input border 흐릿 문제 토큰 1곳에서 해결. 회귀 319+ OK.). vitest 35→37. 회귀 272/272. PR #10 예정. 다음 후속: TASK-017 stdio / TASK-037 sweeper / admin owner block-delete.
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -56,6 +56,8 @@
 - TASK-017 shared package / build-server / runner 골격 스캐폴드 및 1차 검증: done
 
 ## Key Changes
+
+- TASK-046 follow-up (rev 26): light 모드 토큰 4종 추가 조정. muted 5.36:1 AA 통과, border-strong 3.28:1 UI 통과, surface-elevated vs canvas 1.17:1 분리, disabled muted보다 옅게 2.64:1. Login/AdminLogin input border 코멘트도 토큰 변경 결과 반영으로 갱신.
 
 - `docs/sdlc/01-mvp-onboarding.md` 추가
 - `docs/sdlc/02-concept-refinement.md` 추가
