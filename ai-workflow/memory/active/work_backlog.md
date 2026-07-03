@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 18: TASK-036 완료 — PKG-006 Preview Queue + Ready, 8 phase e2e smoke + TS 37 + Go 13 = 50/50 tests)
+- 최종 수정일: 2026-07-03 (rev 19: PR #4 머지 — TASK-034/035/036 일괄 main 합류, 회귀 265/265 OK)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙

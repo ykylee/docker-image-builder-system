@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 16: TASK-036 PKG-006 Preview Queue + Ready 완료, 후속 TASK-037 PKG-007 cleanup 또는 docker build 실제 통합 가능)
+- Updated: 2026-07-03 (rev 17: PR #4 (TASK-034/035/036) main 합류, 회귀 265/265 OK, 후속 TASK-037 PKG-007 cleanup 또는 docker.BuildImage 실제 구현)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -138,7 +138,7 @@
 - [ ] shared-contract 의 Go 측 generated binding 전략 결정
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
 - [ ] `MiniMax.md`, `MiniMax_config.example.json` vendor-specific overlay 점검 (MiniMax 하네스 환경에서 별도 진행, 본 세션에서는 기록만)
-- [ ] TASK-034/035/036 일괄 PR #4 오픈 (`codex/backend-build-queue-2026-07-03` → main) — 사용자 결정 대기
+- [x] TASK-034/035/036 일괄 PR #4 오픈 (`codex/backend-build-queue-2026-07-03` → main) — squash merge 완료 (5d023a7), 회귀 265/265 OK
 - [ ] TASK-037 PKG-007 Preview Cleanup Policy Binding (TTL 만료 sweeper) — TASK-036 의 expiresAt 활용
 - [ ] docker.BuildImage 실제 구현 (Docker SDK + SOURCE_PREPARED/DOCKER_BUILD_STARTED 사이 실제 image build) — 현재 noop
 - [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화 (1차 골격은 null 응답)
