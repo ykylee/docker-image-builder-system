@@ -240,6 +240,83 @@ class TsEnumExtractionTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# 2.5 Go const extraction (TASK-062)
+# ---------------------------------------------------------------------------
+
+class GoEnumExtractionTests(unittest.TestCase):
+    def test_extract_basic(self):
+        # Go 식별자 CamelCase 도 허용 (StatusReceived, PhaseDockerBuildStarted 등).
+        src = (
+            'const (\n'
+            '\tStatusReceived           = "RECEIVED"\n'
+            '\tStatusQueued             = "QUEUED"\n'
+            '\tPhaseDockerBuildStarted  = "DOCKER_BUILD_STARTED"\n'
+            '\tErrorCodeBuildFailed     = "BUILD_FAILED"\n'
+            ')\n'
+        )
+        consts = core._extract_go_consts(src)
+        self.assertEqual(consts, {
+            "StatusReceived": "RECEIVED",
+            "StatusQueued": "QUEUED",
+            "PhaseDockerBuildStarted": "DOCKER_BUILD_STARTED",
+            "ErrorCodeBuildFailed": "BUILD_FAILED",
+        })
+
+    def test_extract_no_match(self):
+        # const 블록에 매칭 가능한 줄이 전혀 없으면 None.
+        src = (
+            'package contract\n'
+            '\n'
+            '// StatusFoo = "FOO" — quoted as a comment, no matching const.\n'
+            'var Status = "RECEIVED"  // plain assign, no `=` surrounded value.\n'
+        )
+        self.assertIsNone(core._extract_go_consts(src))
+
+    def test_extract_filters_non_upper_values(self):
+        # value 가 UPPER_SNAKE 가 아니면 매칭 X (예: lowercase, number, mixed).
+        src = (
+            'const (\n'
+            '\tStatusOK = "ok"\n'                 # lowercase value
+            '\tStatusNum = "STATUS_42"\n'          # 숫자 섞임 → 정상
+            '\tStatusMix = "StatusMixed"\n'       # mixed case
+            '\tStatusBare = RECEIVED\n'           # 따옴표 없음
+            ')\n'
+        )
+        consts = core._extract_go_consts(src)
+        # 매칭은 UPPER_SNAKE_CASE 만 — mixed/lowercase/bare 는 매칭 X.
+        # STATUS_42 는 매칭됨 (숫자 허용).
+        self.assertEqual(consts, {"StatusNum": "STATUS_42"})
+
+    def test_extract_resolves_fixtures(self):
+        # 실제 Go contract 모듈을 read 해서 const map 가 정상 매핑되는지.
+        repo = Path(__file__).resolve().parents[3]
+        for rel in (
+            "apps/runner/internal/contract/status.go",
+            "apps/runner/internal/contract/phase.go",
+            "apps/runner/internal/contract/errors.go",
+        ):
+            self.assertTrue((repo / rel).is_file(), f"missing fixture: {rel}")
+            src = (repo / rel).read_text(encoding="utf-8")
+            consts = core._extract_go_consts(src)
+            self.assertIsNotNone(consts, f"no consts parsed from {rel}")
+            self.assertGreaterEqual(len(consts), 5, f"too few consts in {rel}")
+
+    def test_resolve_go_value_set_filters_unknown_idents(self):
+        # _extract_go_consts 결과 dict 에 없는 ident 는 무시 (drift 표면).
+        consts = {"StatusA": "A_VALUE", "StatusB": "B_VALUE"}
+        self.assertEqual(core._resolve_go_value_set(consts, ("StatusA", "StatusMISSING")), {"A_VALUE"})
+        self.assertEqual(
+            core._resolve_go_value_set(consts, ("StatusC", "StatusD")),
+            None,
+            "all-missing idents 는 None 반환",
+        )
+        self.assertIsNone(
+            core._resolve_go_value_set(None, ("StatusA",)),
+            "dict 자체가 None 이면 None",
+        )
+
+
+# ---------------------------------------------------------------------------
 # 3. canonical extraction
 # ---------------------------------------------------------------------------
 
@@ -456,13 +533,27 @@ class RealRepoTests(unittest.TestCase):
                 f"ts_only={ts_only_build}, by_enum={r.summary.by_enum.get('buildStatuses')}"
             ),
         )
-        # by_enum 에 4종 + buildRequestFields + python canonical 그룹 모두 들어 있어야 함
+        # by_enum 에 4종 + buildRequestFields + Python canonical 4종 + Go canonical
+        # 5종 모두 들어 있어야 함 (TASK-061 / TASK-062).
         for k in (
             "buildStatuses", "previewStatuses", "buildPhases", "errorCodes",
             "buildRequestFields",
             "skillBuildStatuses", "executionStatuses", "skillPhases", "skillErrorCodes",
+            # Go bridge (TASK-062)
+            "goBuildStatuses", "goLegacyBuildStatuses",
+            "goExecutionStatuses", "goBuildPhases", "goErrorCodes",
         ):
             self.assertIn(k, r.summary.by_enum)
+
+        # TASK-062: Go ↔ TS sync 5종 모두 0 drift 여야 한다
+        # (Python TEST-061 의 4종에 더해 Go 5종 모두 검증).
+        for k in (
+            "goBuildStatuses", "goLegacyBuildStatuses",
+            "goExecutionStatuses", "goBuildPhases", "goErrorCodes",
+        ):
+            stats = r.summary.by_enum[k]
+            self.assertEqual(stats["missing"], 0, f"{k} has missing Go entries vs TS")
+            self.assertEqual(stats["extra"], 0, f"{k} has extra TS entries not in Go")
 
     def test_real_summary_to_dict(self):
         r = core.check_drift({}, repo_root=self.repo_root)

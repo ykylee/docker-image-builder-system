@@ -122,6 +122,7 @@ def _next_action_for_error_code(error_code: str | None) -> str:
         "QUEUE_CLAIM_FAILED": "CONTACT_OPERATOR",
         "DOCKER_BUILD_FAILED": "FIX_DOCKERFILE",
         "PREVIEW_PROVISION_FAILED": "FIX_PORT",
+        "DEPLOYMENT_FAILED": "CONTACT_OPERATOR",
         "ACTIVE_BUILD_EXISTS": "WAIT",
         "UNKNOWN_ERROR": "CONTACT_OPERATOR",
     }

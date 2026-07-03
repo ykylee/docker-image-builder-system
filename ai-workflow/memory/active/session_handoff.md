@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 54→55: TASK-061 self-review amend 4건 봉인 후 sync. PR #17 에 fix commit (single source-of-truth 보강 + dead branch 정리) 추가. 회귀 221/221 PASS 유지. 다음: PR #17 squash merge.)
+- Updated: 2026-07-03 (rev 54→55: TASK-061 self-review amend 4건 봉인 후 sync. PR #17 에 fix commit (single source-of-truth 보강 + dead branch 정리) 추가. 회귀 221/221 PASS 유지. 다음: PR #17 squash merge.) [rev 56→57: TASK-062 Go canonical contract mirror PR #18 진입. branch `codex/task-062-go-contract-mirror-2026-07-03` 에 4 commits (ERROR_CODES 9종 확장 + Go contract package + Runner literal 교체 + drift checker Go bridge) 진행. 회귀 Python 226/226 + Go 6 packages 모두 PASS. 다음: PR #18 self-review 후 squash merge → 후속 (TASK-064 / canonical §4~§8 잔재 / stdio transport 별도)]).
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note

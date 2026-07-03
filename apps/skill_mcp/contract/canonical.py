@@ -148,7 +148,8 @@ BUILD_PHASES: frozenset[str] = frozenset({
 })
 
 # Canonical error codes. Mirrors packages/shared-contract/src/build/errors.ts
-# `errorCodes`. 8 values.
+# `errorCodes`. 9 values (TASK-062 added DEPLOYMENT_FAILED to parallel the
+# existing PREVIEW_PROVISION_FAILED at the deployment step).
 ERROR_CODES: frozenset[str] = frozenset({
     "ACTIVE_BUILD_EXISTS",
     "INVALID_REQUEST",
@@ -157,6 +158,7 @@ ERROR_CODES: frozenset[str] = frozenset({
     "QUEUE_CLAIM_FAILED",
     "DOCKER_BUILD_FAILED",
     "PREVIEW_PROVISION_FAILED",
+    "DEPLOYMENT_FAILED",
     "UNKNOWN_ERROR",
 })
 
