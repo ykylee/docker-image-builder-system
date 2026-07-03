@@ -67,13 +67,21 @@ describe("MemoryBuildRepository: reportPreviewStatus", () => {
     const result = await repo.reportPreviewStatus(buildId, "READY", {
       previewUrl: "http://preview.local/x",
       host: "preview.local",
-      hostPort: 38124
+      hostPort: 38124,
+      containerRef: "container-x",
+      healthCheckPassed: true,
+      portOpen: true,
+      stabilityWindowPassed: true
     });
     assert.equal(result.kind, "ok");
     if (result.kind !== "ok") return;
     assert.equal(result.response.build.phase, "PREVIEW_READY");
     assert.equal(result.response.build.status, "TEST_READY");
     assert.equal(result.testDeployment.previewUrl, "http://preview.local/x");
+    assert.equal(result.response.test.status, "SUCCESS");
+    assert.equal(result.response.test.healthCheckPassed, true);
+    assert.equal(result.response.test.portOpen, true);
+    assert.equal(result.response.test.stabilityWindowPassed, true);
   });
 
   it("FAILED transitions to FAILED", async () => {
@@ -111,5 +119,39 @@ describe("MemoryBuildRepository: getTestDeployment", () => {
     if (result.kind !== "found") return;
     assert.equal(result.testDeployment.status, "READY");
     assert.equal(result.testDeployment.previewUrl, "http://x/y");
+  });
+});
+
+describe("MemoryBuildRepository: reportDeploymentResult", () => {
+  it("SUCCESS transitions to DEPLOYMENT_COMPLETED / DEPLOY_SUCCESS", async () => {
+    const { repo, buildId } = await setupBuildAtCompletedPhase();
+    await repo.queueTestDeployment(buildId, 8080, 30);
+    await repo.reportPreviewStatus(buildId, "READY", {
+      previewUrl: "http://preview.local/x",
+      host: "preview.local",
+      hostPort: 38124,
+      healthCheckPassed: true,
+      portOpen: true,
+      stabilityWindowPassed: true
+    });
+
+    const result = await repo.reportDeploymentResult(buildId, {
+      status: "SUCCESS",
+      targetType: "DOCKER_REGISTRY",
+      targetRef: "registry.example.com/todo-app",
+      resultRef: "registry.example.com/todo-app:build-1",
+      runnerId: "r-1",
+      responsePayloadJson: {
+        deliveryMode: "POLLING"
+      }
+    });
+    assert.equal(result.kind, "ok");
+    if (result.kind !== "ok") return;
+    assert.equal(result.response.build.phase, "DEPLOYMENT_COMPLETED");
+    assert.equal(result.response.build.status, "DEPLOY_SUCCESS");
+    assert.equal(result.response.deploy.status, "SUCCESS");
+    assert.equal(result.response.deploy.targetType, "DOCKER_REGISTRY");
+    assert.equal(result.response.deploy.resultRef, "registry.example.com/todo-app:build-1");
+    assert.equal(result.response.resultDelivery.mode, "POLLING");
   });
 });

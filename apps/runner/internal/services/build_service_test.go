@@ -20,10 +20,17 @@ type fakeClient struct {
 	reportErr   error
 	queued      []hostclient.QueueTestDeploymentRequest
 	previewReady []hostclient.PreviewReadyRequest
+	deployments []hostclient.DeploymentReportRequest
 }
 
 func (f *fakeClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedBuildResponse, error) {
-	return &hostclient.ClaimedBuildResponse{BuildID: f.buildID, Phase: "QUEUE_CLAIMED", Status: "CLAIMED"}, nil
+	return &hostclient.ClaimedBuildResponse{
+		BuildID:         f.buildID,
+		AppName:         "todo-app",
+		Phase:           "QUEUE_CLAIMED",
+		Status:          "CLAIMED",
+		LifecycleStatus: "PREPARING_SOURCE",
+	}, nil
 }
 
 func (f *fakeClient) ReportPhase(ctx context.Context, buildID, phase, runnerID string) error {
@@ -49,6 +56,13 @@ func (f *fakeClient) ReportPreviewReady(ctx context.Context, buildID string, req
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.previewReady = append(f.previewReady, req)
+	return nil
+}
+
+func (f *fakeClient) ReportDeployment(ctx context.Context, buildID string, req hostclient.DeploymentReportRequest) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.deployments = append(f.deployments, req)
 	return nil
 }
 
@@ -106,8 +120,8 @@ func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
 	if err := svc.ProcessClaim(context.Background(), claim); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(fc.queued) != 2 {
-		t.Errorf("expected 2 queue calls, got %d", len(fc.queued))
+	if len(fc.queued) != 1 {
+		t.Errorf("expected 1 queue call, got %d", len(fc.queued))
 	}
 	if fc.queued[0].InternalPort != 8080 {
 		t.Errorf("expected internalPort 8080, got %d", fc.queued[0].InternalPort)
@@ -117,5 +131,20 @@ func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
 	}
 	if fc.previewReady[0].HostPort != 38124 {
 		t.Errorf("expected hostPort 38124, got %d", fc.previewReady[0].HostPort)
+	}
+	if fc.previewReady[0].ContainerRef != "container-b-1" {
+		t.Errorf("expected containerRef container-b-1, got %s", fc.previewReady[0].ContainerRef)
+	}
+	if !fc.previewReady[0].HealthCheckPassed || !fc.previewReady[0].PortOpen || !fc.previewReady[0].StabilityWindowPassed {
+		t.Errorf("expected preview ready booleans true, got %+v", fc.previewReady[0])
+	}
+	if len(fc.deployments) != 2 {
+		t.Fatalf("expected 2 deployment reports, got %d", len(fc.deployments))
+	}
+	if fc.deployments[0].Status != "IN_PROGRESS" {
+		t.Errorf("expected first deployment status IN_PROGRESS, got %s", fc.deployments[0].Status)
+	}
+	if fc.deployments[1].Status != "SUCCESS" {
+		t.Errorf("expected second deployment status SUCCESS, got %s", fc.deployments[1].Status)
 	}
 }

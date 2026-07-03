@@ -11,7 +11,7 @@
 
 ## 1. 프로젝트 개요
 - 프로젝트명: Docker Image Builder System
-- 프로젝트 목적: AI 에이전트가 비개발자 사용자의 앱 산출물을 빌드 서버로 전달하고, 테스트 가능한 preview URL까지 연결하는 Docker build preview platform을 설계한다.
+- 프로젝트 목적: 외부 사용자 또는 AI 에이전트가 전달한 앱 산출물을 빌드 서버가 받아 Docker build, 컨테이너 테스트, 외부 시스템 배포, 결과 전달까지 자동화하는 플랫폼을 설계한다.
 - 주요 이해관계자: 비개발자 사용자, AI 에이전트 운영자, Build Server/Runner 설계자, 플랫폼 운영자
 
 ## 2. 문서 구조 (Path)
@@ -33,6 +33,7 @@
 - Step 11 `PKG-003` 세분화 문서: docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md
 - Step 12 `PKG-004` 세분화 문서: docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md
 - Step 13 우리 시스템 skill/MCP 개발 계획: docs/sdlc/13-skills-and-mcp-plan.md
+- Step 15 리팩토링 로드맵 및 마일스톤: docs/sdlc/15-refactoring-roadmap-and-milestones.md
 - SDLC 리뷰 문서: docs/review/01-sdlc-review.md
 - 과제 계획안: docs/report/01-assignment-plan.md
 - 보고용 자료: docs/report/02-sdlc-review-report.html
@@ -91,12 +92,12 @@
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함
-- UI 변경: 해당 사항 없음. Preview portal 논의가 생기면 별도 기준 정의
-- 배포/운영: Docker 실행 권한, preview URL 노출 정책, 컨테이너 수명 정책이 문서로 합의되기 전에는 운영 판단 금지
+- UI 변경: 해당 사항 없음. 테스트 runtime 또는 결과 조회 UI 논의가 생기면 별도 기준 정의
+- 배포/운영: Docker 실행 권한, 테스트 runtime 노출 정책, 컨테이너 수명 정책, 외부 배포 경로가 문서로 합의되기 전에는 운영 판단 금지
 
 ## 5. 예외 규칙 (Policy)
 - 병합: 현재 단계에서는 구현보다 컨셉 문서 정합성을 우선한다
-- 승인: Docker 보안 정책, registry 연동, 외부 preview 도메인 정책은 운영자 승인 필요
+- 승인: Docker 보안 정책, registry 연동, 테스트 runtime 노출 정책, 외부 배포 대상 정책은 운영자 승인 필요
 - 제약: Postgres smoke는 통과했지만 Drizzle migration artifact 생성/운영 규칙은 아직 고정되지 않았다
 - 기타: 현재 다음 단계는 postgres 경로를 기본 개발 경로로 승격할지 결정하고, `Runner -> Host Server API only`, `Host Server -> PostgreSQL only` 경계 위에서 Runner 연동으로 넘어가는 것이다
 

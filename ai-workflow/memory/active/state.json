@@ -1,8 +1,8 @@
 {
     "schema_version": "1",
-    "generated_at": "2026-07-03T08:55:00Z",
-    "purpose_digest": "세션 종료 — main HEAD `7c7297f` clean. PR #12 (TASK-050 build phase progress timeline) squash merge + 메타 sync 완료된 상태에서 사용자 wrap-up 요청. 본 세션 신규 code 없음. 회귀 baseline 352+ OK (build-server 73/73 + build-monitor 51/51 + Go 13/13 + Python 215/215 + svelte-check 0/0) 유지. 다음 후속: (a) PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete), (b) TASK-051 postgres phase_history column 추가, (c) visual QA PNG baseline 실측, (d) 운영자 마이그레이션 수동 적용 (TASK-045 v0.2 schema).",
-    "purpose_digest_rev": 61,
+    "generated_at": "2026-07-03T12:30:00Z",
+    "purpose_digest": "문서 정리와 리팩토링 세션을 이어가며 SDLC canonical 문서/README/workflow 메타를 build -> container test -> external deployment -> result delivery 모델로 맞춘 뒤, runtime skeleton 위에 container test result reporting(Task 58)과 external deployment adapter v1(Task 59)까지 반영했다. PR #13 self-review 에서 발견된 race / schema 정확성 / spec 일관성 결함 7건(transaction wrap, FK/DEFAULT, left join, omitempty, openapi 응답 schema, docker marker guard, EXPIRED 코멘트)을 amend commit 으로 묶어 PR 머지 차단 이슈를 0건으로 닫았다.",
+    "purpose_digest_rev": 66,
     "source_of_truth": {
         "project_profile_path": "docs/PROJECT_PROFILE.md",
         "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,11 +28,24 @@
     },
     "session": {
         "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-        "current_axis": "세션 종료. main HEAD `7c7297f` clean. 다음 PR #13 — TASK-017 stdio + TASK-037 sweeper + admin owner block-delete.",
-        "current_focus": "세션 종료 — main HEAD `7c7297f` clean. 본 세션 신규 code 없음. 회귀 baseline 352+ OK. 다음: PR #13 (TASK-017 stdio + TASK-037 sweeper + admin owner block-delete).",
+        "current_axis": "M1~M5 의 핵심 backend/runtime 축에 external deployment adapter v1까지 반영했다. contract, DB split, Build Server API 적응, OpenAPI regeneration, Runner source-build-test-deploy skeleton, canonical test/deploy/resultDelivery block population이 정리됐고 PR #13 self-review follow-up 보완(7건) 으로 race / schema 정확성 / spec 일관성 결함도 닫혔다.",
+        "current_focus": "PR #13 (M1~M5 refactor alignment) 의 self-review follow-up 보완이 amend commit 으로 묶였다. 다음은 PR #13 squash merge 후 TASK-060 Build Monitor status/UI refactor (M4 진입) 또는 TASK-064 smoke/migration/visual QA baseline.",
         "in_progress_items": [],
         "blocked_items": [],
         "recent_done_items": [
+            "PR #13 self-review follow-up 보완 — `reportDeploymentResult` / `reportPreviewStatus` transaction wrap (partial failure 차단), `getTestDeployment` left join 으로 `host`/`hostPort`/`internalPort`/`runtimeUrl` 노출, `0003` SQL 에 `gen_random_uuid()` DEFAULT + `build_request(id) ON DELETE CASCADE` FK 추가, Go `claimResponseBody.Reason` 에 `omitempty`, OpenAPI `POST /builds/:buildId/deployment` 200 응답에 `buildStatusResponseSchema` ref, `docker.BuildImage` marker 기반 idempotent guard 로 ProcessClaim 의 중복 PrepareSource 제거, memory repo EXPIRED case 코멘트 보강. 회귀: TS 4 packages clean, Go 17 passed / 9 packages (docker 패키지 marker guard 분기로 재실행), build-server focused 52/52, build-monitor tsc + svelte-check 0/0. workflow meta 동기화 (state rev 65→66, handoff 44→45, work_backlog 37→38, backlog §46→47, 새 §48) 같은 amend commit 에 포함.",
+            "TASK-059 external deployment adapter v1 — shared-contract 에 deployment report payload 와 phase(`DEPLOYMENT_STARTED`, `DEPLOYMENT_COMPLETED`)를 추가하고, Build Server 는 `/builds/:buildId/deployment` route 와 `deployment_attempt` write/read-path 를 연결했다. Runner 는 `internal/deploy` skeleton adapter 로 deploy artifact 를 만들고 deploy in-progress/success 를 Host Server 로 보고한다. OpenAPI regenerated, build-monitor generated client 갱신. 회귀: shared-contract direct `tsc --noEmit` OK, `apps/runner` `go test ./...` 17 passed, build-server focused tests 52/52 OK, build-monitor direct `tsc --noEmit` OK, `svelte-check` 0/0.",
+            "TASK-058 container test result reporting — shared-contract ready payload 에 healthCheck/portOpen/stabilityWindow/containerRef 를 추가하고, Runner 가 READY 보고 시 명시 test result 를 보낸다. Build Server memory/postgres repository 는 `build_test` snapshot 을 canonical `test` block 으로 실제 채우고, postgres get path 도 `build_test` left join 으로 read-path 를 연결했다. 회귀: shared-contract direct `tsc --noEmit` OK, `apps/runner` `go test ./...` 15 passed, build-server focused tests 49/49 OK.",
+            "TASK-057 docker build no-op 제거 및 source prepare/build/test skeleton 고도화 — Runner docker client 에 `PrepareSource`와 skeleton-mode `BuildImage` 도입, workspace/source marker/Dockerfile/build-manifest 실제 생성, `RUNNER_DOCKER_BUILD_MODE=cli` 일 때 `docker build` 시도 가능. BuildService 는 source prepare 이후 SOURCE_PREPARED phase 를 보고. 회귀: `apps/runner` `go test ./...` 15 passed, build-server focused tests 49/49 OK.",
+            "TASK-056 Runner phase model refactor — Runner HTTP client 의 `runnerId` 하드코딩 제거, claim 응답의 legacy `projectId/repositoryId` 제거 및 `appName/lifecycleStatus` 파싱 추가, `ProcessClaim`의 duplicate queue preview call 제거. 회귀: `apps/runner` `go test ./...` 13 passed, build-server focused tests 49/49 OK.",
+            "TASK-055 OpenAPI regeneration and query contract stabilization — memory backend build-server 를 띄워 `/openapi.json` 기준 `apps/build-monitor/.generated/openapi.d.ts` 재생성, build-monitor `lib/api.ts`가 generated `BuildStatusResponse`/`BuildCurrentPhase`/`BuildPhaseHistoryEntry` alias 사용하도록 정리. 검증: build-monitor direct `tsc --noEmit` OK, `svelte-check` 0/0. `vitest`는 localStorage 미구성 환경으로 기존 실패 지속.",
+            "TASK-054 Build Server repository/service/API refactor — canonical `BuildStatusResponse` helper (`build-status-response.ts`) 도입, memory/postgres repo 응답에 `lifecycle/image/test/deploy/resultDelivery` populate, postgres `build_test` 병행 write 시작, OpenAPI component registration 확장. 회귀: build-server direct `tsc --noEmit` OK, focused tests 49/49 OK.",
+            "TASK-053 DB schema split — `packages/db`에 `build_test`/`deployment_attempt` schema 와 bootstrap DDL, `0003_build_test_and_deployment_attempt.sql` migration 추가. `build_request.preview_*`와 `test_deployment`는 server migration 전까지 legacy shim 으로 유지. 회귀: `packages/db` direct `tsc --noEmit` OK, `apps/build-server` direct `tsc --noEmit` OK, focused tests 28/28 OK.",
+            "TASK-052 shared-contract status/response refactor — `canonicalBuildStatuses`/`legacyBuildStatuses`/`executionStatuses` 정리, `BuildStatusResponse.lifecycle/image/test/deploy/resultDelivery` 추가, `previewStatus`/`previewUrl`/`TestDeployment`는 migration shim 으로 유지. 회귀: `packages/shared-contract` direct `tsc --noEmit` OK, `apps/build-server` shared-contract shim test 3/3 OK, build-server package direct `tsc --noEmit` OK.",
+            "TASK-051 postgres phase history persistence 보강 — `phase_history` JSONB 컬럼과 `0002_phase_history.sql` migration 추가, postgres repo 의 fallback timeline 을 실제 persisted history read/write 로 전환. 회귀: `apps/build-server` tests 25/25 OK (`phase-history`, `build-routes`, `memory-preview`), `packages/db` direct `tsc --noEmit` OK. `pnpm exec` 경로는 `ERR_PNPM_IGNORED_BUILDS` 정책 때문에 direct binary 검증으로 우회.",
+            "TASK-063 roadmap/progress 운영 규칙 도입 — `docs/sdlc/15-refactoring-roadmap-and-milestones.md` 신설, `docs/sdlc/07`, `docs/PROJECT_PROFILE.md`, `work_backlog.md`에 M1~M5 milestone 과 TASK-051~064 backlog 연결.",
+            "문서 정리 2차 — `README.md`, legacy 루트 문서 6종 (`MVP_ONBOARDING`, `CONCEPT_REFINEMENT`, `PREVIEW_POLICY`, `GLOSSARY_AND_STATE_MODEL`, `IDENTITY_MODEL`, `REQUIREMENTS_BASELINE`)을 canonical 포인터 문서로 축약. `docs/report/01-assignment-plan.md`, `docs/report/02-sdlc-review-report.html`, `ai-workflow/memory/active/repository_assessment.md`, 주요 SDLC 제목/참조 링크까지 build/test/deploy/result-delivery 모델로 정렬.",
+            "문서 정리 — `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/13-skills-and-mcp-plan.md`, `docs/sdlc/decisions/03-preview-auth-policy.md`, `docs/PROJECT_PROFILE.md`를 build -> container test -> external deployment -> result delivery 모델 기준으로 재작성/보정. grep 재검증 결과 의도적 preview URL 언급 2건만 `docs/sdlc/03-requirements-baseline.md`에 잔존.",
             "세션 종료 — 작업 내역 정리 및 다음 세션 준비. main HEAD `7c7297f` clean. 본 세션 신규 code 없음. 메타 동기화 (state rev 60→61, handoff 33→34, work_backlog 34→35, backlog §36) commit 1건. 회귀 baseline 352+ OK 유지. 다음: PR #13 — TASK-017 stdio + TASK-037 sweeper + admin owner block-delete.",
             "TASK-046 light mode contrast QA — 4 패치 (tokens.css + theme.css + StatusPill + ThemeToggle). vitest 35→37 (TASK-046 신규 2). 회귀 272/272.",
             "TASK-045 DB schema migration — packages/db schema + bootstrap.ts 를 v0.2 (app_name column 직접) 로 정렬. brownfield 마이그레이션 SQL (idempotent) 신규. postgres repo 가 row.appName 직접 사용. 회귀 270/270.",
@@ -80,10 +93,10 @@
             "TASK-043 ADMIN-* Admin UI — ADMIN_IDS env (default admin,yky.lee) + /admin/builds + /admin/users + AdminLogin/AdminBuilds/AdminUsers + Header adminId 분기. 회귀 TS 53 + vitest 34 + svelte-check 0/0 + Go 13 + Python 215. live e2e: 401/403/200 + owner list + owner filter 정상"
         ],
         "environment_constraints": [],
-        "handoff_rev": 23,
+        "handoff_rev": 45,
         "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-        "index_rev": 28,
-        "latest_rev": 35
+        "index_rev": 38,
+        "latest_rev": 66
     },
     "backlog": {
         "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
@@ -125,8 +138,8 @@
             "TASK-021 발표용 카피 압축 및 승인안 톤 보정",
             "TASK-022 workflow 메타 정합성 보강 (commands placeholder, status assessment, report 인덱스, legacy 배너, 2026-07-02 백로그 봉인)"
         ],
-        "index_rev": "19",
-        "latest_rev": "23"
+        "index_rev": "20",
+        "latest_rev": "24"
     },
     "next_documents": [
         "docs/sdlc/13-skills-and-mcp-plan.md",

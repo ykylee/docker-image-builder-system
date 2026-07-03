@@ -4,7 +4,7 @@
 - 범위: `Must`, `Should`, `Could`, `Open` 분류
 - 대상 독자: 프로젝트 리드, 기획자, 설계 참여자
 - 상태: draft
-- 최종 수정일: 2026-07-02
+- 최종 수정일: 2026-07-03
 - 관련 문서: `docs/sdlc/SRS/06-mvp-must-requirements.md`
 
 ## 1. 분류 기준
@@ -21,50 +21,53 @@
 - 앱 이름 확인 또는 제안
 - `Dockerfile` 확인
 - `.dockerignore` 확인 또는 생성
-- 소스 및 metadata 패키징
+- Git URL 또는 Zip 입력 정규화
 - Build Server의 요청 수신과 DB 저장
 - `userId + appName` 기준 active build 중복 방지
 - build 상태 조회 API
 - build 로그 조회 API
 - 단일 Runner 기반 순차 처리
 - Docker 이미지 빌드
-- preview 컨테이너 실행
-- preview URL 반환
+- 컨테이너 실행 및 최소 동작 테스트
+- 외부 시스템 배포
+- polling 기반 상태 조회 또는 동등한 결과 전달
 - 사용자 친화 상태 메시지
 - 실패 원인 요약 및 다음 조치 안내
-- build 상태와 preview 상태 분리
+- build 상태와 test/deploy 상태 분리
 
 ## 3. Should
 
 - `Dockerfile` 자동 생성 정책
-- preview TTL 정책
-- preview 교체 정책
-- preview readiness 확인 기준
+- 테스트 실행 TTL 정책
+- 실행 환경 교체 정책
+- health check / port open / stability window 기준
 - 오류 코드 체계
 - 시스템 이름 정규화 규칙
 - 운영자 추적이 가능한 로그 수준
+- notification 이벤트 모델
 
 ## 4. Could
 
-- reverse proxy 기반 preview URL
-- subdomain 기반 preview
-- registry push
-- deployment registration
+- reverse proxy 기반 실행 결과 URL
+- subdomain 기반 실행 결과 URL
+- 추가 배포 프로토콜 지원
 - 다중 Runner 확장
 - branch 단위 앱 분기
-- preview TTL 연장 기능
+- 테스트 실행 TTL 연장 기능
 
 ## 5. Open
 
 - `userId`의 실제 source system
-- preview host 구조
-- preview 인증 정책
-- preview cleanup ownership
+- 테스트 실행 host 구조
+- 테스트 실행 인증 정책
+- runtime cleanup ownership
+- 입력 정규화 경계(Build Server 직접 수신 vs 전처리 계층 변환)
+- deploy target protocol의 MVP baseline
 - Dockerfile 생성 책임의 상세 분담
 - 실패 요약 책임의 상세 분담
 
 ## 6. 현 단계 결론
 
-- MVP의 `Must`는 "preview URL을 안정적으로 제공하는 데 필요한 최소 폐루프"로 정의한다.
+- MVP의 `Must`는 "입력 수신 -> build -> container test -> external deploy -> 결과 안내"에 필요한 최소 폐루프로 정의한다.
 - `Must` 항목의 설계 입력 기준선은 `docs/sdlc/SRS/06-mvp-must-requirements.md`로 고정한다.
-- `Should`와 `Open`은 설계 문서 착수 전에 더 줄이는 것이 바람직하다.
+- `Should`와 `Open`은 구현 전 baseline decision으로 더 줄이는 것이 바람직하다.

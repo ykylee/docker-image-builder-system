@@ -1,4 +1,4 @@
-# Docker Build Preview Platform SDLC Step 09 - Repository Package Structure Baseline
+# Docker Build And Deployment Automation Platform SDLC Step 09 - Repository Package Structure Baseline
 
 - 문서 목적: Build Server baseline 스택에 맞는 저장소 패키지 구조와 각 디렉터리 책임을 정의한다.
 - 범위: monorepo 디렉터리 구조, 앱/패키지 책임, 의존 방향, 초기 생성 순서, 비범위

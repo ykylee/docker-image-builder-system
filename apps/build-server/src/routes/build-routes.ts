@@ -12,6 +12,7 @@ import {
   buildStatusResponseSchema,
   claimRequestSchema,
   claimResponseSchema,
+  deploymentReportRequestSchema,
   phaseUpdateRequestSchema,
   testDeploymentQueueRequestSchema,
   testDeploymentQueueResponseSchema,
@@ -205,7 +206,11 @@ export async function registerBuildRoutes(
       {
         previewUrl: payload.previewUrl,
         host: payload.host,
-        hostPort: payload.hostPort
+        hostPort: payload.hostPort,
+        containerRef: payload.containerRef,
+        healthCheckPassed: payload.healthCheckPassed,
+        portOpen: payload.portOpen,
+        stabilityWindowPassed: payload.stabilityWindowPassed
       }
     );
     if (result.kind === "not_found") {
@@ -235,6 +240,32 @@ export async function registerBuildRoutes(
     const result = await buildService.reportPreviewStatus(
       paramsResult.data.buildId,
       payload.status
+    );
+    if (result.kind === "not_found") {
+      return reply.status(404).send({ message: "Build not found." });
+    }
+    return reply.status(200).send(result.response);
+  });
+
+  app.post("/builds/:buildId/deployment", async (request, reply) => {
+    const paramsResult = buildIdParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        message: "Invalid buildId parameter",
+        issues: paramsResult.error.issues
+      });
+    }
+    const body = request.body ?? {};
+    const payloadResult = deploymentReportRequestSchema.safeParse(body);
+    if (!payloadResult.success) {
+      return reply.status(400).send({
+        message: "Invalid deployment payload",
+        issues: payloadResult.error.issues
+      });
+    }
+    const result = await buildService.reportDeploymentResult(
+      paramsResult.data.buildId,
+      payloadResult.data
     );
     if (result.kind === "not_found") {
       return reply.status(404).send({ message: "Build not found." });

@@ -22,7 +22,13 @@ type tickerClient struct {
 func (c *tickerClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedBuildResponse, error) {
 	n := atomic.AddInt32(&c.count, 1)
 	if n == 1 {
-		return &hostclient.ClaimedBuildResponse{BuildID: c.buildID, Phase: "QUEUE_CLAIMED", Status: "CLAIMED"}, nil
+		return &hostclient.ClaimedBuildResponse{
+			BuildID:         c.buildID,
+			AppName:         "todo-app",
+			Phase:           "QUEUE_CLAIMED",
+			Status:          "CLAIMED",
+			LifecycleStatus: "PREPARING_SOURCE",
+		}, nil
 	}
 	return nil, nil
 }
@@ -39,6 +45,10 @@ func (c *tickerClient) QueueTestDeployment(ctx context.Context, buildID string, 
 }
 
 func (c *tickerClient) ReportPreviewReady(ctx context.Context, buildID string, req hostclient.PreviewReadyRequest) error {
+	return nil
+}
+
+func (c *tickerClient) ReportDeployment(ctx context.Context, buildID string, req hostclient.DeploymentReportRequest) error {
 	return nil
 }
 

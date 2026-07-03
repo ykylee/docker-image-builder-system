@@ -20,7 +20,7 @@ type Worker struct {
 
 // New 는 production HTTPBuildControlClient 로 wiring.
 func New(cfg config.Config) *Worker {
-	client := hostclient.NewHTTPBuildControlClient(cfg.HostServerBaseURL)
+	client := hostclient.NewHTTPBuildControlClient(cfg.HostServerBaseURL, cfg.RunnerID)
 	return &Worker{
 		config:  cfg,
 		claimer: queue.NewHostServerClaimer(client),

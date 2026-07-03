@@ -1,4 +1,4 @@
-# Docker Build Preview Platform SDLC Step 10 - PKG-002 Build Server Request Intake Breakdown
+# Docker Build And Deployment Automation Platform SDLC Step 10 - PKG-002 Build Server Request Intake Breakdown
 
 - 문서 목적: `PKG-002 Build Server Request Intake`를 실제 구현 가능한 세부 태스크로 분해한다.
 - 범위: route, schema, service, repository, response policy, validation/error policy, 선후관계
