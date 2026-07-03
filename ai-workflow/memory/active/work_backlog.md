@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일: 2026-07-03 (rev 10: TASK-017 scaffold PR #2 머지 + 다음 단계 (skills-mcp-dev) 헤더 명시)
+- 최종 수정일: 2026-07-03 (rev 13: TASK-031/032/033 P1 잔여 3종 모두 추가, 83 tests, total 215)
 - 관련 문서: [세션 인계](./session_handoff.md), [프로젝트 프로파일](../../docs/PROJECT_PROFILE.md)
 
 ## 1. 운영 원칙
@@ -38,6 +38,15 @@
 - [x] TASK-022: workflow 메타 정합성 보강 (commands placeholder, status assessment, report 인덱스, legacy 배너, 2026-07-02 백로그 봉인)
 - [x] TASK-023: 워크플로우 skill/MCP 셋업 (워크플로우 온보딩 마무리)
 - [x] TASK-024: 리뷰 반영 (08 Build Server=TS / Runner=Go baseline 정합, 09 apps/runner Go 예시·의존방향·PKG-005~007 갱신)
+- [x] TASK-033: preview-readiness-checker skill 1종 구현 (Python, 42 tests OK, total 215)
+- [x] TASK-032: failure-summary MCP 1종 구현 (Python, 16 tests OK, total 173)
+- [x] TASK-031: failure-summary-shaper skill 1종 구현 (Python, 25 tests OK, total 157)
+- [x] TASK-030: contract-drift-checker skill 1종 구현 (Python, 25 tests OK, total 132)
+- [x] TASK-029: build-log-tail MCP 1종 구현 (Python, 50 tests OK)
+- [x] TASK-028: latest-build-status MCP 1종 구현 (Python, 21 tests OK)
+- [x] TASK-027: build-status-explainer skill 2종 구현 (Python, 22 tests OK)
+- [x] TASK-026: build-request-intake skill 1종 구현 (Python, 14 tests OK)
+- [x] TASK-025: 우리 시스템 skill/MCP 후보 정리 및 개발 계획 (docs/sdlc/13)
 - [x] TASK-017: shared package / build-server / runner 골격 스캐폴드 및 1차 검증
 - [x] TASK-018: 보고자료 재구성 및 기획안 재작성
 - [x] TASK-019: 리더 소개용 HTML 보고자료 시각화 재작성

@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 8: PR #2 (TASK-017 scaffold) squash 머지, 다음 단계는 skills-mcp-dev 브랜치 rebase PR)
+- Updated: 2026-07-03 (rev 11: TASK-031/032/033 P1 잔여 3종 모두 추가, 83 tests, total 215)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus
@@ -26,7 +26,8 @@
 - `TASK-017`에서 root workspace, shared packages, `apps/build-server`, `apps/runner` 최소 골격과 1차 smoke 검증까지 완료했다.
 - `apps/build-server`는 이제 `BUILD_REPOSITORY_BACKEND=memory|postgres` 두 경로를 가지며, `postgres`는 schema auto-bootstrap, insert/query, duplicate `409`까지 live smoke를 통과했다.
 - Runner 는 Host Server API 만 바라보고 PostgreSQL 은 Host Server 만 직접 접근하는 경계로 고정했다.
-- 현재 next focus는 postgres 경로를 기본 개발 경로로 승격할지 결정하고, 그 위에서 Runner queue claim / phase update 설계를 실제 코드로 잇는 일이다.
+- 현재 next focus는 P0 skill 2종 + P0 MCP 2종 (총 107 tests) 이 PR #3 로 main 에 합류된 직후 단계다.
+- 후속 후보: (a) P1 skill 1종 (`failure-summary-shaper`) 또는 (b) TASK-017 의 stdio transport 활성화로 4종 MCP 를 real process 로 잇는 일.
 
 ## Work Status
 
@@ -122,6 +123,8 @@
 - `apps/build-server`에 `PostgresBuildRepository`와 backend 선택 로직 추가
 - Colima + Docker + `docker-image-builder-postgres` (`127.0.0.1:15432`) 기준 live Postgres smoke 통과
 - `apps/runner`의 DB 직접 접근 skeleton 을 제거하고 `internal/hostclient` 기반 Host Server API client skeleton 으로 전환
+- `codex/skills-mcp-dev-2026-07-03` 브랜치를 main 으로 rebased 것으로 총 4개 신규 커밍을 squash 해서 PR #3 로 링크 예정
+
 ## Next Actions
 
 - [ ] memory fallback 을 계속 기본값으로 둘지, postgres 를 기본 개발 경로로 승격할지 결정

@@ -115,7 +115,7 @@ packages/
   sdk/
   dockerfile-templates/
 tools/
-  skill-mcp/
+  skill_mcp/
 docs/
 ```
 
@@ -126,7 +126,7 @@ docs/
 - `packages/domain`: 상태 모델, DTO, validation
 - `packages/sdk`: Skill/MCP에서 사용할 서버 client
 - `packages/dockerfile-templates`: 앱 타입별 Dockerfile 템플릿
-- `tools/skill-mcp`: 에이전트용 skill 또는 MCP 엔트리포인트
+- `tools/skill_mcp`: 에이전트용 skill 또는 MCP 엔트리포인트
 
 ## 8. 첫 개발 스프린트 제안
 

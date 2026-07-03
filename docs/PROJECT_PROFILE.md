@@ -32,6 +32,7 @@
 - Step 10 `PKG-002` 세분화 문서: docs/sdlc/10-pkg-002-build-server-request-intake-breakdown.md
 - Step 11 `PKG-003` 세분화 문서: docs/sdlc/11-pkg-003-build-server-persistence-breakdown.md
 - Step 12 `PKG-004` 세분화 문서: docs/sdlc/12-pkg-004-build-server-query-api-breakdown.md
+- Step 13 우리 시스템 skill/MCP 개발 계획: docs/sdlc/13-skills-and-mcp-plan.md
 - SDLC 리뷰 문서: docs/review/01-sdlc-review.md
 - 과제 계획안: docs/report/01-assignment-plan.md
 - 보고용 자료: docs/report/02-sdlc-review-report.html

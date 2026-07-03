@@ -1,0 +1,573 @@
+"""contract-drift-checker skill tests.
+
+TASK-030. 입력 검증 / TS enum 추출 / canonical 추출 / drift 계산 /
+BuildRequest field / 실제 repo_root 통합 / cli 까지 검증한다.
+"""
+
+from __future__ import annotations
+
+import contextlib
+import io
+import json
+import os
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from apps.skill_mcp.skills.contract_drift_checker import cli, core
+
+
+# ---------------------------------------------------------------------------
+# helpers
+# ---------------------------------------------------------------------------
+
+def _write(p: Path, content: str) -> Path:
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(content, encoding="utf-8")
+    return p
+
+
+def _make_repo(tmp: Path) -> Path:
+    """테스트용 가짜 repo_root.
+    packages/shared-contract/src/build/4개 + canonical 1개.
+    drift 가 일부러 있게 만든다 (TS 가 canonical 의 subset).
+    """
+    repo = tmp
+    contract = repo / "packages" / "shared-contract" / "src" / "build"
+    _write(contract / "status.ts", (
+        "export const buildStatuses = [\n"
+        "  \"QUEUED\",\n"
+        "  \"BUILDING\",\n"  # canonical-only: PREPARING, VALIDATING, IMAGE_BUILT, TEST_DEPLOYING, COMPLETED, FAILED, CANCELLED
+        "  \"CLAIMED\",\n"   # TS-only
+        "  \"COMPLETED\"\n"
+        "] as const;\n"
+        "\n"
+        "export const previewStatuses = [\n"
+        "  \"QUEUED\",\n"
+        "  \"PROVISIONING\",\n"  # TS-only
+        "  \"READY\",\n"
+        "  \"NOT_REQUESTED\",\n"  # TS-only
+
+        "  \"FAILED\"\n"
+        "] as const;\n"
+    ))
+    _write(contract / "phase.ts", (
+        "export const buildPhases = [\n"
+        "  \"REQUEST_ACCEPTED\",\n"
+        "  \"FAILED\"\n"
+        "] as const;\n"
+    ))
+    _write(contract / "errors.ts", (
+        "export const errorCodes = [\n"
+        "  \"INVALID_REQUEST\",\n"
+        "  \"INTERNAL_ERROR\",\n"  # canonical-only 도 같이
+
+        "  \"DOCKER_BUILD_FAILED\",\n"
+        "  \"MY_CUSTOM_ERROR\"\n"  # TS-only
+        "] as const;\n"
+    ))
+    _write(contract / "request.ts", (
+        "export const buildRequestSchema = z.object({\n"
+        "  projectId: z.string().min(1),\n"
+        "  repositoryId: z.string().min(1),\n"
+        "  requestedBy: z.string().min(1),\n"
+        "  sourceArchive: sourceArchiveSchema,\n"
+        "  entrypointPath: z.string().min(1),\n"
+        "  metadata: z.record(z.string(), z.string()).default({})\n"
+        "});\n"
+    ))
+    canonical = repo / "docs" / "sdlc" / "contracts" / "01-shared-build-contract-baseline.md"
+    _write(canonical, _CANONICAL_SAMPLE)
+    return repo
+
+
+_CANONICAL_SAMPLE = """# Shared Build Contract Baseline
+
+## 3. 최소 Build Request Payload
+
+### 3.1 필수 필드
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `userId` | string | build ownership 기준 사용자 식별자 |
+| `appName` | string | 사용자 범위 내 앱 식별 이름 |
+| `sourceArchiveRef` | string | Build Server가 읽을 source archive 참조값 |
+
+### 3.2 권장 필드
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `dockerfileMode` | string | `provided` 등 Dockerfile 처리 정책 값 |
+| `runtimePort` | integer | 앱의 기대 listening port |
+
+## 4. Canonical Identifier Rules
+
+...
+
+## 5. Build Status Enum
+
+```text
+QUEUED
+PREPARING
+VALIDATING
+BUILDING
+IMAGE_BUILT
+TEST_DEPLOYING
+TEST_READY
+COMPLETED
+FAILED
+CANCELLED
+```
+
+## 6. Preview Status Enum
+
+```text
+QUEUED
+RESERVED
+STARTING
+READY
+FAILED
+EXPIRED
+STOPPED
+```
+
+## 7. Phase Key Baseline
+
+```text
+REQUEST_ACCEPTED
+SOURCE_PREPARING
+INPUT_VALIDATING
+DOCKER_BUILDING
+IMAGE_REGISTERED
+PREVIEW_QUEUEING
+PREVIEW_STARTING
+PREVIEW_READY
+FAILED
+```
+
+## 8. Error Code Baseline
+
+```text
+INVALID_REQUEST
+SOURCE_ARCHIVE_NOT_FOUND
+DOCKERFILE_NOT_FOUND
+INVALID_RUNTIME_PORT
+INVALID_BUILD_INPUT
+DOCKER_BUILD_FAILED
+PREVIEW_PORT_UNAVAILABLE
+PREVIEW_CONTAINER_START_FAILED
+PREVIEW_HEALTHCHECK_FAILED
+INTERNAL_ERROR
+```
+"""
+
+
+# ---------------------------------------------------------------------------
+# 1. Input validation
+# ---------------------------------------------------------------------------
+
+class InputValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = _make_repo(Path(self.tmp.name))
+
+    def test_non_dict_input(self):
+        r = core.check_drift("not a dict", repo_root=self.repo)
+        self.assertFalse(r.ok)
+        self.assertEqual(r.errors[0]["code"], "INVALID_INPUT")
+
+    def test_missing_contract_dir(self):
+        bad = Path(self.tmp.name) / "no-such"
+        r = core.check_drift({}, repo_root=bad)
+        self.assertFalse(r.ok)
+        self.assertEqual(r.errors[0]["code"], "MISSING_FIELD")
+        self.assertEqual(r.errors[0]["field"], "contractPath")
+
+    def test_missing_canonical_file(self):
+        # contract 디렉터리만 있고 canonical 없는 경우
+        bare = Path(self.tmp.name) / "bare"
+        (bare / "packages" / "shared-contract" / "src" / "build").mkdir(parents=True)
+        r = core.check_drift({}, repo_root=bare)
+        self.assertFalse(r.ok)
+        self.assertEqual(r.errors[0]["code"], "MISSING_FIELD")
+        self.assertEqual(r.errors[0]["field"], "canonicalPath")
+
+    def test_unknown_enum_name(self):
+        r = core.check_drift({"enums": ["buildStatuses", "fakeEnum"]}, repo_root=self.repo)
+        self.assertFalse(r.ok)
+        self.assertEqual(r.errors[0]["code"], "INVALID_INPUT")
+        self.assertEqual(r.errors[0]["field"], "enums")
+
+    def test_enums_not_a_list(self):
+        r = core.check_drift({"enums": "buildStatuses"}, repo_root=self.repo)
+        self.assertFalse(r.ok)
+        self.assertEqual(r.errors[0]["code"], "INVALID_INPUT")
+        self.assertEqual(r.errors[0]["field"], "enums")
+
+
+# ---------------------------------------------------------------------------
+# 2. TS enum extraction
+# ---------------------------------------------------------------------------
+
+class TsEnumExtractionTests(unittest.TestCase):
+    def test_extract_basic(self):
+        src = 'export const buildStatuses = [\n  "QUEUED",\n  "BUILDING"\n] as const;'
+        self.assertEqual(
+            core._extract_ts_enum(src, "buildStatuses"),
+            ["QUEUED", "BUILDING"],
+        )
+
+    def test_extract_no_match(self):
+        src = 'export const other = ["X"] as const;'
+        self.assertIsNone(core._extract_ts_enum(src, "buildStatuses"))
+
+    def test_extract_filters_non_upper_words(self):
+        src = (
+            "export const x = [\n"
+            "  \"QUEUED\",\n"
+            "  \"mixedCase\",\n"
+            "  \"lower\",\n"
+            "  \"OK_NAME\",\n"
+            "  42\n"
+            "] as const;"
+        )
+        self.assertEqual(
+            core._extract_ts_enum(src, "x"),
+            ["QUEUED", "OK_NAME"],
+        )
+
+
+# ---------------------------------------------------------------------------
+# 3. canonical extraction
+# ---------------------------------------------------------------------------
+
+class CanonicalExtractionTests(unittest.TestCase):
+    def test_extract_enums(self):
+        text = _CANONICAL_SAMPLE
+        enums = core._extract_canonical_enums(text)
+        # 4개 block 모두 잡혔는지
+        self.assertIn("buildStatuses", enums)
+        self.assertIn("previewStatuses", enums)
+        self.assertIn("buildPhases", enums)
+        self.assertIn("errorCodes", enums)
+        # §5 BuildStatus 10종
+        self.assertEqual(len(enums["buildStatuses"]), 10)
+        self.assertIn("CANCELLED", enums["buildStatuses"])
+        # §6 PreviewStatus 7종
+        self.assertEqual(len(enums["previewStatuses"]), 7)
+        self.assertIn("STOPPED", enums["previewStatuses"])
+        # §8 ErrorCode 10종
+        self.assertEqual(len(enums["errorCodes"]), 10)
+        self.assertIn("INTERNAL_ERROR", enums["errorCodes"])
+
+    def test_extract_request_fields(self):
+        fields = core._extract_canonical_request_fields(_CANONICAL_SAMPLE)
+        # §3.1 + §3.2 의 5종: userId, appName, sourceArchiveRef, dockerfileMode, runtimePort
+        self.assertEqual(fields, [
+            "userId",
+            "appName",
+            "sourceArchiveRef",
+            "dockerfileMode",
+            "runtimePort",
+        ])
+
+
+# ---------------------------------------------------------------------------
+# 4. Drift computation (canonical-only and TS-only)
+# ---------------------------------------------------------------------------
+
+class DriftComputationTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = _make_repo(Path(self.tmp.name))
+
+    def test_drift_summary_counts(self):
+        r = core.check_drift({}, repo_root=self.repo)
+        # 가짜 repo 의 _make_repo 에서 의도적으로 drift 를 심어둠
+        self.assertFalse(r.ok)
+        # buildStatuses: TS=4(QUEUED, BUILDING, CLAIMED, COMPLETED) / canonical=10
+        # shared: QUEUED, BUILDING, COMPLETED
+        # missing: 7 (PREPARING, VALIDATING, IMAGE_BUILT, TEST_DEPLOYING, TEST_READY, FAILED, CANCELLED)
+        # extra: 1 (CLAIMED)
+        # previewStatuses: TS=5(QUEUED, PROVISIONING, READY, NOT_REQUESTED, FAILED) / canonical=7
+        # shared: QUEUED, READY, FAILED
+        # missing: 4 (RESERVED, STARTING, EXPIRED, STOPPED)
+        # extra: 2 (PROVISIONING, NOT_REQUESTED)
+        # buildPhases: TS=2 / canonical=9
+        # shared: REQUEST_ACCEPTED, FAILED
+        # missing: 7
+        # extra: 0
+        # errorCodes: TS=4 / canonical=10
+        # shared: INVALID_REQUEST, INTERNAL_ERROR, DOCKER_BUILD_FAILED
+        # missing: 7
+        # extra: 1 (MY_CUSTOM_ERROR)
+        # request fields: TS=6 / canonical=5
+        # shared: 0
+        # missing: 5 (userId, appName, sourceArchiveRef, dockerfileMode, runtimePort)
+        # extra: 6 (projectId, repositoryId, requestedBy, sourceArchive, entrypointPath, metadata)
+
+        s = r.summary
+        self.assertEqual(s.missing_in_code, 7 + 4 + 7 + 7 + 5)
+        self.assertEqual(s.extra_in_code, 1 + 2 + 0 + 1 + 6)
+        self.assertEqual(s.total, s.missing_in_code + s.extra_in_code)
+
+        by_enum = s.by_enum
+        self.assertEqual(by_enum["buildStatuses"]["missing"], 7)
+        self.assertEqual(by_enum["buildStatuses"]["extra"], 1)
+        self.assertEqual(by_enum["buildStatuses"]["shared"], 3)
+        self.assertEqual(by_enum["previewStatuses"]["missing"], 4)
+        self.assertEqual(by_enum["previewStatuses"]["extra"], 2)
+        self.assertEqual(by_enum["buildPhases"]["missing"], 7)
+        self.assertEqual(by_enum["errorCodes"]["missing"], 7)
+        self.assertEqual(by_enum["errorCodes"]["extra"], 1)
+        self.assertEqual(by_enum["buildRequestFields"]["missing"], 5)
+        self.assertEqual(by_enum["buildRequestFields"]["extra"], 6)
+
+    def test_drift_items_kind_enum_value(self):
+        r = core.check_drift({}, repo_root=self.repo)
+        # 첫 몇 개 drift 의 kind/enum/value 검증
+        kinds = {d.kind for d in r.drift_items}
+        self.assertIn("missing_in_code", kinds)
+        self.assertIn("extra_in_code", kinds)
+
+        # canonical-only 항목은 §N 표기
+        for d in r.drift_items:
+            if d.kind == "missing_in_code":
+                self.assertTrue(d.canonical_section.startswith("§"))
+
+    def test_enums_subset_filter(self):
+        r = core.check_drift(
+            {"enums": ["buildStatuses"], "checkRequest": False},
+            repo_root=self.repo,
+        )
+        # buildStatuses 만 검사 → by_enum 에 buildStatuses 만
+        self.assertIn("buildStatuses", r.summary.by_enum)
+        self.assertNotIn("previewStatuses", r.summary.by_enum)
+        self.assertNotIn("buildPhases", r.summary.by_enum)
+        self.assertNotIn("errorCodes", r.summary.by_enum)
+        self.assertNotIn("buildRequestFields", r.summary.by_enum)
+
+    def test_check_request_false_skips_request_fields(self):
+        r = core.check_drift({"checkRequest": False}, repo_root=self.repo)
+        self.assertNotIn("buildRequestFields", r.summary.by_enum)
+        # request drift 가 빠져서 total 이 줄어들어야 함
+        with_req = core.check_drift({}, repo_root=self.repo)
+        self.assertLess(r.summary.total, with_req.summary.total)
+
+    def test_no_drift_when_sets_match(self):
+        # 가짜 repo 의 status.ts 를 canonical 과 동일 set 으로 덮어쓰기
+        status_ts = (
+            self.repo / "packages" / "shared-contract" / "src" / "build" / "status.ts"
+        )
+        status_ts.write_text(
+            "export const buildStatuses = [\n"
+            "  \"QUEUED\", \"PREPARING\", \"VALIDATING\", \"BUILDING\",\n"
+            "  \"IMAGE_BUILT\", \"TEST_DEPLOYING\", \"TEST_READY\",\n"
+            "  \"COMPLETED\", \"FAILED\", \"CANCELLED\"\n"
+            "] as const;\n"
+            "export const previewStatuses = [\n"
+            "  \"QUEUED\", \"RESERVED\", \"STARTING\", \"READY\",\n"
+            "  \"FAILED\", \"EXPIRED\", \"STOPPED\"\n"
+            "] as const;\n",
+            encoding="utf-8",
+        )
+        r = core.check_drift(
+            {
+                "enums": ["buildStatuses", "previewStatuses"],
+                "checkRequest": False,
+            },
+            repo_root=self.repo,
+        )
+        # buildStatuses / previewStatuses 만 본 경우 drift 0
+        s = r.summary
+        self.assertEqual(s.total, 0)
+        self.assertTrue(r.ok)
+
+
+# ---------------------------------------------------------------------------
+# 5. File-level error / warning
+# ---------------------------------------------------------------------------
+
+class FileLevelTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = _make_repo(Path(self.tmp.name))
+
+    def test_missing_ts_file_warns(self):
+        # phase.ts 를 지워서 warnings 가 발생하는 케이스
+        (self.repo / "packages" / "shared-contract" / "src" / "build" / "phase.ts").unlink()
+        r = core.check_drift({}, repo_root=self.repo)
+        # ok=False 면서도 errors 는 0 (warnings 만)
+        self.assertFalse(r.ok)
+        self.assertEqual(r.errors, [])
+        codes = [w["code"] for w in r.warnings]
+        self.assertIn("PARSE_ERROR", codes)
+        # buildPhases summary 는 0/0/0 으로 채워짐
+        self.assertEqual(r.summary.by_enum["buildPhases"], {"missing": 0, "extra": 0, "shared": 0})
+
+    def test_io_error_on_canonical(self):
+        # canonical 을 읽을 수 없게 권한 박탈 (root 가 아니면 실패할 수 있어 mock)
+        with mock.patch.object(core, "_read_text", side_effect=OSError("disk fail")):
+            r = core.check_drift({}, repo_root=self.repo)
+        self.assertFalse(r.ok)
+        self.assertTrue(any(e["code"] == "IO_ERROR" for e in r.errors))
+
+
+# ---------------------------------------------------------------------------
+# 6. Real repo_root integration (current checkout)
+# ---------------------------------------------------------------------------
+
+class RealRepoTests(unittest.TestCase):
+    """실제 저장소에서 check_drift() 가 drift 를 잡는지."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.repo_root = Path(__file__).resolve().parents[3]
+        # 위에서 만든 _make_repo 가 아닌, 실제 packages/shared-contract 와 canonical
+        if not (cls.repo_root / "packages" / "shared-contract" / "src" / "build" / "status.ts").is_file():
+            raise unittest.SkipTest("real shared-contract not present")
+        if not (cls.repo_root / "docs" / "sdlc" / "contracts" / "01-shared-build-contract-baseline.md").is_file():
+            raise unittest.SkipTest("real canonical not present")
+
+    def test_real_drift_detected(self):
+        r = core.check_drift({}, repo_root=self.repo_root)
+        # 현재 PR #2 머지 시점에서 buildStatus TS=6 vs canonical=10 이라 drift 가 잡혀야 함
+        self.assertFalse(r.ok)
+        # BuildStatus drift: canonical-only 에 PREPARING / VALIDATING / IMAGE_BUILT / TEST_DEPLOYING / CANCELLED 가 포함
+        values = {d.value for d in r.drift_items if d.enum == "buildStatuses"}
+        for v in ("PREPARING", "VALIDATING", "IMAGE_BUILT", "TEST_DEPLOYING", "CANCELLED"):
+            self.assertIn(v, values, msg=f"missing canonical-only BuildStatus drift: {v}")
+        # TS-only 에 CLAIMED 가 포함
+        extra = {d.value for d in r.drift_items if d.enum == "buildStatuses" and d.kind == "extra_in_code"}
+        self.assertIn("CLAIMED", extra)
+        # by_enum 에 4종 + buildRequestFields 모두 들어 있어야 함
+        for k in ("buildStatuses", "previewStatuses", "buildPhases", "errorCodes", "buildRequestFields"):
+            self.assertIn(k, r.summary.by_enum)
+
+    def test_real_summary_to_dict(self):
+        r = core.check_drift({}, repo_root=self.repo_root)
+        d = r.to_dict()
+        for k in ("ok", "drift_items", "summary", "warnings", "errors", "ref"):
+            self.assertIn(k, d)
+        self.assertEqual(d["ref"]["contract_doc"], "docs/sdlc/contracts/01-shared-build-contract-baseline.md")
+        self.assertEqual(d["ref"]["skill_version"], "v1")
+
+
+# ---------------------------------------------------------------------------
+# 7. cli.main
+# ---------------------------------------------------------------------------
+
+class CliTests(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.repo = _make_repo(Path(self.tmp.name))
+
+    def test_cli_no_args(self):
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"CONTRACT_DRIFT_REPO_ROOT": str(self.repo)}), \
+                contextlib.redirect_stdout(buf):
+            rc = cli.main([])
+        self.assertEqual(rc, 0)  # drift 는 있지만 strict 가 아니므로 rc=0
+        out = json.loads(buf.getvalue())
+        self.assertFalse(out["ok"])
+        self.assertGreater(out["summary"]["total"], 0)
+
+    def test_cli_strict_exits_2_on_drift(self):
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"CONTRACT_DRIFT_REPO_ROOT": str(self.repo)}), \
+                contextlib.redirect_stdout(buf):
+            rc = cli.main(["--strict"])
+        self.assertEqual(rc, 2)
+        out = json.loads(buf.getvalue())
+        self.assertFalse(out["ok"])
+
+    def test_cli_strict_exits_0_when_no_drift(self):
+        # 모든 enum 을 동일 set 으로 맞춰서 drift 0 만들기
+        status_ts = (
+            self.repo / "packages" / "shared-contract" / "src" / "build" / "status.ts"
+        )
+        status_ts.write_text(
+            "export const buildStatuses = [\"QUEUED\",\"PREPARING\",\"VALIDATING\","
+            "\"BUILDING\",\"IMAGE_BUILT\",\"TEST_DEPLOYING\",\"TEST_READY\","
+            "\"COMPLETED\",\"FAILED\",\"CANCELLED\"] as const;\n"
+            "export const previewStatuses = [\"QUEUED\",\"RESERVED\",\"STARTING\","
+            "\"READY\",\"FAILED\",\"EXPIRED\",\"STOPPED\"] as const;\n",
+            encoding="utf-8",
+        )
+        phase_ts = (
+            self.repo / "packages" / "shared-contract" / "src" / "build" / "phase.ts"
+        )
+        phase_ts.write_text(
+            "export const buildPhases = [\"REQUEST_ACCEPTED\",\"SOURCE_PREPARING\","
+            "\"INPUT_VALIDATING\",\"DOCKER_BUILDING\",\"IMAGE_REGISTERED\","
+            "\"PREVIEW_QUEUEING\",\"PREVIEW_STARTING\",\"PREVIEW_READY\",\"FAILED\"] as const;\n",
+            encoding="utf-8",
+        )
+        errors_ts = (
+            self.repo / "packages" / "shared-contract" / "src" / "build" / "errors.ts"
+        )
+        errors_ts.write_text(
+            "export const errorCodes = [\"INVALID_REQUEST\",\"SOURCE_ARCHIVE_NOT_FOUND\","
+            "\"DOCKERFILE_NOT_FOUND\",\"INVALID_RUNTIME_PORT\",\"INVALID_BUILD_INPUT\","
+            "\"DOCKER_BUILD_FAILED\",\"PREVIEW_PORT_UNAVAILABLE\","
+            "\"PREVIEW_CONTAINER_START_FAILED\",\"PREVIEW_HEALTHCHECK_FAILED\","
+            "\"INTERNAL_ERROR\"] as const;\n",
+            encoding="utf-8",
+        )
+        # request 필드도 canonical 5종과 일치하도록
+        request_ts = (
+            self.repo / "packages" / "shared-contract" / "src" / "build" / "request.ts"
+        )
+        request_ts.write_text(
+            "export const buildRequestSchema = z.object({\n"
+            "  userId: z.string().min(1),\n"
+            "  appName: z.string().min(1),\n"
+            "  sourceArchiveRef: z.string().min(1),\n"
+            "  dockerfileMode: z.string().default(\"provided\"),\n"
+            "  runtimePort: z.int().positive()\n"
+            "});\n",
+            encoding="utf-8",
+        )
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"CONTRACT_DRIFT_REPO_ROOT": str(self.repo)}), \
+                contextlib.redirect_stdout(buf):
+            rc = cli.main(["--strict"])
+        self.assertEqual(rc, 0)
+        out = json.loads(buf.getvalue())
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["summary"]["total"], 0)
+
+    def test_cli_input_filter_enums(self):
+        buf = io.StringIO()
+        stdin = io.StringIO(json.dumps({"enums": ["buildStatuses"]}))
+        with mock.patch.dict(os.environ, {"CONTRACT_DRIFT_REPO_ROOT": str(self.repo)}), \
+                contextlib.redirect_stdout(buf), \
+                mock.patch("sys.stdin", stdin):
+            rc = cli.main(["--input", "-"])
+        self.assertEqual(rc, 0)
+        out = json.loads(buf.getvalue())
+        self.assertIn("buildStatuses", out["summary"]["by_enum"])
+        self.assertNotIn("previewStatuses", out["summary"]["by_enum"])
+
+    def test_cli_output_file(self):
+        out_p = Path(self.tmp.name) / "out.json"
+        with mock.patch.dict(os.environ, {"CONTRACT_DRIFT_REPO_ROOT": str(self.repo)}):
+            rc = cli.main(["--output", str(out_p)])
+        self.assertEqual(rc, 0)
+        data = json.loads(out_p.read_text(encoding="utf-8"))
+        self.assertIn("summary", data)
+
+    def test_cli_invalid_input_json_exits_nonzero(self):
+        p = Path(self.tmp.name) / "bad.json"
+        p.write_text("{not json", encoding="utf-8")
+        with self.assertRaises(SystemExit):
+            cli.main(["--input", str(p)])
+
+
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()
