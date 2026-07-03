@@ -30,22 +30,23 @@
 | Validation | Zod |
 | Database | PostgreSQL |
 | Schema / Query Layer | Drizzle ORM |
-| Queue Model | PostgreSQL `FOR UPDATE SKIP LOCKED` |
+| Queue Model | Host Server-owned PostgreSQL `FOR UPDATE SKIP LOCKED` |
 | Runner Language | Go |
 | Runner Runtime | Go native binary |
 | 저장소 구조 | monorepo with `apps/` and `packages/` |
 
 핵심 원칙:
 
-- Build Server가 canonical contract와 system-of-record를 가진다.
+- Build Server가 canonical contract, PostgreSQL, queue ownership, system-of-record를 가진다.
 - Runner는 Go로 분리하지만 상태 enum, phase key, error code를 새로 정의하지 않는다.
+- Runner는 Host Server API만 바라보고 PostgreSQL에 직접 접근하지 않는다.
 - 공통 계약은 `packages/shared-contract`와 generated artifact 기준으로 공유한다.
 
 ## 3. 개발 원칙
 
 - Build Server를 먼저 연다.
 - shared contract와 persistence 경계를 먼저 고정한다.
-- Runner는 Build Server의 queue/상태/DB 구조가 닫힌 뒤 붙인다.
+- Runner는 Build Server의 API/상태 모델이 닫힌 뒤 붙인다.
 - 구현은 `PKG-001`~`PKG-004`를 P0, `PKG-005`~`PKG-007`을 P1로 나눠 진행한다.
 - 초기 단계에서는 실행 가능한 최소 skeleton을 우선 만들고, 고도화는 후속 단계로 미룬다.
 
@@ -108,7 +109,7 @@
 
 목표:
 
-- Build Server와 Runner가 공유할 상태 저장 구조를 PostgreSQL 기준으로 고정한다.
+- Build Server 단독 소유의 상태 저장 구조를 PostgreSQL 기준으로 고정한다.
 
 주요 작업:
 
@@ -158,15 +159,15 @@
 
 목표:
 
-- Go Runner가 Build Server가 정의한 queue/persistence contract를 소비하는 최소 실행 골격을 만든다.
+- Go Runner가 Host Server API contract를 소비하는 최소 실행 골격을 만든다.
 
 주요 작업:
 
 - `apps/runner`에 `go.mod` 생성
-- queue claim loop skeleton
-- build phase update contract 연결
+- host server claim polling skeleton
+- build phase update/report contract 연결
 - Docker 실행 boundary 생성
-- failure/status/log write path skeleton
+- failure/status/log report path skeleton
 
 권장 구조 예시:
 
@@ -176,7 +177,7 @@ apps/runner/
   internal/queue/
   internal/build/
   internal/docker/
-  internal/repository/
+  internal/hostclient/
   internal/contracts/
 ```
 
@@ -187,7 +188,7 @@ apps/runner/
 완료 기준:
 
 - Go Runner 진입 바이너리가 생성된다
-- build queue claim과 상태 업데이트 흐름의 최소 골격이 존재한다
+- host server claim과 상태 업데이트/report 흐름의 최소 골격이 존재한다
 - Build Server contract를 Go에서 참조하는 경로가 정리된다
 
 ### Phase 6. Preview Runner Work
@@ -235,10 +236,10 @@ apps/runner/
 
 ### Runner Track
 
-- build queue claim
+- host server claim polling
 - Docker build execution
-- phase / log 기록
-- preview queue claim
+- phase / log report
+- preview readiness report
 - readiness / cleanup
 
 ### Cross-cutting Track
@@ -289,7 +290,7 @@ apps/runner/
 - 신규 build request를 받아 `QUEUED` 상태 레코드를 생성할 수 있다
 - duplicate build를 business response로 반환할 수 있다
 - build status / logs 조회가 가능하다
-- Runner가 `QUEUED` 작업을 claim할 수 있다
+- Runner가 Host Server를 통해 `QUEUED` 작업을 할당받을 수 있다
 
 ## 9. 리스크와 대응
 

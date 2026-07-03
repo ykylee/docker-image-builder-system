@@ -4,3 +4,7 @@
 /.codex/
 /.MiniMax/
 /.agents/
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo

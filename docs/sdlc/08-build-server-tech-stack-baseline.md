@@ -22,7 +22,7 @@
 - Build Server baseline 언어는 `TypeScript`로 둔다.
 - API 프레임워크는 `Fastify`를 우선 추천한다.
 - 관계형 DB는 `PostgreSQL`을 기준으로 둔다.
-- queue는 외부 broker를 바로 도입하지 않고 `PostgreSQL row locking` 기반으로 시작한다.
+- queue는 외부 broker를 바로 도입하지 않고 `PostgreSQL row locking` 기반으로 Host Server 내부에서 시작한다.
 - Runner baseline 언어는 `Go`로 둔다. Build Server와 분리된 별도 process로 두고, Docker orchestration / long-running worker 강점을 활용한다.
 
 ## 3. 추천 스택
@@ -37,7 +37,7 @@
 | Validation | Zod |
 | Database | PostgreSQL |
 | Query/Schema Layer | Drizzle ORM (Build Server 측) |
-| Queue Model | PostgreSQL `FOR UPDATE SKIP LOCKED` |
+| Queue Model | Host Server-owned PostgreSQL queue (`FOR UPDATE SKIP LOCKED`) |
 | Cross-Language Contract | `packages/shared-contract` (TS) ↔ `apps/runner` (Go) 가 동일한 JSON Schema/스펙 문서를 공유 |
 | Packaging Direction | monorepo with `apps/` and `packages/` |
 
@@ -53,7 +53,7 @@
 
 - long-running worker 와 Docker orchestration 은 Go 가 강점을 갖는다.
 - Build Server 와 다른 런타임이지만 `packages/shared-contract` 가 단일 source-of-truth 이고, 동일 JSON Schema / contract spec 문서를 두 언어가 함께 참조하므로 cross-language drift 는 통제 가능하다.
-- Build Server 와의 통신은 PostgreSQL row locking 기반 queue 와 REST/JSON API 로만 둔다 (직접 in-process import 없음).
+- Runner 는 Host Server REST/JSON API 로만 통신한다. PostgreSQL queue 는 Host Server 내부 구현으로만 사용하고 Runner 는 직접 접근하지 않는다.
 
 비교 메모:
 
@@ -76,14 +76,14 @@
 ## 6. 왜 PostgreSQL인가
 
 - 현재 설계 문서가 active build 판정과 queue pickup에 row locking 가능한 관계형 DB를 전제로 한다.
-- `FOR UPDATE SKIP LOCKED` 패턴으로 build queue와 preview service queue를 둘 다 처리할 수 있다.
+- `FOR UPDATE SKIP LOCKED` 패턴으로 build queue와 preview service queue를 둘 다 Host Server 내부에서 처리할 수 있다.
 - build_request / build_log / test_deployment 모델을 가장 자연스럽게 담을 수 있다.
 
 초기 도입 원칙:
 
 - 외부 message broker 없이 시작한다.
-- build queue와 preview service queue는 DB 테이블로 분리한다.
-- concurrency limit과 active build 판정도 DB 질의를 기준으로 둔다.
+- build queue와 preview service queue는 DB 테이블로 분리하되 Host Server 만 직접 접근한다.
+- concurrency limit과 active build 판정도 Host Server 의 DB 질의를 기준으로 둔다.
 
 ## 7. 왜 Drizzle ORM인가
 
@@ -93,22 +93,22 @@
 
 주의:
 
-- ORM이 queue semantics를 숨기지 않도록 queue claim query는 raw SQL 또는 명시적 query builder로 다루는 편이 좋다.
+- ORM이 queue semantics를 숨기지 않도록 Host Server 내부 queue claim query는 raw SQL 또는 명시적 query builder로 다루는 편이 좋다.
 
 ## 8. Runner baseline 방향 (Go)
 
 - Runner 는 Build Server 와 분리된 Go process 로 둔다. 같은 monorepo 안의 `apps/runner/` 에 위치하지만 runtime / 언어는 Build Server 와 다르다.
-- Build Server 와의 통신은 queue (PostgreSQL `FOR UPDATE SKIP LOCKED`) 와 shared contract 의 JSON shape 로만 한다. 직접 in-process import / gRPC 같은 강한 결합은 MVP 단계에서 보류한다.
+- Runner 와의 통신은 Host Server REST/JSON API 와 shared contract 의 JSON shape 로만 한다. PostgreSQL queue 는 Host Server 내부 구현으로만 두고, Runner 의 직접 DB 접근은 금지한다.
 - Runner 가 책임질 범위:
-  - build queue claim
+  - Host Server claim API polling
   - source 준비
   - Docker build 실행
-  - preview service queue 등록
+  - phase / result report API 호출
   - preview readiness / cleanup 처리
 
 이유:
 
-- Build Server는 system-of-record와 API에 집중하고, Runner는 비동기 실행 책임을 분리해야 한다.
+- Build Server는 system-of-record, PostgreSQL, queue ownership, API를 모두 가진다. Runner는 비동기 실행만 담당해야 한다.
 - Runner 를 Go 로 두면 long-running worker / Docker orchestration 안정성을 우선할 수 있다.
 - contract 의 단일 source-of-truth 는 `packages/shared-contract` (TypeScript) 이고, Runner 는 동일 spec 문서를 기준으로 동작한다.
 
@@ -140,7 +140,7 @@ packages/
 - service mesh / reverse proxy routing 최적화
 - Build Server 까지 Go/Python 으로 옮기는 안 — contract drift 위험을 본 단계에서는 감수하지 않는다.
 - Build Server 안에서 Node worker 를 띄워 queue 까지 같이 처리하는 안 — Runner 와 책임이 겹친다.
-- Build Server ↔ Runner 간 gRPC / 강한 in-process 결합 — MVP 단계에서는 DB queue + REST/JSON 으로 충분하다.
+- Build Server ↔ Runner 간 gRPC / 강한 in-process 결합 — MVP 단계에서는 Host Server REST/JSON API 로 충분하다.
 
 이유:
 
@@ -152,7 +152,7 @@ packages/
 
 - `PKG-002`와 `PKG-004`는 Fastify + Zod 기준의 API shape 로 구체화할 수 있다.
 - `PKG-003`은 PostgreSQL + Drizzle 기준의 persistence 로 구체화할 수 있다.
-- `PKG-005` `PKG-006` `PKG-007` 은 Go Runner 기준으로 세부 태스크를 쪼갠다. (`apps/runner/cmd`, `internal/queue`, `internal/jobs`, `internal/docker`)
+- `PKG-005` `PKG-006` `PKG-007` 은 Go Runner 기준으로 세부 태스크를 쪼갠다. (`apps/runner/cmd`, `internal/queue`, `internal/hostclient`, `internal/docker`)
 - `PKG-001` shared contract 는 `packages/shared-contract` (TypeScript) 로 두되, Build Server 와 Runner 가 동일 JSON Schema / spec 문서를 함께 참조한다.
 
 ## 12. 보류 또는 추후 재검토 항목
@@ -165,6 +165,6 @@ packages/
 
 ## 13. 현 단계 결론
 
-- 현재 저장소 기준 baseline recommendation 은 `Build Server = TypeScript (Fastify + Drizzle)`, `Runner = Go`, 공통 계층 = `packages/shared-contract` (TS, JSON Schema/스펙 단일 source) 다.
-- Build Server 와 Runner 는 서로 다른 언어지만 `packages/shared-contract` 와 PostgreSQL queue 를 통해 결합하며, 직접 in-process import 는 두지 않는다.
+- 현재 저장소 기준 baseline recommendation 은 `Build Server = TypeScript (Fastify + Drizzle + PostgreSQL)`, `Runner = Go`, 공통 계층 = `packages/shared-contract` (TS, JSON Schema/스펙 단일 source) 다.
+- Build Server 와 Runner 는 서로 다른 언어지만 `packages/shared-contract` 와 Host Server API 를 통해 결합하며, Runner 의 직접 DB 접근이나 in-process import 는 두지 않는다.
 - 다음 단계는 `packages/shared-contract` 코드 스캐폴드와 `apps/runner` Go module 골격을 함께 닫는 것이다.

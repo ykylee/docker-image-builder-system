@@ -1,0 +1,23 @@
+{
+  "name": "@docker-image-builder-system/build-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/apps/build-server/src/index.js",
+  "types": "dist/apps/build-server/src/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "check": "tsc -p tsconfig.json --noEmit",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "@docker-image-builder-system/db": "workspace:*",
+    "@docker-image-builder-system/shared-config": "workspace:*",
+    "@docker-image-builder-system/shared-contract": "workspace:*",
+    "fastify": "^5.3.3",
+    "zod": "^4.0.5"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.3"
+  }
+}

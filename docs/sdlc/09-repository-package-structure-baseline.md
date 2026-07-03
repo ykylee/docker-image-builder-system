@@ -22,7 +22,7 @@
 
 - 앱 실행 단위와 재사용 패키지를 분리한다.
 - shared contract 는 앱보다 아래가 아니라 별도 `packages/`에서 관리한다.
-- Runner 는 Build Server 의 하위 모듈이 아니라 별도 언어(Go) 의 실행 앱으로 둔다. Build Server 와 Runner 는 runtime-level import 가 없으며, `packages/shared-contract` 의 spec 과 PostgreSQL queue 로만 결합한다.
+- Runner 는 Build Server 의 하위 모듈이 아니라 별도 언어(Go) 의 실행 앱으로 둔다. Build Server 와 Runner 는 runtime-level import 가 없으며, `packages/shared-contract` 의 spec 과 Host Server API 로만 결합한다.
 - 인프라 세부사항은 앱 내부에만 머물지 않고 공통 설정 패키지로 재사용 가능해야 한다.
 
 ## 3. 권장 Top-Level Structure
@@ -82,9 +82,9 @@ apps/build-server/
 
 역할:
 
-- build queue poll / claim (PostgreSQL `FOR UPDATE SKIP LOCKED`)
+- Host Server claim API polling
 - Docker build 실행
-- preview service queue 등록
+- phase / result report API 호출
 - readiness, cleanup 처리
 
 초기 하위 구조 권장:
@@ -100,7 +100,7 @@ apps/runner/
     queue/
     jobs/
     services/
-    repositories/
+    hostclient/
     docker/
     lib/
   test/
@@ -110,10 +110,10 @@ apps/runner/
 설명:
 
 - `cmd/runner/`: entry point (`main.go`)
-- `internal/queue/`: PostgreSQL queue poll/claim
+- `internal/queue/`: Host Server claim polling orchestration
 - `internal/jobs/`: build job, preview job
 - `internal/services/`: phase, cleanup orchestration
-- `internal/repositories/`: DB access (Go 측 Drizzle 대체는 직접 SQL 또는 sqlx)
+- `internal/hostclient/`: Host Server REST/JSON API client
 - `internal/docker/`: Docker daemon interaction boundary (Docker SDK for Go)
 - `internal/lib/`: runner-local helpers
 - `go.mod` / `go.sum` 은 TypeScript 패키지 매니페스트를 대체한다 (`package.json` / `tsconfig.json` 은 두지 않는다).
@@ -221,7 +221,8 @@ apps/runner -> apps/build-server
 
 - app끼리 직접 import 하지 않는다 (TypeScript / Go 양쪽 모두).
 - Build Server(TS) 와 Runner(Go) 는 서로 다른 언어이므로, runtime-level import 자체가 불가능하다. 두 app 이 공유할 수 있는 것은 `packages/shared-contract` 의 JSON Schema / spec 문서와 `packages/shared-config` 의 env schema 뿐이다.
-- Runner(Go) 가 PostgreSQL queue 와 REST/JSON 으로 Build Server 와 통신할 때도 동일 contract 를 단일 source 로 사용한다.
+- Runner(Go) 는 Host Server REST/JSON API 로만 Build Server 와 통신하며, 동일 contract 를 단일 source 로 사용한다.
+- PostgreSQL 은 Host Server 전용 persistence 이며 Runner 의 직접 접근은 금지한다.
 - shared-contract 는 Docker SDK, DB 구현, 특정 런타임에 의존하지 않는다.
 
 ## 7. 초기 생성 순서
@@ -246,7 +247,7 @@ apps/runner -> apps/build-server
 | `PKG-002` | `apps/build-server/src/routes`, `services`, `schemas` |
 | `PKG-003` | `packages/db/`, `apps/build-server/src/repositories` |
 | `PKG-004` | `apps/build-server/src/routes`, `schemas` |
-| `PKG-005` | `apps/runner/cmd/runner`, `internal/queue`, `internal/services` |
+| `PKG-005` | `apps/runner/cmd/runner`, `internal/queue`, `internal/hostclient`, `internal/services` |
 | `PKG-006` | `apps/runner/internal/jobs`, `internal/services` |
 | `PKG-007` | `apps/runner/internal/services`, `internal/docker` |
 | `PKG-008` | 후속 Skill/MCP 저장소 또는 별도 패키지 |
@@ -278,5 +279,5 @@ apps/runner -> apps/build-server
   - `packages/shared-contract` (TypeScript, JSON Schema/스펙 단일 source)
   - `packages/shared-config`
   - `packages/db`
-- Build Server(TS) 와 Runner(Go) 는 runtime-level import 가 없고, `packages/shared-contract` 와 PostgreSQL queue, REST/JSON 으로만 결합한다.
-- 다음 단계는 `packages/shared-contract` 코드 스캐폴드와 `apps/runner` Go module 골격을 함께 닫고, 그 위에서 `PKG-002` (Build Server request intake) 와 `PKG-005` (Runner queue claim / Docker build) 를 실제 구현 태스크로 분해하는 것이다.
+- Build Server(TS) 와 Runner(Go) 는 runtime-level import 가 없고, `packages/shared-contract` 와 Host Server REST/JSON API 로만 결합한다.
+- 다음 단계는 `packages/shared-contract` 코드 스캐폴드와 `apps/runner` Go module 골격을 함께 닫고, 그 위에서 `PKG-002` (Build Server request intake) 와 `PKG-005` (Runner host-server claim / Docker build) 를 실제 구현 태스크로 분해하는 것이다.
