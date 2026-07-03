@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 52→53: PR #16 squash merge 합류 sync. main HEAD `bc3613d` (squash merge commit, 입력 `2fccef6`). self-review 보완 필요 0건으로 amend 없이 squash merge. TASK-060 의 마지막 frontend 조각 (status chip filter canonical 정렬) 닫힘. 다음: TASK-061 (Skill/MCP contract rename and payload refactor) 또는 TASK-062 (stdio transport 정리).)
+- Updated: 2026-07-03 (rev 53→54: TASK-061 Skill/MCP contract rename + payload refactor PR #17 오픈. branch `codex/task-061-skill-mcp-contract-refactor-2026-07-03` 에 foundation (canonical Python contract source-of-truth + drift checker Python cross-check) + consumer refactor (3 skills + 2 MCPs canonical v2 정렬) 가 2 commit 으로 묶여 self-review 대기 중. 회귀 221/221 PASS (전 TASK 누적 215 + 신규 6). drift-checker self-check: skill sync 4종 모두 missing=0/extra=0/shared(12/5/11/8). 다음: PR #17 self-review 후 main 합류 + TASK-062 (stdio transport 정리 + Go Runner generated contract 동기) 또는 canonical §4~§8 baseline 잔재 정리.)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note
