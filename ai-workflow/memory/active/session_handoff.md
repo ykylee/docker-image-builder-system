@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-03 (rev 12: PR #3 머지 반영, TASK-025~033 모두 main 합류, 후속 TASK-017 stdio transport 또는 P2 후보)
+- Updated: 2026-07-03 (rev 13: TASK-034 시작 — PKG-005 Runner Claim And Build Phase Skeleton, 브랜치 codex/backend-build-queue-2026-07-03)
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Current Focus

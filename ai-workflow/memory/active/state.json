@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-03",
-  "purpose_digest": "PR #3 머지 완료 (4307d83, TASK-025~033 일괄): P0+P1 8종 (skill 5종 + MCP 3종) + plan 1종 + skill-mcp cross-ref 정정 1건. 215 tests OK. 후속: P2 후보 (preview-ttl, dockerfile-template-suggest), TASK-017 stdio transport 활성화, contract-drift-checker 24건 drift 해소 (PKG-001 owner 결정 필요).",
-  "purpose_digest_rev": "35",
+  "purpose_digest": "PR #3 (TASK-025~033) main 합류 완료, 메타 동기화 (rev 35) 마침. 다음은 TASK-034 (PKG-005 Runner Claim And Build Phase Skeleton) 시작 — 브랜치 `codex/backend-build-queue-2026-07-03` 에서 Runner 가 Host Server API 로 작업을 claim 하고 build phase 를 보고하는 최소 골격 정의. apps/runner/queue 골격 + apps/build-server claim endpoint + phase update endpoint 가 1차 목표.",
+  "purpose_digest_rev": "36",
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,9 +28,11 @@
   },
   "session": {
     "current_baseline": "요구사항/설계/백로그/리뷰/보고 패키지 위에 monorepo backend scaffold, memory/postgres smoke 경로, postgres persistence와 live Colima DB 검증까지 연결되었다.",
-    "current_axis": "PR #3 머지 완료(squash 4307d83, 52 files, +7174/-10). 우리 시스템 skill 5종 + MCP 3종 + plan 1종이 main 합류. TASK-017 stdio transport 활성화 또는 P2 후보 (preview-ttl / dockerfile-template-suggest) 가 다음.",
-    "current_focus": "PR #3 (TASK-025~033) main 합류, 메타 동기화 마무리",
-    "in_progress_items": [],
+    "current_axis": "PR #3 머지 완료, 다음 축은 백엔드 빌드 큐 (PKG-005). TASK-034 (Runner Claim And Build Phase Skeleton) 시작. Runner (Go) 가 Host Server (TS) 의 claim API 를 poll 하고, build phase 를 다시 Host Server 로 보고하는 최소 흐름을 정의한다.",
+    "current_focus": "TASK-034: PKG-005 Runner Claim And Build Phase Skeleton — 브랜치 codex/backend-build-queue-2026-07-03",
+    "in_progress_items": [
+      "TASK-034 PKG-005 Runner Claim And Build Phase Skeleton — 브랜치 codex/backend-build-queue-2026-07-03 시작"
+    ],
     "blocked_items": [],
     "recent_done_items": [
       "TASK-031 failure-summary-shaper skill 1종 구현 (apps/skill_mcp/skills/failure_summary_shaper, Python, 25 tests OK, total 157)",
