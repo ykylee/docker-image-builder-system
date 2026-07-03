@@ -124,6 +124,10 @@
 - Colima + Docker + `docker-image-builder-postgres` (`127.0.0.1:15432`) 기준 live Postgres smoke 통과
 - `apps/runner`의 DB 직접 접근 skeleton 을 제거하고 `internal/hostclient` 기반 Host Server API client skeleton 으로 전환
 - `codex/skills-mcp-dev-2026-07-03` 브랜치를 main 으로 rebased 것으로 총 4개 신규 커밍을 squash 해서 PR #3 로 링크 예정
+- TASK-034 PKG-005 Host Server 1차 골격: shared-contract 에 claimRequest/claimResponse/phaseUpdateRequest 3종 schema, BuildRepository 2 method (claimNextBuild/updatePhase) + memory/postgres 동시성 안전 구현, BuildService + 2 endpoint (POST /builds/claim, POST /builds/:buildId/phase)
+- TASK-035 PKG-005 Go Runner: HTTPBuildControlClient (claim/phase 실제 호출, 2-depth nesting 처리) + BuildService.ProcessClaim 4 phase 자동 + worker ticker loop + 10 Go tests
+- TASK-036 PKG-006 Preview Queue + Readiness: 5종 schema (testDeployment/Queue/Ready/Status), BuildRepository 3 method (queueTestDeployment/reportPreviewStatus/getTestDeployment), 4 endpoint, Runner queue 2회 + ready 1회 자동 보고 (8 phase e2e)
+- 누적 회귀 265/265 OK (TS 37 + Go 13 + Python 215), 브랜치 `codex/backend-build-queue-2026-07-03` 10 commits (push 완료, PR 미오픈)
 
 ## Next Actions
 
@@ -134,6 +138,10 @@
 - [ ] shared-contract 의 Go 측 generated binding 전략 결정
 - [ ] `OI-008`, `OI-009`, `OI-006` 후속 decision 착수 여부 결정
 - [ ] `MiniMax.md`, `MiniMax_config.example.json` vendor-specific overlay 점검 (MiniMax 하네스 환경에서 별도 진행, 본 세션에서는 기록만)
+- [ ] TASK-034/035/036 일괄 PR #4 오픈 (`codex/backend-build-queue-2026-07-03` → main) — 사용자 결정 대기
+- [ ] TASK-037 PKG-007 Preview Cleanup Policy Binding (TTL 만료 sweeper) — TASK-036 의 expiresAt 활용
+- [ ] docker.BuildImage 실제 구현 (Docker SDK + SOURCE_PREPARED/DOCKER_BUILD_STARTED 사이 실제 image build) — 현재 noop
+- [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화 (1차 골격은 null 응답)
 
 ## Risks & Blockers
 
@@ -144,3 +152,7 @@
 - 표준 키트 prototype의 실제 MCP transport는 미구현이므로 active MCP 3종은 `transport_ready=false` 상태에서 동일 계약의 수동 절차로 운영한다.
 - `pnpm -r check` 는 현재 환경에서 `ERR_PNPM_IGNORED_BUILDS` 정책에 걸릴 수 있다. 이 저장소의 1차 검증 경로는 direct `tsc` + `go build` + HTTP smoke 로 우회 중이다.
 - Colima 기반 Postgres smoke는 통과했지만, 컨테이너 lifecycle 과 migration artifact 운영 규칙은 아직 문서화/자동화되지 않았다.
+- TASK-036 의 Postgres testDeployment 응답은 host/hostPort/expiresAt/internalPort 가 null (buildRequestTable 컬럼 미보유). 별도 table 또는 컬럼 추가가 후속.
+- docker.BuildImage 가 noop — 실제 image build / docker run / docker stop 후속. 현 단계에서는 phase 흐름만 canonical contract 와 정합.
+- phase 자동 status 전이 휴리스틱 (DOCKER_BUILD_STARTED→BUILDING 등) 단순 매핑. canonical phase machine 도입 시 invalid_transition 분기 활용.
+- Preview queue 2회 호출은 idempotent retry 의도였으나 interface 정돈 필요 (단일 queue + status 매핑).
