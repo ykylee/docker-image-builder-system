@@ -67,9 +67,21 @@ func (f *fakeClient) ReportDeployment(ctx context.Context, buildID string, req h
 	return nil
 }
 
+// TASK-066: DownloadSource added to keep fakeClient compatible
+// with the expanded BuildControlClient interface. The services
+// tests do not exercise the fetcher (the BuildService falls back
+// to `PrepareSource` when `s.fetcher == nil`), so a no-op
+// implementation is correct here.
+func (f *fakeClient) DownloadSource(ctx context.Context, buildID string) ([]byte, string, int, error) {
+	return nil, "", 0, nil
+}
+
 func TestProcessClaim_NilClaim_NoPhaseReports(t *testing.T) {
 	fc := &fakeClient{}
-	svc := NewBuildService(fc, docker.NewClient(), "r-1")
+	// TASK-066: `fetcher=nil` exercises the `PrepareSource`
+	// fallback path so the test stays focused on the phase
+	// reporting contract without dragging in the fetcher.
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
 	if err := svc.ProcessClaim(context.Background(), nil); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -80,7 +92,7 @@ func TestProcessClaim_NilClaim_NoPhaseReports(t *testing.T) {
 
 func TestProcessClaim_ReportsFullHappyPath(t *testing.T) {
 	fc := &fakeClient{buildID: "b-1"}
-	svc := NewBuildService(fc, docker.NewClient(), "r-1")
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
 	claim := &queue.ClaimedBuild{BuildID: "b-1"}
 	if err := svc.ProcessClaim(context.Background(), claim); err != nil {
 		t.Fatalf("expected no error, got %v", err)
@@ -106,7 +118,7 @@ func TestProcessClaim_ReportsFullHappyPath(t *testing.T) {
 
 func TestProcessClaim_PhaseReportError_Propagates(t *testing.T) {
 	fc := &fakeClient{buildID: "b-1", reportErr: errors.New("boom")}
-	svc := NewBuildService(fc, docker.NewClient(), "r-1")
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
 	claim := &queue.ClaimedBuild{BuildID: "b-1"}
 	if err := svc.ProcessClaim(context.Background(), claim); err == nil {
 		t.Fatal("expected error, got nil")
@@ -116,7 +128,7 @@ func TestProcessClaim_PhaseReportError_Propagates(t *testing.T) {
 
 func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
 	fc := &fakeClient{buildID: "b-1"}
-	svc := NewBuildService(fc, docker.NewClient(), "r-1")
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
 	claim := &queue.ClaimedBuild{BuildID: "b-1"}
 	if err := svc.ProcessClaim(context.Background(), claim); err != nil {
 		t.Fatalf("expected no error, got %v", err)

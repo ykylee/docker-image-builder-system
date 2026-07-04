@@ -53,6 +53,15 @@ func (c *tickerClient) ReportDeployment(ctx context.Context, buildID string, req
 	return nil
 }
 
+// TASK-066: DownloadSource added to keep tickerClient
+// compatible with the expanded BuildControlClient interface. The
+// worker tests do not exercise the fetcher (the BuildService
+// falls back to `PrepareSource` when `s.fetcher == nil`), so a
+// no-op implementation is correct here.
+func (c *tickerClient) DownloadSource(ctx context.Context, buildID string) ([]byte, string, int, error) {
+	return nil, "", 0, nil
+}
+
 func TestWorker_StopsOnContextCancel(t *testing.T) {
 	fc := &tickerClient{buildID: "b-1"}
 	cfg := config.Config{
