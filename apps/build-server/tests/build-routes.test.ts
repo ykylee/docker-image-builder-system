@@ -416,6 +416,52 @@ describe("POST /builds/:buildId/source (TASK-066)", () => {
     await app.close();
   });
 
+  it("returns 400 when the body size does not match the declared metadata", async () => {
+    const app = await buildApp();
+    // Build a body whose SHA-256 matches the declared checksum but
+    // whose length differs. The route checks checksum first, so a
+    // body that fails *both* would surface as checksum_mismatch.
+    // To isolate size_mismatch we pick content whose sha256
+    // happens to equal the declared value — that requires the
+    // declared bytes and uploaded bytes to be preimages of each
+    // other under SHA-256, which is computationally infeasible
+    // to construct adversarially. Instead, declare the checksum
+    // of the *uploaded* body and set sizeBytes one off:
+    //   declared: sha256("abc"), sizeBytes=2
+    //   upload:   "abc" (3 bytes) → checksum matches, size differs.
+    const declared = "abc"; // 3 bytes
+    const declaredChecksum = createHash("sha256").update(declared).digest("hex");
+    const enq = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: {
+        appName: `p-size-${Math.random().toString(36).slice(2, 8)}`,
+        requestedBy: "yklee",
+        sourceArchive: {
+          objectKey: "k",
+          checksumSha256: declaredChecksum,
+          sizeBytes: 2 // one less than the upload
+        },
+        entrypointPath: "x"
+      }
+    });
+    assert.equal(enq.statusCode, 202);
+    const buildId = (enq.json() as { build: { buildId: string } }).build.buildId;
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: declared
+    });
+    assert.equal(res.statusCode, 400);
+    const body = res.json();
+    assert.match(body.message, /size/i);
+    assert.equal(body.expected, 2);
+    assert.equal(body.actual, declared.length);
+    await app.close();
+  });
+
   it("returns 404 when the build does not exist", async () => {
     const app = await buildApp();
     const res = await app.inject({

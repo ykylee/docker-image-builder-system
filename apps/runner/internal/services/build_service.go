@@ -103,8 +103,18 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 			return err
 		}
 		sourceDir = fmt.Sprintf("%s/src", s.docker.WorkspaceDir(buildID))
-		defaultDockerfile := "FROM scratch\nCOPY build-manifest.json /build-manifest.json\n"
-		if err := os.WriteFile(filepath.Join(sourceDir, s.dockerfilePath), []byte(defaultDockerfile), 0o644); err != nil {
+		// The fallback Dockerfile is intentionally minimal (no
+		// COPY) because `BuildImage` writes the build manifest
+		// to `<workspaceDir>/build-manifest.json`, NOT inside
+		// `sourceDir` — so a `COPY build-manifest.json ...`
+		// directive would fail the real `docker build` step
+		// (this only fires when `buildMode=cli`). `FROM scratch`
+		// alone is a valid no-op Dockerfile.
+		if err := os.WriteFile(
+			filepath.Join(sourceDir, s.dockerfilePath),
+			[]byte("FROM scratch\n"),
+			0o644,
+		); err != nil {
 			_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 			return fmt.Errorf("runner %s: write fallback Dockerfile: %w", s.runnerID, err)
 		}

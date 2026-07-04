@@ -19,10 +19,25 @@
 
 set -euo pipefail
 
-PORT="${PORT:-3017}"
+# Pick a free TCP port via Python so multiple e2e runs don't
+# collide on the same machine. PORT env still overrides for CI
+# pinning.
+if [[ -z "${PORT:-}" ]]; then
+  PORT="$(python3 -c 'import socket; s=socket.socket(); s.bind(("",0)); print(s.getsockname()[1]); s.close()')"
+fi
 BASE="http://127.0.0.1:${PORT}"
 TMP="$(mktemp -d)"
-trap 'rm -rf "${TMP}"; if [[ -n "${SERVER_PID:-}" ]]; then kill "${SERVER_PID}" 2>/dev/null || true; fi' EXIT
+# Wait for the server to actually exit before nuking TMP — node
+# holds an open file descriptor to the redirected stdout, so
+# removing TMP while the process is alive produces a noisy
+# "file not found" error from libuv before the server exits.
+trap '
+  if [[ -n "${SERVER_PID:-}" ]]; then
+    kill "${SERVER_PID}" 2>/dev/null || true
+    wait "${SERVER_PID}" 2>/dev/null || true
+  fi
+  rm -rf "${TMP}"
+' EXIT
 
 # Start the Build Server in the background. `tsc` has already been
 # run by the user; we just exec the compiled entry point.
