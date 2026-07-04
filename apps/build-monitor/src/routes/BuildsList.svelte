@@ -39,27 +39,10 @@
   // 을 빠르게 주기 위해 chip 필터는 클라이언트에 둠).
   // TASK-060 3차 (PR #16): canonical lifecycleStatus (TASK-052) 와 legacy
   // status 가 동시 emit 되는 migration window 에서 chip 이 양쪽 모두 매칭
-  // 하도록 한다. 예: BUILDING chip 은 `b.lifecycleStatus === "BUILDING"`
-  // 또는 `b.status === "BUILDING"` 어느 한쪽이라도 매칭되면 표시.
-  // canonical success 계열 (BUILD_SUCCESS / TEST_SUCCESS / DEPLOY_SUCCESS)
-  // 도 COMPLETED chip 에 매칭 — terminal success 가 canonical 단계별로
-  // emit 되는 경우 사용자 토글이 한 번에 잡도록 한다.
-  function matchesChip(
-    b: { status: string; lifecycleStatus?: string },
-    f: typeof filter
-  ): boolean {
-    if (f === "ALL") return true;
-    if (b.status === f) return true;
-    if (b.lifecycleStatus === f) return true;
-    if (f === "COMPLETED") {
-      return (
-        b.lifecycleStatus === "BUILD_SUCCESS" ||
-        b.lifecycleStatus === "TEST_SUCCESS" ||
-        b.lifecycleStatus === "DEPLOY_SUCCESS"
-      );
-    }
-    return false;
-  }
+  // 하도록 한다. canonical success 계열 (BUILD_SUCCESS / TEST_SUCCESS /
+  // DEPLOY_SUCCESS) 은 COMPLETED chip 으로 분류되어 BUILDING chip 에서
+  // 제외된다. helper 는 `src/lib/chipFilter.ts` 단일 source-of-truth.
+  import { matchesChip } from "../lib/chipFilter.js";
   let visible = $derived(
     filter === "ALL" ? builds : builds.filter((b) => matchesChip(b, filter))
   );

@@ -66,23 +66,9 @@
   // client-side status chip (server already does the heavy filtering).
   let filter = $state<"ALL" | "BUILDING" | "COMPLETED" | "FAILED">("ALL");
   // TASK-060 3차 (PR #16): canonical lifecycleStatus 와 legacy status 양쪽
-  // 매칭. BuildsList 와 동일한 matchesChip helper 를 inline 으로 둠.
-  function matchesChip(
-    b: { status: string; lifecycleStatus?: string },
-    f: typeof filter
-  ): boolean {
-    if (f === "ALL") return true;
-    if (b.status === f) return true;
-    if (b.lifecycleStatus === f) return true;
-    if (f === "COMPLETED") {
-      return (
-        b.lifecycleStatus === "BUILD_SUCCESS" ||
-        b.lifecycleStatus === "TEST_SUCCESS" ||
-        b.lifecycleStatus === "DEPLOY_SUCCESS"
-      );
-    }
-    return false;
-  }
+  // 매칭. canonical success 계열은 COMPLETED chip 으로 분류되어 BUILDING
+  // chip 에서 제외. helper 는 `src/lib/chipFilter.ts` 단일 source-of-truth.
+  import { matchesChip } from "../lib/chipFilter.js";
   let visible = $derived(
     filter === "ALL" ? builds : builds.filter((b) => matchesChip(b, filter))
   );

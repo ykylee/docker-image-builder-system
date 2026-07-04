@@ -32,6 +32,16 @@ export default defineConfig({
       deps: {
         inline: [/@testing-library\/svelte/]
       }
+    },
+    // jsdom 기본 URL 은 "about:blank" (opaque origin) — localStorage /
+    // sessionStorage / 쿠키 가 비활성. TASK-064 운영 baseline: 명시적
+    // http://localhost/ URL 을 주어 same-origin storage 가 활성화되도록
+    // 한다. setup.ts 에서도 storage polyfill 을 한 번 더 박아 jsdom 환경
+    // 자체가 깨졌을 때의 안전망 역할.
+    environmentOptions: {
+      jsdom: {
+        url: "http://localhost/"
+      }
     }
   }
 });

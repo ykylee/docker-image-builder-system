@@ -6,7 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: draft
-- Updated: 2026-07-04 (rev 55→56: 메타 sync — TASK-061/062 가 PR #17/PR #18 로 main 합류 완료된 사실을 workflow 메타에 회수. `state.json` `current_focus` 를 신규 `TASK-066 Runner source archive fetch + real docker build` 로 갱신, `work_backlog` rev 49→50 + 신규 일일 백로그 `backlog/2026-07-04.md` rev 1 연결. 회귀 영향 없음. 다음: TASK-066 1차 PR 진입 (`codex/task-066-runner-source-archive-2026-07-04`))
+- Updated: 2026-07-04 (rev 54→55: TASK-061 self-review amend 4건 봉인 후 sync. PR #17 에 fix commit (single source-of-truth 보강 + dead branch 정리) 추가. 회귀 221/221 PASS 유지. 다음: PR #17 squash merge. rev 56→57: TASK-062 Go canonical contract mirror PR #18 진입. 회귀 Python 226/226 + Go 6 packages 모두 PASS. 다음: PR #18 self-review 후 squash merge.) [**rev 57→58: TASK-064 smoke / migration / visual QA baseline 진입. branch `codex/task-064-ops-baseline-2026-07-04` 에 5 축 — (1) vitest localStorage 환경 보강 (vite.config.ts `environmentOptions.jsdom.url` + setup.ts JSDOM fallback + jsdom.d.ts) + chipFilter 단일 source-of-truth + success-exclusion 보강 (40 failed → 0, vitest 60/60); (2) `packages/db/src/migrate.ts` + 8 tests (schema_migrations 테이블 + 한 transaction 씩 idempotent + --dry-run/--to flag) + `apps/build-server/src/app/create-app.ts` postgres boot 시 자동 통합 + `apps/build-server/scripts/migrate.ts` standalone CLI; (3) `scripts/smoke.sh` 5 단계 (memory backend PASS); (4) `apps/build-monitor/tests/visual/diff.py` Pillow 기반 per-channel histogram diff + 5 unit test + README 재작성; (5) `docs/operations/smoke-and-migration.md` 8 섹션 신설. 회귀: TS 4 packages clean, packages/db migrate 8/8, apps/build-server focused 27/27, apps/runner go 17 packages, apps/skill_mcp 226/226, apps/build-monitor vitest 60/60, scripts/smoke.sh memory PASS. drift 54 pre-existing (TASK-064 변경 전후 동일, canonical §4~§8 잔재, follow-up). 다음: PR #19 self-review 후 squash merge.**]
 - Related docs: [Project Profile](../../docs/PROJECT_PROFILE.md), [Work Backlog](./work_backlog.md)
 
 ## Session wrap-up note
@@ -76,6 +76,13 @@
 - `apps/runner/internal/docker/client.go` 의 `BuildImage` 가 marker (`src/source-prepared.txt`) 기반 idempotent guard 로 변경. `BuildService.ProcessClaim` 의 happy path 에서는 `PrepareSource` 가 먼저 호출되어 marker 가 있으니 skip. 단독 호출 (테스트 등) 에서는 marker 가 없으니 `PrepareSource` 호출.
 - `apps/build-server/src/repositories/memory-build-repository.ts` 의 `reportPreviewStatus` EXPIRED case 주석 보강 — preview TTL 만료이지 build 자체의 terminal 이 아니며, phaseHistory 도 push 하지 않는다.
 - 회귀: TS 4 packages clean, Go 9 packages OK (docker 패키지는 marker guard 분기 추가로 재실행), build-server focused 52/52, build-monitor tsc + svelte-check 0/0. PR #13 의 머지 차단 이슈 0건.
+
+## Current Focus (TASK-064)
+
+- TASK-064 smoke / migration / visual QA baseline 작업 중. PR #19 (branch `codex/task-064-ops-baseline-2026-07-04`) 에 5 축 동시 진행.
+- vitest 60/60 green (frontend test baseline 복원). build-server 가 postgres boot 시 `applyMigrations` 자동 호출. standalone CLI 로 dry-run / 부분 적용 가능. `scripts/smoke.sh` memory PASS. `apps/build-monitor/tests/visual/diff.py` + `test_diff.py` 5/5.
+- `docs/operations/smoke-and-migration.md` 8 섹션 운영 가이드 신설. workflow meta sync (state rev 77→78, handoff 57→58, work_backlog 48→49) 같은 PR 안에 포함.
+- 다음: PR #19 self-review → squash merge → canonical §4~§8 baseline 잔재 정리 (drift 54) 또는 stdio transport 별도 PR.
 
 ## Current Focus
 
