@@ -1,5 +1,6 @@
 export * from "./bootstrap.js";
 export * from "./client.js";
+export * from "./migrate.js";
 export * from "./query-helpers.js";
 export * from "./schema/build-log.js";
 export * from "./schema/build-request.js";

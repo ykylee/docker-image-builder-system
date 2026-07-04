@@ -1,5 +1,6 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import {
+  applyMigrations,
   createDbClientFromPool,
   createDbPool,
   ensureDbSchema
@@ -13,6 +14,13 @@ import { registerAdminRoutes, createAdminAllowList } from "../routes/admin-route
 import { registerBuildRoutes } from "../routes/build-routes.js";
 import { registerHealthRoute } from "../routes/health-route.js";
 import { BuildService } from "../services/build-service.js";
+
+// TASK-064 운영 baseline — postgres backend 부팅 시
+// `apps/build-server/migrations/` 의 미적용 SQL 을 자동 적용한다.
+// `ensureDbSchema` 가 greenfield DDL 을 bootstrap 으로 만들고, 이어서
+// 0001~0003 의 brownfield migration 을 차례로 적용한다. 같은 트랜잭션
+// 안에서 처리되므로 partial failure 시 자동 rollback.
+const MIGRATIONS_DIR = new URL("../../migrations/", import.meta.url).pathname;
 
 export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstance> {
   const app = Fastify({
@@ -58,7 +66,16 @@ async function createPostgresBuildRepository(
   const pool = createDbPool(runtime.databaseUrl);
 
   if (runtime.dbAutoBootstrap) {
+    // greenfield: CREATE TABLE IF NOT EXISTS bootstrap DDL.
     await ensureDbSchema(pool);
+    // brownfield: 0001~000N SQL 을 schema_migrations 추적 위에서 idempotent 적용.
+    const result = await applyMigrations(pool, { migrationsDir: MIGRATIONS_DIR });
+    if (result.applied.length > 0) {
+      app.log.info(
+        { applied: result.applied.map((m) => m.version) },
+        "applied pending migrations on bootstrap"
+      );
+    }
   }
 
   app.addHook("onClose", async () => {
