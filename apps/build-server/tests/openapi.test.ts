@@ -40,6 +40,7 @@ describe("openapi document", () => {
       "/builds/{buildId}/logs",
       "/builds/{buildId}/phase",
       "/builds/{buildId}/preview",
+      "/builds/{buildId}/source",
       "/builds/{buildId}/test-deployment",
       "/builds/{buildId}/test-deployment/ready",
       "/builds/{buildId}/test-deployment/status",

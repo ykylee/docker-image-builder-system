@@ -54,6 +54,7 @@
 - 격리 테스트: `curl http://127.0.0.1:3000/health && curl -X POST http://127.0.0.1:3000/builds ...` (memory / postgres backend smoke 모두 확인 완료)
 - 실행 확인: `GET /health`, `POST /builds`, `GET /builds/:buildId`, `GET /builds/:buildId/logs` 응답과 `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus 정합성 점검
 - 출처: `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`
+- 소스 아카이브 라운드트립 (TASK-066): `POST/GET/DELETE /builds/:buildId/source` 3종. Skill 은 `POST /builds` 로 `sourceArchive` 메타데이터 (objectKey + sha256 + size) 를 선언한 뒤, 동일 buildId 로 raw archive bytes 를 `application/octet-stream` 으로 POST. Runner 는 `GET /builds/:buildId/source` 로 bytes + `X-Source-Checksum-Sha256` 헤더 검증 후 `<workspaceRoot>/<buildID>/src/` 에 추출. 재업로드/교체 는 last-write-wins, cleanup 은 `DELETE /builds/:buildId/source`. e2e: `apps/build-server/scripts/e2e-source-archive.sh` (memory) + `e2e-source-archive-postgres.sh` (postgres bytea direct verify).
 - 메모: `apps/build-server`는 현재 `BUILD_REPOSITORY_BACKEND=memory|postgres` 두 경로를 모두 가진다. `postgres`는 Colima + Docker + `docker-image-builder-postgres`(127.0.0.1:15432) 기준 live smoke까지 통과했다. 현재 `tsconfig` 산출물은 `dist/apps/build-server/src/index.js` 경로를 사용한다. `pnpm --filter @docker-image-builder-system/build-server dev` 는 `tsx` build script 승인 이후 dev watch 경로로 재개방한다.
 
 ## 3.1 활성 워크플로우 자산 (Active Skills / MCPs)

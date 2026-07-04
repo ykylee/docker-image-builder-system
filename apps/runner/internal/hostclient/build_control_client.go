@@ -7,18 +7,31 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 )
 
 // BuildControlClient 는 Host Server 의 build control endpoint 들을 호출한다.
 // - ClaimNextBuild: POST /builds/claim
 // - ReportPhase: POST /builds/:buildId/phase
+// - QueueTestDeployment: POST /builds/:buildId/preview
+// - ReportPreviewReady: POST /builds/:buildId/test-deployment/ready
+// - ReportDeployment: POST /builds/:buildId/deployment
+// - DownloadSource: GET /builds/:buildId/source (TASK-066)
 type BuildControlClient interface {
 	ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error)
 	ReportPhase(ctx context.Context, buildID, phase, runnerID string) error
 	QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error
 	ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error
 	ReportDeployment(ctx context.Context, buildID string, req DeploymentReportRequest) error
+	// DownloadSource fetches the raw source archive bytes for `buildID`
+	// (TASK-066). Returns the body bytes, the SHA-256 reported by the
+	// server in the `X-Source-Checksum-Sha256` response header, and
+	// the byte count from `X-Source-Size-Bytes`. The caller is
+	// expected to verify the checksum against the bytes (or against
+	// the build's `sourceArchive.checksumSha256` metadata) before
+	// trusting the payload.
+	DownloadSource(ctx context.Context, buildID string) ([]byte, string, int, error)
 }
 
 // ClaimedBuildResponse 는 Host Server POST /builds/claim 응답에서
@@ -172,6 +185,58 @@ func (c *NoopBuildControlClient) ReportPreviewReady(context.Context, string, Pre
 
 func (c *NoopBuildControlClient) ReportDeployment(context.Context, string, DeploymentReportRequest) error {
 	return nil
+}
+
+func (c *NoopBuildControlClient) DownloadSource(context.Context, string) ([]byte, string, int, error) {
+	// Noop variant returns (nil, "", 0, nil) so callers that ignore the
+	// archive can use the same plumbing as production. Production
+	// callers check for an empty payload and treat it as "no archive
+	// available" rather than as an error.
+	return nil, "", 0, nil
+}
+
+// DownloadSource: GET /builds/:buildId/source (TASK-066).
+//
+// Returns the response body as a byte slice plus the
+// `X-Source-Checksum-Sha256` and `X-Source-Size-Bytes` response
+// header values. Errors are wrapped with the HTTP status and a
+// truncated body excerpt so a CI log can correlate a download
+// failure with a server-side error. The body is read with
+// `io.ReadAll` so the entire archive is materialised in memory —
+// the route is bounded by the build server's `bodyLimit` (256 MiB
+// for the upload side) and the Runner has the same upper bound
+// implicitly via the size header.
+func (c *HTTPBuildControlClient) DownloadSource(ctx context.Context, buildID string) ([]byte, string, int, error) {
+	url := fmt.Sprintf("%s/builds/%s/source", c.baseURL, buildID)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	req.Header.Set("Accept", "application/octet-stream")
+
+	res, err := c.http.Do(req)
+	if err != nil {
+		return nil, "", 0, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(res.Body)
+		return nil, "", 0, fmt.Errorf("download source failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
+	}
+
+	checksum := res.Header.Get("X-Source-Checksum-Sha256")
+	sizeHeader := res.Header.Get("X-Source-Size-Bytes")
+	size, err := strconv.Atoi(sizeHeader)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("download source: invalid X-Source-Size-Bytes header %q: %w", sizeHeader, err)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, "", 0, fmt.Errorf("download source: read body: %w", err)
+	}
+	return body, checksum, size, nil
 }
 
 // QueueTestDeployment: POST /builds/:buildId/preview

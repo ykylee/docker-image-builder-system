@@ -104,6 +104,86 @@ export type GetTestDeploymentResult =
       kind: "not_found";
     };
 
+// TASK-066: source archive storage. The Skill uploads the raw archive
+// bytes (e.g. tar.gz) after `POST /builds` via `POST /builds/:buildId/source`.
+// The Runner downloads them via `GET /builds/:buildId/source` before
+// running `docker build`.
+//
+// `expectedChecksumSha256` is the BuildRequest.sourceArchive.checksumSha256
+// already recorded on the build. The repository compares the supplied
+// checksum against the actual SHA-256 of `bytes` and reports a
+// `checksum_mismatch` if they differ so the caller can surface a 400.
+// `expectedSizeBytes` is the BuildRequest.sourceArchive.sizeBytes; a
+// mismatch is reported as `size_mismatch` for the same reason.
+//
+// `ok` returns the actual size (after any in-memory truncation) so the
+// caller can include it in a 201 response without re-measuring.
+export type StoreSourceArchiveResult =
+  | {
+      kind: "ok";
+      checksumSha256: string;
+      sizeBytes: number;
+    }
+  | {
+      kind: "not_found";
+    }
+  | {
+      kind: "checksum_mismatch";
+      expected: string;
+      actual: string;
+    }
+  | {
+      kind: "size_mismatch";
+      expected: number;
+      actual: number;
+    };
+
+export type GetSourceArchiveResult =
+  | {
+      kind: "ok";
+      bytes: Uint8Array;
+      checksumSha256: string;
+      sizeBytes: number;
+    }
+  | {
+      kind: "not_found";
+    };
+
+// TASK-066: delete the stored source archive bytes. The route
+// is `DELETE /builds/:buildId/source`. This intentionally does not
+// touch `build_request.source_archive_*` — those columns record
+// the declared `SourceArchive` metadata (recorded at `POST
+// /builds` time) and remain valid even after the bytes are
+// removed, so the metadata stays the canonical truth of "what
+// the Skill committed to" while the bytes themselves are an
+// auxiliary blob. Distinguished from `not_found` for the build
+// (no such buildId) vs `ok` (build exists but no archive to
+// delete — same semantic, returned as `ok` because the desired
+// state is "no archive present").
+export type DeleteSourceArchiveResult =
+  | { kind: "ok" }
+  | { kind: "not_found" };
+
+// TASK-066: read just the declared `SourceArchive` metadata for a
+// build. This is the metadata that was recorded at `POST /builds`
+// (the canonical checksum and size the Skill committed to) — the
+// route layer uses it to validate an incoming `POST
+// /builds/:buildId/source` upload without having to expose
+// `sourceArchive` on the public `BuildSummary` shape (which would be
+// a wider contract change than the current slice needs).
+export type GetSourceArchiveMetadataResult =
+  | {
+      kind: "ok";
+      sourceArchive: {
+        objectKey: string;
+        checksumSha256: string;
+        sizeBytes: number;
+      };
+    }
+  | {
+      kind: "not_found";
+    };
+
 export interface BuildRepository {
   createBuild(input: BuildRequest): Promise<CreateBuildResult>;
   getBuild(buildId: string): Promise<BuildStatusResponse | null>;
@@ -126,6 +206,17 @@ export interface BuildRepository {
   ): Promise<ReportDeploymentResult>;
   getTestDeployment(buildId: string): Promise<GetTestDeploymentResult>;
   listBuilds(query: BuildListQuery): Promise<BuildListResponse>;
+  storeSourceArchive(
+    buildId: string,
+    bytes: Uint8Array,
+    expectedChecksumSha256: string,
+    expectedSizeBytes: number
+  ): Promise<StoreSourceArchiveResult>;
+  getSourceArchive(buildId: string): Promise<GetSourceArchiveResult>;
+  getSourceArchiveMetadata(
+    buildId: string
+  ): Promise<GetSourceArchiveMetadataResult>;
+  deleteSourceArchive(buildId: string): Promise<DeleteSourceArchiveResult>;
   // Admin-only operations (ADMIN-*). Both methods intentionally bypass
   // owner filtering at the service layer; the admin route layer is the
   // single guard that ensures the caller is in the configured ADMIN_IDS

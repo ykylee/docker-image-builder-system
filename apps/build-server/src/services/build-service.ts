@@ -17,7 +17,11 @@ import type {
 
 import type {
   BuildRepository,
-  PreviewStatusDetails
+  DeleteSourceArchiveResult,
+  GetSourceArchiveMetadataResult,
+  GetSourceArchiveResult,
+  PreviewStatusDetails,
+  StoreSourceArchiveResult
 } from "../repositories/build-repository.js";
 
 export type ReportPhaseOutcome =
@@ -176,5 +180,51 @@ export class BuildService {
 
   async listBuildOwners(): Promise<AdminUserListResponse> {
     return this.repository.listBuildOwners();
+  }
+
+  // TASK-066: thin wrappers around the repository for the source
+  // archive upload/download endpoints. The repository owns the
+  // SHA-256 + size verification (it re-computes the checksum from the
+  // actual bytes) so the service is only responsible for surfacing
+  // the result to the route layer. `storeSourceArchive` and
+  // `getSourceArchive` are the canonical verbs across both the
+  // memory and postgres backends — see the repository for the
+  // mismatch semantics.
+  storeSourceArchive(
+    buildId: string,
+    bytes: Uint8Array,
+    expectedChecksumSha256: string,
+    expectedSizeBytes: number
+  ): Promise<StoreSourceArchiveResult> {
+    return this.repository.storeSourceArchive(
+      buildId,
+      bytes,
+      expectedChecksumSha256,
+      expectedSizeBytes
+    );
+  }
+
+  getSourceArchive(buildId: string): Promise<GetSourceArchiveResult> {
+    return this.repository.getSourceArchive(buildId);
+  }
+
+  // TASK-066: read the declared `SourceArchive` metadata for a
+  // build. The upload route uses this to validate an incoming
+  // payload without re-fetching the full build. See
+  // `getSourceArchiveMetadata` in `build-repository.ts` for the
+  // shape and the `not_found` semantics.
+  getSourceArchiveMetadata(
+    buildId: string
+  ): Promise<GetSourceArchiveMetadataResult> {
+    return this.repository.getSourceArchiveMetadata(buildId);
+  }
+
+  // TASK-066: remove the stored archive bytes (admin cleanup /
+  // test teardown). The declared `SourceArchive` metadata on
+  // the build row is preserved — the row's source_archive_*
+  // columns remain the canonical record of what the Skill
+  // committed to.
+  deleteSourceArchive(buildId: string): Promise<DeleteSourceArchiveResult> {
+    return this.repository.deleteSourceArchive(buildId);
   }
 }

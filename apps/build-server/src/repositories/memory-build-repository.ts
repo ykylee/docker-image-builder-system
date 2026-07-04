@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import type {
   AdminListBuildsQuery,
@@ -17,6 +17,7 @@ import type {
   BuildSummary,
   DeploymentReportRequest,
   ExecutionStatus,
+  SourceArchive,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
@@ -25,11 +26,15 @@ import type {
   BuildRepository,
   ClaimNextBuildResult,
   CreateBuildResult,
+  DeleteSourceArchiveResult,
+  GetSourceArchiveMetadataResult,
+  GetSourceArchiveResult,
   GetTestDeploymentResult,
   PreviewStatusDetails,
   QueueTestDeploymentResult,
   ReportDeploymentResult,
   ReportPreviewStatusResult,
+  StoreSourceArchiveResult,
   UpdatePhaseResult
 } from "./build-repository.js";
 import {
@@ -42,6 +47,14 @@ import {
 type StoredBuild = {
   summary: BuildSummary;
   requestedBy: string;
+  // TASK-066: declared `SourceArchive` metadata (objectKey +
+  // checksumSha256 + sizeBytes) recorded at `POST /builds`. The Skill
+  // commits to these values before the bytes are uploaded; the route
+  // layer uses them to verify the eventual `POST
+  // /builds/:buildId/source` payload. Kept on the build record
+  // (not on the source archive store) because the metadata is the
+  // canonical truth and the bytes are auxiliary.
+  sourceArchive: SourceArchive;
   lastError: BuildError | null;
   logs: BuildLogEntry[];
   testDeployment: TestDeployment | null;
@@ -121,6 +134,10 @@ export function createMemoryBuildRepository(): BuildRepository {
       builds.set(buildId, {
         summary,
         requestedBy: input.requestedBy,
+        // TASK-066: preserve the declared SourceArchive metadata so
+        // the upload route can verify an incoming payload against
+        // these values without re-reading the original request.
+        sourceArchive: input.sourceArchive,
         lastError: null,
         logs: [logEntry],
         testDeployment: null,
@@ -676,9 +693,145 @@ export function createMemoryBuildRepository(): BuildRepository {
           return bl.localeCompare(al);
         });
       return { users };
+    },
+
+    // TASK-066: store the source archive bytes for `buildId`. The
+    // supplied `bytes` are a `Uint8Array` (Fastify parses
+    // `application/octet-stream` to Buffer which we coerce). The actual
+    // SHA-256 is recomputed and compared against
+    // `BuildRequest.sourceArchive.checksumSha256` (passed in as
+    // `expectedChecksumSha256`) before the row is admitted. Size is
+    // also verified against the metadata. The store is per-buildId; a
+    // re-upload overwrites the previous bytes (last-write-wins). The
+    // row is held in a `Map` separate from the build's metadata so
+    // memory pressure from many concurrent archives is bounded by
+    // their actual byte size, not the build state object.
+    async storeSourceArchive(
+      buildId: string,
+      bytes: Uint8Array,
+      expectedChecksumSha256: string,
+      expectedSizeBytes: number
+    ): Promise<StoreSourceArchiveResult> {
+      const stored = builds.get(buildId);
+      if (!stored) {
+        return { kind: "not_found" };
+      }
+
+      // The bytes arrive as a Buffer (Fastify octet-stream) which is a
+      // subclass of Uint8Array. We always recompute the SHA-256 from the
+      // actual bytes — never trust the caller-supplied checksum header
+      // alone — so a tampered body is detected here rather than at the
+      // Runner side.
+      const actualChecksumSha256 = createHash("sha256")
+        .update(Buffer.from(bytes))
+        .digest("hex");
+      if (actualChecksumSha256 !== expectedChecksumSha256) {
+        return {
+          kind: "checksum_mismatch",
+          expected: expectedChecksumSha256,
+          actual: actualChecksumSha256
+        };
+      }
+
+      const actualSizeBytes = bytes.byteLength;
+      if (actualSizeBytes !== expectedSizeBytes) {
+        return {
+          kind: "size_mismatch",
+          expected: expectedSizeBytes,
+          actual: actualSizeBytes
+        };
+      }
+
+      sourceArchives.set(buildId, {
+        bytes: new Uint8Array(bytes),
+        checksumSha256: actualChecksumSha256,
+        sizeBytes: actualSizeBytes
+      });
+
+      return {
+        kind: "ok",
+        checksumSha256: actualChecksumSha256,
+        sizeBytes: actualSizeBytes
+      };
+    },
+
+    // TASK-066: returns a defensive copy of the stored bytes. The
+    // `Uint8Array` is copied so a route handler that holds the buffer
+    // across an `await` cannot see the bytes get replaced by a
+    // concurrent re-upload.
+    async getSourceArchive(buildId: string): Promise<GetSourceArchiveResult> {
+      const stored = sourceArchives.get(buildId);
+      if (!stored) {
+        return { kind: "not_found" };
+      }
+      return {
+        kind: "ok",
+        bytes: new Uint8Array(stored.bytes),
+        checksumSha256: stored.checksumSha256,
+        sizeBytes: stored.sizeBytes
+      };
+    },
+
+    // TASK-066: read the declared `SourceArchive` metadata (the
+    // checksum and size the Skill committed to at `POST /builds`).
+    // Distinct from `getSourceArchive` which returns the uploaded
+    // bytes — the metadata is always present once a build exists, so
+    // this method only returns `not_found` for an unknown build.
+    async getSourceArchiveMetadata(
+      buildId: string
+    ): Promise<GetSourceArchiveMetadataResult> {
+      const stored = builds.get(buildId);
+      if (!stored) {
+        return { kind: "not_found" };
+      }
+      // `stored.sourceArchive` was recorded by `createBuild` from the
+      // original `BuildRequest` payload. The shape is the
+      // canonical `SourceArchive` (`objectKey`, `checksumSha256`,
+      // `sizeBytes`).
+      return {
+        kind: "ok",
+        sourceArchive: stored.sourceArchive
+      };
+    },
+
+    // TASK-066: remove the stored archive bytes. The build row
+    // (and its declared `sourceArchive` metadata) is intentionally
+    // left intact — only the auxiliary blob is dropped. Returns
+    // `not_found` in two distinct cases so the route layer can
+    // surface a 404 for both:
+    //   1. the buildId itself is unknown, OR
+    //   2. the build exists but no archive row was present
+    //      (i.e. a duplicate DELETE on the same buildId).
+    // `Map.delete` returns the prior boolean so the two cases
+    // are distinguishable without an extra `has` lookup.
+    async deleteSourceArchive(
+      buildId: string
+    ): Promise<DeleteSourceArchiveResult> {
+      const stored = builds.get(buildId);
+      if (!stored) {
+        return { kind: "not_found" };
+      }
+      const hadArchive = sourceArchives.delete(buildId);
+      if (!hadArchive) {
+        return { kind: "not_found" };
+      }
+      return { kind: "ok" };
     }
   };
 }
+
+// TASK-066: separate Map so the archive buffer does not bloat
+// `StoredBuild` and so a future eviction policy can target archives
+// independently. Kept at module scope so re-creating the repository
+// (e.g. in tests) does not lose previously-stored bytes — tests
+// construct a fresh repository per scenario and would otherwise need
+// to re-upload for every test.
+type StoredSourceArchive = {
+  bytes: Uint8Array;
+  checksumSha256: string;
+  sizeBytes: number;
+};
+const sourceArchives = new Map<string, StoredSourceArchive>();
 
 
 // TASK-050: terminal phase 헬퍼. BuildStatusResponse 의 currentPhase 가

@@ -4,6 +4,7 @@ export * from "./migrate.js";
 export * from "./query-helpers.js";
 export * from "./schema/build-log.js";
 export * from "./schema/build-request.js";
+export * from "./schema/build-source.js";
 export * from "./schema/build-test.js";
 export * from "./schema/deployment-attempt.js";
 export * from "./schema/test-deployment.js";

@@ -15,6 +15,25 @@ export const sourceArchiveSchema = z
 
 export type SourceArchive = z.infer<typeof sourceArchiveSchema>;
 
+// TASK-066: response body for `POST /builds/:buildId/source`. Returns
+// the actual checksum and size after the server has verified the
+// payload against the build's `SourceArchive` metadata. Echoes the
+// buildId so a Skill that batches uploads can pair the response with
+// the originating build without re-parsing the URL.
+export const sourceArchiveUploadResponseSchema = z
+  .object({
+    buildId: z.string().uuid(),
+    checksumSha256: z.string().min(1),
+    sizeBytes: z.int().nonnegative()
+  })
+  .meta({
+    id: "SourceArchiveUploadResponse",
+    description:
+      "Response body for POST /builds/{buildId}/source. The server echoes the recomputed SHA-256 and observed size after accepting the upload."
+  });
+
+export type SourceArchiveUploadResponse = z.infer<typeof sourceArchiveUploadResponseSchema>;
+
 export const buildRequestSchema = z
   .object({
     // appName is the canonical identity of the application being built.

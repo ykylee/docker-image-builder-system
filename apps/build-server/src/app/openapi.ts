@@ -45,6 +45,7 @@ import {
   testDeploymentReadyRequestSchema,
   testDeploymentStatusRequestSchema,
   sourceArchiveSchema,
+  sourceArchiveUploadResponseSchema,
   buildRequestSchema,
   openapiTags
 } from "@docker-image-builder-system/shared-contract";
@@ -81,6 +82,7 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "TestDeploymentReadyRequest", schema: testDeploymentReadyRequestSchema },
   { id: "TestDeploymentStatusRequest", schema: testDeploymentStatusRequestSchema },
   { id: "SourceArchive", schema: sourceArchiveSchema },
+  { id: "SourceArchiveUploadResponse", schema: sourceArchiveUploadResponseSchema },
   { id: "BuildRequest", schema: buildRequestSchema },
   { id: "AdminListBuildsQuery", schema: adminListBuildsQuerySchema },
   { id: "AdminListBuildsResponse", schema: adminListBuildsResponseSchema },
@@ -220,6 +222,73 @@ registry.registerPath({
   request: { params: z.object({ buildId: z.string().uuid() }) },
   responses: { 200: { description: "Test deployment present.", content: { "application/json": { schema: testDeploymentSchema } } } }
 });
+// TASK-066: source archive upload/download. The Skill uploads the
+// raw archive bytes via POST after POST /builds has recorded the
+// `SourceArchive` metadata. The Runner downloads the bytes via GET
+// before running `docker build`. The body for POST is
+// `application/octet-stream` (binary); the OpenAPI document describes
+// the request as a `string` (base64) of format `binary` so the spec
+// is portable. The recomputed SHA-256 is echoed in the response body
+// (POST) and a response header (GET) so the caller can verify
+// integrity without re-reading the body.
+registry.registerPath({
+  method: "post",
+  path: "/builds/{buildId}/source",
+  description:
+    "Upload the raw source archive bytes for a build. Body is application/octet-stream; the server recomputes the SHA-256 and size and refuses the upload if they do not match the build's `sourceArchive` metadata. The Skill is expected to call this after `POST /builds` has succeeded.",
+  tags: ["Builds"],
+  request: {
+    params: z.object({ buildId: z.string().uuid() }),
+    body: {
+      content: {
+        "application/octet-stream": {
+          schema: z.string().describe("Raw source archive bytes (binary).")
+        }
+      }
+    }
+  },
+  responses: {
+    201: {
+      description: "Source archive accepted and verified.",
+      content: { "application/json": { schema: component("SourceArchiveUploadResponse") as never } }
+    },
+    400: { description: "Checksum or size mismatch (recomputed from body)." },
+    404: { description: "Build not found." }
+  }
+});
+registry.registerPath({
+  method: "get",
+  path: "/builds/{buildId}/source",
+  description:
+    "Download the raw source archive bytes for a build. Response is application/octet-stream; the SHA-256 is surfaced in the `X-Source-Checksum-Sha256` response header and the byte count in `X-Source-Size-Bytes`.",
+  tags: ["Builds"],
+  request: { params: z.object({ buildId: z.string().uuid() }) },
+  responses: {
+    200: {
+      description: "Source archive bytes.",
+      content: { "application/octet-stream": { schema: z.string().describe("Raw source archive bytes (binary).") } }
+    },
+    404: { description: "Build or source archive not found." }
+  }
+});
+
+// TASK-066: drop the stored source archive bytes without
+// touching the build row's declared `sourceArchive`
+// metadata. Lets the Skill re-upload under the same buildId
+// without going through `POST /builds` again.
+registry.registerPath({
+  method: "delete",
+  path: "/builds/{buildId}/source",
+  description:
+    "Delete the stored source archive bytes for a build. Returns 204 on success and 404 when the build itself is unknown. The declared `sourceArchive` metadata on the build row is preserved.",
+  tags: ["Builds"],
+  request: { params: z.object({ buildId: z.string().uuid() }) },
+  responses: {
+    204: { description: "Source archive dropped." },
+    404: { description: "Build not found." }
+  }
+});
+
 registry.registerPath({
   method: "get",
   path: "/health",

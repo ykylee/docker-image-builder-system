@@ -249,3 +249,55 @@ func TestHTTPBuildControlClient_ReportDeployment_OK(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 }
+
+// TASK-066: DownloadSource returns the body bytes plus the
+// X-Source-Checksum-Sha256 and X-Source-Size-Bytes response
+// headers. The server side enforces both fields; this test
+// verifies the client parses them and surfaces 4xx / 5xx as
+// errors rather than silently returning empty bytes.
+func TestHTTPBuildControlClient_DownloadSource_Success(t *testing.T) {
+	body := []byte("hello source archive")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/builds/b-1/source" || r.Method != "GET" {
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if r.Header.Get("Accept") != "application/octet-stream" {
+			t.Errorf("expected Accept application/octet-stream, got %q", r.Header.Get("Accept"))
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("X-Source-Checksum-Sha256", "deadbeef")
+		w.Header().Set("X-Source-Size-Bytes", "21")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(body)
+	}))
+	defer srv.Close()
+
+	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
+	got, checksum, size, err := c.DownloadSource(context.Background(), "b-1")
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if string(got) != string(body) {
+		t.Errorf("body mismatch: got=%q want=%q", string(got), string(body))
+	}
+	if checksum != "deadbeef" {
+		t.Errorf("checksum: got=%q want=%q", checksum, "deadbeef")
+	}
+	if size != 21 {
+		t.Errorf("size: got=%d want=%d", size, 21)
+	}
+}
+
+func TestHTTPBuildControlClient_DownloadSource_NotFound(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"message":"Source archive not found for build."}`))
+	}))
+	defer srv.Close()
+
+	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
+	_, _, _, err := c.DownloadSource(context.Background(), "b-missing")
+	if err == nil {
+		t.Fatal("expected error for 404, got nil")
+	}
+}

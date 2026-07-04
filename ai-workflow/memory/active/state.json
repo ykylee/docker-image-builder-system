@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-04T23:40:00Z",
-  "purpose_digest": "TASK-064 운영 baseline (M5 operations & tracking) main 합류 — vitest localStorage 환경 보강 (40 failed → 0, vitest 60/60 green) + chipFilter 단일 source-of-truth + success-exclusion 보강 + packages/db migration runner (8 → 11 tests) + build-server postgres boot 시 applyMigrations 자동 통합 + standalone CLI + scripts/smoke.sh 5 단계 memory backend PASS + apps/build-monitor/tests/visual/diff.py Pillow 기반 baseline diff + docs/operations/smoke-and-migration.md 8 섹션 운영 가이드. TASK-061 (Skill/MCP contract rename + payload refactor) PR #17 `a155d52` + TASK-062 (Go canonical contract mirror) PR #18 `3e360ec` + TASK-064 (smoke / migration / visual QA baseline) PR #19 main 합류. 신규 active queue: TASK-066 Runner source archive fetch + real docker build (M3 follow-up). 회귀 baseline: TS 4 packages clean, Go 6 packages, build-server 52/52, build-monitor vitest 60/60, Python 226/226 + 신규 packages/db 11 tests + visual diff 5 tests — 모두 영향 없음.",
-  "purpose_digest_rev": 79,
+"generated_at": "2026-07-04T23:55:00Z",
+  "purpose_digest": "TASK-066 보완 (DELETE endpoint + tar hardening + postgres e2e script) PR #20 squash merge main 합류. Build Server 측: `build_source` memory/postgres `bytea` 저장 + `POST/GET/DELETE /builds/:buildId/source` 3 endpoint + octet-stream content parser (256 MiB bodyLimit) + checksum/size 재계산 검증 + SourceArchiveUploadResponse schema + `DELETE ... RETURNING` 으로 row 부재 감지. Runner 측: `internal/source/fetcher.go` (BuildControlClient.DownloadSource + tar.gz extract + validateTarEntryName 으로 absolute/`..`/NUL/control/backslash reject + transport-error 1 retry + cleanup on terminal error) + `docker.BuildImage(ctx, buildID, sourceDir, dockerfileRelPath)` (scratch Dockerfile 제거, sourceDir 기준 real `docker build`) + BuildService.ProcessClaim fetcher wire-up. 보완: validateTarEntryName unit 16 case + DELETE route 5 case + memory e2e 4 case (DELETE parity) + postgres e2e script (`e2e-source-archive-postgres.sh` bytea round-trip 직접 verify) + PROJECT_PROFILE docs. 회귀 baseline: TS 4 packages clean, build-server 94/94 PASS (TASK-066 11 신규), Go 7 packages 모두 PASS, Python skill_mcp canonical enum + drift 계산 모두 PASS, e2e memory 7/7 PASS, e2e postgres 5/5 PASS. 이전 main 합류: TASK-061 (PR #17 `a155d52`), TASK-062 (PR #18 `3e360ec`), TASK-064 (PR #19 `5265844`). 다음: TASK-067 (container run + healthcheck) 또는 TASK-068 (real deploy adapter).",
+  "purpose_digest_rev": 80,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -35,6 +35,7 @@
     ],
     "blocked_items": [],
     "recent_done_items": [
+      "PR #20 (TASK-066 Runner source archive fetch + real docker build) squash merge main 합류 (`ac41866`) — Build Server 측 `build_source` memory/postgres `bytea` 저장 + `POST/GET/DELETE /builds/:buildId/source` 3 endpoint + octet-stream content parser (256 MiB bodyLimit) + checksum/size 재계산 검증 + SourceArchiveUploadResponse schema + `DELETE ... RETURNING` 으로 row 부재 감지. Runner 측 `internal/source/fetcher.go` (BuildControlClient.DownloadSource + tar.gz extract + validateTarEntryName 으로 absolute/`..`/NUL/control/backslash reject + transport-error 1 retry + cleanup on terminal error) + `docker.BuildImage(ctx, buildID, sourceDir, dockerfileRelPath)` (scratch Dockerfile 제거, sourceDir 기준 real `docker build`) + BuildService.ProcessClaim fetcher wire-up. 보완: validateTarEntryName unit 16 case + DELETE route 5 case + memory e2e 4 case (DELETE parity) + postgres e2e script (`e2e-source-archive-postgres.sh` bytea round-trip 직접 verify) + PROJECT_PROFILE docs. self-review fix 3건 + 코드 보완 5 area 모두 봉인. 회귀: TS 4 packages clean, build-server 94/94 PASS (TASK-066 11 신규), Go 7 packages 모두 PASS, Python skill_mcp 동일, e2e memory 7/7, e2e postgres 5/5. 메타 sync (state rev 79→80, handoff 57→58, work_backlog 51→52, daily backlog rev 2→3) 같은 sync commit.",
       "PR #19 (TASK-064 smoke / migration / visual QA baseline) main 합류 (`3698385`) — vitest 환경 보강 (40 failed → 0, vitest 60/60 green) + matchesChip helper `src/lib/chipFilter.ts` 단일 source-of-truth + canonical success exclusion 보강 + `packages/db/src/migrate.ts` + 11 tests (schema_migrations + idempotent + --dry-run / --to numeric compare) + `apps/build-server/src/app/create-app.ts` postgres boot 시 `applyMigrations` 자동 통합 + `apps/build-server/scripts/migrate.ts` standalone CLI (--to invalid 거부) + `scripts/smoke.sh` 5 단계 (실제 409 + admin 200 검증) + `apps/build-monitor/tests/visual/diff.py` Pillow 기반 per-channel histogram diff + 5 unit test + `docs/operations/smoke-and-migration.md` 8 섹션 운영 가이드. self-review amend 6건 봉인 (smoke.sh 409 silent pass 차단, admin curl 중복 제거, diff.py dead code/corrupt PNG 핸들링, --to numeric compare + invalid 거부, recordChecksum default true, setup.ts JSDOM lazy). 회귀: TS 4 packages clean, packages/db 11/11, build-server focused 27/27, runner go 17 packages, skill_mcp 226/226, build-monitor vitest 60/60, smoke memory PASS. drift 54 pre-existing (TASK-064 변경 전후 동일, canonical §4~§8 baseline 잔재, follow-up). 메타 sync (state rev 78→79, handoff 56→57, work_backlog 50→51) 같은 sync commit.",
       "PR #17 (TASK-061 Skill/MCP contract rename + payload refactor) foundation + consumer refactor — `apps/skill_mcp/contract/canonical.py` 신규 (canonical 12 builds / 5 execution / 11 phases / 8 errorCodes / 8 nextActions / 7 readinessStates, OPEN_PREVIEW→OPEN_DEPLOYMENT) + drift checker Python cross-check (4 sync groups, dynamic import 로 cache 우회) + 3 skills (`build-status-explainer` v1→v2: canonical BuildStatusResponse payload + 12 status table + legacy forward-mapper, `failure-summary-shaper` v1→v2: canonical 8 ErrorCode + stage: BUILD/TEST/DEPLOY/DELIVERY + OPEN_DEPLOYMENT, `preview-readiness-checker` v1→v2: canonical test/executionStatuses 우선 consume + 카드 container-test 톤 정렬, 디렉터리명은 import 호환성 위해 그대로) + 2 MCPs (`latest-build-status` v1→v2: `_BUILD_TOP_KEYS` testDeployment→test/error→lastError + legacy forward-mapping helper, `failure-summary` v1→v2: envelope `source`→`stage`) + 5 SKILL.md/MCP.md 문서 sync + `docs/sdlc/13-skills-and-mcp-plan.md` §10 신설. 회귀 221/221 PASS (전 TASK 누적 215 + 신규 6). drift-checker self-check: skill sync groups 4종 모두 missing=0/extra=0 (`skillBuildStatuses` 12 / `executionStatuses` 5 / `skillPhases` 11 / `skillErrorCodes` 8). workflow meta 동기화 (state rev 74→75, handoff 53→54, work_backlog 46→47, backlog §50/51/52) 같은 PR 안에 포함.",
       "PR #13 self-review follow-up 보완 — `reportDeploymentResult` / `reportPreviewStatus` transaction wrap (partial failure 차단), `getTestDeployment` left join 으로 `host`/`hostPort`/`internalPort`/`runtimeUrl` 노출, `0003` SQL 에 `gen_random_uuid()` DEFAULT + `build_request(id) ON DELETE CASCADE` FK 추가, Go `claimResponseBody.Reason` 에 `omitempty`, OpenAPI `POST /builds/:buildId/deployment` 200 응답에 `buildStatusResponseSchema` ref, `docker.BuildImage` marker 기반 idempotent guard 로 ProcessClaim 의 중복 PrepareSource 제거, memory repo EXPIRED case 코멘트 보강. 회귀: TS 4 packages clean, Go 17 passed / 9 packages (docker 패키지 marker guard 분기로 재실행), build-server focused 52/52, build-monitor tsc + svelte-check 0/0. workflow meta 동기화 (state rev 65→66, handoff 44→45, work_backlog 37→38, backlog §46→47, 새 §48) 같은 amend commit 에 포함.",
@@ -97,14 +98,14 @@
       "TASK-043 ADMIN-* Admin UI — ADMIN_IDS env (default admin,yky.lee) + /admin/builds + /admin/users + AdminLogin/AdminBuilds/AdminUsers + Header adminId 분기. 회귀 TS 53 + vitest 34 + svelte-check 0/0 + Go 13 + Python 215. live e2e: 401/403/200 + owner list + owner filter 정상"
     ],
     "environment_constraints": [],
-    "handoff_rev": 57,
+    "handoff_rev": 58,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 50,
-    "latest_rev": 1
+    "index_rev": 52,
+    "latest_rev": 3
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-03.md",
-    "task_count": 34,
+"latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-04.md",
+    "task_count": 36,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -143,8 +144,8 @@
       "TASK-021 발표용 카피 압축 및 승인안 톤 보정",
       "TASK-022 workflow 메타 정합성 보강 (commands placeholder, status assessment, report 인덱스, legacy 배너, 2026-07-02 백로그 봉인)"
     ],
-    "index_rev": "28",
-    "latest_rev": "32"
+    "index_rev": "30",
+    "latest_rev": "34"
   },
   "next_documents": [
     "docs/sdlc/13-skills-and-mcp-plan.md",

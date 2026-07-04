@@ -27,6 +27,23 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     logger: true
   });
 
+  // TASK-066: accept the raw source archive bytes uploaded by the
+  // Skill as `application/octet-stream`. Fastify's default content
+  // type parser only handles JSON and text/plain, so an octet-stream
+  // body would otherwise 415. The parser runs the body bytes through
+  // `asBuffer()` and exposes them as a `Buffer` on `request.body`,
+  // which the `POST /builds/:buildId/source` route then type-guards
+  // with `Buffer.isBuffer` before validating. A generous `bodyLimit`
+  // is also lifted from the Fastify default (1 MiB) to 256 MiB so
+  // realistic source archives fit; this matches the
+  // `sourceArchive.sizeBytes` upper bound that callers are expected
+  // to honour.
+  app.addContentTypeParser(
+    "application/octet-stream",
+    { parseAs: "buffer", bodyLimit: 256 * 1024 * 1024 },
+    (_request, payload, done) => done(null, payload)
+  );
+
   // OpenAPI / Swagger UI / CORS are registered before any data layer so
   // /docs and /openapi.json are available even when the database is
   // unreachable. When corsOrigin is `false` (CORS disabled) we still keep

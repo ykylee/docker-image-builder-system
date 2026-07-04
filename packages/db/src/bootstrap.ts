@@ -98,6 +98,24 @@ const bootstrapStatements = [
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
+  `,
+  `
+    CREATE TABLE IF NOT EXISTS build_source (
+      build_id UUID PRIMARY KEY,
+      bytes BYTEA NOT NULL,
+      checksum_sha256 TEXT NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX IF NOT EXISTS build_source_build_id_idx
+    ON build_source (build_id)
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS build_source_checksum_idx
+    ON build_source (checksum_sha256)
   `
 ];
 
