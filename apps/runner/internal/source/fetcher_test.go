@@ -218,3 +218,143 @@ func TestFetcher_CleansUpOnError(t *testing.T) {
 		t.Errorf("expected buildDir to not exist after size mismatch, stat err=%v", err)
 	}
 }
+
+// makeTarGzWithEntry builds an in-memory tar.gz with one regular
+// file whose name is the literal string the test wants the
+// fetcher to evaluate (including names that are otherwise
+// impossible to express on the test runner's filesystem, e.g.
+// embedded NUL bytes).
+func makeTarGzWithEntry(t *testing.T, entryName string) ([]byte, string) {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	hdr := &tar.Header{
+		Name:     entryName,
+		Mode:     0o644,
+		Size:     4,
+		Typeflag: tar.TypeReg,
+	}
+	if err := tw.WriteHeader(hdr); err != nil {
+		t.Fatalf("tar header: %v", err)
+	}
+	if _, err := tw.Write([]byte("data")); err != nil {
+		t.Fatalf("tar write: %v", err)
+	}
+	if err := tw.Close(); err != nil {
+		t.Fatalf("tar close: %v", err)
+	}
+	if err := gz.Close(); err != nil {
+		t.Fatalf("gzip close: %v", err)
+	}
+	sum := sha256.Sum256(buf.Bytes())
+	return buf.Bytes(), hex.EncodeToString(sum[:])
+}
+
+
+
+
+func TestFetcher_RejectsTarEntryAbsolute(t *testing.T) {
+	// Absolute path entry — POSIX `/foo` style.
+	archive, checksum := makeTarGzWithEntry(t, "/abs/foo.txt")
+	client := &stubClient{
+		download: func(_ context.Context, _ string) ([]byte, string, int, error) {
+			return archive, checksum, len(archive), nil
+		},
+	}
+	tmp := t.TempDir()
+	fetcher := NewFetcher(client, tmp).WithRetries(0, 0)
+
+	_, err := fetcher.Fetch(context.Background(), "b-1")
+	if err == nil {
+		t.Fatal("expected absolute path rejection, got nil")
+	}
+	if !strings.Contains(err.Error(), "absolute") {
+		t.Errorf("expected error mentioning 'absolute', got: %v", err)
+	}
+}
+
+func TestFetcher_AcceptsDeeplyNestedValidEntries(t *testing.T) {
+	// Sanity check: a normal archive with nested paths still
+	// extracts cleanly. This guards against an over-eager
+	// reject path that catches valid relative paths.
+	archive, checksum := makeTarGz(t, "src/lib/internal/utils.ts", []byte("export const x = 1;\n"))
+	client := &stubClient{
+		download: func(_ context.Context, _ string) ([]byte, string, int, error) {
+			return archive, checksum, len(archive), nil
+		},
+	}
+	tmp := t.TempDir()
+	fetcher := NewFetcher(client, tmp).WithRetries(0, 0)
+
+	res, err := fetcher.Fetch(context.Background(), "b-1")
+	if err != nil {
+		t.Fatalf("expected happy path, got %v", err)
+	}
+	want := filepath.Join(res.SourceDir, "src", "lib", "internal", "utils.ts")
+	if _, err := os.Stat(want); err != nil {
+		t.Errorf("expected nested file at %s, got %v", want, err)
+	}
+}
+
+// TestValidateTarEntryName_Unit exercises validateTarEntryName in
+// isolation so we can drive it with entry names that the
+// archive/tar package itself refuses to produce (a NUL byte in
+// the entry name trips the PAX record writer at construction
+// time, before we get a chance to test the fetcher's defence).
+func TestValidateTarEntryName_RejectsUnsafeNames(t *testing.T) {
+	cases := []struct {
+		name      string
+		input     string
+		wantMatch string // substring expected in the error message
+	}{
+		{name: "empty", input: "", wantMatch: "empty"},
+		{name: "absolute_unix", input: "/etc/passwd", wantMatch: "absolute"},
+		{name: "parent", input: "..", wantMatch: ".."},
+		{name: "parent_separator", input: "../escape", wantMatch: ".."},
+		{name: "parent_nested", input: "a/../b", wantMatch: ".."},
+		{name: "parent_trailing", input: "foo/..", wantMatch: ".."},
+		{name: "backslash", input: "evil\\name.txt", wantMatch: "backslash"},
+		{name: "control_char", input: "evil\x01name", wantMatch: "control character"},
+		{name: "control_char_high", input: "evil\x7fname", wantMatch: "control character"},
+		{name: "tab_is_rejected", input: "tab\there.txt", wantMatch: "control character"}, // tab (0x09) is < 0x20; the contract rejects all C0 controls.
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateTarEntryName(tc.input)
+			if tc.wantMatch == "" {
+				if err != nil {
+					t.Errorf("expected accept for %q, got %v", tc.input, err)
+				}
+				return
+			}
+			if err == nil {
+				t.Errorf("expected reject for %q (looking for %q in error), got nil", tc.input, tc.wantMatch)
+				return
+			}
+			if !strings.Contains(err.Error(), tc.wantMatch) {
+				t.Errorf("expected error containing %q for %q, got: %v", tc.wantMatch, tc.input, err)
+			}
+		})
+	}
+}
+
+// TestValidateTarEntryName_AcceptsValidNames guards against an
+// over-eager reject path that would catch legitimate entry names.
+func TestValidateTarEntryName_AcceptsValidNames(t *testing.T) {
+	valid := []string{
+		"Dockerfile",
+		"src/lib/internal/utils.ts",
+		"a.txt",
+		"deeply/nested/path/with/many/segments/file-name_123.test",
+		".hidden",
+		"trailing-slash/",
+	}
+	for _, name := range valid {
+		t.Run(name, func(t *testing.T) {
+			if err := validateTarEntryName(name); err != nil {
+				t.Errorf("expected accept for %q, got %v", name, err)
+			}
+		})
+	}
+}

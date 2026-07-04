@@ -209,6 +209,54 @@ func (f *Fetcher) Fetch(ctx context.Context, buildID string) (*ExtractResult, er
 	}, nil
 }
 
+// validateTarEntryName rejects entry names that are unsafe to
+// extract. The checks are deliberately strict — the archive is
+// uploaded by an external Skill over HTTP and the contained files
+// land directly on the Runner host's filesystem, so a malformed
+// name should be surfaced as an error rather than silently
+// rewritten. Rejected conditions:
+//   - absolute paths (Unix `/foo`, Windows `C:\foo` — the latter is
+//     caught by the backslash check below)
+//   - any parent-relative component (`..` or `../foo`/`foo/..`/`a/../b`)
+//   - NUL byte (`\x00`) — tar entries are guaranteed not to embed
+//     these by the format spec, but a crafted zip-compatible or
+//     libarchive-rewriter archive could. NUL also truncates the
+//     path early under C bindings.
+//   - control characters (`< 0x20` or `0x7f`) — these are not
+//     valid in POSIX filenames and have been used in past CVEs
+//     to confuse downstream tooling.
+//   - Windows separator `\` — a Skill running on Windows might
+//     emit backslash separators; we map them to `/` before extract
+//     so a cross-platform archive still works, but the reject
+//     rule here treats a literal `\` (not part of `/`) as a
+//     warning sign.
+func validateTarEntryName(name string) error {
+	if name == "" {
+		return fmt.Errorf("reject empty tar entry name")
+	}
+	if filepath.IsAbs(name) {
+		return fmt.Errorf("reject absolute tar entry name %q", name)
+	}
+	if strings.Contains(name, "..") {
+		return fmt.Errorf("reject tar entry name with '..': %q", name)
+	}
+	// Backslash is non-portable across POSIX and is a classic tar
+	// injection vector. Reject so the destination is unambiguously
+	// under destDir regardless of host OS.
+	if strings.ContainsRune(name, '\\') {
+		return fmt.Errorf("reject tar entry name with backslash: %q", name)
+	}
+	for _, r := range name {
+		if r == 0 {
+			return fmt.Errorf("reject tar entry name with NUL byte: %q", name)
+		}
+		if r < 0x20 || r == 0x7f {
+			return fmt.Errorf("reject tar entry name with control character %q: %U", name, r)
+		}
+	}
+	return nil
+}
+
 // extractTarGz unpacks a gzip-compressed tar at `archivePath` into
 // `destDir`. Path traversal entries (e.g. `../`) are rejected so a
 // malicious archive cannot write outside `destDir`. The
@@ -236,14 +284,16 @@ func extractTarGz(archivePath, destDir string) error {
 			return fmt.Errorf("read tar header: %w", err)
 		}
 
-		// Reject absolute paths and any `..` segment so a
-		// malicious archive cannot escape destDir. Symlinks are
-		// also rejected (the archive is treated as a plain
+		// Reject names that escape `destDir`, embed a NUL byte,
+		// contain control characters, or use Windows-style
+		// separators. See `validateTarEntryName` for the full
+		// rejection contract. Symlinks are also rejected
+		// elsewhere (the archive is treated as a plain
 		// file/directory tree — docker build does not need
 		// symlinks).
 		name := hdr.Name
-		if filepath.IsAbs(name) || strings.Contains(name, "..") {
-			return fmt.Errorf("reject unsafe tar entry name %q", name)
+		if err := validateTarEntryName(name); err != nil {
+			return err
 		}
 		target := filepath.Join(destDir, name)
 

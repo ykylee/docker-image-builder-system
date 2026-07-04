@@ -271,6 +271,24 @@ registry.registerPath({
     404: { description: "Build or source archive not found." }
   }
 });
+
+// TASK-066: drop the stored source archive bytes without
+// touching the build row's declared `sourceArchive`
+// metadata. Lets the Skill re-upload under the same buildId
+// without going through `POST /builds` again.
+registry.registerPath({
+  method: "delete",
+  path: "/builds/{buildId}/source",
+  description:
+    "Delete the stored source archive bytes for a build. Returns 204 on success and 404 when the build itself is unknown. The declared `sourceArchive` metadata on the build row is preserved.",
+  tags: ["Builds"],
+  request: { params: z.object({ buildId: z.string().uuid() }) },
+  responses: {
+    204: { description: "Source archive dropped." },
+    404: { description: "Build not found." }
+  }
+});
+
 registry.registerPath({
   method: "get",
   path: "/health",

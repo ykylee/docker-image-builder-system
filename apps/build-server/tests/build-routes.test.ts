@@ -556,3 +556,141 @@ describe("GET /builds/:buildId/source (TASK-066)", () => {
     await app.close();
   });
 });
+
+describe("DELETE /builds/:buildId/source (TASK-066)", () => {
+  async function makeBuildWithArchive(
+    app: Awaited<ReturnType<typeof buildApp>>,
+    archiveBytes: Buffer
+  ) {
+    const checksum = createHash("sha256").update(archiveBytes).digest("hex");
+    const enq = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: {
+        appName: `p-del-${Math.random().toString(36).slice(2, 8)}`,
+        requestedBy: "yklee",
+        sourceArchive: {
+          objectKey: "k",
+          checksumSha256: checksum,
+          sizeBytes: archiveBytes.byteLength
+        },
+        entrypointPath: "x"
+      }
+    });
+    assert.equal(enq.statusCode, 202);
+    return {
+      buildId: (enq.json() as { build: { buildId: string } }).build.buildId,
+      checksum
+    };
+  }
+
+  it("returns 204 and the archive is gone afterwards", async () => {
+    const app = await buildApp();
+    const archive = Buffer.from("delete-me");
+    const { buildId } = await makeBuildWithArchive(app, archive);
+
+    const upload = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: archive
+    });
+    assert.equal(upload.statusCode, 201);
+
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/builds/${buildId}/source`
+    });
+    assert.equal(del.statusCode, 204);
+
+    // Verify the archive is actually gone (GET → 404).
+    const get = await app.inject({
+      method: "GET",
+      url: `/builds/${buildId}/source`
+    });
+    assert.equal(get.statusCode, 404);
+    await app.close();
+  });
+
+  it("returns 404 when the build does not exist", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/builds/00000000-0000-0000-0000-000000000000/source"
+    });
+    assert.equal(res.statusCode, 404);
+    await app.close();
+  });
+
+  it("returns 400 on a non-UUID buildId", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "DELETE",
+      url: "/builds/x-not-a-uuid/source"
+    });
+    assert.equal(res.statusCode, 400);
+    await app.close();
+  });
+
+  it("returns 404 when deleting again (idempotent failure surfaces as 404)", async () => {
+    const app = await buildApp();
+    const archive = Buffer.from("twice");
+    const { buildId } = await makeBuildWithArchive(app, archive);
+    await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: archive
+    });
+    // First delete: 204.
+    const first = await app.inject({
+      method: "DELETE",
+      url: `/builds/${buildId}/source`
+    });
+    assert.equal(first.statusCode, 204);
+    // Second delete: archive already gone, repo reports
+    // `not_found` and the route returns 404. Not strictly
+    // idempotent in the HTTP sense — but the caller can
+    // safely retry the POST to re-upload.
+    const second = await app.inject({
+      method: "DELETE",
+      url: `/builds/${buildId}/source`
+    });
+    assert.equal(second.statusCode, 404);
+    await app.close();
+  });
+
+  it("preserves the build row and allows re-upload after delete", async () => {
+    // After DELETE the build should still be queryable and its
+    // declared `sourceArchive` metadata (objectKey, sha256,
+    // size) should be intact so the Skill can re-upload under
+    // the same buildId without going through `POST /builds`.
+    const app = await buildApp();
+    const archive = Buffer.from("resurrect");
+    const { buildId, checksum } = await makeBuildWithArchive(app, archive);
+
+    await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: archive
+    });
+    const del = await app.inject({
+      method: "DELETE",
+      url: `/builds/${buildId}/source`
+    });
+    assert.equal(del.statusCode, 204);
+
+    // Re-upload under the same buildId is 201 and matches the
+    // declared metadata.
+    const reupload = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: archive
+    });
+    assert.equal(reupload.statusCode, 201);
+    assert.equal(reupload.json().checksumSha256, checksum);
+    await app.close();
+  });
+});

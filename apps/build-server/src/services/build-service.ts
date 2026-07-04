@@ -17,6 +17,7 @@ import type {
 
 import type {
   BuildRepository,
+  DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
   PreviewStatusDetails,
@@ -216,5 +217,14 @@ export class BuildService {
     buildId: string
   ): Promise<GetSourceArchiveMetadataResult> {
     return this.repository.getSourceArchiveMetadata(buildId);
+  }
+
+  // TASK-066: remove the stored archive bytes (admin cleanup /
+  // test teardown). The declared `SourceArchive` metadata on
+  // the build row is preserved — the row's source_archive_*
+  // columns remain the canonical record of what the Skill
+  // committed to.
+  deleteSourceArchive(buildId: string): Promise<DeleteSourceArchiveResult> {
+    return this.repository.deleteSourceArchive(buildId);
   }
 }

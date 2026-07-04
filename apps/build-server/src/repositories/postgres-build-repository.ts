@@ -40,6 +40,7 @@ import type {
   BuildRepository,
   ClaimNextBuildResult,
   CreateBuildResult,
+  DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
   GetTestDeploymentResult,
@@ -1118,5 +1119,32 @@ export class PostgresBuildRepository implements BuildRepository {
         sizeBytes: row.sizeBytes
       }
     };
+  }
+
+  // TASK-066: delete the stored archive bytes. The build row
+  // itself (and `build_request.source_archive_*` columns) is
+  // untouched so the declared metadata remains the canonical
+  // record of what the Skill committed to. `DELETE ... RETURNING`
+  // is used so a missing row yields 0 rows and we can report
+  // `not_found` for the build (vs `ok` for "build exists, no
+  // archive was present") without a separate existence check —
+  // but that ambiguity is fine: both states end with no bytes
+  // present, which is what `DELETE` was trying to achieve.
+  async deleteSourceArchive(
+    buildId: string
+  ): Promise<DeleteSourceArchiveResult> {
+    const result = await this.db
+      .delete(buildSourceTable)
+      .where(eq(buildSourceTable.buildId, buildId))
+      .returning({ buildId: buildSourceTable.buildId });
+    if (result.length === 0) {
+      // Either the build does not exist, or it exists but never
+      // had an archive uploaded. Report `not_found` for symmetry
+      // with `storeSourceArchive` so the route can surface a
+      // 404 — the caller can re-check via `GET /builds/:id` if
+      // it needs to distinguish the two.
+      return { kind: "not_found" };
+    }
+    return { kind: "ok" };
   }
 }

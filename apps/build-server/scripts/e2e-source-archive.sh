@@ -184,6 +184,35 @@ if [[ "${NF_STATUS}" != "404" ]]; then
   echo "[e2e] GET on missing buildId should be 404, got ${NF_STATUS}"
   exit 1
 fi
-echo "[e2e] 404 path confirmed"
+NF_DEL_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "${BASE}/builds/00000000-0000-0000-0000-000000000000/source")"
+if [[ "${NF_DEL_STATUS}" != "404" ]]; then
+  echo "[e2e] DELETE on missing buildId should be 404, got ${NF_DEL_STATUS}"
+  exit 1
+fi
+echo "[e2e] 404 path confirmed (GET + DELETE)"
+
+# 7. DELETE /builds/:buildId/source — drop the archive and
+#    verify the build row itself is still queryable so the
+#    Skill can re-upload under the same buildId.
+DEL_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' -X DELETE "${BASE}/builds/${BUILD_ID}/source")"
+if [[ "${DEL_STATUS}" != "204" ]]; then
+  echo "[e2e] DELETE happy path should be 204, got ${DEL_STATUS}"
+  exit 1
+fi
+GET_AFTER_DEL_STATUS="$(curl -sS -o /dev/null -w '%{http_code}' "${BASE}/builds/${BUILD_ID}/source")"
+if [[ "${GET_AFTER_DEL_STATUS}" != "404" ]]; then
+  echo "[e2e] GET after DELETE should be 404, got ${GET_AFTER_DEL_STATUS}"
+  exit 1
+fi
+REUPLOAD_STATUS="$(curl -sS -o "${TMP}/reupload.json" -w '%{http_code}' \
+  -X POST \
+  -H 'content-type: application/octet-stream' \
+  --data-binary "@${ARCHIVE}" \
+  "${BASE}/builds/${BUILD_ID}/source")"
+if [[ "${REUPLOAD_STATUS}" != "201" ]]; then
+  echo "[e2e] re-upload after DELETE should be 201, got ${REUPLOAD_STATUS}"
+  exit 1
+fi
+echo "[e2e] DELETE + re-upload ok"
 
 echo "[e2e] OK"

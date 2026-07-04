@@ -26,6 +26,7 @@ import type {
   BuildRepository,
   ClaimNextBuildResult,
   CreateBuildResult,
+  DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
   GetTestDeploymentResult,
@@ -791,6 +792,30 @@ export function createMemoryBuildRepository(): BuildRepository {
         kind: "ok",
         sourceArchive: stored.sourceArchive
       };
+    },
+
+    // TASK-066: remove the stored archive bytes. The build row
+    // (and its declared `sourceArchive` metadata) is intentionally
+    // left intact — only the auxiliary blob is dropped. Returns
+    // `not_found` in two distinct cases so the route layer can
+    // surface a 404 for both:
+    //   1. the buildId itself is unknown, OR
+    //   2. the build exists but no archive row was present
+    //      (i.e. a duplicate DELETE on the same buildId).
+    // `Map.delete` returns the prior boolean so the two cases
+    // are distinguishable without an extra `has` lookup.
+    async deleteSourceArchive(
+      buildId: string
+    ): Promise<DeleteSourceArchiveResult> {
+      const stored = builds.get(buildId);
+      if (!stored) {
+        return { kind: "not_found" };
+      }
+      const hadArchive = sourceArchives.delete(buildId);
+      if (!hadArchive) {
+        return { kind: "not_found" };
+      }
+      return { kind: "ok" };
     }
   };
 }

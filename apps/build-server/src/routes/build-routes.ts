@@ -398,4 +398,29 @@ export async function registerBuildRoutes(
     reply.header("X-Source-Size-Bytes", String(result.sizeBytes));
     return reply.status(200).send(Buffer.from(result.bytes));
   });
+
+  // DELETE /builds/:buildId/source — drop the stored source
+  // archive bytes (TASK-066). The build row (and its declared
+  // `sourceArchive` metadata) is preserved so the Skill can
+  // re-upload the same archive under the same buildId and the
+  // Runner can re-fetch it. This is distinct from deleting the
+  // build itself (which goes through the admin endpoints / future
+  // build lifecycle route). 204 on success, 404 when no such
+  // build or no archive present, 400 on a non-UUID buildId.
+  app.delete("/builds/:buildId/source", async (request, reply) => {
+    const paramsResult = buildIdParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        message: "Invalid buildId parameter",
+        issues: paramsResult.error.issues
+      });
+    }
+    const result = await buildService.deleteSourceArchive(
+      paramsResult.data.buildId
+    );
+    if (result.kind === "not_found") {
+      return reply.status(404).send({ message: "Build not found." });
+    }
+    return reply.status(204).send();
+  });
 }

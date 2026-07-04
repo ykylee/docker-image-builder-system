@@ -149,6 +149,21 @@ export type GetSourceArchiveResult =
       kind: "not_found";
     };
 
+// TASK-066: delete the stored source archive bytes. The route
+// is `DELETE /builds/:buildId/source`. This intentionally does not
+// touch `build_request.source_archive_*` — those columns record
+// the declared `SourceArchive` metadata (recorded at `POST
+// /builds` time) and remain valid even after the bytes are
+// removed, so the metadata stays the canonical truth of "what
+// the Skill committed to" while the bytes themselves are an
+// auxiliary blob. Distinguished from `not_found` for the build
+// (no such buildId) vs `ok` (build exists but no archive to
+// delete — same semantic, returned as `ok` because the desired
+// state is "no archive present").
+export type DeleteSourceArchiveResult =
+  | { kind: "ok" }
+  | { kind: "not_found" };
+
 // TASK-066: read just the declared `SourceArchive` metadata for a
 // build. This is the metadata that was recorded at `POST /builds`
 // (the canonical checksum and size the Skill committed to) — the
@@ -201,6 +216,7 @@ export interface BuildRepository {
   getSourceArchiveMetadata(
     buildId: string
   ): Promise<GetSourceArchiveMetadataResult>;
+  deleteSourceArchive(buildId: string): Promise<DeleteSourceArchiveResult>;
   // Admin-only operations (ADMIN-*). Both methods intentionally bypass
   // owner filtering at the service layer; the admin route layer is the
   // single guard that ensures the caller is in the configured ADMIN_IDS
