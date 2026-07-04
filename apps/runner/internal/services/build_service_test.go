@@ -3,6 +3,9 @@ package services
 import (
 	"context"
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"testing"
 
@@ -159,5 +162,92 @@ func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
 	}
 	if fc.deployments[1].Status != contract.ExecutionStatusSuccess {
 		t.Errorf("expected second deployment status SUCCESS, got %s", fc.deployments[1].Status)
+	}
+}
+
+// TASK-067: BuildService 가 docker.Client.RunContainer 의 ContainerStatus
+// 값을 그대로 ReportPreviewReady 의 입력으로 사용해야 한다. 새 docker
+// Client (skeleton mode) 를 명시적으로 wire-up 해서 ReportPreviewReady 에
+// 들어간 host / hostPort / runtimeUrl / containerRef 가 ContainerStatus 의
+// 그것과 일치하는지 확인.
+func TestProcessClaim_PassesContainerStatusFromRunContainer(t *testing.T) {
+	fc := &fakeClient{buildID: "b-67"}
+	dockerClient := docker.NewClient()
+	svc := NewBuildService(fc, dockerClient, nil, "r-67")
+	claim := &queue.ClaimedBuild{BuildID: "b-67"}
+
+	if err := svc.ProcessClaim(context.Background(), claim); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(fc.previewReady) != 1 {
+		t.Fatalf("expected 1 preview ready call, got %d", len(fc.previewReady))
+	}
+	req := fc.previewReady[0]
+
+	// BuildService 가 RunContainer(skeleton) 의 결과를 그대로 전달했는지 확인.
+	// skeleton mode 의 default HostPort 는 38124 이고 containerRef 는
+	// "container-<buildID>".
+	if req.ContainerRef != "container-b-67" {
+		t.Errorf("expected containerRef=container-b-67, got %s", req.ContainerRef)
+	}
+	if req.HostPort != 38124 {
+		t.Errorf("expected hostPort=38124, got %d", req.HostPort)
+	}
+	if req.Host != "preview.local" {
+		t.Errorf("expected host=preview.local, got %s", req.Host)
+	}
+	expectedRuntimeURL := "http://preview.local:38124/"
+	if req.PreviewURL != expectedRuntimeURL {
+		t.Errorf("expected previewURL=%s, got %s", expectedRuntimeURL, req.PreviewURL)
+	}
+	if !req.HealthCheckPassed || !req.PortOpen || !req.StabilityWindowPassed {
+		t.Errorf("expected all health flags true, got %+v", req)
+	}
+}
+
+// RUNNER_STOP_CONTAINER_ON_DONE=true 일 때 ProcessClaim 종료 후
+// defer StopContainer 가 호출되어야 한다. cli mode + fake runContainer /
+// stopContainer + httptest health server 로 docker daemon 없이 검증.
+// fake health server 의 port 를 WithHostPort 로 명시해 probe 가 정확히
+// 그쪽을 향하도록 한다.
+func TestProcessClaim_StopContainerOnDoneDefer(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
+	t.Setenv("RUNNER_DOCKER_BUILD_MODE", "skeleton")
+	t.Setenv("RUNNER_DOCKER_RUN_MODE", "cli")
+	t.Setenv("RUNNER_STOP_CONTAINER_ON_DONE", "true")
+	t.Setenv("RUNNER_HEALTHCHECK_TIMEOUT_SECONDS", "5")
+
+	// healthcheck 응답용 fake HTTP server — BuildService 가 이쪽으로
+	// probe 하도록 WithHostPort 로 port 를 명시한다.
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+	srvPort := srv.Listener.Addr().(*net.TCPAddr).Port
+
+	fc := &fakeClient{buildID: "b-67"}
+	dockerClient := docker.NewClient()
+	dockerClient.SetRunContainerCmdForTest(func(ctx context.Context, args ...string) error {
+		return nil
+	})
+	var stopCalls int
+	dockerClient.SetStopContainerCmdForTest(func(ctx context.Context, args ...string) error {
+		stopCalls++
+		return nil
+	})
+	dockerClient.SetHealthClientForTest(srv.Client())
+
+	svc := NewBuildService(fc, dockerClient, nil, "r-67").WithHostPort(srvPort)
+	claim := &queue.ClaimedBuild{BuildID: "b-67"}
+
+	if err := svc.ProcessClaim(context.Background(), claim); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if stopCalls != 1 {
+		t.Errorf("expected exactly 1 stop container call, got %d", stopCalls)
 	}
 }
