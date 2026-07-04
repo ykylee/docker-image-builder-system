@@ -291,4 +291,111 @@ export async function registerBuildRoutes(
     }
     return reply.status(200).send({ testDeployment: result.testDeployment });
   });
+
+  // POST /builds/:buildId/source — upload the raw source archive bytes
+  // (TASK-066). The body is a binary `application/octet-stream` payload
+  // whose size and SHA-256 must match the metadata recorded on the
+  // build (`BuildRequest.sourceArchive.sizeBytes` /
+  // `BuildRequest.sourceArchive.checksumSha256`). The server
+  // recomputes the SHA-256 from the actual bytes and refuses the
+  // upload if the recomputed value disagrees with the metadata —
+  // never trust the client-supplied `X-Source-Checksum-Sha256`
+  // header alone.
+  app.post("/builds/:buildId/source", async (request, reply) => {
+    const paramsResult = buildIdParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        message: "Invalid buildId parameter",
+        issues: paramsResult.error.issues
+      });
+    }
+
+    // The metadata we need to verify the upload against is read via
+    // a dedicated `getSourceArchiveMetadata` call so a 404 (no such
+    // build) is reported before a 400 (bad archive) and so the
+    // verified size and checksum come from the canonical build
+    // record, not from caller-supplied headers.
+    const metadataResult = await buildService.getSourceArchiveMetadata(
+      paramsResult.data.buildId
+    );
+    if (metadataResult.kind === "not_found") {
+      return reply.status(404).send({ message: "Build not found." });
+    }
+    const expectedSourceArchive = metadataResult.sourceArchive;
+
+    // Fastify parses `application/octet-stream` bodies into `Buffer`
+    // and exposes the raw bytes via `request.body`. Anything else
+    // (e.g. JSON) is rejected with a 415-style 400 — the only
+    // accepted content type for this endpoint is octet-stream.
+    if (!Buffer.isBuffer(request.body)) {
+      return reply.status(400).send({
+        message: "Source archive must be uploaded as application/octet-stream.",
+        receivedContentType: request.headers["content-type"] ?? null
+      });
+    }
+
+    const result = await buildService.storeSourceArchive(
+      paramsResult.data.buildId,
+      new Uint8Array(request.body),
+      expectedSourceArchive.checksumSha256,
+      expectedSourceArchive.sizeBytes
+    );
+
+    if (result.kind === "not_found") {
+      return reply.status(404).send({ message: "Build not found." });
+    }
+    if (result.kind === "checksum_mismatch") {
+      return reply.status(400).send({
+        message:
+          "Source archive checksum does not match the build's sourceArchive.checksumSha256 metadata.",
+        expected: result.expected,
+        actual: result.actual
+      });
+    }
+    if (result.kind === "size_mismatch") {
+      return reply.status(400).send({
+        message:
+          "Source archive size does not match the build's sourceArchive.sizeBytes metadata.",
+        expected: result.expected,
+        actual: result.actual
+      });
+    }
+
+    return reply.status(201).send({
+      buildId: paramsResult.data.buildId,
+      checksumSha256: result.checksumSha256,
+      sizeBytes: result.sizeBytes
+    });
+  });
+
+  // GET /builds/:buildId/source — download the raw source archive
+  // bytes (TASK-066). Returns the bytes as `application/octet-stream`
+  // with the SHA-256 surfaced in a response header so the Runner can
+  // verify the integrity of the downloaded bytes without re-reading
+  // the body. A build that exists but has no uploaded archive is
+  // reported as 404 (`not_found` from the repository), distinct from
+  // a build that does not exist at all (also 404 but with a
+  // different message).
+  app.get("/builds/:buildId/source", async (request, reply) => {
+    const paramsResult = buildIdParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        message: "Invalid buildId parameter",
+        issues: paramsResult.error.issues
+      });
+    }
+
+    const result = await buildService.getSourceArchive(paramsResult.data.buildId);
+    if (result.kind === "not_found") {
+      return reply.status(404).send({ message: "Source archive not found for build." });
+    }
+
+    // The bytes are a Uint8Array. Buffer.from(view) is a zero-copy view
+    // on the underlying ArrayBuffer so we do not duplicate the payload
+    // for the wire send.
+    reply.header("Content-Type", "application/octet-stream");
+    reply.header("X-Source-Checksum-Sha256", result.checksumSha256);
+    reply.header("X-Source-Size-Bytes", String(result.sizeBytes));
+    return reply.status(200).send(Buffer.from(result.bytes));
+  });
 }

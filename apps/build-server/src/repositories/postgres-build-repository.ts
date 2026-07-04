@@ -1,6 +1,7 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import {
+  buildSourceTable,
   buildTestTable,
   and,
   asc,
@@ -39,11 +40,14 @@ import type {
   BuildRepository,
   ClaimNextBuildResult,
   CreateBuildResult,
+  GetSourceArchiveMetadataResult,
+  GetSourceArchiveResult,
   GetTestDeploymentResult,
   PreviewStatusDetails,
   QueueTestDeploymentResult,
   ReportDeploymentResult,
   ReportPreviewStatusResult,
+  StoreSourceArchiveResult,
   UpdatePhaseResult
 } from "./build-repository.js";
 import {
@@ -971,5 +975,148 @@ export class PostgresBuildRepository implements BuildRepository {
     }));
 
     return { users };
+  }
+
+  // TASK-066: store the source archive bytes for `buildId`. The whole
+  // operation runs inside a single transaction so the build existence
+  // check and the upsert observe the same snapshot — a concurrent
+  // build deletion cannot leave the source row orphaned. The SHA-256
+  // and size are recomputed from the actual `bytes` rather than
+  // trusting the caller-supplied metadata, so a tampered body is
+  // rejected before the row is written. The `bytea` column is updated
+  // via an `INSERT ... ON CONFLICT DO UPDATE` so a re-upload of the
+  // same buildId replaces the previous bytes (last-write-wins) — the
+  // same semantic as the in-memory repository.
+  async storeSourceArchive(
+    buildId: string,
+    bytes: Uint8Array,
+    expectedChecksumSha256: string,
+    expectedSizeBytes: number
+  ): Promise<StoreSourceArchiveResult> {
+    // The SHA-256 is computed once and reused for both the mismatch
+    // check and the row write so a single computation covers the full
+    // verification path.
+    const actualChecksumSha256 = createHash("sha256")
+      .update(Buffer.from(bytes))
+      .digest("hex");
+    if (actualChecksumSha256 !== expectedChecksumSha256) {
+      return {
+        kind: "checksum_mismatch",
+        expected: expectedChecksumSha256,
+        actual: actualChecksumSha256
+      };
+    }
+
+    const actualSizeBytes = bytes.byteLength;
+    if (actualSizeBytes !== expectedSizeBytes) {
+      return {
+        kind: "size_mismatch",
+        expected: expectedSizeBytes,
+        actual: actualSizeBytes
+      };
+    }
+
+    return this.db.transaction(async (tx) => {
+      const [buildExists] = await tx
+        .select({ id: buildRequestTable.id })
+        .from(buildRequestTable)
+        .where(eq(buildRequestTable.id, buildId))
+        .limit(1);
+
+      if (!buildExists) {
+        return { kind: "not_found" } as const;
+      }
+
+      // Drizzle's pg driver accepts Uint8Array directly for `bytea`
+      // columns and serialises it as the binary form. We do not need to
+      // hex-encode the payload ourselves.
+      await tx
+        .insert(buildSourceTable)
+        .values({
+          buildId,
+          bytes: new Uint8Array(bytes),
+          checksumSha256: actualChecksumSha256,
+          sizeBytes: actualSizeBytes
+        })
+        .onConflictDoUpdate({
+          target: buildSourceTable.buildId,
+          set: {
+            bytes: new Uint8Array(bytes),
+            checksumSha256: actualChecksumSha256,
+            sizeBytes: actualSizeBytes,
+            updatedAt: new Date()
+          }
+        });
+
+      return {
+        kind: "ok",
+        checksumSha256: actualChecksumSha256,
+        sizeBytes: actualSizeBytes
+      } as const;
+    });
+  }
+
+  // TASK-066: read the stored archive bytes. Returns a fresh
+  // `Uint8Array` so the caller is not coupled to Drizzle's internal
+  // row representation. A build with no uploaded archive is reported
+  // as `not_found` (no `bytes` row) — distinct from the build itself
+  // being missing, which is reported as `not_found` from the build
+  // existence check first so a 404 from the route layer is the same
+  // for both.
+  async getSourceArchive(buildId: string): Promise<GetSourceArchiveResult> {
+    const [row] = await this.db
+      .select({
+        buildId: buildSourceTable.buildId,
+        bytes: buildSourceTable.bytes,
+        checksumSha256: buildSourceTable.checksumSha256,
+        sizeBytes: buildSourceTable.sizeBytes
+      })
+      .from(buildSourceTable)
+      .where(eq(buildSourceTable.buildId, buildId))
+      .limit(1);
+
+    if (!row) {
+      return { kind: "not_found" };
+    }
+
+    return {
+      kind: "ok",
+      bytes: new Uint8Array(row.bytes),
+      checksumSha256: row.checksumSha256,
+      sizeBytes: row.sizeBytes
+    };
+  }
+
+  // TASK-066: read the declared `SourceArchive` metadata from
+  // `build_request` directly. No need to touch `build_source` — the
+  // metadata is part of the build row and is present the moment
+  // `POST /builds` succeeds, regardless of whether the Skill has
+  // uploaded the actual bytes yet. Used by the upload route to
+  // validate an incoming `POST /builds/:buildId/source` payload.
+  async getSourceArchiveMetadata(
+    buildId: string
+  ): Promise<GetSourceArchiveMetadataResult> {
+    const [row] = await this.db
+      .select({
+        objectKey: buildRequestTable.sourceArchiveKey,
+        checksumSha256: buildRequestTable.sourceArchiveChecksumSha256,
+        sizeBytes: buildRequestTable.sourceArchiveSizeBytes
+      })
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+
+    if (!row) {
+      return { kind: "not_found" };
+    }
+
+    return {
+      kind: "ok",
+      sourceArchive: {
+        objectKey: row.objectKey,
+        checksumSha256: row.checksumSha256,
+        sizeBytes: row.sizeBytes
+      }
+    };
   }
 }

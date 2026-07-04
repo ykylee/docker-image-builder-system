@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 
 import Fastify from "fastify";
@@ -9,6 +10,14 @@ import { BuildService } from "../src/services/build-service.js";
 
 function buildApp() {
   const app = Fastify({ logger: false });
+  // Mirror `createApp`'s TASK-066 content-type parser so the
+  // route-layer `Buffer.isBuffer(request.body)` check passes inside
+  // the test fixture.
+  app.addContentTypeParser(
+    "application/octet-stream",
+    { parseAs: "buffer" },
+    (_request, payload, done) => done(null, payload)
+  );
   const repo = createMemoryBuildRepository();
   const service = new BuildService(repo);
   return registerBuildRoutes(app, service).then(() => app);
@@ -330,6 +339,174 @@ describe("GET /builds/:buildId/test-deployment", () => {
     const body = res.json();
     assert.equal(body.testDeployment.status, "QUEUED");
     assert.equal(body.testDeployment.internalPort, 8080);
+    await app.close();
+  });
+});
+
+describe("POST /builds/:buildId/source (TASK-066)", () => {
+  // 6 hex chars is enough to disambiguate unique content in this
+  // test fixture; the BuildRequest schema only requires
+  // checksumSha256.min(1) so a short hex string is accepted.
+  async function makeBuildWithArchive(
+    app: Awaited<ReturnType<typeof buildApp>>,
+    archiveBytes: Buffer
+  ) {
+    const checksum = createHash("sha256")
+      .update(archiveBytes)
+      .digest("hex");
+    const enq = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: {
+        appName: `p-source-${Math.random().toString(36).slice(2, 8)}`,
+        requestedBy: "yklee",
+        sourceArchive: {
+          objectKey: `key-${checksum.slice(0, 8)}`,
+          checksumSha256: checksum,
+          sizeBytes: archiveBytes.byteLength
+        },
+        entrypointPath: "x"
+      }
+    });
+    assert.equal(enq.statusCode, 202, "build should be accepted");
+    return {
+      buildId: (enq.json() as { build: { buildId: string } }).build.buildId,
+      checksum
+    };
+  }
+
+  it("returns 201 with the recomputed checksum and size for a matching upload", async () => {
+    const app = await buildApp();
+    const archive = Buffer.from("hello-source-archive");
+    const { buildId, checksum } = await makeBuildWithArchive(app, archive);
+
+    const res = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: archive
+    });
+    assert.equal(res.statusCode, 201);
+    const body = res.json();
+    assert.equal(body.buildId, buildId);
+    assert.equal(body.checksumSha256, checksum);
+    assert.equal(body.sizeBytes, archive.byteLength);
+    await app.close();
+  });
+
+  it("returns 400 when the body checksum does not match the declared metadata", async () => {
+    const app = await buildApp();
+    const declared = Buffer.from("the-declared-bytes");
+    const { buildId } = await makeBuildWithArchive(app, declared);
+
+    // Upload different bytes; declared metadata still claims the
+    // checksum of `declared`, so the server should refuse with 400.
+    const tampered = Buffer.from("the-actual-tampered-bytes");
+    const res = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: tampered
+    });
+    assert.equal(res.statusCode, 400);
+    const body = res.json();
+    assert.match(body.message, /checksum/i);
+    assert.equal(body.expected, createHash("sha256").update(declared).digest("hex"));
+    assert.equal(body.actual, createHash("sha256").update(tampered).digest("hex"));
+    await app.close();
+  });
+
+  it("returns 404 when the build does not exist", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: `/builds/00000000-0000-0000-0000-000000000000/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: Buffer.from("orphan")
+    });
+    assert.equal(res.statusCode, 404);
+    await app.close();
+  });
+
+  it("returns 400 when the content type is not application/octet-stream", async () => {
+    const app = await buildApp();
+    const archive = Buffer.from("any");
+    const { buildId } = await makeBuildWithArchive(app, archive);
+    const res = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/json" },
+      payload: { not: "octet-stream" }
+    });
+    assert.equal(res.statusCode, 400);
+    const body = res.json();
+    assert.match(body.message, /octet-stream/i);
+    await app.close();
+  });
+});
+
+describe("GET /builds/:buildId/source (TASK-066)", () => {
+  it("returns 404 when no archive has been uploaded", async () => {
+    const app = await buildApp();
+    const enq = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: {
+        appName: "p-source-get",
+        requestedBy: "yklee",
+        sourceArchive: { objectKey: "k", checksumSha256: "x", sizeBytes: 1 },
+        entrypointPath: "x"
+      }
+    });
+    assert.equal(enq.statusCode, 202);
+    const buildId = (enq.json() as { build: { buildId: string } }).build.buildId;
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/builds/${buildId}/source`
+    });
+    assert.equal(res.statusCode, 404);
+    await app.close();
+  });
+
+  it("returns 200 with bytes and X-Source-Checksum-Sha256 header after a successful upload", async () => {
+    const app = await buildApp();
+    const archive = Buffer.from("roundtrip-archive-bytes");
+    const checksum = createHash("sha256").update(archive).digest("hex");
+    const enq = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: {
+        appName: "p-source-roundtrip",
+        requestedBy: "yklee",
+        sourceArchive: {
+          objectKey: "k",
+          checksumSha256: checksum,
+          sizeBytes: archive.byteLength
+        },
+        entrypointPath: "x"
+      }
+    });
+    const buildId = (enq.json() as { build: { buildId: string } }).build.buildId;
+
+    const upload = await app.inject({
+      method: "POST",
+      url: `/builds/${buildId}/source`,
+      headers: { "content-type": "application/octet-stream" },
+      payload: archive
+    });
+    assert.equal(upload.statusCode, 201);
+
+    const res = await app.inject({
+      method: "GET",
+      url: `/builds/${buildId}/source`
+    });
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.headers["content-type"], "application/octet-stream");
+    assert.equal(res.headers["x-source-checksum-sha256"], checksum);
+    assert.equal(res.headers["x-source-size-bytes"], String(archive.byteLength));
+    assert.equal(res.rawPayload.byteLength, archive.byteLength);
+    assert.equal(Buffer.compare(res.rawPayload, archive), 0);
     await app.close();
   });
 });
