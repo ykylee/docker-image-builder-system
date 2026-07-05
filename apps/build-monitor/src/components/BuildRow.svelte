@@ -1,31 +1,25 @@
 <script lang="ts">
   import StatusPill from "./StatusPill.svelte";
   import { link } from "svelte-spa-router";
+  import type { BuildSummary } from "../lib/api";
 
   /**
    * BuildRow — DESIGN.md §3 Components.
    * Build Status Response 의 한 row. StatusPill + buildId(mono) + updatedAt(relative).
+   *
+   * prop 타입은 `BuildSummary & { requestedBy?: string }` 으로 canonical
+   * BuildSummary 의 structural super-set. BuildSummary 자체에는
+   * requestedBy 가 없지만 (canonical user-facing summary) AdminUser
+   * BuildSummary = BuildSummary & { requestedBy: string } intersection 이
+   * caller 측 타입 시스템과 정합 — AdminBuilds / AdminUsers 양쪽 모두
+   * BuildSummary 호환 호출이 가능하다. owner cell 렌더 여부는 requestedBy
+   * optional 로 두어 caller 가 명시적으로 owner 를 끄거나 켤 수 있게 한다.
    */
-  type BuildRowData = {
-    buildId: string;
-    status: string;
-    // lifecycleStatus (TASK-052) 는 canonical 12-state union 의 optional
-    // 필드. BuildSummary 가 status 와 lifecycleStatus 를 동시 emit 하는
-    // migration window 에서 StatusPill 이 lifecycleStatus 를 우선 사용
-    // 하도록 전달한다. 없으면 legacy status 로 fallback.
-    lifecycleStatus?: string;
-    // appName is the canonical application identifier (v0.2 collapse of
-    // the legacy projectId/repositoryId pair). It is rendered as the App
-    // column in both the user-facing BuildsList and the admin builds view.
-    appName: string;
-    updatedAt: string; // ISO 8601
-    // Owner is optional so the user-facing BuildsList route can keep
-    // using BuildRow without changes. AdminBuilds passes the canonical
-    // requestedBy so the admin table can render the owner column.
-    requestedBy?: string;
+  type Props = {
+    build: BuildSummary & { requestedBy?: string };
   };
 
-  let { build }: { build: BuildRowData } = $props();
+  let { build }: Props = $props();
 
   function relativeTime(iso: string): string {
     const then = new Date(iso).getTime();

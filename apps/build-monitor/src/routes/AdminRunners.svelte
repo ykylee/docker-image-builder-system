@@ -334,6 +334,14 @@
     font-family: var(--font-mono);
     font-size: var(--size-xs);
   }
+  /* TASK-070 (PR #23): `.pill` 의 raw rgb (green-500 / rose-500) 와
+     `.btn-danger` / `.chip.active` 의 raw rgba 를 모두 canonical 디자인
+     토큰 (`--color-accent-success` / `--color-accent-danger` /
+     `--color-accent-primary`) 기반 `color-mix` 로 정렬. tokens.css 가
+     light / dark 모드별로 다른 톤을 emit 하므로 (light 모드 success =
+     #059669, danger = #dc2626) 단일 source-of-truth 가 자동 정렬됨.
+     rAF color-mix (chrome 111+ / firefox 113+ / safari 16.2+) — 2026
+     모던 브라우저 모두 지원. */
   .pill {
     display: inline-block;
     padding: 2px 10px;
@@ -343,14 +351,14 @@
     letter-spacing: 0.04em;
   }
   .pill.active {
-    background: rgba(34, 197, 94, 0.16);
-    color: rgb(34, 197, 94);
-    border: 1px solid rgba(34, 197, 94, 0.32);
+    background: color-mix(in srgb, var(--color-accent-success) 16%, transparent);
+    color: var(--color-accent-success);
+    border: 1px solid color-mix(in srgb, var(--color-accent-success) 32%, transparent);
   }
   .pill.off {
-    background: rgba(244, 63, 94, 0.12);
-    color: rgb(244, 63, 94);
-    border: 1px solid rgba(244, 63, 94, 0.28);
+    background: color-mix(in srgb, var(--color-accent-danger) 12%, transparent);
+    color: var(--color-accent-danger);
+    border: 1px solid color-mix(in srgb, var(--color-accent-danger) 28%, transparent);
   }
   .err-cell {
     max-width: 240px;
@@ -383,12 +391,12 @@
     background: var(--color-bg-canvas);
   }
   .btn-danger {
-    background: rgba(244, 63, 94, 0.08);
+    background: color-mix(in srgb, var(--color-accent-danger) 8%, transparent);
     color: var(--color-accent-danger);
-    border-color: rgba(244, 63, 94, 0.32);
+    border-color: color-mix(in srgb, var(--color-accent-danger) 32%, transparent);
   }
   .btn-danger:hover:not(:disabled) {
-    background: rgba(244, 63, 94, 0.16);
+    background: color-mix(in srgb, var(--color-accent-danger) 16%, transparent);
   }
   .btn-secondary:disabled,
   .btn-danger:disabled {

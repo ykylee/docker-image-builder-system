@@ -1,8 +1,8 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
-  import StatusPill from "../components/StatusPill.svelte";
-  import type { AdminUserSummary } from "../lib/api";
+  import BuildRow from "../components/BuildRow.svelte";
+  import type { AdminUserSummary, BuildSummary } from "../lib/api";
   import { listAdminBuilds, listAdminUsers } from "../lib/api";
 
   let adminId = $state<string | null>(null);
@@ -17,16 +17,16 @@
   // TASK-060 2차 (PR #15): recent builds panel 은 BuildRow 가 아닌 직접
   // markup 으로 표시했는데, StatusPill 로 통일해 canonical lifecycleStatus
   // 까지 노출. lifecycleStatus 는 optional 이라 fallback 이 안전.
+  // TASK-070 (PR #23): recent builds panel 을 동일한 BuildRow 컴포넌트
+  // 로 교체하여 BuildsList / AdminBuilds 와 UI 정렬. 동일 user 의 build
+  // 만 노출되는 inline expansion 이라 `requestedBy` 컬럼은 노이즈가 되므로
+  // BuildRow 호출 시 owner 를 넘기지 않는다 (BuildRow 의 `requestedBy` 가
+  // optional 이라 owner cell 미렌더). 외부 link (target=_blank) 도 제거
+  // — svelte-spa-router `use:link` 가 일반 빌드 상세 라우트와 같은 탭
+  // 라우팅을 제공 (admin 이 다른 페이지와 동일 패턴으로 일관성 있게
+  // 탐색 가능).
   let selectedUser = $state<string | null>(null);
-  let selectedBuilds = $state<
-    {
-      buildId: string;
-      appName: string;
-      status: string;
-      lifecycleStatus?: string;
-      updatedAt: string;
-    }[]
-  >([]);
+  let selectedBuilds = $state<BuildSummary[]>([]);
   let selectedLoading = $state(false);
 
   onMount(async () => {
@@ -59,14 +59,12 @@
     selectedLoading = true;
     try {
       const result = await listAdminBuilds(adminId, { requestedBy: userId, limit: 50 });
-      selectedBuilds = result.builds.map((b) => ({
-        buildId: b.buildId,
-        appName: b.appName,
-        status: b.status,
-        // TASK-052 lifecycleStatus — StatusPill forwarding.
-        lifecycleStatus: b.lifecycleStatus,
-        updatedAt: b.updatedAt
-      }));
+      // AdminListBuildsResponse.builds 의 entry 는 BuildSummary & { requestedBy } 이지만
+      // selectedUser 의 inline expansion 라 owner 컬럼이 시각 노이즈가 되어
+      // requestedBy 를 omit 해서 BuildRow 에게 넘긴다. (BuildRow 는 build
+      // 의 requestedBy 가 있으면 owner cell 을 렌더하는 구조 — BuildRow.svelte
+      // TASK-070 코멘트 참조.) 나머지 필드 (BuildSummary 전체) 는 그대로 보존.
+      selectedBuilds = result.builds.map(({ requestedBy: _requestedBy, ...rest }) => rest);
     } catch (e) {
       error = e instanceof Error ? e.message : String(e);
     } finally {
@@ -79,6 +77,10 @@
     selectedBuilds = [];
   }
 
+  // user 행의 lastBuildAt 표시용 relative time. BuildRow 는 자체
+  // relativeTime 이 컴포넌트 안에 내장되어 있어 recent builds panel
+  // 에서는 import 만 하면 끝이지만, 사용자 행 (Users 표) 의 lastBuildAt
+  // cell 은 AdminUsers 측에서 직접 계산해야 한다.
   function relativeTime(iso: string): string {
     const then = new Date(iso).getTime();
     const now = Date.now();
@@ -158,16 +160,31 @@
       {:else if selectedBuilds.length === 0}
         <p class="muted">No builds found.</p>
       {:else}
-        <ul class="build-list">
-          {#each selectedBuilds as b (b.buildId)}
-            <li>
-              <StatusPill status={b.status} lifecycleStatus={b.lifecycleStatus} />
-              <a class="project mono" href={`/builds/${b.buildId}`} target="_blank" rel="noopener">{b.appName}</a>
-              <span class="muted small">{b.buildId.slice(0, 8)}</span>
-              <span class="muted small r">{relativeTime(b.updatedAt)}</span>
-            </li>
-          {/each}
-        </ul>
+        <!--
+          TASK-070 (PR #23): 기존 inline `<ul class="build-list">` 마크업을
+          BuildRow 컴포넌트 + `<table>` 구조로 교체. BuildsList / AdminBuilds 와
+          동일한 5 컬럼 (StatusPill / buildId link / appName / optional owner /
+          relative time) — 단, owner 컬럼은 같은 user 의 inline expansion이라
+          시각 노이즈가 되므로 BuildRow 호출 시 owner 를 넘기지 않는다
+          (BuildRow 내부 `{#if build.requestedBy}` 가드). BuildRow 의 외부
+          svelte-spa-router `use:link` 가 같은 탭 라우팅을 제공.
+        -->
+        <table class="recent-builds" aria-label={`Recent builds for ${selectedUser}`}>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Build</th>
+              <th>App</th>
+              <th class="r">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each selectedBuilds as b (b.buildId)}
+              <!-- requestedBy 미전달 → BuildRow 가 owner cell 미렌더. -->
+              <BuildRow build={b} />
+            {/each}
+          </tbody>
+        </table>
       {/if}
     </section>
   {/if}
@@ -202,7 +219,6 @@
   }
   .muted { color: var(--color-text-muted); margin: 4px 0 0; font-size: var(--size-sm); }
   .err { color: var(--color-accent-danger); }
-  .small { font-size: var(--size-xs); }
 
   table {
     width: 100%;
@@ -274,30 +290,15 @@
     align-items: center;
     justify-content: space-between;
   }
-  .build-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    flex-direction: column;
-    gap: var(--space-sm);
-  }
-  .build-list li {
-    display: grid;
-    grid-template-columns: 110px 1fr auto auto;
-    gap: var(--space-md);
-    padding: var(--space-sm) var(--space-md);
-    border-radius: var(--radius-md);
-    background: var(--color-bg-canvas);
-    border: 1px solid var(--color-border-subtle);
-  }
-  .project {
-    color: var(--color-accent-primary);
-    font-size: var(--size-sm);
-    font-weight: var(--weight-medium);
-  }
-  .project:hover { text-decoration: underline; }
-
+  /* TASK-070 (PR #23): recent builds panel 도 BuildsList / AdminBuilds 의
+     사용자 / admin 표와 동일한 `<table>` 모양 (surface / border-subtle /
+     radius-lg / shadow-card / overflow-hidden) 으로 통일. 위 일반 `table`
+     셀렉터 의 background + border + radius + shadow + overflow 가 모두
+     상속되어 추가 표면 디자인 없이 정합. 헤더 thead th 의 padding /
+     background / color / uppercase 도 동일 셀렉터가 적용. 마지막 row 의
+     하단 border 는 BuildRow 자체의 `:global(tbody > tr.row:last-child) td`
+     가드와 정합. */
+  .recent-builds th.r { text-align: right; }
   .btn-secondary {
     padding: var(--space-xs) var(--space-md);
     border-radius: var(--radius-md);
