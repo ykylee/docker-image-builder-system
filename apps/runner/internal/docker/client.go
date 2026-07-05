@@ -77,6 +77,11 @@ type Client struct {
 	// 로 교체할 수 있다.
 	runContainerCmd func(ctx context.Context, args ...string) error
 	stopContainerCmd func(ctx context.Context, args ...string) error
+	// runDockerInspectCmd 는 RunContainer 의 host port auto-assign readback
+	// path 의 `docker inspect` 호출을 갈아끼울 수 있게 한다. 동일하게 default
+	// 는 exec.CommandContext(dockerBin, ...). tests 에서 fake reader 로
+	// 교체할 수 있다.
+	runDockerInspectCmd func(ctx context.Context, args []string) (string, error)
 }
 
 type buildManifest struct {
@@ -129,6 +134,7 @@ func NewClient() *Client {
 	}
 	c.runContainerCmd = c.defaultRunContainerCmd
 	c.stopContainerCmd = c.defaultStopContainerCmd
+	c.runDockerInspectCmd = c.defaultRunDockerInspect
 	return c
 }
 
@@ -353,13 +359,21 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 	// 넘기는 편이 안전하다. 그 경로는 후속 TASK 의 port-collision retry 정책과
 	// 함께 도입 예정 (현재는 docker auto-assign + best-effort inspect).
 	if hostPort == 0 {
+		// host port 가 0 이었으면 docker 가 자동 할당한 port 를 조회한다.
+		// Go template 의 `index` 는 `index <obj> <key>` 형태라서 nested 호출은
+		// `(index (index ... ...) 0).HostPort` 처럼 마지막 key 를 field access 로
+		// 표현해야 한다. `index ... ... "HostPort"` 처럼 trailing arg 를 두면
+		// Go template parser 가 "can't give argument to non-function index" 로
+		// 실패한다 — 이전 (TASK-067 1차 PR) 가 이 버그를 안고 있었고 skeleton
+		// mode (mock 38124) 에선 가려져 있었음. cli mode + auto-assign path 의
+		// 첫 live container smoke (Scenario 5) 에서 결정적으로 드러남.
 		inspectArgs := []string{
 			"inspect",
 			"--format",
-			fmt.Sprintf("{{ (index (index .NetworkSettings.Ports \"%d/tcp\") 0) \"HostPort\" }}", opts.InternalPort),
+			fmt.Sprintf("{{(index (index .NetworkSettings.Ports \"%d/tcp\") 0).HostPort}}", opts.InternalPort),
 			opts.ContainerName,
 		}
-		hostPortStr, err := c.runDockerInspect(ctx, inspectArgs)
+		hostPortStr, err := c.runDockerInspectCmd(ctx, inspectArgs)
 		if err == nil && hostPortStr != "" {
 			if p, parseErr := strconv.Atoi(strings.TrimSpace(hostPortStr)); parseErr == nil {
 				hostPort = p
@@ -507,14 +521,20 @@ func (c *Client) SetHealthClientForTest(client *http.Client) {
 	c.healthClient = client
 }
 
-// runDockerInspect 는 `docker inspect` 호출 + 결과 string 반환 (cli mode 한정).
-func (c *Client) runDockerInspect(ctx context.Context, args []string) (string, error) {
+// defaultRunDockerInspect 는 `docker inspect` 호출 + 결과 string 반환.
+func (c *Client) defaultRunDockerInspect(ctx context.Context, args []string) (string, error) {
 	cmd := exec.CommandContext(ctx, c.dockerBin, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+// SetRunDockerInspectCmdForTest 는 test 에서 cli mode 의 docker inspect 호출을
+// 가로채기 위한 seam (RunContainer 의 host port auto-assign readback path).
+func (c *Client) SetRunDockerInspectCmdForTest(fn func(ctx context.Context, args []string) (string, error)) {
+	c.runDockerInspectCmd = fn
 }
 
 // probePort 는 net.Dial 로 TCP port 가 listening 인지 확인한다.

@@ -72,7 +72,7 @@ echo "hello-source-archive" >"${SRC}/hello.txt"
 ARCHIVE="${TMP}/source.tar.gz"
 tar -czf "${ARCHIVE}" -C "${TMP}" src
 SHA="$(sha256sum "${ARCHIVE}" | awk '{print $1}')"
-SIZE="$(wc -c <"${ARCHIVE}")"
+  SIZE="$(wc -c <"${ARCHIVE}" | tr -d ' ')"
 echo "[e2e] archive sha256=${SHA} size=${SIZE}"
 
 # 2. POST /builds
@@ -113,7 +113,7 @@ HEADERS="${TMP}/headers.txt"
 curl -fsS -D "${HEADERS}" -o "${TMP}/download.tar.gz" \
   "${BASE}/builds/${BUILD_ID}/source"
 DOWNLOAD_SHA="$(sha256sum "${TMP}/download.tar.gz" | awk '{print $1}')"
-DOWNLOAD_SIZE="$(wc -c <"${TMP}/download.tar.gz")"
+  DOWNLOAD_SIZE="$(wc -c <"${TMP}/download.tar.gz" | tr -d ' ')"
 if [[ "${DOWNLOAD_SHA}" != "${SHA}" ]]; then
   echo "[e2e] downloaded bytes sha mismatch: expected=${SHA} got=${DOWNLOAD_SHA}"
   exit 1

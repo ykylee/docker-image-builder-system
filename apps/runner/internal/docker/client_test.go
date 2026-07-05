@@ -8,8 +8,10 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
+	"text/template"
 	"time"
 )
 
@@ -285,5 +287,65 @@ func TestPickFreePortReturnsEphemeral(t *testing.T) {
 	}
 	if p <= 0 || p > 65535 {
 		t.Errorf("expected ephemeral port in 1..65535, got %d", p)
+	}
+}
+
+// HostPort=0 auto-assign path 의 docker inspect format template 검증.
+// Scenario 5 의 live container smoke 가 `index ... ... "HostPort"` 형태의 trailing
+// argument 가 Go template parser 에서 "can't give argument to non-function index"
+// 로 실패함을 발견했다 (TASK-067 1차 PR 의 버그). client.go 의 fix 는
+// `(index (index ...) 0).HostPort` 로 끝 key 를 field access 로 표현. 본
+// 테스트는 format string 이 `text/template` 으로 정상 parse 되고, 모킹된
+// docker inspect 출력 (NetworkSettings.Ports 호환 구조체) 을 사용해 host port
+// 가 정확히 추출됨을 보장한다.
+func TestRunContainerCliModeInspectTemplateParsesAndExtractsHostPort(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
+	t.Setenv("RUNNER_DOCKER_BUILD_MODE", "skeleton")
+	t.Setenv("RUNNER_DOCKER_RUN_MODE", "cli")
+
+	client := NewClient()
+
+	const inspectTemplate = `{{(index (index .NetworkSettings.Ports "8080/tcp") 0).HostPort}}`
+	if _, err := template.New("inspect").Parse(inspectTemplate); err != nil {
+		t.Fatalf("template parse failed (regression of Scenario 5 bug): %v", err)
+	}
+
+	// RunContainer 의 inspect-format 빌드식이 위와 같은 문자열을 emit 하는지 검증.
+	var captured []string
+	client.SetRunDockerInspectCmdForTest(func(ctx context.Context, args []string) (string, error) {
+		captured = append([]string(nil), args...)
+		// auto-assign 으로 docker 가 32771 같은 OS ephemeral port 를 골랐다고 가정.
+		return "32771", nil
+	})
+	client.runContainerCmd = func(ctx context.Context, args ...string) error {
+		return nil
+	}
+	status, err := client.RunContainer(context.Background(), ContainerRunOptions{
+		ImageTag:        "img:tag",
+		ContainerName:   "container-test-inspect",
+		HostPort:        0,
+		InternalPort:    8080,
+		HealthcheckPath: "/",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	if len(captured) != 4 || captured[0] != "inspect" || captured[1] != "--format" ||
+		captured[3] != "container-test-inspect" {
+		t.Errorf("unexpected inspect args: %v", captured)
+	}
+	if !strings.Contains(captured[2], ".HostPort}}") {
+		t.Errorf("inspect format must end with .HostPort}} for host-port field access, got: %q", captured[2])
+	}
+	if captured[2] == `{{(index (index .NetworkSettings.Ports "8080/tcp") 0) "HostPort"}}` {
+		t.Errorf("regression: trailing \"HostPort\" arg form re-introduced")
+	}
+	if status.HostPort != 32771 {
+		t.Errorf("expected HostPort=32771 from inspect readback, got %d", status.HostPort)
+	}
+	if !strings.Contains(status.RuntimeURL, "127.0.0.1:32771") {
+		t.Errorf("expected RuntimeURL to embed introspected host port, got %s", status.RuntimeURL)
 	}
 }
