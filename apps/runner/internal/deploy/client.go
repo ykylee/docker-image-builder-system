@@ -1,23 +1,57 @@
 package deploy
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
 const (
 	defaultTargetType = "DOCKER_REGISTRY"
 	defaultTargetRef  = "registry.example.com/docker-image-builder-system"
+	defaultMode       = "skeleton"
+	defaultDockerBin  = "docker"
+	defaultPushTimeout = 120 * time.Second
 )
 
+// DeployOptions 는 Deploy 가 받아들이는 입력. SourceImage 는 local
+// docker daemon 에 이미 존재하는 image tag (BuildImage 가 만든
+// docker-image-builder-system/<buildMode>:<buildID> 형태) 다. cli
+// mode 에선 이 image 를 targetRef:buildID 로 retag 한 뒤 push.
+// skeleton mode 에선 SourceImage 는 무시되고 기존 동작 (deploy-result.json
+// emit) 만 수행되므로 호출자가 image build 결과를 신경쓰지 않아도
+// 된다.
+type DeployOptions struct {
+	SourceImage string
+}
+
+// Client 는 외부 deploy target 으의 adapter. 현재는 단일 target type
+// (DOCKER_REGISTRY) 의 skeleton + cli 두 mode 를 지원한다. skeleton
+// mode 는 기존처럼 deploy-result.json 만 workspace 에 emit 하고 실제
+// 외부 호출은 없다 — test / dry-run 용. cli mode 는 docker tag + push
+// 로 local image 를 targetRef:buildID 로 registry 에 올린다.
 type Client struct {
 	workspaceRoot string
 	targetType    string
 	targetRef     string
+	mode          string
+	dockerBin     string
+	pushTimeout   time.Duration
+	now           func() time.Time
+	// tagImageCmd / pushImageCmd 는 cli mode 의 docker invocation 을
+	// 갈아끼울 수 있게 한다. default 는 exec.CommandContext(dockerBin,
+	// ...). tests 에서 fake command runner 로 교체해 docker daemon
+	// 없이도 검증한다.
+	tagImageCmd  func(ctx context.Context, args ...string) (string, error)
+	pushImageCmd func(ctx context.Context, args ...string) (string, error)
 }
 
 type Result struct {
@@ -26,6 +60,12 @@ type Result struct {
 	ResultRef           string
 	ResponsePayloadJSON map[string]any
 }
+
+// ErrDeploySourceImageMissing 은 cli mode 에서 SourceImage 가 비어
+// 있을 때 반환된다. BuildService.ProcessClaim 은 containerStatus.ImageTag
+// 를 항상 채우므로 production 경로에선 발생하지 않지만, ad-hoc caller
+// / test 가 빈 값을 흘릴 때 silent fallback 대신 명시적 에러로 표면화.
+var ErrDeploySourceImageMissing = errors.New("deploy: SourceImage is required in cli mode")
 
 func NewClient() *Client {
 	workspaceRoot := os.Getenv("RUNNER_WORKSPACE_ROOT")
@@ -43,23 +83,120 @@ func NewClient() *Client {
 		targetRef = defaultTargetRef
 	}
 
-	return &Client{
+	mode := os.Getenv("RUNNER_DEPLOY_MODE")
+	if mode == "" {
+		mode = defaultMode
+	}
+
+	dockerBin := os.Getenv("RUNNER_DOCKER_BIN")
+	if dockerBin == "" {
+		dockerBin = defaultDockerBin
+	}
+
+	pushTimeout := defaultPushTimeout
+	if v := os.Getenv("RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+			pushTimeout = time.Duration(n) * time.Second
+		}
+	}
+
+	c := &Client{
 		workspaceRoot: workspaceRoot,
 		targetType:    targetType,
 		targetRef:     targetRef,
+		mode:          mode,
+		dockerBin:     dockerBin,
+		pushTimeout:   pushTimeout,
+		now:           time.Now,
 	}
+	c.tagImageCmd = c.defaultTagImageCmd
+	c.pushImageCmd = c.defaultPushImageCmd
+	return c
 }
 
-func (c *Client) Deploy(_ context.Context, buildID string) (*Result, error) {
-	workspaceDir := filepath.Join(c.workspaceRoot, buildID)
+// Mode 는 현재 deploy mode (`skeleton` / `cli`) 를 돌려준다. test 와
+// ProcessClaim 의 조건부 분기에서 사용.
+func (c *Client) Mode() string {
+	return c.mode
+}
+
+// PushTimeout 는 cli mode 의 `docker push` timeout. test 가 shorter
+// 값으로 단축 검증할 때 사용.
+func (c *Client) PushTimeout() time.Duration {
+	return c.pushTimeout
+}
+
+// WorkspaceDir 는 per-build workspace 경로. deploy-result.json 이
+// emit 되는 위치와 같다.
+func (c *Client) WorkspaceDir(buildID string) string {
+	return filepath.Join(c.workspaceRoot, buildID)
+}
+
+// Deploy 는 buildID 에 대한 외부 deploy 단계를 수행한다.
+//
+// skeleton mode (default) 는 기존 동작 — workspace/<buildID>/deploy-result.json
+// 을 emit 하고 Result{TargetType, TargetRef, ResultRef=<targetRef>:<buildID>}
+// 를 돌려준다. responsePayload 에는 deliveryMode=POLLING, artifact=
+// ResultRef 가 들어간다.
+//
+// cli mode 는 local SourceImage 를 targetRef:buildID 로 retag 한 뒤
+// `docker push` 로 registry 에 올린다. push 가 성공하면 Result.ResultRef
+// = targetRef:buildID 그대로, responsePayload 에는 deliveryMode +
+// artifact + sourceImage 가 들어간다. docker tag / push 가 non-zero
+// exit 으로 끝나면 그 단계의 stderr 를 error 에 포함해서 caller 가
+// RunReportDeployment 의 errorMessage 로 그대로 노출한다. timeout
+// 은 c.pushTimeout (default 120s, RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS
+// override).
+func (c *Client) Deploy(ctx context.Context, buildID string, opts DeployOptions) (*Result, error) {
+	if buildID == "" {
+		return nil, errors.New("deploy: buildID is required")
+	}
+
+	resultRef := fmt.Sprintf("%s:%s", c.targetRef, buildID)
+
+	if c.mode != "cli" {
+		return c.emitSkeleton(ctx, buildID, resultRef)
+	}
+
+	if opts.SourceImage == "" {
+		return nil, ErrDeploySourceImageMissing
+	}
+
+	if err := c.runTag(ctx, opts.SourceImage, resultRef); err != nil {
+		return nil, fmt.Errorf("deploy: docker tag %s -> %s failed: %w", opts.SourceImage, resultRef, err)
+	}
+
+	if err := c.runPush(ctx, resultRef); err != nil {
+		return nil, fmt.Errorf("deploy: docker push %s failed: %w", resultRef, err)
+	}
+
+	if err := c.writeDeployResult(ctx, buildID, resultRef, opts.SourceImage, "POLLING"); err != nil {
+		return nil, err
+	}
+
+	return &Result{
+		TargetType: c.targetType,
+		TargetRef:  c.targetRef,
+		ResultRef:  resultRef,
+		ResponsePayloadJSON: map[string]any{
+			"deliveryMode": "POLLING",
+			"artifact":     resultRef,
+			"sourceImage":  opts.SourceImage,
+			"deployedAt":   c.now().UTC().Format(time.RFC3339),
+		},
+	}, nil
+}
+
+func (c *Client) emitSkeleton(_ context.Context, buildID, resultRef string) (*Result, error) {
+	workspaceDir := c.WorkspaceDir(buildID)
 	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
 		return nil, fmt.Errorf("deploy: mkdir %s: %w", workspaceDir, err)
 	}
 
-	resultRef := fmt.Sprintf("%s:%s", c.targetRef, buildID)
 	payload := map[string]any{
 		"buildId":      buildID,
-		"deployedAt":   time.Now().UTC().Format(time.RFC3339),
+		"deployedAt":   c.now().UTC().Format(time.RFC3339),
 		"targetType":   c.targetType,
 		"targetRef":    c.targetRef,
 		"resultRef":    resultRef,
@@ -83,4 +220,99 @@ func (c *Client) Deploy(_ context.Context, buildID string) (*Result, error) {
 			"artifact":     resultRef,
 		},
 	}, nil
+}
+
+// writeDeployResult 는 cli mode 가 성공한 뒤에도 workspace 에
+// deploy-result.json 을 남긴다 — 운영자가 빌드 디렉터리만 봐도
+// 어떤 image 가 registry 에 들어갔는지 추적 가능하도록. skeleton
+// mode 의 emitSkeleton 과 같은 path.
+func (c *Client) writeDeployResult(_ context.Context, buildID, resultRef, sourceImage, deliveryMode string) error {
+	workspaceDir := c.WorkspaceDir(buildID)
+	if err := os.MkdirAll(workspaceDir, 0o755); err != nil {
+		return fmt.Errorf("deploy: mkdir %s: %w", workspaceDir, err)
+	}
+
+	payload := map[string]any{
+		"buildId":      buildID,
+		"deployedAt":   c.now().UTC().Format(time.RFC3339),
+		"targetType":   c.targetType,
+		"targetRef":    c.targetRef,
+		"resultRef":    resultRef,
+		"sourceImage":  sourceImage,
+		"deliveryMode": deliveryMode,
+	}
+
+	raw, err := json.MarshalIndent(payload, "", "  ")
+	if err != nil {
+		return fmt.Errorf("deploy: marshal payload: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(workspaceDir, "deploy-result.json"), raw, 0o644); err != nil {
+		return fmt.Errorf("deploy: write deploy result: %w", err)
+	}
+	return nil
+}
+
+func (c *Client) runTag(ctx context.Context, sourceImage, targetRef string) error {
+	_, err := c.tagImageCmd(ctx, "tag", sourceImage, targetRef)
+	return err
+}
+
+func (c *Client) runPush(ctx context.Context, targetRef string) error {
+	pushCtx, cancel := context.WithTimeout(ctx, c.pushTimeout)
+	defer cancel()
+	_, err := c.pushImageCmd(pushCtx, "push", targetRef)
+	return err
+}
+
+// defaultTagImageCmd 는 exec.CommandContext 로 docker tag 를 호출한다.
+// docker tag 는 진행률 출력이 거의 없어 stdout 을 부모 process 로 흘려
+// 운영자가 docker daemon 의 응답을 실시간으로 본다. stderr 는 부모
+// process 로 흘려보내면서 동시에 캡쳐해서 non-zero exit 시 caller 가
+// errorMessage 로 노출할 수 있도록 한다 (docker 가 TLS / auth error 를
+// stderr 로 내보내는 운영 케이스 보존).
+func (c *Client) defaultTagImageCmd(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, c.dockerBin, args...)
+	var stderr bytes.Buffer
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%w (stderr=%s)", err, strings.TrimSpace(stderr.String()))
+	}
+	return "", nil
+}
+
+// defaultPushImageCmd 는 exec.CommandContext 로 docker push 를 호출한다.
+// docker push 는 layer upload 진행률을 stderr 로 출력한다 — 운영자가
+// `e2e-deploy-push.sh` 같은 live smoke 를 돌릴 때 실시간으로 push
+// 진행률을 볼 수 있도록 stderr 를 부모 process 로 흘려보낸다 (TASK-067
+// 의 defaultRunContainerCmd 패턴과 정합). 동시에 캡쳐해서 non-zero
+// exit 시 caller 의 errorMessage 로 노출한다.
+func (c *Client) defaultPushImageCmd(ctx context.Context, args ...string) (string, error) {
+	cmd := exec.CommandContext(ctx, c.dockerBin, args...)
+	var stderr bytes.Buffer
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderr)
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("%w (stderr=%s)", err, strings.TrimSpace(stderr.String()))
+	}
+	return "", nil
+}
+
+// SetTagImageCmdForTest 는 cli mode 의 docker tag 호출을 가로채기 위한
+// seam. production 코드에서는 호출하지 말 것 — 항상
+// `defaultTagImageCmd` 가 설정된 채 NewClient 로 들어온다.
+func (c *Client) SetTagImageCmdForTest(fn func(ctx context.Context, args ...string) (string, error)) {
+	c.tagImageCmd = fn
+}
+
+// SetPushImageCmdForTest 는 cli mode 의 docker push 호출을 가로채기
+// 위한 seam.
+func (c *Client) SetPushImageCmdForTest(fn func(ctx context.Context, args ...string) (string, error)) {
+	c.pushImageCmd = fn
+}
+
+// SetNowForTest 는 deploy-result.json 의 deployedAt 시각 기준을
+// 고정한다. test 의 결과 비교에서 time.Now 의 변동을 제거.
+func (c *Client) SetNowForTest(now func() time.Time) {
+	c.now = now
 }
