@@ -102,4 +102,38 @@ describe("AdminRunners page (TASK-069)", () => {
       expect(screen.getByText(/No runners registered yet/)).toBeTruthy();
     });
   });
+
+  // TASK-070 (PR #23): AdminRunners 의 `.pill.active` / `.pill.off`
+  // 가 ACTIVE / DISABLED 상태에 매핑되며 raw rgb 가 아닌 canonical
+  // 디자인 토큰 (`--color-accent-success` / `--color-accent-danger`)
+  // 기반 `color-mix` 로 정렬되었는지 회귀 가드.
+  it("uses pill.active / pill.off semantics that map to canonical accent tokens", async () => {
+    localStorage.setItem("adminId", "admin");
+    listAdminRunnersMock.mockResolvedValueOnce(fixture);
+    render(AdminRunners);
+    await waitFor(() => expect(screen.getByText("runner-A")).toBeTruthy());
+
+    // ACTIVE 상태 pill 은 .pill.active 클래스를 가진다.
+    const activePills = document.querySelectorAll(".pill.active");
+    expect(activePills.length).toBeGreaterThanOrEqual(1);
+    // ACTIVE pill text 가 정확히 ACTIVE.
+    const activeTexts = Array.from(activePills).map((el) => el.textContent?.trim());
+    expect(activeTexts).toContain("ACTIVE");
+
+    // DISABLED 상태 pill 은 .pill.off 클래스를 가진다.
+    const offPills = document.querySelectorAll(".pill.off");
+    expect(offPills.length).toBeGreaterThanOrEqual(1);
+    // DISABLED pill text 가 정확히 DISABLED.
+    const offTexts = Array.from(offPills).map((el) => el.textContent?.trim());
+    expect(offTexts).toContain("DISABLED");
+
+    // 두 종류가 disjoint 한지 — 같은 cell 이 active 와 off 를 동시에
+    // 가지는 일이 없도록.
+    activePills.forEach((el) => {
+      expect(el.classList.contains("pill.off")).toBe(false);
+    });
+    offPills.forEach((el) => {
+      expect(el.classList.contains("pill.active")).toBe(false);
+    });
+  });
 });
