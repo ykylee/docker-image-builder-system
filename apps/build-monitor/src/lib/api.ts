@@ -294,3 +294,95 @@ export async function removeAdminFromAllowList(
   }
   return result.data;
 }
+
+// ---------------------------------------------------------------------------
+// Runner registry (TASK-069).
+//
+// Mirrors server-side AdminRunner + AdminRunnerListResponse +
+// AdminRunnerPatchRequest/Response + AdminRunnerDeleteResponse. The
+// Build Server exposes:
+//   GET    /admin/runners             -> AdminRunnerListResponse
+//   PATCH  /admin/runners/:runnerId   -> AdminRunnerPatchResponse (DISABLE/REACTIVATE)
+//   DELETE /admin/runners/:runnerId   -> AdminRunnerDeleteResponse (idempotent)
+// All three require X-Admin-Id set to a caller already in the admin allow-list.
+// ---------------------------------------------------------------------------
+
+export type RunnerStatus = "ACTIVE" | "DISABLED";
+
+export interface AdminRunner {
+  runnerId: string;
+  status: RunnerStatus;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  buildsClaimed: number;
+  buildsCompleted: number;
+  currentBuildId: string | null;
+  lastError: string | null;
+}
+
+export interface AdminRunnerListResponse {
+  runners: AdminRunner[];
+}
+
+export interface AdminRunnerPatchRequest {
+  status: RunnerStatus;
+}
+
+export interface AdminRunnerPatchResponse {
+  runner: AdminRunner;
+}
+
+export interface AdminRunnerDeleteResponse {
+  removedRunnerId: string;
+}
+
+export async function listAdminRunners(
+  adminId: string
+): Promise<AdminRunnerListResponse> {
+  return (await apiGet(
+    "/admin/runners",
+    "/admin/runners",
+    { headers: { "x-admin-id": adminId } }
+  )) as AdminRunnerListResponse;
+}
+
+export async function patchAdminRunnerStatus(
+  adminId: string,
+  runnerId: string,
+  status: RunnerStatus
+): Promise<AdminRunnerPatchResponse> {
+  // PATCH /admin/runners/:id 는 path parameter 를 포함 — openapi-fetch 의
+  // dynamic URL substitution 을 우회하기 위해 직접 fetch 헬퍼 호출.
+  const fetchFn = (api as unknown as {
+    PATCH: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).PATCH;
+  const result = (await fetchFn(`/admin/runners/${encodeURIComponent(runnerId)}`, {
+    headers: {
+      "x-admin-id": adminId,
+      "content-type": "application/json"
+    },
+    body: { status }
+  })) as { data?: AdminRunnerPatchResponse; response?: { status?: number } };
+  if (!result.data) {
+    const status = result.response?.status ?? 0;
+    throw new Error(`PATCH /admin/runners/${runnerId} failed: ${status}`);
+  }
+  return result.data;
+}
+
+export async function deleteAdminRunner(
+  adminId: string,
+  runnerId: string
+): Promise<AdminRunnerDeleteResponse> {
+  const fetchFn = (api as unknown as {
+    DELETE: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).DELETE;
+  const result = (await fetchFn(`/admin/runners/${encodeURIComponent(runnerId)}`, {
+    headers: { "x-admin-id": adminId }
+  })) as { data?: AdminRunnerDeleteResponse; response?: { status?: number } };
+  if (!result.data) {
+    const status = result.response?.status ?? 0;
+    throw new Error(`DELETE /admin/runners/${runnerId} failed: ${status}`);
+  }
+  return result.data;
+}

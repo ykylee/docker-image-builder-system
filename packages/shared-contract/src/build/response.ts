@@ -319,7 +319,20 @@ export const claimResponseSchema = z
   .object({
     claimed: z.boolean(),
     build: buildStatusResponseSchema.nullable(),
-    reason: z.enum(["NO_BUILD_AVAILABLE", "ACTIVE_BUILD_EXISTS", "QUEUE_CLAIM_FAILED"]).nullable()
+    reason: z
+      .enum([
+        "NO_BUILD_AVAILABLE",
+        "ACTIVE_BUILD_EXISTS",
+        "QUEUE_CLAIM_FAILED",
+        // TASK-069: admin 가 /admin/runners/:runnerId PATCH 로 status=DISABLED
+        // 로 토글한 러너의 후속 claim. Runner poll loop 가 짧게 backoff.
+        "RUNNER_DISABLED",
+        // Runner 가 자기 id 없이 /builds/claim 호출. v1 에선 명시적으로
+        // backoff (모니터링 알림 의미). 추후 모든 caller 가 id 보장하면
+        // 본 enum 멤버 제거 검토.
+        "RUNNER_ID_REQUIRED"
+      ])
+      .nullable()
   })
   .meta({
     id: "ClaimResponse",

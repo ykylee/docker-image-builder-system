@@ -31,6 +31,11 @@ PYTHON_CANONICAL_MAP: dict[str, tuple[str, str, str]] = {
     "EXECUTION_STATUSES": ("executionStatuses", "status.ts", "executionStatuses"),
     "BUILD_PHASES": ("buildPhases", "phase.ts", "skillPhases"),
     "ERROR_CODES": ("errorCodes", "errors.ts", "skillErrorCodes"),
+    # TASK-069: runner registry status enum (TS/Python/Go 3-way sync anchor).
+    # admin menu 가 DISABLED 로 토글하면 Build Server 가 후속 claim 을 거부 —
+    # 본 sync 가 깨지면 ADMIN UI 의 토글이 server 의 claim gate 와 정합이
+    # 깨질 수 있다.
+    "RUNNER_STATUSES": ("runnerStatuses", "runner-registry.ts", "skillRunnerStatuses"),
 }
 PYTHON_CANONICAL_MODULE = "apps.skill_mcp.contract.canonical"
 
@@ -79,6 +84,13 @@ GO_CANONICAL_MAP: dict[str, tuple[str, str, str, str]] = {
         "errorCodes",
         "errors.ts",
         "goErrorCodes",
+    ),
+    # TASK-069: runner registry status (TS/Python/Go 3-way sync anchor).
+    "runnerStatuses": (
+        "runner_registry.go",
+        "runnerStatuses",
+        "runner-registry.ts",
+        "goRunnerStatuses",
     ),
 }
 GO_CANONICAL_DIR = Path("apps/runner/internal/contract")
@@ -773,6 +785,14 @@ def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftRepor
                 wanted_idents = tuple(p for p in go_consts if p.startswith("Phase"))
             elif group_key == "errorCodes":
                 wanted_idents = tuple(p for p in go_consts if p.startswith("ErrorCode"))
+            elif group_key == "runnerStatuses":
+                # TASK-069: Runner registry status (ACTIVE/DISABLED). The
+                # file is `runner_registry.go`, so a generic prefix filter
+                # would be brittle — explicit ident list.
+                wanted_idents = (
+                    "RunnerStatusActive",
+                    "RunnerStatusDisabled",
+                )
             else:
                 wanted_idents = ()
 

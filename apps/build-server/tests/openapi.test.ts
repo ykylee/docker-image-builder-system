@@ -27,11 +27,14 @@ describe("openapi document", () => {
       "Test Deployment"
     ]);
 
-    // deployment path 가 추가되어 unique path key 가 13개다.
     // unique path keys. 같은 path (/builds) 에 GET + POST 가 merge 됨.
+    // TASK-069: /admin/runners + /admin/runners/{runnerId} 가 추가되어
+    // unique path key 가 16개 (이전 14 + 2).
     const pathKeys = Object.keys(document.paths).sort();
     assert.deepEqual(pathKeys, [
       "/admin/builds",
+      "/admin/runners",
+      "/admin/runners/{runnerId}",
       "/admin/users",
       "/builds",
       "/builds/claim",
@@ -51,8 +54,9 @@ describe("openapi document", () => {
     const buildsMethods = Object.keys(document.paths["/builds"] ?? {}).sort();
     assert.deepEqual(buildsMethods, ["get", "post"]);
 
-    // 15 component schemas (BuildLogEntry 와 BuildSummary 는 zod parse 의
+    // 20 component schemas (BuildLogEntry 와 BuildSummary 는 zod parse 의
     // 응답 envelope 안에서 자동 emit 됨). 마지막 PR 에서 변동 가능.
+    // TASK-069: AdminRunner / AdminRunnerListResponse / PATCH-REQ / PATCH-RESP / DELETE-RESP 추가.
     const schemaKeys = Object.keys(document.components.schemas).sort();
     assert.ok(
       schemaKeys.includes("BuildRequest"),
@@ -85,6 +89,26 @@ describe("openapi document", () => {
     assert.ok(
       schemaKeys.includes("AdminUserListResponse"),
       "AdminUserListResponse schema must be registered"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminRunner"),
+      "AdminRunner schema must be registered (TASK-069)"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminRunnerListResponse"),
+      "AdminRunnerListResponse schema must be registered (TASK-069)"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminRunnerPatchRequest"),
+      "AdminRunnerPatchRequest schema must be registered (TASK-069)"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminRunnerPatchResponse"),
+      "AdminRunnerPatchResponse schema must be registered (TASK-069)"
+    );
+    assert.ok(
+      schemaKeys.includes("AdminRunnerDeleteResponse"),
+      "AdminRunnerDeleteResponse schema must be registered (TASK-069)"
     );
   });
 });

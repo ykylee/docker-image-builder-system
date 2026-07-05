@@ -7,6 +7,10 @@ import {
   adminAllowListResponseSchema,
   adminListBuildsQuerySchema,
   adminListBuildsResponseSchema,
+  adminRunnerDeleteResponseSchema,
+  adminRunnerListResponseSchema,
+  adminRunnerPatchRequestSchema,
+  adminRunnerPatchResponseSchema,
   adminUserListResponseSchema
 } from "@docker-image-builder-system/shared-contract";
 
@@ -304,6 +308,125 @@ export async function registerAdminRoutes(
         adminAllowListRemoveResponseSchema.parse({
           removed: target,
           admins: allowList.list()
+        })
+      );
+    }
+  );
+
+  // -------------------------------------------------------------------------
+  // Admin runner registry endpoints (TASK-069).
+  //
+  //   GET    /admin/runners              -> list all registered runners
+  //   PATCH  /admin/runners/:runnerId    -> DISABLE / REACTIVATE (status)
+  //   DELETE /admin/runners/:runnerId    -> permanent removal
+  //
+  // Runner visibility: every Runner id that has ever called
+  // /builds/claim gets a record (self-register on first claim, idempotent).
+  // Admin 토글이 claim gate 에 반영 — PATCH status=DISABLED 후 다음 claim 은
+  // reason=RUNNER_DISABLED 로 거절된다. 후속 cancellation / rejoin 같은
+  // extension 은 PR scope 밖.
+  // -------------------------------------------------------------------------
+
+  app.get("/admin/runners", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(
+      request.headers[ADMIN_ID_HEADER]
+    );
+    if (!callerId.success) {
+      return reply.status(401).send({
+        message: "Admin id header missing.",
+        header: ADMIN_ID_HEADER
+      });
+    }
+    if (!isAdmin(callerId.data)) {
+      return reply.status(403).send({
+        message: "Caller is not in the admin allow-list.",
+        callerId: callerId.data
+      });
+    }
+    const body = await buildService.listAdminRunners();
+    return reply
+      .status(200)
+      .send(adminRunnerListResponseSchema.parse(body));
+  });
+
+  app.patch<{ Params: { runnerId: string } }>(
+    "/admin/runners/:runnerId",
+    async (request, reply) => {
+      const callerId = adminIdHeaderSchema.safeParse(
+        request.headers[ADMIN_ID_HEADER]
+      );
+      if (!callerId.success) {
+        return reply.status(401).send({
+          message: "Admin id header missing.",
+          header: ADMIN_ID_HEADER
+        });
+      }
+      if (!isAdmin(callerId.data)) {
+        return reply.status(403).send({
+          message: "Caller is not in the admin allow-list.",
+          callerId: callerId.data
+        });
+      }
+      const target = request.params.runnerId;
+      // Runner id 는 admin id 와 달리 broad charset (host 의 어떤 환경 변수도
+      // 가능) — 별도 정규식 없이 zod 가 min(1) 까지만 강제. 미래에
+      // allow-list 정책을 도입할 경우 ADMIN_ID_PATTERN 을 차용할 수 있다.
+      if (!target || target.trim() === "") {
+        return reply.status(400).send({
+          message: "runnerId is required.",
+          target
+        });
+      }
+      const bodyResult = adminRunnerPatchRequestSchema.safeParse(
+        request.body ?? {}
+      );
+      if (!bodyResult.success) {
+        return reply.status(400).send({
+          message: "Invalid admin runner patch request",
+          issues: bodyResult.error.issues
+        });
+      }
+      const updated = await buildService.setAdminRunnerStatus(
+        target,
+        bodyResult.data.status
+      );
+      if (!updated) {
+        return reply.status(404).send({
+          message: "Runner is not registered (no claim seen yet).",
+          runnerId: target
+        });
+      }
+      return reply.status(200).send(
+        adminRunnerPatchResponseSchema.parse({ runner: updated })
+      );
+    }
+  );
+
+  app.delete<{ Params: { runnerId: string } }>(
+    "/admin/runners/:runnerId",
+    async (request, reply) => {
+      const callerId = adminIdHeaderSchema.safeParse(
+        request.headers[ADMIN_ID_HEADER]
+      );
+      if (!callerId.success) {
+        return reply.status(401).send({
+          message: "Admin id header missing.",
+          header: ADMIN_ID_HEADER
+        });
+      }
+      if (!isAdmin(callerId.data)) {
+        return reply.status(403).send({
+          message: "Caller is not in the admin allow-list.",
+          callerId: callerId.data
+        });
+      }
+      const target = request.params.runnerId;
+      // DELETE 는 idempotent — unknown runner 도 200 + { removedRunnerId }
+      // 으로 보고. UI 가 stale entry 클릭해도 surprise 가 없다.
+      await buildService.deleteAdminRunner(target);
+      return reply.status(200).send(
+        adminRunnerDeleteResponseSchema.parse({
+          removedRunnerId: target
         })
       );
     }

@@ -109,6 +109,16 @@ LEGACY_PREVIEW_TO_EXECUTION: dict[str, str] = {
     # member (FAILED) or shim values handled per-case.
 }
 
+# TASK-069: Runner registry status enum. Mirrors
+# `packages/shared-contract/src/build/runner-registry.ts` `runnerStatusSchema`
+# 와 `apps/runner/internal/contract/runner_registry.go` `RunnerStatuses`.
+# Admin menu 가 이 enum 으로 DISABLE / REACTIVATE 토글하며, Build Server 가
+# POST /builds/claim 응답 reason=RUNNER_DISABLED 로 거부 여부를 결정.
+RUNNER_STATUSES: frozenset[str] = frozenset({
+    "ACTIVE",
+    "DISABLED",
+})
+
 # Canonical 4-stage enum for failure-summary-shaper. Marks at which
 # build/test/deploy/result-delivery step a failure happened. Mirrors
 # the new narrative in docs/sdlc/02-concept-refinement.md and the

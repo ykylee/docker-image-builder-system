@@ -20,6 +20,11 @@ const projectRequire = createRequire(import.meta.url);
 import {
   adminListBuildsQuerySchema,
   adminListBuildsResponseSchema,
+  adminRunnerDeleteResponseSchema,
+  adminRunnerListResponseSchema,
+  adminRunnerPatchRequestSchema,
+  adminRunnerPatchResponseSchema,
+  adminRunnerSchema,
   adminUserBuildSummarySchema,
   adminUserListResponseSchema,
   buildErrorSchema,
@@ -87,7 +92,14 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "AdminListBuildsQuery", schema: adminListBuildsQuerySchema },
   { id: "AdminListBuildsResponse", schema: adminListBuildsResponseSchema },
   { id: "AdminUserBuildSummary", schema: adminUserBuildSummarySchema },
-  { id: "AdminUserListResponse", schema: adminUserListResponseSchema }
+  { id: "AdminUserListResponse", schema: adminUserListResponseSchema },
+  // TASK-069: runner registry. Admin endpoints 들은 schema 만 노출하고
+  // path 등록은 registerOpenApiRoutes 호출 시점에 별도로 한다.
+  { id: "AdminRunner", schema: adminRunnerSchema },
+  { id: "AdminRunnerListResponse", schema: adminRunnerListResponseSchema },
+  { id: "AdminRunnerPatchRequest", schema: adminRunnerPatchRequestSchema },
+  { id: "AdminRunnerPatchResponse", schema: adminRunnerPatchResponseSchema },
+  { id: "AdminRunnerDeleteResponse", schema: adminRunnerDeleteResponseSchema }
 ];
 
 // Component registry. We keep a Map from canonical component id to a
@@ -327,6 +339,63 @@ registry.registerPath({
     200: {
       description: "Owner rollup.",
       content: { "application/json": { schema: component("AdminUserListResponse") as never } }
+    },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." }
+  }
+});
+
+// TASK-069: runner registry admin endpoints. Self-register on first claim
+// (Runner 가 별도 등록 절차 없이 첫 POST /builds/claim 호출 시 자동으로
+// ACTIVE record 생성). Admin 이 DISABLE 로 토글하면 다음 claim 부터
+// reason=RUNNER_DISABLED 로 거절된다.
+registry.registerPath({
+  method: "get",
+  path: "/admin/runners",
+  description:
+    "Admin-only. List every registered runner (ACTIVE + DISABLED) sorted by runnerId.",
+  tags: ["Admin"],
+  responses: {
+    200: {
+      description: "Snapshot of the runner registry.",
+      content: { "application/json": { schema: component("AdminRunnerListResponse") as never } }
+    },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." }
+  }
+});
+registry.registerPath({
+  method: "patch",
+  path: "/admin/runners/{runnerId}",
+  description:
+    "Admin-only. Toggle a runner's status (DISABLED blocks future claims, ACTIVE re-enables). 404 for an unknown runner id (no prior claim seen).",
+  tags: ["Admin"],
+  request: {
+    params: z.object({ runnerId: z.string().min(1) }),
+    body: { content: { "application/json": { schema: component("AdminRunnerPatchRequest") as never } } }
+  },
+  responses: {
+    200: {
+      description: "Status toggled.",
+      content: { "application/json": { schema: component("AdminRunnerPatchResponse") as never } }
+    },
+    400: { description: "Invalid status value or empty runnerId." },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." },
+    404: { description: "Runner id has not yet registered (no claim observed)." }
+  }
+});
+registry.registerPath({
+  method: "delete",
+  path: "/admin/runners/{runnerId}",
+  description:
+    "Admin-only. Permanently remove a runner from the registry. Idempotent — unknown runner id still returns 200 with removedRunnerId echoed back so the admin UI can clear stale entries.",
+  tags: ["Admin"],
+  request: { params: z.object({ runnerId: z.string().min(1) }) },
+  responses: {
+    200: {
+      description: "Removed (or already absent).",
+      content: { "application/json": { schema: component("AdminRunnerDeleteResponse") as never } }
     },
     401: { description: "X-Admin-Id header missing." },
     403: { description: "Caller is not in the admin allow-list." }

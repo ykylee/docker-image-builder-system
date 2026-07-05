@@ -1,6 +1,8 @@
 import type {
   AdminListBuildsQuery,
   AdminListBuildsResponse,
+  AdminRunner,
+  AdminRunnerListResponse,
   AdminUserListResponse,
   BuildDuplicateResponse,
   BuildListQuery,
@@ -9,6 +11,7 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   DeploymentReportRequest,
+  RunnerStatus,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
@@ -33,6 +36,23 @@ export type ClaimNextBuildResult =
   | {
       kind: "active_build_exists";
       build: BuildStatusResponse;
+    }
+  | {
+      // TASK-069: admin 이 /admin/runners/:runnerId PATCH 로 status=DISABLED
+      // 로 토글한 러너의 후속 claim. 호스트 측은 200 + `{claimed: false, reason: "RUNNER_DISABLED"}`
+      // 으로 받아들이고 poll loop 가 짧게 backoff 한다. cancelled build 는
+      // NO_BUILD_AVAILABLE 와 동급 — 활성 빌드 claim 다음 cycle 의 자연스러운
+      // 후보이다.
+      kind: "runner_disabled";
+      runnerId: string;
+    }
+  | {
+      // claim 시점에 admin 이 러너를 DELETE 했거나, DELETE 후 새로 들어온
+      // claim 의 본인 runner id 가 unknown 인 경우. 이 경우 Build Server 가
+      // 자동으로 empty record 를 생성하고 (self-register) claim 을 받아들인다.
+      // explicit "unknown runner" result 는 사용하지 않는다 — runner 가 항상
+      // 자기 자신을 등록한 후 claim 이 가능하도록 self-register 후 길을 탄다.
+      kind: "runner_id_required";
     };
 
 export type UpdatePhaseResult =
@@ -223,4 +243,27 @@ export interface BuildRepository {
   // list.
   listBuildsAcrossUsers(query: AdminListBuildsQuery): Promise<AdminListBuildsResponse>;
   listBuildOwners(): Promise<AdminUserListResponse>;
+
+  // TASK-069: runner registry operations. The Runner self-registers on its
+  // first claim (idempotent — calling registerRunner with an existing
+  // runnerId returns the existing record). markRunnerSeen updates
+  // lastSeenAt + (optionally) currentBuildId + bumps the relevant counter.
+  // Admin endpoints (PATCH/DELETE) drive setRunnerStatus / deleteRunner.
+  // listRunners returns the full registry in stable id order for the
+  // /admin/runners page.
+  registerRunner(runnerId: string): Promise<AdminRunner>;
+  markRunnerSeen(
+    runnerId: string,
+    currentBuildId: string | null,
+    event: "claimed" | "completed" | "failed"
+  ): Promise<AdminRunner | null>;
+  listRunners(): Promise<AdminRunnerListResponse>;
+  setRunnerStatus(runnerId: string, status: RunnerStatus): Promise<AdminRunner | null>;
+  deleteRunner(runnerId: string): Promise<{ removed: true } | { removed: false }>;
+  // Read-only helper used by `BuildService.claimNextBuild` to gate the
+  // call against the registry. Returns ACTIVE / DISABLED / null (unknown).
+  // Unknown runners are auto-registered on first claim, so `null` means
+  // "first time we've seen this id — let the call proceed and then
+  // register".
+  getRunnerStatus(runnerId: string): Promise<RunnerStatus | null>;
 }

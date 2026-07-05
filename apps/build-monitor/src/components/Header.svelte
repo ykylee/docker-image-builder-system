@@ -83,6 +83,7 @@
         <a use:link href="/admin/builds">Admin · Builds</a>
         <a use:link href="/admin/users">Admin · Users</a>
         <a use:link href="/admin/admins">Admin · Admins</a>
+        <a use:link href="/admin/runners">Admin · Runners</a>
         <button class="logout-btn" onclick={adminLogout}>Admin Logout</button>
       {:else}
         <a use:link href="/admin/login" class="admin-link">Admin</a>

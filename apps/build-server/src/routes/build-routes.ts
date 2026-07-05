@@ -102,7 +102,11 @@ export async function registerBuildRoutes(
     }
     const payload = payloadResult.data;
     void payload.capabilities;
-    const result = await buildService.claimNextBuild();
+    // TASK-069: claim 의 canonical runnerId 를 Build Service 에 넘긴다.
+    // BuildService 가 registry 의 DISABLED 여부를 검사 + successful claim
+    // 시 registerRunner + markRunnerSeen 으로 누적. 빈 문자열 / 누락은
+    // service 단에서 RUNNER_ID_REQUIRED reason 으로 거부된다.
+    const result = await buildService.claimNextBuild(payload.runnerId);
     const validated = claimResponseSchema.parse(result);
     return reply.status(200).send(validated);
   });
@@ -130,7 +134,11 @@ export async function registerBuildRoutes(
         allowed: buildPhases
       });
     }
-    const result = await buildService.reportPhase(paramsResult.data.buildId, payload.phase);
+    const result = await buildService.reportPhase(
+      paramsResult.data.buildId,
+      payload.phase,
+      payload.runnerId
+    );
     if (result.kind === "not_found") {
       return reply.status(404).send({
         message: "Build not found."

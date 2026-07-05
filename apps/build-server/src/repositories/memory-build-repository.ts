@@ -23,6 +23,11 @@ import type {
 
 import { nowIsoString } from "../lib/time.js";
 import type {
+  AdminRunner,
+  AdminRunnerListResponse,
+  RunnerStatus
+} from "@docker-image-builder-system/shared-contract";
+import type {
   BuildRepository,
   ClaimNextBuildResult,
   CreateBuildResult,
@@ -68,6 +73,22 @@ type StoredBuild = {
   phaseHistory: { phase: BuildPhase; completedAt: string }[];
   currentPhaseStartedAt: string | null;
 };
+
+// TASK-069: stored runner registry state. The in-memory repo keeps a
+// `StoredRunner` per registered id at module scope (same lifetime as
+// `sourceArchives`). The fields mirror `AdminRunner` 1:1 — convert
+// through `toAdminRunner` for the public shape.
+type StoredRunner = {
+  runnerId: string;
+  status: RunnerStatus;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  buildsClaimed: number;
+  buildsCompleted: number;
+  currentBuildId: string | null;
+  lastError: string | null;
+};
+const runners = new Map<string, StoredRunner>();
 
 function emptyTestDeployment(updatedAt: string): TestDeployment {
   return {
@@ -816,7 +837,117 @@ export function createMemoryBuildRepository(): BuildRepository {
         return { kind: "not_found" };
       }
       return { kind: "ok" };
+    },
+
+    // -------------------------------------------------------------------------
+    // TASK-069: runner registry (admin menu backing store).
+    //
+    // registerRunner is idempotent — first claim from a runner id auto-
+    // creates the record (status=ACTIVE, firstSeenAt=lastSeenAt=now). 
+    // markRunnerSeen updates lastSeenAt + (optionally) currentBuildId and
+    // bumps the counter that matches the lifecycle event. The Build
+    // Service invokes registerRunner on every successful claim and
+    // markRunnerSeen on claim / phase=DOCKER_BUILD_COMPLETED /
+    // phase=FAILED.
+    // -------------------------------------------------------------------------
+
+    async registerRunner(runnerId: string): Promise<AdminRunner> {
+      const now = nowIsoString();
+      let stored = runners.get(runnerId);
+      if (!stored) {
+        stored = {
+          runnerId,
+          status: "ACTIVE",
+          firstSeenAt: now,
+          lastSeenAt: now,
+          buildsClaimed: 0,
+          buildsCompleted: 0,
+          currentBuildId: null,
+          lastError: null
+        };
+        runners.set(runnerId, stored);
+      } else {
+        // Idempotent re-register: leave status as-is (preserves admin's
+        // DISABLE toggle across Runner restarts), refresh lastSeenAt so
+        // the admin UI's freshness signal is current.
+        stored.lastSeenAt = now;
+      }
+      return toAdminRunner(stored);
+    },
+
+    async markRunnerSeen(
+      runnerId: string,
+      currentBuildId: string | null,
+      event: "claimed" | "completed" | "failed"
+    ): Promise<AdminRunner | null> {
+      const stored = runners.get(runnerId);
+      if (!stored) {
+        // 첫 markRunnerSeen 이 registerRunner 보다 먼저 호출되면 (예: phase
+        // 보고가 claim 보다 앞에 있는 잘못된 호출 순서) — null 반환. 호출자는
+        // registerRunner 를 먼저 부르는 것을 강제하지 않고, 정합만 보장.
+        // 실제 phase machine 은 claim 이후에만 phase 보고를 받으므로 정상
+        // 흐름에선 발생하지 않는다.
+        return null;
+      }
+      stored.lastSeenAt = nowIsoString();
+      if (event === "claimed") {
+        stored.buildsClaimed += 1;
+        stored.currentBuildId = currentBuildId;
+      } else if (event === "completed") {
+        stored.buildsCompleted += 1;
+        // 빌드가 terminal 으로 끝나면 currentBuildId 를 비운다 (in-flight 가
+        // 아니므로). admin UI 가 "지금 뭐 돌고 있지" 를 정확히 표시할 수 있도록.
+        stored.currentBuildId = null;
+        stored.lastError = null;
+      } else {
+        // failed: lastError 는 호출자가 별도로 채움 (Build Service 가
+        // updatePhase 후 BuildError 값을 보유하고 있으므로 service 단에서
+        // set 한다). 여기서는 currentBuildId 만 비운다.
+        stored.currentBuildId = null;
+      }
+      return toAdminRunner(stored);
+    },
+
+    async listRunners(): Promise<AdminRunnerListResponse> {
+      const sorted = Array.from(runners.values()).sort((a, b) =>
+        a.runnerId.localeCompare(b.runnerId)
+      );
+      return { runners: sorted.map(toAdminRunner) };
+    },
+
+    async setRunnerStatus(runnerId: string, status: RunnerStatus) {
+      const stored = runners.get(runnerId);
+      if (!stored) {
+        return null;
+      }
+      stored.status = status;
+      return toAdminRunner(stored);
+    },
+
+    async deleteRunner(runnerId: string) {
+      const existed = runners.delete(runnerId);
+      return existed ? { removed: true as const } : { removed: false as const };
+    },
+
+    async getRunnerStatus(runnerId: string): Promise<RunnerStatus | null> {
+      const stored = runners.get(runnerId);
+      return stored ? stored.status : null;
     }
+  };
+}
+
+// TASK-069: StoredRunner → AdminRunner 변환. Repo 내부 상태는 PII-free
+// (UUID/canonical id 만 보관) — 변환은 단순히 field rename 만 한다.
+function toAdminRunner(stored: StoredRunner): AdminRunner {
+  return {
+    runnerId: stored.runnerId,
+    status: stored.status,
+    firstSeenAt: stored.firstSeenAt,
+    lastSeenAt: stored.lastSeenAt,
+    buildsClaimed: stored.buildsClaimed,
+    buildsCompleted: stored.buildsCompleted,
+    currentBuildId: stored.currentBuildId,
+    lastError: stored.lastError
   };
 }
 

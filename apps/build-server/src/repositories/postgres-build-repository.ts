@@ -9,6 +9,7 @@ import {
   buildRequestTable,
   desc,
   deploymentAttemptTable,
+  runnerTable,
   sql,
   type DatabaseClient
 } from "@docker-image-builder-system/db";
@@ -17,6 +18,8 @@ import { eq, inArray } from "@docker-image-builder-system/db";
 import type {
   AdminListBuildsQuery,
   AdminListBuildsResponse,
+  AdminRunner,
+  AdminRunnerListResponse,
   AdminUserBuildSummary,
   AdminUserListResponse,
   AdminUserSummary,
@@ -33,6 +36,7 @@ import type {
   DeploymentReportRequest,
   ErrorCode,
   PreviewStatus,
+  RunnerStatus,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
@@ -1147,4 +1151,150 @@ export class PostgresBuildRepository implements BuildRepository {
     }
     return { kind: "ok" };
   }
+
+  // -------------------------------------------------------------------------
+  // TASK-069: runner registry (admin menu backing store, postgres variant).
+  //
+  // The schema lives in `packages/db/src/schema/runner.ts` and the migration
+  // in `apps/build-server/migrations/0005_runner_registry.sql`. Memory + postgres
+  // repos implement the same 6 methods on the `BuildRepository` interface
+  // so the admin routes don't care which backend is wired.
+  // -------------------------------------------------------------------------
+
+  async registerRunner(runnerId: string): Promise<AdminRunner> {
+    // PostgreSQL upsert: ON CONFLICT (runner_id) DO UPDATE — preserve status
+    // (admin 의 DISABLED 토글이 runner 재시작 시 사라지지 않게), but bump
+    // last_seen_at to keep the freshness signal honest.
+    const inserted = await this.db
+      .insert(runnerTable)
+      .values({
+        runnerId,
+        status: "ACTIVE",
+        firstSeenAt: sql`NOW()`,
+        lastSeenAt: sql`NOW()`,
+        buildsClaimed: 0,
+        buildsCompleted: 0,
+        currentBuildId: null,
+        lastError: null
+      })
+      .onConflictDoUpdate({
+        target: runnerTable.runnerId,
+        set: {
+          lastSeenAt: sql`NOW()`
+        }
+      })
+      .returning();
+    const row = inserted[0];
+    if (!row) {
+      // ON CONFLICT DO UPDATE 의 returning() 는 항상 row 를 반환해야 하지만
+      // 타입 가드를 위해 안전망 추가.
+      throw new Error(`registerRunner(${runnerId}) returned no row`);
+    }
+    return rowToAdminRunner(row);
+  }
+
+  async markRunnerSeen(
+    runnerId: string,
+    currentBuildId: string | null,
+    event: "claimed" | "completed" | "failed"
+  ): Promise<AdminRunner | null> {
+    // Conditional UPDATE — counter/event 의 분기를 event 별 SQL fragment 로
+    // 표현. WHERE runner_id matches; returns null if not found so callers
+    // can register-on-first-call 패턴을 강제하지 않고도 정합 보장.
+    if (event === "claimed") {
+      const updated = await this.db
+        .update(runnerTable)
+        .set({
+          lastSeenAt: sql`NOW()`,
+          currentBuildId,
+          buildsClaimed: sql`${runnerTable.buildsClaimed} + 1`
+        })
+        .where(eq(runnerTable.runnerId, runnerId))
+        .returning();
+      return updated[0] ? rowToAdminRunner(updated[0]) : null;
+    }
+    if (event === "completed") {
+      const updated = await this.db
+        .update(runnerTable)
+        .set({
+          lastSeenAt: sql`NOW()`,
+          currentBuildId: null,
+          buildsCompleted: sql`${runnerTable.buildsCompleted} + 1`,
+          lastError: null
+        })
+        .where(eq(runnerTable.runnerId, runnerId))
+        .returning();
+      return updated[0] ? rowToAdminRunner(updated[0]) : null;
+    }
+    // failed
+    const updated = await this.db
+      .update(runnerTable)
+      .set({
+        lastSeenAt: sql`NOW()`,
+        currentBuildId: null
+      })
+      .where(eq(runnerTable.runnerId, runnerId))
+      .returning();
+    return updated[0] ? rowToAdminRunner(updated[0]) : null;
+  }
+
+  async listRunners(): Promise<AdminRunnerListResponse> {
+    const rows = await this.db
+      .select()
+      .from(runnerTable)
+      .orderBy(asc(runnerTable.runnerId));
+    return { runners: rows.map(rowToAdminRunner) };
+  }
+
+  async setRunnerStatus(runnerId: string, status: RunnerStatus) {
+    const updated = await this.db
+      .update(runnerTable)
+      .set({ status })
+      .where(eq(runnerTable.runnerId, runnerId))
+      .returning();
+    return updated[0] ? rowToAdminRunner(updated[0]) : null;
+  }
+
+  async deleteRunner(runnerId: string) {
+    const deleted = await this.db
+      .delete(runnerTable)
+      .where(eq(runnerTable.runnerId, runnerId))
+      .returning({ runnerId: runnerTable.runnerId });
+    return deleted.length > 0
+      ? ({ removed: true as const })
+      : ({ removed: false as const });
+  }
+
+  async getRunnerStatus(runnerId: string): Promise<RunnerStatus | null> {
+    const row = await this.db
+      .select({ status: runnerTable.status })
+      .from(runnerTable)
+      .where(eq(runnerTable.runnerId, runnerId))
+      .limit(1);
+    return row[0] ? (row[0].status as RunnerStatus) : null;
+  }
+}
+
+// TASK-069: postgres → AdminRunner 변환. row 의 status 는 text 로 저장되지만
+// canonical enum 으로 narrow 한다 (DB 가 enum 제약이 없으므로 가드).
+function rowToAdminRunner(row: {
+  runnerId: string;
+  status: string;
+  firstSeenAt: Date;
+  lastSeenAt: Date;
+  buildsClaimed: number;
+  buildsCompleted: number;
+  currentBuildId: string | null;
+  lastError: string | null;
+}): AdminRunner {
+  return {
+    runnerId: row.runnerId,
+    status: row.status === "DISABLED" ? "DISABLED" : "ACTIVE",
+    firstSeenAt: row.firstSeenAt.toISOString(),
+    lastSeenAt: row.lastSeenAt.toISOString(),
+    buildsClaimed: row.buildsClaimed,
+    buildsCompleted: row.buildsCompleted,
+    currentBuildId: row.currentBuildId,
+    lastError: row.lastError
+  };
 }

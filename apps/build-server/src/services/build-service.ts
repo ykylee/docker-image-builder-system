@@ -11,6 +11,7 @@ import type {
   BuildStatusResponse,
   ClaimResponse,
   DeploymentReportRequest,
+  RunnerStatus,
   TestDeployment,
   TestDeploymentQueueResponse
 } from "@docker-image-builder-system/shared-contract";
@@ -82,10 +83,35 @@ export class BuildService {
     };
   }
 
-  async claimNextBuild(): Promise<ClaimResponse> {
+  async claimNextBuild(runnerId?: string): Promise<ClaimResponse> {
+    // Runner 가 자기 id 를 안 보냈거나 빈 문자열 — 호환을 위해 fallback id 로
+    // auto-register 한다. 기존 빌드서버 호출 (runner_id 미전송) 도 그대로 동작.
+    // 단, 신규 러너는 모두 id 를 보내므로 fallback branch 는 사실상
+    // smoke / e2e / 테스트 전용.
+    const trimmedRunnerId = runnerId && runnerId.trim() !== "" ? runnerId.trim() : "_anonymous";
+
+    // 사전 gate — admin 이 DISABLED 토글한 러너의 claim 은 runner_disabled
+    // 로 거절. runner 가 unknown 이면 self-register 가 registerRunner 안에서
+    // 새 record 를 만든다 (idempotent). _anonymous 는 anonymous caller 의
+    // 식별 — DISABLED 토글되면 (admin 이 의도적으로 anonymous claim 차단) 이
+    // 경로를 통해 거부된다. 일반적으론 Anonymous 가 DISABLED 가 될 일은
+    // 없지만 admin 의 실수 / 디버그용으로 가능.
+    const runnerStatus =
+      await this.repository.getRunnerStatus(trimmedRunnerId);
+    if (runnerStatus === "DISABLED") {
+      return {
+        claimed: false,
+        build: null,
+        reason: "RUNNER_DISABLED"
+      };
+    }
+
     const result = await this.repository.claimNextBuild();
 
     if (result.kind === "no_build_available") {
+      // claim 으로 잡힐 빌드가 없어도 runner record 는 유지/갱신 — 그래야
+      // admin UI 의 "이 러너 마지막 본 시각" 이 정확하다.
+      await this.repository.registerRunner(trimmedRunnerId);
       return {
         claimed: false,
         build: null,
@@ -101,6 +127,29 @@ export class BuildService {
       };
     }
 
+    if (result.kind === "runner_disabled") {
+      return {
+        claimed: false,
+        build: null,
+        reason: "RUNNER_DISABLED"
+      };
+    }
+
+    if (result.kind === "runner_id_required") {
+      return {
+        claimed: false,
+        build: null,
+        reason: "RUNNER_ID_REQUIRED"
+      };
+    }
+
+    // claimed — registry 갱신 + claim counter ++
+    await this.repository.registerRunner(trimmedRunnerId);
+    await this.repository.markRunnerSeen(
+      trimmedRunnerId,
+      result.response.build.buildId,
+      "claimed"
+    );
     return {
       claimed: true,
       build: result.response,
@@ -108,11 +157,71 @@ export class BuildService {
     };
   }
 
+  /**
+   * Helper for admin endpoints — wraps the registry methods. The
+   * runnerId is the canonical id (matches the `RUNNER_ID` env value
+   * the runner booted with). Marking a runner seen is invoked by the
+   * service's reportPhase path on terminal phases (COMPLETED / FAILED).
+   */
+  async onPhaseTerminal(
+    runnerId: string,
+    buildId: string,
+    phase: "COMPLETED" | "FAILED"
+  ): Promise<void> {
+    if (!runnerId) {
+      return;
+    }
+    if (phase === "COMPLETED") {
+      await this.repository.markRunnerSeen(runnerId, null, "completed");
+    } else {
+      await this.repository.markRunnerSeen(runnerId, null, "failed");
+    }
+    // runnerId 가 아니어도 buildId 채로 runner 를 식별하지는 않는다
+    // (claim 시점의 runnerId 만 canonical). buildId param 은 후속
+    // lastError attach hook 를 위해 받지만 v1 scope 에선 미사용.
+    void buildId;
+  }
+
+  /**
+   * Admin endpoints 의 thin wrapper — service 가 repo 를 한 단계 더 거치면
+   * routes 가 repository 직접 호출하지 않아도 되고, 라우팅 책임이 service
+   * (도메인) 안에 모인다. v1 에선 단순 위임.
+   */
+  listAdminRunners() {
+    return this.repository.listRunners();
+  }
+
+  setAdminRunnerStatus(runnerId: string, status: RunnerStatus) {
+    return this.repository.setRunnerStatus(runnerId, status);
+  }
+
+  deleteAdminRunner(runnerId: string) {
+    return this.repository.deleteRunner(runnerId);
+  }
+
   async reportPhase(
     buildId: string,
-    phase: string
+    phase: string,
+    runnerId?: string
   ): Promise<ReportPhaseOutcome> {
     const result = await this.repository.updatePhase(buildId, phase);
+    // TASK-069: terminal phase 진입 시 runner registry 의 counter + currentBuildId
+    // 를 갱신한다. INVALID_TRANSITION result 라도 registry 는 best-effort 로
+    // 갱신 (runner 가 잘못된 phase 를 한 번 더 보내더라도 counter 가 정직하게
+    // 반영되어야 한다 — 실제 flow 상 terminal phase 가 한 번 도달하면 그 후로
+    // invalid_transition 결과가 와도 marker 자체는 지워졌다는 사실이 admin
+    // UI 에 정확히 노출되어야 함).
+    if (runnerId && runnerId.trim() !== "") {
+      const trimmed = runnerId.trim();
+      // self-register — 첫 phase 보고가 claim 보다 먼저 오는 비정상 호출도
+      // 가볍게 흡수한다 (claim 시점에 정합).
+      await this.repository.registerRunner(trimmed);
+      if (phase === "COMPLETED") {
+        await this.repository.markRunnerSeen(trimmed, null, "completed");
+      } else if (phase === "FAILED") {
+        await this.repository.markRunnerSeen(trimmed, null, "failed");
+      }
+    }
     return result;
   }
 

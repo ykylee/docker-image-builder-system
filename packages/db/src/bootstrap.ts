@@ -116,6 +116,31 @@ const bootstrapStatements = [
   `
     CREATE INDEX IF NOT EXISTS build_source_checksum_idx
     ON build_source (checksum_sha256)
+  `,
+  // TASK-069: runner registry. Single TEXT PK (runner_id = canonical id
+  // from RUNNER_ID env). counters + status + timestamps + optional
+  // current_build_id + last_error. See 0005_runner_registry.sql for the
+  // migration that mirrors this shape (idempotent); postgres backend's
+  // build-server wired migrations auto-run on boot.
+  `
+    CREATE TABLE IF NOT EXISTS runner (
+      runner_id TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'ACTIVE',
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      builds_claimed BIGINT NOT NULL DEFAULT 0,
+      builds_completed INTEGER NOT NULL DEFAULT 0,
+      current_build_id TEXT,
+      last_error TEXT
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX IF NOT EXISTS runner_runner_id_idx
+    ON runner (runner_id)
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS runner_status_last_seen_idx
+    ON runner (status, last_seen_at)
   `
 ];
 
