@@ -250,7 +250,15 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return err
 	}
 
-	deployResult, err := s.deployer.Deploy(ctx, buildID)
+	// TASK-068: cli mode 의 deploy adapter 는 local SourceImage
+	// (`docker-image-builder-system/<buildMode>:<buildID>`) 를
+	// registry 에 push 한다. skeleton mode 는 SourceImage 가 local
+	// docker daemon 에 없을 수 있어 opts.SourceImage 를 비워두고
+	// 그대로 skeleton 동작을 탄다 (기존과 동일 — workspace 에
+	// deploy-result.json 만 emit).
+	deployResult, err := s.deployer.Deploy(ctx, buildID, deploy.DeployOptions{
+		SourceImage: containerStatus.ImageTag,
+	})
 	if err != nil {
 		_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
 			Status:       contract.ExecutionStatusFailed,

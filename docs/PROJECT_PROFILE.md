@@ -6,7 +6,7 @@
 - 범위: 프로젝트 개요, 문서 구조, 기본 명령, 검증 포인트, 예외 규칙
 - 대상 독자: 개발자, 운영자, AI agent, 프로젝트 온보딩 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-03
+- 최종 수정일: 2026-07-05
 - 관련 문서: [공통 표준](../ai-workflow/core/global_workflow_standard.md)
 
 ## 1. 프로젝트 개요
@@ -56,6 +56,7 @@
 - 출처: `docs/sdlc/08-build-server-tech-stack-baseline.md`, `docs/sdlc/09-repository-package-structure-baseline.md`
 - 소스 아카이브 라운드트립 (TASK-066): `POST/GET/DELETE /builds/:buildId/source` 3종. Skill 은 `POST /builds` 로 `sourceArchive` 메타데이터 (objectKey + sha256 + size) 를 선언한 뒤, 동일 buildId 로 raw archive bytes 를 `application/octet-stream` 으로 POST. Runner 는 `GET /builds/:buildId/source` 로 bytes + `X-Source-Checksum-Sha256` 헤더 검증 후 `<workspaceRoot>/<buildID>/src/` 에 추출. 재업로드/교체 는 last-write-wins, cleanup 은 `DELETE /builds/:buildId/source`. e2e: `apps/build-server/scripts/e2e-source-archive.sh` (memory) + `e2e-source-archive-postgres.sh` (postgres bytea direct verify).
 - 메모: `apps/build-server`는 현재 `BUILD_REPOSITORY_BACKEND=memory|postgres` 두 경로를 모두 가진다. `postgres`는 Colima + Docker + `docker-image-builder-postgres`(127.0.0.1:15432) 기준 live smoke까지 통과했다. 현재 `tsconfig` 산출물은 `dist/apps/build-server/src/index.js` 경로를 사용한다. `pnpm --filter @docker-image-builder-system/build-server dev` 는 `tsx` build script 승인 이후 dev watch 경로로 재개방한다.
+- 외부 deploy (TASK-068): `apps/runner/internal/deploy/client.go` adapter 는 `RUNNER_DEPLOY_MODE` env 로 `skeleton` (default, `deploy-result.json` 만 workspace 에 emit) / `cli` (real `docker tag <sourceImage> <targetRef>:<buildID>` + `docker push`, timeout `RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS` default 120s) 두 모드 지원. `RUNNER_DEPLOY_TARGET_TYPE` (default `DOCKER_REGISTRY`) / `RUNNER_DEPLOY_TARGET_REF` (default `registry.example.com/docker-image-builder-system`) / `RUNNER_DOCKER_BIN` (default `docker`). BuildService.ProcessClaim 가 `containerStatus.ImageTag` 를 `DeployOptions.SourceImage` 로 전달 — cli mode 일 때 registry 에 push, skeleton mode 일 때 SourceImage 무시 (기존 동작 보존). e2e: `apps/runner/scripts/e2e-deploy-push.sh` (Build Server memory backend + local `registry:2` 부팅 + busybox Dockerfile + Runner cli mode + registry `/v2/<repo>/tags/list` 검증 + cleanup).
 
 ## 3.1 활성 워크플로우 자산 (Active Skills / MCPs)
 - 본 프로젝트가 표준 워크플로우 키트(`ai-workflow/`)에서 active로 채택한 자산을 정리한다. 미채택 prototype은 명시적으로 deferred 처리한다.
