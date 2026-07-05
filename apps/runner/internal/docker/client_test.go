@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -251,13 +252,13 @@ func TestProbePortAndHealth(t *testing.T) {
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	// srv.Listener.Addr() 에서 port 추출.
+	// srv.Listener.Addr() 에서 host/port 추출 후 probe/health 에 그대로 넘긴다.
 	host, portStr, err := net.SplitHostPort(srv.Listener.Addr().String())
 	if err != nil {
 		t.Fatalf("split host/port: %v", err)
 	}
-	var port int
-	if _, err := fmtSscan(portStr, &port); err != nil {
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
 		t.Fatalf("parse port: %v", err)
 	}
 
@@ -272,22 +273,17 @@ func TestProbePortAndHealth(t *testing.T) {
 	}
 }
 
-// fmtSscan 은 strconv.Atoi 의 thin wrapper — test file 의 import cycle 을
-// 피하기 위해 inline 으로 둔다.
-func fmtSscan(s string, dst *int) (int, error) {
-	// s 가 정수가 아니면 에러. 단순 파서.
-	n := 0
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		if c < '0' || c > '9' {
-			return 0, &strconvErr{s: s}
-		}
-		n = n*10 + int(c-'0')
+// pickFreePort 가 OS ephemeral port 를 받아오는지 검증 — 현재는
+// BuildService.WithHostPort=0 + cli mode 의 host-side port pre-allocation
+// 용도로 정의돼 있고, RunContainer 의 hostPort=0 path 는 docker auto-assign
+// 으로 처리한다. 후속 TASK (port collision retry) 에서 실제 호출처가 생길
+// 예정이지만 지금은 dead code 가 되지 않도록 직접 호출 테스트로 커버.
+func TestPickFreePortReturnsEphemeral(t *testing.T) {
+	p, err := pickFreePort()
+	if err != nil {
+		t.Fatalf("pickFreePort: %v", err)
 	}
-	*dst = n
-	return 1, nil
+	if p <= 0 || p > 65535 {
+		t.Errorf("expected ephemeral port in 1..65535, got %d", p)
+	}
 }
-
-type strconvErr struct{ s string }
-
-func (e *strconvErr) Error() string { return "invalid integer: " + e.s }

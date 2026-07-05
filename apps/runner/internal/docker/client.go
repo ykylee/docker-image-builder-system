@@ -345,8 +345,13 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 
 	// host port 가 0 이었으면 docker 가 자동 할당한 port 를 조회한다.
 	// `docker inspect --format '{{ (index (index .NetworkSettings.Ports "<internalPort>/tcp") 0) "HostPort" }}' <name>`.
-	// inspect 실패 시에도 RunContainer 는 status 만 못 채우고 반환한다
-	// (caller 가 WaitForHealth 의 port-open probe 로 재시도 가능).
+	// inspect 실패 (docker daemon race / inspect format mismatch / 빈 응답)
+	// 시 status.HostPort == 0 으로 그대로 반환한다 — caller (BuildService) 가
+	// 그대로 ReportPreviewReady 에 :0 URL 을 흘려보내면 downstream 에서 잘못된
+	// previewUrl 이 노출되므로, BuildService 가 HostPort=0 으로 빌드할 때는
+	// pickFreePort 로 OS ephemeral port 를 미리 잡아 host 포트로 명시적으로
+	// 넘기는 편이 안전하다. 그 경로는 후속 TASK 의 port-collision retry 정책과
+	// 함께 도입 예정 (현재는 docker auto-assign + best-effort inspect).
 	if hostPort == 0 {
 		inspectArgs := []string{
 			"inspect",
