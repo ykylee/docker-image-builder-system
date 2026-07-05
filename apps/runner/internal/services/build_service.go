@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
@@ -16,13 +17,31 @@ import (
 )
 
 type BuildService struct {
-	hostClient   hostclient.BuildControlClient
-	docker       *docker.Client
-	fetcher      *source.Fetcher
-	deployer     *deploy.Client
-	runnerID     string
-	internalPort int // default 8080, env override PREVIEW_INTERNAL_PORT
+	hostClient     hostclient.BuildControlClient
+	docker         *docker.Client
+	fetcher        *source.Fetcher
+	deployer       *deploy.Client
+	runnerID       string
+	internalPort   int // default 8080, env override PREVIEW_INTERNAL_PORT
 	dockerfilePath string // default "Dockerfile", env override RUNNER_DOCKERFILE_PATH
+	// hostPort 는 ReportPreviewReady 가 노출할 container 의 host port.
+	// 0 이면 RunContainer 가 cli mode 에서 OS 가 알려주는 ephemeral
+	// port 를 잡는다 (default). test 는 BuildService.WithHostPort 로
+	// fake health server 의 port 를 명시적으로 주입해 probe 결과를
+	// 결정적으로 만든다.
+	hostPortOverride int
+	// healthcheckPath 와 healthcheckTimeout 은 BuildRequest 의 그것을
+	// 그대로 받아쓰지 않고 env override (RUNNER_HEALTHCHECK_PATH /
+	// RUNNER_HEALTHCHECK_TIMEOUT_SECONDS) 도 받는다. 1차 PR 은
+	// BuildRequest 에 두 필드를 노출하지 않고 env 만 사용 — 후속 PR 에서
+	// BuildRequest 의 optional 필드로 정식 승격.
+	healthcheckPath    string
+	healthcheckTimeout time.Duration
+	// stopContainerOnDone 가 true 면 ReportPreviewReady 가 끝난 뒤
+	// container 를 stop + remove 한다. 1차 PR 은 false 가 기본 —
+	// preview URL 이 test deployment 동안 살아있어야 하므로. e2e
+	// script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 검증.
+	stopContainerOnDone bool
 }
 
 func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *docker.Client, fetcher *source.Fetcher, runnerID string) *BuildService {
@@ -37,14 +56,30 @@ func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *doc
 	if dockerfilePath == "" {
 		dockerfilePath = "Dockerfile"
 	}
+	healthcheckPath := os.Getenv("RUNNER_HEALTHCHECK_PATH")
+	if healthcheckPath == "" {
+		healthcheckPath = "/"
+	}
+	healthcheckTimeout := 30 * time.Second
+	if v := os.Getenv("RUNNER_HEALTHCHECK_TIMEOUT_SECONDS"); v != "" {
+		var n int
+		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
+			healthcheckTimeout = time.Duration(n) * time.Second
+		}
+	}
+	stopOnDone := os.Getenv("RUNNER_STOP_CONTAINER_ON_DONE") == "true"
+
 	return &BuildService{
-		hostClient:     hostClient,
-		docker:         dockerClient,
-		fetcher:        fetcher,
-		deployer:       deploy.NewClient(),
-		runnerID:       runnerID,
-		internalPort:   port,
-		dockerfilePath: dockerfilePath,
+		hostClient:          hostClient,
+		docker:              dockerClient,
+		fetcher:             fetcher,
+		deployer:            deploy.NewClient(),
+		runnerID:            runnerID,
+		internalPort:        port,
+		dockerfilePath:      dockerfilePath,
+		healthcheckPath:     healthcheckPath,
+		healthcheckTimeout:  healthcheckTimeout,
+		stopContainerOnDone: stopOnDone,
 	}
 }
 
@@ -143,18 +178,60 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return err
 	}
 
-	// report PREVIEW_READY (test deployment URL)
-	previewURL := fmt.Sprintf("http://preview.local/%s", buildID)
-	host := "preview.local"
-	hostPort := 38124
+	// TASK-067: real container run + healthcheck. queueTestDeployment 가
+	// 받아들여진 직후 BuildImage 가 만든 image 로 docker container 를 띄우고
+	// HTTP healthcheck / TCP port open 이 안정될 때까지 polling 한다.
+	// 성공 시 ContainerStatus 의 runtimeUrl / host / hostPort / containerRef
+	// 를 그대로 ReportPreviewReady 에 전달한다 — mock 값 (preview.local,
+	// 38124, container-<id>) 대신 진짜 binding 정보를 노출한다.
+	//
+	// hostPort=0 으로 두면 RunContainer 가 cli mode 일 때 OS 가 알려주는
+	// ephemeral port 를 잡아 그걸 사용하고, skeleton mode 일 때는 기존
+	// 38124 fallback 을 그대로 사용한다. BuildService 는 그 결정에
+	// 개입하지 않아 두 mode 사이의 일관성을 유지한다.
+	containerName := fmt.Sprintf("container-%s", buildID)
+	runOpts := docker.ContainerRunOptions{
+		ImageTag:           s.docker.ImageTagFor(buildID),
+		ContainerName:      containerName,
+		HostPort:           s.hostPortOverride,
+		InternalPort:       s.internalPort,
+		HealthcheckPath:    s.healthcheckPath,
+		HealthcheckTimeout: s.healthcheckTimeout,
+		StabilityWindow:    5 * time.Second,
+	}
+
+	containerStatus, err := s.docker.RunContainer(ctx, runOpts)
+	if err != nil {
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
+		return fmt.Errorf("runner %s: run container: %w", s.runnerID, err)
+	}
+
+	if _, err := s.docker.WaitForHealth(ctx, containerStatus, s.healthcheckTimeout); err != nil {
+		// healthcheck 실패는 terminal — container stop 후 FAILED 보고.
+		_ = s.docker.StopContainer(context.Background(), containerStatus.ContainerRef)
+		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
+		return fmt.Errorf("runner %s: container healthcheck: %w", s.runnerID, err)
+	}
+
+	// 1차 PR scope: container 가 PREVIEW_READY 동안 살아있어야 하므로
+	// 자동 stop 안 함. e2e script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로
+	// 켜고 cleanup 검증.
+	if s.stopContainerOnDone {
+		defer func() {
+			if err := s.docker.StopContainer(context.Background(), containerStatus.ContainerRef); err != nil {
+				log.Printf("runner %s stop container failed: %v", s.runnerID, err)
+			}
+		}()
+	}
+
 	if err := s.hostClient.ReportPreviewReady(ctx, buildID, hostclient.PreviewReadyRequest{
-		PreviewURL:            previewURL,
-		Host:                  host,
-		HostPort:              hostPort,
-		ContainerRef:          fmt.Sprintf("container-%s", buildID),
-		HealthCheckPassed:     true,
-		PortOpen:              true,
-		StabilityWindowPassed: true,
+		PreviewURL:            containerStatus.RuntimeURL,
+		Host:                  containerStatus.Host,
+		HostPort:              containerStatus.HostPort,
+		ContainerRef:          containerStatus.ContainerRef,
+		HealthCheckPassed:     containerStatus.HealthCheckPassed,
+		PortOpen:              containerStatus.PortOpen,
+		StabilityWindowPassed: containerStatus.StabilityWindowPassed,
 		RunnerID:              s.runnerID,
 	}); err != nil {
 		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
@@ -213,4 +290,13 @@ func (s *BuildService) reportPhase(ctx context.Context, buildID, phase string) e
 	}
 	log.Printf("runner %s reported phase: buildID=%s phase=%s", s.runnerID, buildID, phase)
 	return nil
+}
+
+// WithHostPort 는 BuildService 가 RunContainer 에 넘길 host port 를
+// 명시적으로 강제한다. port 0 이면 RunContainer 가 cli mode 일 때
+// 자체 결정 (ephemeral port) 으로 돌아간다. test 가 fake health
+// server 의 port 와 probe / report 를 동기화할 때 사용.
+func (s *BuildService) WithHostPort(port int) *BuildService {
+	s.hostPortOverride = port
+	return s
 }
