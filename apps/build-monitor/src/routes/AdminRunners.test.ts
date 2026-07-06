@@ -103,37 +103,51 @@ describe("AdminRunners page (TASK-069)", () => {
     });
   });
 
-  // TASK-070 (PR #23): AdminRunners 의 `.pill.active` / `.pill.off`
-  // 가 ACTIVE / DISABLED 상태에 매핑되며 raw rgb 가 아닌 canonical
-  // 디자인 토큰 (`--color-accent-success` / `--color-accent-danger`)
-  // 기반 `color-mix` 로 정렬되었는지 회귀 가드.
-  it("uses pill.active / pill.off semantics that map to canonical accent tokens", async () => {
+  // TASK-070 (PR #23) + TASK-072 (PR #25) 회귀 가드. v1 (PR #23) 의
+  // inline `<span class="pill active/off">` 가 canonical `<StatusPill>`
+  // 컴포넌트로 승격됨. StatusPill 의 colorFor 매핑에 RunnerStatus
+  // (ACTIVE / DISABLED) 가 추가되어 (TASK-072) 디자인 토큰 정렬 + semantic
+  // 색상이 그대로 승계된다.
+  it("renders ACTIVE / DISABLED runner status via canonical StatusPill with semantic tokens", async () => {
     localStorage.setItem("adminId", "admin");
     listAdminRunnersMock.mockResolvedValueOnce(fixture);
     render(AdminRunners);
     await waitFor(() => expect(screen.getByText("runner-A")).toBeTruthy());
 
-    // ACTIVE 상태 pill 은 .pill.active 클래스를 가진다.
-    const activePills = document.querySelectorAll(".pill.active");
-    expect(activePills.length).toBeGreaterThanOrEqual(1);
-    // ACTIVE pill text 가 정확히 ACTIVE.
-    const activeTexts = Array.from(activePills).map((el) => el.textContent?.trim());
-    expect(activeTexts).toContain("ACTIVE");
+    // ACTIVE runner 의 StatusPill 이 "Status: ACTIVE" aria-label 로 노출.
+    const activePill = screen.getByRole("status", { name: "Status: ACTIVE" });
+    expect(activePill).toBeInTheDocument();
+    // inline `--pill-color` 가 canonical success 토큰.
+    expect((activePill as HTMLElement).style.getPropertyValue("--pill-color")).toBe(
+      "var(--color-accent-success)"
+    );
 
-    // DISABLED 상태 pill 은 .pill.off 클래스를 가진다.
-    const offPills = document.querySelectorAll(".pill.off");
-    expect(offPills.length).toBeGreaterThanOrEqual(1);
-    // DISABLED pill text 가 정확히 DISABLED.
-    const offTexts = Array.from(offPills).map((el) => el.textContent?.trim());
-    expect(offTexts).toContain("DISABLED");
+    // DISABLED runner 의 StatusPill 이 "Status: DISABLED" aria-label 로 노출.
+    const disabledPill = screen.getByRole("status", { name: "Status: DISABLED" });
+    expect(disabledPill).toBeInTheDocument();
+    // inline `--pill-color` 가 canonical danger 토큰.
+    expect((disabledPill as HTMLElement).style.getPropertyValue("--pill-color")).toBe(
+      "var(--color-accent-danger)"
+    );
 
-    // 두 종류가 disjoint 한지 — 같은 cell 이 active 와 off 를 동시에
-    // 가지는 일이 없도록.
-    activePills.forEach((el) => {
-      expect(el.classList.contains("pill.off")).toBe(false);
-    });
-    offPills.forEach((el) => {
-      expect(el.classList.contains("pill.active")).toBe(false);
-    });
+    // 두 StatusPill 이 disjoint (서로 다른 element).
+    expect(activePill).not.toBe(disabledPill);
+  });
+
+  // TASK-072 회귀 가드: inline `.pill` 클래스 (raw rgb 디자인) 가 더는
+  // 노출되지 않음 — canonical StatusPill 으로 전면 전환된 결과.
+  // (이전 PR #23 의 `.pill.active` / `.pill.off` 셀렉터는 StatusPill 의
+  // component-scoped `.pill` (hashed) 와 매치 안 되므로 회귀가드 의미
+  // 자체가 canonical 승격으로 무효화됨.)
+  it("no longer exposes inline pill.active / pill.off raw-rgb design", async () => {
+    localStorage.setItem("adminId", "admin");
+    listAdminRunnersMock.mockResolvedValueOnce(fixture);
+    render(AdminRunners);
+    await waitFor(() => expect(screen.getByText("runner-A")).toBeTruthy());
+
+    // inline `.pill.active` / `.pill.off` (raw rgb 디자인) 가 더는 매치 안 됨.
+    // 모든 StatusPill 의 .pill (component-scoped, hashed) 만 존재.
+    expect(document.querySelectorAll(".pill.active").length).toBe(0);
+    expect(document.querySelectorAll(".pill.off").length).toBe(0);
   });
 });

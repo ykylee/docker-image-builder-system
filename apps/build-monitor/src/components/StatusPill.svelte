@@ -2,12 +2,19 @@
   /**
    * StatusPill — DESIGN.md §3 Components.
    * color + text + uppercase mono 로 status 를 명확히 encode (color blindness 대비).
-   * a11y: role="status" + aria-label="Build status: <STATUS>"
+   * a11y: role="status" + aria-label="Status: <STATUS>"
    *
    * TASK-060: lifecycleStatus 가 전달되면 (canonical 12-state union) 그 값을
    * 우선 사용하고, 없으면 legacy `status` 로 fallback 한다. BuildSummary 의
    * 두 status 가 동시 emit 되는 migration window 동안 UI 가 두 status 를 모두
    * 안정적으로 표시하도록 한다.
+   *
+   * TASK-072: RunnerStatus (ACTIVE / DISABLED) 도 의미 있게 매핑. AdminRunners
+   * 가 inline `<span class="pill ...">` 대신 canonical StatusPill 을 쓰도록
+   * 승격하면서 colorFor 매핑에 `ACTIVE` → success, `DISABLED` → danger 추가.
+   * aria-label 의 "Build status:" prefix 는 BuildSummary 만 의미가 있어서
+   * "Status:" 로 일반화 — BuildSummary / RunnerStatus / 미래 추가 kind 모두
+   * 자연스러운 label.
    */
   let { status, lifecycleStatus }: { status: string; lifecycleStatus?: string } = $props();
 
@@ -47,6 +54,14 @@
         return "var(--color-accent-info)";
       case "EXPIRED":
         return "var(--color-text-secondary)";
+      // RunnerStatus (TASK-069 / TASK-072) — admin Runner registry 의
+      // 가시화 status. ACTIVE = success (운영 가능), DISABLED = danger
+      // (admin 이 disable 한 상태). 같은 색상 의미론을 BuildSummary 의
+      // success / failed 와 일치시켜 운영자가 두 화면을 번갈아 봐도 직관적.
+      case "ACTIVE":
+        return "var(--color-accent-success)";
+      case "DISABLED":
+        return "var(--color-accent-danger)";
       // UNKNOWN 도 secondary — light 모드 에서 --color-text-muted 가
       // 15% alpha-mix 시 canvas 에 거의 안 보임. (TASK-046 QA)
       default:
@@ -65,7 +80,7 @@
 <span
   class="pill"
   role="status"
-  aria-label="Build status: {label}"
+  aria-label="Status: {label}"
   style="--pill-color: {color}"
 >{label}</span>
 

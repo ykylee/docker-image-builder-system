@@ -106,7 +106,7 @@ describe("BuildsList", () => {
     render(BuildsList);
     await waitFor(() =>
       expect(
-        screen.getByRole("status", { name: /Build status: DEPLOYING/i })
+        screen.getByRole("status", { name: /Status: DEPLOYING/i })
       ).toBeInTheDocument()
     );
   });
