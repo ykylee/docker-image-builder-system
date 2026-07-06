@@ -155,14 +155,17 @@
     border: none;
     cursor: pointer;
     transition: all var(--motion-duration-fast) var(--motion-easing-standard);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    /* raw rgba 잔재 정리 (TASK-083) — 동일 primary click surface 의
+       일관성 위해 디자인 토큰 `--shadow-glow` 사용. dark / light 모드별 자동
+       follow. */
+    box-shadow: var(--shadow-glow);
     text-decoration: none;
     display: inline-flex;
     align-items: center;
   }
   .btn-primary:hover {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5);
+    box-shadow: var(--shadow-glow);
   }
   .btn-secondary {
     padding: var(--space-sm) var(--space-xl);

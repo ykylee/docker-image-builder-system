@@ -547,11 +547,13 @@
     border: none;
     cursor: pointer;
     transition: all var(--motion-duration-fast) var(--motion-easing-standard);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    /* TASK-083: 디자인 토큰 `--shadow-glow` 정렬 — raw rgba 잔재 정리.
+       동일 primary click surface 의 일관성. dark / light 모드별 자동 follow. */
+    box-shadow: var(--shadow-glow);
   }
   .btn-primary:hover:not(:disabled) {
     transform: translateY(-1px);
-    box-shadow: 0 6px 16px rgba(99, 102, 241, 0.5);
+    box-shadow: var(--shadow-glow);
   }
   .btn-primary:disabled {
     opacity: 0.6;

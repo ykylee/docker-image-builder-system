@@ -139,7 +139,7 @@
     height: 32px;
     border-radius: var(--radius-md);
     background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-info));
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+    box-shadow: var(--shadow-glow);
   }
   .logo {
     color: white;
