@@ -1,0 +1,74 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — multi-runner self-dogfood compose override
+# =============================================================================
+#  TASK-081-B 의 운영 검증용 override. compose.dev.yaml 의 `runner` service 를
+#  그대로 두고 (`dibs-runner`, RUNNER_ID=runner-compose-1), 추가 runner
+#  `runner2` / `runner3` 를 같은 image 로 띄운다. 각 runner 는 다른
+#  `RUNNER_ID` 로 self-register 하므로 admin 의 `/admin/runners` 페이지에서
+#  3 개 row 가 보인다.
+#
+#  사용:
+#    # 환경 변수 (TASK-078 과 동일 — silent fallback 없이 강제)
+#    export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
+#    export ADMIN_IDS=admin
+#
+#    # memory backend + 3 runner
+#    docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml up -d
+#
+#    # log 추적
+#    docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml logs -f runner runner2 runner3
+#
+#    # 종료 + cleanup
+#    docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml down -v
+#
+#  주의:
+#    - 새 runner service 의 build context / dockerfile / image 는 compose.dev.yaml
+#      의 runner 와 동일하게 명시 (extends 는 compose-spec 에서 deprecated).
+#    - HOST_SERVER_BASE_URL 은 build-server service name 으로 자동 resolve.
+#      override 에서 다시 명시하지 않으면 부모 compose 의 값을 inherit.
+#    - 모든 runner 가 host docker socket 을 공유 mount 한다 — 동일한 권한으로
+#      host 데몬 RPC 호출. self-dogfood 용 단순화. 운영에서는 rootless
+#      DinD 또는 별도 runner node 로 격리 검토 (후속 TASK).
+# =============================================================================
+
+services:
+  runner2:
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    image: dibs/runner:dev
+    container_name: dibs-runner-2
+    restart: on-failure
+    depends_on:
+      build-server:
+        condition: service_healthy
+    environment:
+      HOST_SERVER_BASE_URL: http://build-server:3000
+      RUNNER_ID: runner-multi-2
+      RUNNER_POLL_INTERVAL: 5s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_SOCKET_GID:?DOCKER_SOCKET_GID must be set; run 'getent group docker | cut -d: -f3' on the host}"
+    mem_limit: 512m
+
+  runner3:
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    image: dibs/runner:dev
+    container_name: dibs-runner-3
+    restart: on-failure
+    depends_on:
+      build-server:
+        condition: service_healthy
+    environment:
+      HOST_SERVER_BASE_URL: http://build-server:3000
+      RUNNER_ID: runner-multi-3
+      RUNNER_POLL_INTERVAL: 5s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_SOCKET_GID:?DOCKER_SOCKET_GID must be set; run 'getent group docker | cut -d: -f3' on the host}"
+    mem_limit: 512m
