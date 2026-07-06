@@ -318,9 +318,18 @@ export class PostgresBuildRepository implements BuildRepository {
         };
       }
 
+      // TASK-080: gate claim on source archive presence. Inner-joining
+      // build_source mirrors the in-memory repo's
+      // `sourceArchives.has(buildId)` check — a build whose source
+      // bytes have not yet been uploaded is not eligible for claim.
+      // Without this, a Runner that claims the build before the
+      // Skill finishes uploading hits a 404 on
+      // `/builds/:id/source` and the build fails immediately. See
+      // `docs/operations/dogfood-e2e-2026-07-06.md` §3.2.
       const [nextRow] = await tx
-        .select()
+        .select({ build: buildRequestTable })
         .from(buildRequestTable)
+        .innerJoin(buildSourceTable, eq(buildSourceTable.buildId, buildRequestTable.id))
         .where(eq(buildRequestTable.status, "QUEUED"))
         .orderBy(asc(buildRequestTable.createdAt))
         .limit(1);
@@ -329,10 +338,15 @@ export class PostgresBuildRepository implements BuildRepository {
         return { kind: "no_build_available" };
       }
 
+      // The inner-joined select projects the build row as `build`
+      // (Task-080 source-gate). Pull it out so the rest of this
+      // block continues to read flat fields from the build row.
+      const nextBuild = nextRow.build;
+
       const timestamp = new Date();
       const nextPhaseHistory = advancePhaseHistory(
-        (nextRow.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
-        nextRow.phase as BuildPhase,
+        (nextBuild.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
+        nextBuild.phase as BuildPhase,
         "QUEUE_CLAIMED",
         timestamp.toISOString()
       );
@@ -347,7 +361,7 @@ export class PostgresBuildRepository implements BuildRepository {
         })
         .where(
           and(
-            eq(buildRequestTable.id, nextRow.id),
+            eq(buildRequestTable.id, nextBuild.id),
             eq(buildRequestTable.status, "QUEUED")
           )
         )

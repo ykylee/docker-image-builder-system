@@ -234,7 +234,22 @@ export function createMemoryBuildRepository(): BuildRepository {
         };
       }
 
-      const next = queueOrder.find((entry) => entry.summary.status === "QUEUED");
+      // TASK-080: skip builds whose source archive bytes have not been
+      // uploaded yet. The Skill is expected to POST /builds/:id/source
+      // immediately after POST /builds; the build is not eligible for
+      // claim until the bytes arrive. Without this gate, a Runner that
+      // claims the build before the Skill finishes uploading hits a
+      // 404 on /builds/:id/source and the build fails immediately. See
+      // `docs/operations/dogfood-e2e-2026-07-06.md` §3.2 for the
+      // observed race (failed build ids d4b86bb8 / b20f5746 / b9d6d047).
+      // The bytes live in the module-scoped `sourceArchives` Map
+      // (keyed by buildId) — its presence mirrors the existence of a
+      // row in the postgres `build_source` table.
+      const next = queueOrder.find(
+        (entry) =>
+          entry.summary.status === "QUEUED" &&
+          sourceArchives.has(entry.summary.buildId)
+      );
       if (!next) {
         return { kind: "no_build_available" };
       }

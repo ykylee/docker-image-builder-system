@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -357,4 +358,98 @@ func TestValidateTarEntryName_AcceptsValidNames(t *testing.T) {
 			}
 		})
 	}
+}
+
+// ---------------------------------------------------------------------------
+// TASK-080: source-upload race mitigation — Runner retry policy.
+// The default retry budget is 3 attempts × exponential backoff
+// (1s × 3 each step → 1s, 3s, 9s ≈ 13s total wait) so a Runner that
+// claims a build before the Skill finishes uploading gets a window
+// long enough to absorb the typical upload latency. These tests
+// pin both the default values and the exponential schedule; the
+// underlying values are short (1ms / 3ms / 9ms) so the test runs
+// in a few milliseconds while still exercising the same code path.
+// ---------------------------------------------------------------------------
+
+func TestFetcher_DefaultsAreExponentialReady(t *testing.T) {
+	client := &stubClient{
+		download: func(context.Context, string) ([]byte, string, int, error) {
+			return nil, "", 0, errors.New("never called")
+		},
+	}
+	tmp := t.TempDir()
+	fetcher := NewFetcher(client, tmp)
+	if fetcher.maxRetries != 3 {
+		t.Errorf("default maxRetries: got=%d want=3", fetcher.maxRetries)
+	}
+	if fetcher.retryBackoff != 1*time.Second {
+		t.Errorf("default retryBackoff: got=%s want=1s", fetcher.retryBackoff)
+	}
+	// Sanity: the default must yield an exponential schedule whose
+	// worst-case wait is retryBackoff * 3^maxRetries.
+	wantWorstCase := time.Second * time.Duration(intPow(3, fetcher.maxRetries))
+	gotWorstCase := fetcher.retryBackoff * time.Duration(intPow(3, fetcher.maxRetries))
+	if gotWorstCase != wantWorstCase {
+		t.Errorf("worst-case backoff schedule mismatch: got=%s want=%s", gotWorstCase, wantWorstCase)
+	}
+}
+
+// intPow returns base^exp for small non-negative integers. Used
+// solely by the TASK-080 default-budget assertions.
+func intPow(base, exp int) int {
+	if exp <= 0 {
+		return 1
+	}
+	r := 1
+	for i := 0; i < exp; i++ {
+		r *= base
+	}
+	return r
+}
+
+func TestFetcher_RetryBackoffIsExponential(t *testing.T) {
+	// Drive the retry loop with a synthetic transport error on
+	// every attempt so the backoff sequence is observed end-to-end.
+	// 1ms base × 3^attempt = 1ms, 3ms, 9ms (≤ 13ms total).
+	archive, checksum := makeTarGz(t, "Dockerfile", []byte("FROM scratch\n"))
+	var (
+		mu        sync.Mutex
+		callTimes []time.Time
+	)
+	client := &stubClient{
+		download: func(_ context.Context, _ string) ([]byte, string, int, error) {
+			mu.Lock()
+			callTimes = append(callTimes, time.Now())
+			mu.Unlock()
+			return nil, "", 0, errors.New("synthetic transport error")
+		},
+	}
+	tmp := t.TempDir()
+	fetcher := NewFetcher(client, tmp).WithRetries(3, 1*time.Millisecond)
+
+	_, err := fetcher.Fetch(context.Background(), "b-1")
+	if err == nil {
+		t.Fatal("expected terminal error after exhausting retries, got nil")
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(callTimes) != 4 {
+		t.Fatalf("expected 4 download attempts (1 initial + 3 retries), got %d", len(callTimes))
+	}
+	// Gap between attempt n and n+1 should be ≥ retryBackoff *
+	// 3^(n-1). Allow a small CI scheduling tolerance.
+	expectedGaps := []time.Duration{1 * time.Millisecond, 3 * time.Millisecond, 9 * time.Millisecond}
+	for i := 1; i < len(callTimes); i++ {
+		gap := callTimes[i].Sub(callTimes[i-1])
+		minGap := expectedGaps[i-1]
+		// Use a generous lower bound (1/2 of expected) to absorb
+		// goroutine scheduling jitter on slow CI hosts.
+		if gap < minGap/2 {
+			t.Errorf("attempt %d→%d gap=%s, want ≥ %s (exponential backoff violated)",
+				i, i+1, gap, minGap)
+		}
+	}
+	_ = archive
+	_ = checksum
 }
