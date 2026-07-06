@@ -63,6 +63,16 @@ export type BuildListResponse = components["schemas"]["BuildListResponse"];
 export type BuildListQuery = components["schemas"]["BuildListQuery"];
 export type BuildLogEntry = components["schemas"]["BuildLogEntry"];
 
+// TASK-079 (skill 측 build request UI): BuildRequest payload + 응답 type 을
+// openapi-generated components schema 의 structural shape 와 동기화.
+// BuildRequest 자체는 .generated/openapi.d.ts 의 `BuildRequest` component
+// schema 와 1:1 매핑. submitBuildRequest 호출 시 BuildAcceptedResponse 와
+// BuildDuplicateResponse 를 모두 받을 수 있어 union 으로 노출.
+export type BuildRequestPayload = components["schemas"]["BuildRequest"];
+export type BuildAcceptedResponse = components["schemas"]["BuildAcceptedResponse"];
+export type BuildDuplicateResponse = components["schemas"]["BuildDuplicateResponse"];
+export type BuildRequestResponse = BuildAcceptedResponse | BuildDuplicateResponse;
+
 // BuildLogsResponse 는 OpenAPI 에 별도 schema 로 emit 되지 않음
 // (registerPath 의 response 가 inline `buildLogEntrySchema[]` 만 가리킴,
 // envelope 없음). 1차 inline 정의. 후속 PR 에서 buildLogsResponseSchema
@@ -116,6 +126,43 @@ export async function getBuildLogs(
     `/builds/${buildId}/logs`,
     { params: { path: { buildId }, query: since ? { since } : {} } }
   )) as BuildLogsResponse;
+}
+
+// TASK-079 (skill 측 build request UI): POST /builds helper.
+//
+// openapi-fetch 의 `POST` 동적 URL 치환 helper 를 직접 호출. 응답 envelope 은
+// 202 (BuildAcceptedResponse) 또는 409 (BuildDuplicateResponse) 둘 다 가능
+// — caller 가 `result.duplicate` 분기로 새 build 와 중복 build 를 구분.
+//
+// 표준 검증 시나리오:
+//   1. fresh appName → { accepted: true, duplicate: false, build }
+//   2. 같은 appName 재시도 → { accepted: false, duplicate: true, reason: "ACTIVE_BUILD_EXISTS", build }
+//   3. invalid payload → fetchFn 이 throw (openapi-fetch 가 4xx/5xx 를 error 로 wrapping)
+export async function submitBuildRequest(
+  payload: BuildRequestPayload,
+  options: { headers?: Record<string, string> } = {}
+): Promise<BuildRequestResponse> {
+  const fetchFn = (api as unknown as {
+    POST: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).POST;
+  const result = (await fetchFn("/builds", {
+    headers: {
+      "content-type": "application/json",
+      ...(options.headers ?? {})
+    },
+    body: payload
+  })) as {
+    data?: BuildRequestResponse;
+    error?: unknown;
+    response?: { status?: number };
+  };
+  if (result.data) {
+    return result.data;
+  }
+  const status = result.response?.status ?? 0;
+  throw new Error(
+    `POST /builds failed: ${status} ${JSON.stringify(result.error)}`
+  );
 }
 
 // ---------------------------------------------------------------------------

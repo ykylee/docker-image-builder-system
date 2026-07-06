@@ -70,6 +70,11 @@
       {#if userId}
         <span class="user-id mono">@{userId}</span>
         <a use:link href="/builds">Builds</a>
+        <!-- TASK-079 (skill 측 build request UI): 일반 인증 사용자 (admin
+             여부 무관) 가 POST /builds payload 를 직접 작성해 lifecycle
+             을 시험할 수 있는 진입점. Header 의 첫 nav 로 노출하여
+             로그인 직후 가장 빠르게 접근 가능하도록 함. -->
+        <a use:link href="/build-request">New Build</a>
         <button class="logout-btn" onclick={logout}>Logout</button>
       {/if}
       {#if effectiveAdminId}
@@ -81,8 +86,14 @@
         <a use:link href="/admin/builds">Admin</a>
       {/if}
       <div class="divider"></div>
-      <a href="/openapi.json" target="_blank" rel="noopener">API</a>
-      <a href="/docs" target="_blank" rel="noopener">Docs</a>
+      <!-- API Console: SPA 안에서 Swagger UI 를 임베드한 페이지.
+           build 요청을 시험하면서 동시에 OpenAPI contract 를 확인할 수 있게
+           함. 외부 `/docs/` 로 새 탭 열기보다 SPA 흐름 유지가 자연스러움. -->
+      <a use:link href="/api-console" data-testid="hdr-api-console">API Console</a>
+      <!-- OpenAPI: raw JSON spec — 다운로드 / 외부 검증 도구 입력용. -->
+      <a href="/openapi.json" target="_blank" rel="noopener" data-testid="hdr-openapi">OpenAPI</a>
+      <!-- Docs: build-server Swagger UI 를 외부 새 탭에서 열기. -->
+      <a href="/docs/" target="_blank" rel="noopener" data-testid="hdr-docs">Docs</a>
       <div class="divider"></div>
       <ThemeToggle />
     </nav>
