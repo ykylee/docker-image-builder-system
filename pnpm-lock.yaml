@@ -85,6 +85,9 @@ importers:
       '@docker-image-builder-system/shared-contract':
         specifier: workspace:*
         version: link:../../packages/shared-contract
+      '@fastify/static':
+        specifier: ^9.0.0
+        version: 9.1.3
       '@fastify/swagger':
         specifier: ^9.7.0
         version: 9.7.0
