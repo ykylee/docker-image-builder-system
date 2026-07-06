@@ -53,11 +53,48 @@ func newWorkerWithDeps(cfg config.Config, client hostclient.BuildControlClient) 
 	}
 }
 
+// claimBackoff 는 연속 claim 실패에 대한 exponential backoff.
+//
+//	attempt 1: 1 × pollInterval
+//	attempt 2: 2 × pollInterval
+//	attempt 3: 4 × pollInterval
+//	attempt 4: 8 × pollInterval
+//	... capped at 5 min.
+//
+// claim 자체가 err 가 아니거나 claim 이 nil 인 경우는 정상 (server healthy
+// / no builds available) — backoff 카운트 미증가.
+//
+// 일반 process claim 실패 (build 는 받았지만 실행 중 에러) 는 별개 —
+// phase reporter 가 build server 에 FAILED 상태로 보고하므로 backoff 와
+// 분리. process failure 가 누적되어도 poll 자체는 계속.
+func (w *Worker) claimBackoff(consecutiveFailures int) time.Duration {
+	if consecutiveFailures <= 0 {
+		return 0
+	}
+	maxBackoff := 5 * time.Minute
+	base := w.config.PollInterval
+	d := base
+	for i := 0; i < consecutiveFailures-1 && d < maxBackoff; i++ {
+		d *= 2
+	}
+	if d > maxBackoff {
+		d = maxBackoff
+	}
+	return d
+}
+
 func (w *Worker) Run(ctx context.Context) error {
 	ticker := time.NewTicker(w.config.PollInterval)
 	defer ticker.Stop()
 
 	log.Printf("runner started: id=%s host=%s poll=%s", w.config.RunnerID, w.config.HostServerBaseURL, w.config.PollInterval)
+
+	// consecutive claim *error* count. claim 이 nil 이면 reset, err 면
+	// increment. process failure 는 별도.
+	var consecutiveClaimErrors int
+	// log suppression — 같은 에러의 반복 출력 rate limit (5초 throttle).
+	var lastLogTime time.Time
+	const logThrottle = 5 * time.Second
 
 	for {
 		select {
@@ -67,13 +104,35 @@ func (w *Worker) Run(ctx context.Context) error {
 		case <-ticker.C:
 			claim, err := w.claimer.ClaimNext(ctx)
 			if err != nil {
-				log.Printf("claim error: %v", err)
+				consecutiveClaimErrors++
+				backoff := w.claimBackoff(consecutiveClaimErrors)
+				now := time.Now()
+				if now.Sub(lastLogTime) >= logThrottle || consecutiveClaimErrors == 1 {
+					log.Printf("claim error (failure=%d, backoff=%s): %v",
+						consecutiveClaimErrors, backoff, err)
+					lastLogTime = now
+				}
+				// backoff sleep — ctx cancel 시 즉시 종료.
+				if backoff > 0 {
+					select {
+					case <-ctx.Done():
+						return nil
+					case <-time.After(backoff):
+					}
+				}
 				continue
+			}
+			// claim 성공 (or 정상적으로 nil) — error count reset.
+			if consecutiveClaimErrors > 0 {
+				log.Printf("claim recovered after %d consecutive failures", consecutiveClaimErrors)
+				consecutiveClaimErrors = 0
 			}
 			if claim == nil {
 				continue
 			}
 			if err := w.svc.ProcessClaim(ctx, claim); err != nil {
+				// process failure 는 build server 가 FAILED phase 로 보고받음.
+				// poll loop 자체는 계속.
 				log.Printf("process claim error: buildID=%s err=%v", claim.BuildID, err)
 			}
 		}
