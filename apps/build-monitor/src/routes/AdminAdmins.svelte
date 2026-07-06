@@ -103,15 +103,26 @@
   }
 </script>
 
-<section class="admin-admins">
+<section class="page">
+  <!-- TASK-083: page 구조를 다른 admin 페이지 (Builds / Users /
+       Runners) 와 통일. `.page` wrapper + `<header class="page-head">`
+       컨테이너 + fadeIn 애니메이션 + h1 gradient text + var(--size-xxl).
+       table 영역만 `.admins-content` 인너 컨테이너 (max-width 720) 로
+       좁게 묶어 admin allow-list 의 좁은 폭 디자인 의도는 보존. -->
   <AdminTabs />
 
-  <h1>Admins</h1>
-  <p class="muted">
-    현재 admin allow-list (Build Server <code>runtime.adminIds</code> 시드 + POST /admin/admins
-    으로 추가된 항목). 첫 항목은 시드 보호 id (삭제 불가). 변경 사항은 in-process
-    만 반영되며 process 재시작 후 ADMIN_IDS env 가 canonical.
-  </p>
+  <header class="page-head">
+    <div>
+      <h1>Admins</h1>
+      <p class="muted">
+        현재 admin allow-list (Build Server <code>runtime.adminIds</code> 시드 + POST /admin/admins
+        으로 추가된 항목). 첫 항목은 시드 보호 id (삭제 불가). 변경 사항은 in-process
+        만 반영되며 process 재시작 후 ADMIN_IDS env 가 canonical.
+      </p>
+    </div>
+  </header>
+
+  <div class="admins-content">
 
   {#if error}
     <div class="banner banner-error" role="alert">{error}</div>
@@ -178,22 +189,53 @@
       {/if}
     </tbody>
   </table>
+  </div>
 </section>
 
 <style>
-  .admin-admins {
-    max-width: 720px;
-    margin: 0 auto;
+  /* TASK-083: page wrapper 정합. 다른 admin 페이지 (Builds / Users /
+     Runners) 와 동일하게 `.page` + fadeIn + `<header class="page-head">`
+     컨테이너 + h1 gradient text + var(--size-xxl). 한 페이지에서 헤더
+     디자인 토큰이 단일 source. 인너 `.admins-content` 만 max-width 720 으로
+     좁게 유지 (admin allow-list 의 row 가 적어 좁은 폭이 자연). */
+  .page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xxl);
+    animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .page-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    flex-wrap: wrap;
   }
   h1 {
-    font-size: var(--size-2xl);
+    margin: 0;
+    font-size: var(--size-xxl);
     font-weight: var(--weight-semibold);
-    margin: 0 0 var(--space-sm);
+    letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--color-text-primary), var(--color-text-muted));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
   .muted {
     color: var(--color-text-muted);
+    margin: 4px 0 0;
     font-size: var(--size-sm);
-    margin: 0 0 var(--space-lg);
+  }
+  /* allow-list 본문만 좁은 폭. 다른 admin 페이지의 폭 100% table 과
+     의도적 차이. (TASK-083) */
+  .admins-content {
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
   }
   .banner {
     padding: var(--space-md);

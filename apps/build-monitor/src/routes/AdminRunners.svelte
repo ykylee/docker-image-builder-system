@@ -21,6 +21,10 @@
   import { push } from "svelte-spa-router";
   import AdminTabs from "../components/AdminTabs.svelte";
   import StatusPill from "../components/StatusPill.svelte";
+  // TASK-083: status filter chip 디자인을 canonical FilterChips 컴포넌트
+  // 로 승격. AdminBuilds 와 같은 디자인 토큰 (`--shadow-glow`) 을 단일
+  // source 로 공유 — 운영자가 두 페이지를 번갈아 봐도 같은 톤으로 직관.
+  import FilterChips from "../components/FilterChips.svelte";
   import { userIdStore } from "../lib/session.js";
   import type {
     AdminRunner,
@@ -145,17 +149,12 @@
         {runners.filter((r) => r.status === "DISABLED").length} disabled
       </p>
     </div>
-    <div class="chips" role="group" aria-label="Status filter">
-      {#each ["ALL", "ACTIVE", "DISABLED"] as f (f)}
-        <button
-          type="button"
-          class="chip"
-          class:active={filter === f}
-          aria-pressed={filter === f}
-          onclick={() => (filter = f as typeof filter)}
-        >{f}</button>
-      {/each}
-    </div>
+    <FilterChips
+      options={["ALL", "ACTIVE", "DISABLED"]}
+      selected={filter}
+      onSelect={(v) => (filter = v as typeof filter)}
+      ariaLabel="Status filter"
+    />
   </header>
 
   {#if loading}
@@ -277,34 +276,6 @@
   .err {
     color: var(--color-accent-danger);
   }
-  .chips {
-    display: inline-flex;
-    gap: var(--space-sm);
-    background: var(--color-bg-surface);
-    padding: var(--space-xs);
-    border-radius: var(--radius-pill);
-    border: 1px solid var(--color-border-subtle);
-    box-shadow: var(--shadow-card);
-  }
-  .chip {
-    padding: var(--space-sm) var(--space-lg);
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--color-text-secondary);
-    font-size: var(--size-sm);
-    font-weight: var(--weight-medium);
-    border: 1px solid transparent;
-    transition: all var(--motion-duration-fast) var(--motion-easing-standard);
-  }
-  .chip:hover {
-    color: var(--color-text-primary);
-  }
-  .chip.active {
-    background: var(--color-accent-primary);
-    color: white;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-  }
-
   table {
     width: 100%;
     border-collapse: separate;

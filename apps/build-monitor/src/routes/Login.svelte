@@ -156,7 +156,8 @@
   }
   .btn-primary:hover {
     background: var(--color-accent-primary-hover);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    /* TASK-083: 디자인 토큰 `--shadow-glow` 정렬 — raw rgba 잔재 정리. */
+    box-shadow: var(--shadow-glow);
     transform: translateY(-1px);
   }
   .btn-primary:active {

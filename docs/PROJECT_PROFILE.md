@@ -103,6 +103,12 @@
 - 회귀 (TASK-077): TS 4 packages clean, build-monitor vitest 78/78 PASS (TASK-076 baseline 69 + 신규 AdminTabs.test.ts 4건 + Header 9→10 신규 TASK-077 회귀 가드 1건 + admin 페이지 4종 tab 노출 가드 4건) + svelte-check 0/0 + vite build OK (gzip js 32.79KB / css 5.14KB) + build-server 123/123 동일 + e2e-single-port PASS.
 - 운영 가이드 (운영 환경 배포 시 필수): `ADMIN_IDS` 는 시크릿처럼 취급 — 외부 저장소/PR description/issue 에 노출 금지, 운영에선 CORS wildcard (`CORS_ORIGIN=true`) 를 끄고 명시 origin 화이트리스트로 제한. admin 인증은 평문 id 비교이므로 SSO/JWT 로의 마이그레이션은 후속 ADMIN-* task group 에서 다룬다.
 
+## 3.3 Build Monitor UI 정합 (TASK-083)
+- 의도: admin 4 페이지 (Builds / Users / Admins / Runners) + BuildsList 의 시각 정합 — `.page` wrapper + `<header class="page-head">` 컨테이너 + fadeIn 애니메이션 + h1 gradient text + `var(--size-xxl)` 단일 source, chip 디자인의 canonical 컴포넌트화 (FilterChips), raw rgba 잔재 4건의 `--shadow-glow` 디자인 토큰 정렬. AdminTabs 의 active tab 톤 (TASK-077 self-review amend) 과 FilterChips 의 active chip 톤이 같은 `--color-accent-primary` + `--shadow-glow` 로 통일되어 운영자가 페이지 간을 번갈아 봐도 동일 의미.
+- 신규: `apps/build-monitor/src/components/FilterChips.svelte` (status filter chip 디자인 단일 source, dark / light 모드별 자동 follow). amend: `AdminBuilds.svelte` / `AdminRunners.svelte` / `BuildsList.svelte` (중복 chip CSS + chip 영역 FilterChips 로 교체), `AdminAdmins.svelte` (`<header class="page-head">` 컨테이너 + h1 gradient + fadeIn + `.admins-content` 인너 컨테이너), `Header.svelte` (`.logo-wrapper` `--shadow-glow` 정렬).
+- Header sticky bar 의 `box-shadow: 0 1px 3px rgba(0,0,0,0.04)` 는 의미적으로 `--shadow-card` 와 구분되는 1px light-only shadow 라 후속 TASK (sticky-bar 디자인 토큰 신설) 후보로 보류.
+- 회귀 (TASK-083): TS 4 packages clean, build-monitor vitest **121/121 PASS** (TASK-079 baseline 114 → +7: FilterChips.test.ts 옵션 검증 6 + 디자인 토큰 `--shadow-glow` 사용 source-level 가드 1), build-server 123/123 동일, svelte-check 0 errors / 0 warnings, vite build OK (gzip js 37.25KB / css 6.27KB, chip 중복 CSS 통합으로 약간 감소), e2e-single-port PASS.
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함

@@ -2,6 +2,13 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import AdminTabs from "../components/AdminTabs.svelte";
+  // TASK-083: status filter chip 디자인을 canonical FilterChips 컴포넌트
+  // 로 승격. AdminBuilds / AdminRunners 양쪽 페이지의 중복 `.chips + .chip
+  // + .chip.active` CSS 를 단일 source 로 통합하고, active glow 의 raw
+  // rgba 는 디자인 토큰 `--shadow-glow` 로 정렬해 dark / light 모드별 자동
+  // follow. BuildSummary success / failed 와 AdminRunner ACTIVE / DISABLED 의
+  // StatusPill 컬러와 동등 의미 (현재 활성 segment) 로 톤 통일.
+  import FilterChips from "../components/FilterChips.svelte";
   import BuildRow from "../components/BuildRow.svelte";
   import type { AdminUserBuildSummary, BuildSummary } from "../lib/api";
   import { listAdminBuilds } from "../lib/api";
@@ -94,17 +101,12 @@
         {ownerFilter ? `for @${ownerFilter}` : "across all owners"}
       </p>
     </div>
-    <div class="chips" role="group" aria-label="Status filter">
-      {#each ["ALL", "BUILDING", "COMPLETED", "FAILED"] as f (f)}
-        <button
-          type="button"
-          class="chip"
-          class:active={filter === f}
-          aria-pressed={filter === f}
-          onclick={() => (filter = f as typeof filter)}
-        >{f}</button>
-      {/each}
-    </div>
+    <FilterChips
+      options={["ALL", "BUILDING", "COMPLETED", "FAILED"]}
+      selected={filter}
+      onSelect={(v) => (filter = v as typeof filter)}
+      ariaLabel="Status filter"
+    />
   </header>
 
   <form class="owner-filter" onsubmit={(e) => { e.preventDefault(); applyFilter(); }}>
@@ -176,32 +178,6 @@
   }
   .muted { color: var(--color-text-muted); margin: 4px 0 0; font-size: var(--size-sm); }
   .err { color: var(--color-accent-danger); }
-  .chips {
-    display: inline-flex;
-    gap: var(--space-sm);
-    background: var(--color-bg-surface);
-    padding: var(--space-xs);
-    border-radius: var(--radius-pill);
-    border: 1px solid var(--color-border-subtle);
-    box-shadow: var(--shadow-card);
-  }
-  .chip {
-    padding: var(--space-sm) var(--space-lg);
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--color-text-secondary);
-    font-size: var(--size-sm);
-    font-weight: var(--weight-medium);
-    border: 1px solid transparent;
-    transition: all var(--motion-duration-fast) var(--motion-easing-standard);
-  }
-  .chip:hover { color: var(--color-text-primary); }
-  .chip.active {
-    background: var(--color-accent-primary);
-    color: white;
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-  }
-
   .owner-filter {
     display: flex;
     align-items: end;
@@ -246,7 +222,10 @@
   }
   .btn-primary:hover:not(:disabled) {
     background: var(--color-accent-primary-hover);
-    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+    /* 디자인 토큰 `--shadow-glow` 정렬 — dark / light 모드별 자동 follow
+       (light rgba(79, 70, 229, 0.15), dark rgba(99, 102, 241, 0.3)).
+       raw rgba 잔재 정리. (TASK-083) */
+    box-shadow: var(--shadow-glow);
   }
   .btn-secondary {
     background: var(--color-bg-surface-elevated);
