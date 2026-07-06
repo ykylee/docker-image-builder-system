@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import AdminTabs from "../components/AdminTabs.svelte";
   import BuildRow from "../components/BuildRow.svelte";
   import type { AdminUserBuildSummary, BuildSummary } from "../lib/api";
   import { listAdminBuilds } from "../lib/api";
+  import { userIdStore } from "../lib/session.js";
 
   // The admin response carries an extra requestedBy field on top of
   // BuildSummary. We keep the local state as the admin type so the
@@ -15,7 +17,11 @@
   }
   let loading = $state(true);
   let error = $state<string | null>(null);
-  let adminId = $state<string | null>(null);
+  // TASK-076: admin 권한은 userId 그 자체다. 별도 adminId store 가
+  // 사라졌으므로 `X-Admin-Id` 헤더도 userId 로 보낸다. userId 가
+  // admin allow-list 에 없으면 backend 가 403 으로 거부하고 화면에
+  // 에러 메시지가 노출된다.
+  let userId = $derived($userIdStore);
 
   // Owner filter is exposed so the admin can drill into one user's
   // build list. The text input is debounced only by the click of the
@@ -25,14 +31,17 @@
   let ownerFilter = $state("");
 
   onMount(async () => {
-    const stored = localStorage.getItem("adminId");
-    if (!stored) {
+    // userId 가 없으면 Login 페이지로 redirect (TASK-076: 더 이상
+    // /admin/login 으로 가지 않는다 — admin 진입점은 일반 Login 과
+    // 동일하다). AdminUsers/AdminAdmins/AdminRunners 와 동일한 single-
+    // check 패턴 — 다른 탭에서 logout/login 발생 시 페이지 재방문 /
+    // 다음 navigation 에서 최신 userId 반영.
+    if (!userId) {
       loading = false;
-      push("/admin/login");
+      push("/");
       return;
     }
-    adminId = stored;
-    await refresh(stored, ownerFilter);
+    await refresh(userId, ownerFilter);
   });
 
   async function refresh(id: string, owner: string) {
@@ -51,15 +60,15 @@
   }
 
   async function applyFilter() {
-    if (adminId) {
-      await refresh(adminId, ownerFilter);
+    if (userId) {
+      await refresh(userId, ownerFilter);
     }
   }
 
   async function clearFilter() {
     ownerFilter = "";
-    if (adminId) {
-      await refresh(adminId, "");
+    if (userId) {
+      await refresh(userId, "");
     }
   }
 
@@ -75,6 +84,8 @@
 </script>
 
 <section class="page">
+  <AdminTabs />
+
   <header class="page-head">
     <div>
       <h1>All Builds</h1>

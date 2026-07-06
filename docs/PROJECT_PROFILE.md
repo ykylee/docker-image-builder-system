@@ -99,8 +99,8 @@
   - `GET /admin/users` — 빌드 history 가 있는 userId 별 `buildCount` / `lastBuildAt` rollup.
 - 인증: `X-Admin-Id` header 가 build server 의 `ADMIN_IDS` env (default `admin,yky.lee`) 에 포함될 때만 허용. 미일치 시 401 (header 누락) / 403 (not in allow-list).
 - OpenAPI: `Admin` tag 가 추가됐고 `/admin/*` paths, `AdminListBuildsQuery` / `AdminListBuildsResponse` / `AdminUserBuildSummary` / `AdminUserListResponse` components 가 emit 된다. `/docs` Swagger UI 에서 확인 가능.
-- build-monitor 측 진입점: `/admin/login` → admin id 입력 → localStorage `adminId` 키에 저장 → `/admin/builds` 와 `/admin/users` 라우트. 일반 user 로그인 (`userId` 키) 과는 분리.
-- 회귀: backend 53/53 (TS unit), build-monitor 34/34 (vitest) + svelte-check 0/0 + vite build OK.
+- build-monitor 측 진입점 (TASK-076 + TASK-077): `/admin/login` 라우트는 제거됐다. 일반 Login 페이지(`/`)에서 userId 입력 → localStorage `userId` 키에 저장 → admin allow-list (`ADMIN_IDS`) 에 해당 userId 가 포함되어 있으면 Header 가 단일 "Admin" 진입점을 자동 노출한다 (`X-Admin-Id` 헤더는 userId 그 자체로 채워짐). admin 섹션 (Builds / Users / Admins / Runners) 사이의 이동은 페이지 상단 공통 탭 바 `<AdminTabs />` (svelte-spa-router `$location` store 구독) 가 담당한다 — Header 는 더 이상 4개의 섹션 링크를 나열하지 않는다. 별도 admin login / admin logout 단계가 없다 — 일반 Logout 한 번에 userId 가 clear 되면 admin 메뉴도 함께 사라진다. userId 가 admin allow-list 에 없는 상태에서 `/admin/*` 라우트로 직접 진입하면 backend 가 401/403 으로 거부하고 화면에 에러가 노출된다.
+- 회귀 (TASK-077): TS 4 packages clean, build-monitor vitest 78/78 PASS (TASK-076 baseline 69 + 신규 AdminTabs.test.ts 4건 + Header 9→10 신규 TASK-077 회귀 가드 1건 + admin 페이지 4종 tab 노출 가드 4건) + svelte-check 0/0 + vite build OK (gzip js 32.79KB / css 5.14KB) + build-server 123/123 동일 + e2e-single-port PASS.
 - 운영 가이드 (운영 환경 배포 시 필수): `ADMIN_IDS` 는 시크릿처럼 취급 — 외부 저장소/PR description/issue 에 노출 금지, 운영에선 CORS wildcard (`CORS_ORIGIN=true`) 를 끄고 명시 origin 화이트리스트로 제한. admin 인증은 평문 id 비교이므로 SSO/JWT 로의 마이그레이션은 후속 ADMIN-* task group 에서 다룬다.
 
 ## 4. 검증 포인트 (Validation)

@@ -2,10 +2,18 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/svelte";
 import AdminUsers from "./AdminUsers.svelte";
 
+// TASK-077: AdminTabs 가 `$location` 을 구독하므로 mock store 가 필요.
+// vi.hoisted 로 묶어서 hoist-safe 한 writable store 생성.
+const { locStore } = vi.hoisted(() => ({
+  locStore: (
+    require("svelte/store") as typeof import("svelte/store")
+  ).writable<string>("/admin/users")
+}));
 const pushMock = vi.fn();
 vi.mock("svelte-spa-router", () => ({
   push: (...args: unknown[]) => pushMock(...args),
-  link: (_node: HTMLAnchorElement) => ({ destroy() {}, update() {} })
+  link: (_node: HTMLAnchorElement) => ({ destroy() {}, update() {} }),
+  location: locStore
 }));
 
 const listAdminUsersMock = vi.fn();
@@ -20,6 +28,7 @@ beforeEach(() => {
   listAdminUsersMock.mockReset();
   listAdminBuildsMock.mockReset();
   localStorage.clear();
+  locStore.set("/admin/users");
 });
 
 afterEach(() => {
@@ -27,13 +36,28 @@ afterEach(() => {
 });
 
 describe("AdminUsers", () => {
-  it("redirects to /admin/login when no adminId is stored", async () => {
+  // TASK-077: 페이지 상단에 admin 섹션 탭이 노출된다.
+  it("renders the AdminTabs nav with all 4 sections", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminUsersMock.mockResolvedValue({ users: [] });
     render(AdminUsers);
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/login"));
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Builds" })).toBeInTheDocument()
+    );
+    expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admins" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Runners" })).toBeInTheDocument();
+  });
+
+  // TASK-076: userId 가 없으면 Login 페이지(`/`) 로 redirect.
+  it("redirects to / when no userId is stored", async () => {
+    render(AdminUsers);
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
   });
 
   it("renders user rows with buildCount and lastBuildAt", async () => {
-    localStorage.setItem("adminId", "admin");
+    // TASK-076: admin 권한은 userId 그 자체.
+    localStorage.setItem("userId", "admin");
     listAdminUsersMock.mockResolvedValue({
       users: [
         { userId: "alice", buildCount: 3, lastBuildAt: "2026-07-03T00:00:00.000Z" },
@@ -48,7 +72,7 @@ describe("AdminUsers", () => {
   });
 
   it("opens a user's recent builds when the row is clicked", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminUsersMock.mockResolvedValue({
       users: [
         { userId: "alice", buildCount: 2, lastBuildAt: "2026-07-03T00:00:00.000Z" }
@@ -89,7 +113,7 @@ describe("AdminUsers", () => {
   // TASK-070 (PR #23): recent builds panel 이 BuildRow 컴포넌트로
   // 교체되었으므로 BuildRow 의 data-testid 와 canonical 컬럼 노출을 검증한다.
   it("renders the recent builds panel via the BuildRow component", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminUsersMock.mockResolvedValue({
       users: [
         { userId: "alice", buildCount: 1, lastBuildAt: "2026-07-03T00:00:00.000Z" }
@@ -139,7 +163,7 @@ describe("AdminUsers", () => {
   // TASK-070 (PR #23): admin 이 close 버튼으로 expansion 을 닫을 때
   // BuildRow 도 함께 unmount 되는지 검증.
   it("closes the recent builds panel when the Close button is clicked", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminUsersMock.mockResolvedValue({
       users: [
         { userId: "alice", buildCount: 1, lastBuildAt: "2026-07-03T00:00:00.000Z" }

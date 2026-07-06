@@ -1,11 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import AdminTabs from "../components/AdminTabs.svelte";
   import BuildRow from "../components/BuildRow.svelte";
   import type { AdminUserSummary, BuildSummary } from "../lib/api";
   import { listAdminBuilds, listAdminUsers } from "../lib/api";
+  import { userIdStore } from "../lib/session.js";
 
-  let adminId = $state<string | null>(null);
+  // TASK-076: admin 권한은 userId 그 자체다. 별도 adminId store 가
+  // 사라졌으므로 `X-Admin-Id` 헤더도 userId 로 보낸다.
+  let userId = $derived($userIdStore);
   let users = $state<AdminUserSummary[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
@@ -30,14 +34,15 @@
   let selectedLoading = $state(false);
 
   onMount(async () => {
-    const stored = localStorage.getItem("adminId");
-    if (!stored) {
+    // userId 가 없으면 Login 페이지로 redirect (TASK-076: 더 이상
+    // /admin/login 으로 가지 않는다 — admin 진입점은 일반 Login 과
+    // 동일하다).
+    if (!userId) {
       loading = false;
-      push("/admin/login");
+      push("/");
       return;
     }
-    adminId = stored;
-    await refresh(stored);
+    await refresh(userId);
   });
 
   async function refresh(id: string) {
@@ -53,12 +58,12 @@
     }
   }
 
-  async function openUser(userId: string) {
-    if (!adminId) return;
-    selectedUser = userId;
+  async function openUser(targetUserId: string) {
+    if (!userId) return;
+    selectedUser = targetUserId;
     selectedLoading = true;
     try {
-      const result = await listAdminBuilds(adminId, { requestedBy: userId, limit: 50 });
+      const result = await listAdminBuilds(userId, { requestedBy: targetUserId, limit: 50 });
       // AdminListBuildsResponse.builds 의 entry 는 BuildSummary & { requestedBy } 이지만
       // selectedUser 의 inline expansion 라 owner 컬럼이 시각 노이즈가 되어
       // requestedBy 를 omit 해서 BuildRow 에게 넘긴다. (BuildRow 는 build
@@ -97,6 +102,8 @@
 </script>
 
 <section class="page">
+  <AdminTabs />
+
   <header class="page-head">
     <div>
       <h1>Users</h1>

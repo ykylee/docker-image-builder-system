@@ -219,7 +219,7 @@ TASK-064 시점 누적 회귀:
 - `apps/build-server` postgres build-service + admin-repo + build-routes
 - `apps/build-monitor` vitest 60 (StatusPill 7 + BuildRow 1 +
   PhaseTimeline ? + Header 6 + ThemeToggle 2 + AdminAdmins + BuildsList
-  + Login + BuildDetail + AdminBuilds + AdminUsers + AdminLogin +
+  + Login + BuildDetail + AdminBuilds + AdminUsers +
   chipFilter 6)
 - `apps/runner` `go test ./...` 17 passed
 - `apps/skill_mcp` pytest 226 (canonical contract v2 + 3 skills + 2 MCPs)
