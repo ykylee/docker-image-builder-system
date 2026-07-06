@@ -312,3 +312,4 @@
 - phase 자동 status 전이 휴리스틱 (DOCKER_BUILD_STARTED→BUILDING 등) 단순 매핑. canonical phase machine 도입 시 invalid_transition 분기 활용.
 - Preview queue 2회 호출은 idempotent retry 의도였으나 interface 정돈 필요 (단일 queue + status 매핑).
 - self-dogfood 실제 런타임에서 source archive 업로드보다 runner claim 이 먼저 일어나면 build 가 404 source fetch 로 실패할 수 있다. 현재는 runner `DISABLED` → build/source 적재 → `ACTIVE` 순서로 우회 검증했다.
+- (rev 73→74: TASK-080 source upload race mitigation PR #30 squash merge main 합류 `2e2d67a` 2026-07-06T14:11:45Z. 옵션 B (memory `sourceArchives.has` + postgres `build_source` INNER JOIN) + 옵션 C (runner fetcher exponential retry 1s/3s/9s). 회귀 baseline: build-server 123→127 PASS, Go 8 packages PASS. amend 3건 (trailing newline + JSDoc 3). 리뷰 문서 `docs/operations/dogfood-e2e-review-and-followup-2026-07-06.md` 동봉. 다음: race 0/10 fail 검증 + TASK-081 multi-runner.)
