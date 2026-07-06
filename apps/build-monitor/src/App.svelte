@@ -4,7 +4,6 @@
   import Login from "./routes/Login.svelte";
   import BuildsList from "./routes/BuildsList.svelte";
   import BuildDetail from "./routes/BuildDetail.svelte";
-  import AdminLogin from "./routes/AdminLogin.svelte";
   import AdminBuilds from "./routes/AdminBuilds.svelte";
   import AdminUsers from "./routes/AdminUsers.svelte";
   import AdminAdmins from "./routes/AdminAdmins.svelte";
@@ -15,11 +14,11 @@
     "/": Login,
     "/builds": BuildsList,
     "/builds/:buildId": BuildDetail,
-    // Admin routes (ADMIN-007). Each admin route reads the adminId
-    // from a distinct localStorage key; the user-facing Login / Header
-    // does not satisfy the admin guard. TASK-069 adds /admin/runners
-    // for runner registry management (list / DISABLE / DELETE).
-    "/admin/login": AdminLogin,
+    // Admin routes (TASK-076). 별도 AdminLogin 단계가 없으므로 admin
+    // 진입점은 일반 Login 과 동일 — userId 가 admin allow-list 에 들어
+    // 있으면 Header 가 admin 메뉴를 자동 노출한다. 각 admin route 는
+    // userId 부재 시 Login 페이지 (`/`) 로 redirect 하고, 미인가 요청은
+    // backend 의 X-Admin-Id 401/403 으로 표면화된다.
     "/admin/builds": AdminBuilds,
     "/admin/users": AdminUsers,
     "/admin/admins": AdminAdmins,

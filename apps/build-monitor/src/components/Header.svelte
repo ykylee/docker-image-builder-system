@@ -2,19 +2,23 @@
   import { onMount } from "svelte";
   import { link, push } from "svelte-spa-router";
   import ThemeToggle from "./ThemeToggle.svelte";
-  import { userIdStore, adminIdStore } from "../lib/session.js";
+  import { userIdStore } from "../lib/session.js";
   import { adminAllowListStore } from "../lib/admin-store.js";
 
   // session.ts 의 writable store 가 localStorage 와 양방향 동기화를
   // 담당한다 (Bug 1: 로그인 직후 Header 가 즉시 갱신되도록). 컴포넌트
   // state 를 따로 두지 않고 store 값을 직접 구독한다.
+  //
+  // TASK-076: 별도 adminId store 는 제거됐다. admin 권한은 userId 가
+  // admin allow-list 에 속해 있으면 자동 부여되며, userId 만으로 admin
+  // session 을 암묵적으로 잡는다 (별도 admin login / logout 단계 없음).
   let userId = $derived($userIdStore);
-  let adminId = $derived($adminIdStore);
 
   // TASK-048: admin allow-list 캐시. userId 가 admin list 에 포함되어
   // 있으면 admin 메뉴를 자동으로 노출한다 (별도 AdminLogin 단계 없이).
   // 빈 배열은 "아직 fetch 안 됨" 또는 "fetch 실패" 상태이며, 이 경우
-  // auto-enable 도 false 로 두어 명시적 /admin/login 흐름을 유지한다.
+  // auto-enable 도 false 로 두어 비-admin 사용자가 admin 메뉴를 보지
+  // 못하도록 한다.
   let adminAllowList = $derived($adminAllowListStore);
 
   // userId 가 adminAllowList 에 포함되면 admin 으로 auto-enable. 단,
@@ -23,44 +27,35 @@
     !!userId && adminAllowList.length > 0 && adminAllowList.includes(userId)
   );
 
-  // 표시할 admin id 결정. 명시적 adminId (AdminLogin 통과) 가 있으면
-  // 그걸 우선하고, 없으면 auto-enable 인 경우 userId 로 admin session
-  // 을 암묵적으로 잡는다. logout 시 userIdStore 가 null 이 되면
-  // autoAdminEnabled 도 false 가 되어 admin 메뉴가 자연스럽게 사라진다.
-  let effectiveAdminId = $derived(adminId ?? (autoAdminEnabled ? userId : null));
+  // 표시할 admin id = userId 그 자체 (TASK-076). 별도 admin session 이
+  // 없으므로 logout 하면 userIdStore 가 null 이 되는 순간 admin 메뉴도
+  // 자연스럽게 사라진다.
+  let effectiveAdminId = $derived(autoAdminEnabled ? userId : null);
 
   function logout() {
-    userIdStore.set(null);
     // userId 가 admin allow-list 에 있었더라도, logout 하면 더 이상
-    // admin 메뉴는 노출되지 않는다. admin session 도 같이 정리.
-    adminIdStore.set(null);
+    // admin 메뉴는 노출되지 않는다 — userId null 이 되면
+    // autoAdminEnabled 도 false 가 되므로 admin 메뉴가 자연스럽게 사라진다.
+    userIdStore.set(null);
     push("/");
   }
 
   // 부팅 시 userId 가 있으면 admin allow-list 를 prefetch 한다. userId 가
-  // admin list 에 속해 있으면 즉시 admin 메뉴가 노출되고, 아니면 AdminLogin
-  // 흐름이 그대로 유지된다. 실패 시 (offline / 비-401 응답) 캐시는 빈 배열
-  // 로 남고 explicit /admin/login 으로 fallback 가능.
+  // admin list 에 속해 있으면 즉시 admin 메뉴가 노출되고, 아니면 admin
+  // 메뉴는 표시되지 않는다. 실패 시 (offline / 비-401 응답) 캐시는 빈
+  // 배열로 남고 admin 메뉴는 비활성화된다 — 이전에는 이때 `/admin/login`
+  // 으로 fallback 했지만 TASK-076 에서는 그 entry 가 사라졌으므로
+  // 단순히 admin 메뉴만 닫힌다.
   onMount(async () => {
     if (userId && adminAllowList.length === 0) {
       try {
         await adminAllowListStore.refresh(userId);
       } catch {
-        // intentional: stale cache; user can still visit /admin/login.
+        // intentional: stale cache; admin menu stays hidden until next
+        // successful refresh (e.g. next page navigation trigger).
       }
     }
   });
-
-  function adminLogout() {
-    // Admin session is independent from the user session so logging out
-    // of the admin UI does not sign the user out of the build monitor.
-    // 단, auto-enable 인 경우 (userId 가 admin 인 상태) 에는 user
-    // session 은 유지하되, admin 메뉴만 숨긴다.
-    adminIdStore.set(null);
-    if (!autoAdminEnabled) {
-      push("/");
-    }
-  }
 </script>
 
 <header class="hdr">
@@ -80,13 +75,10 @@
       {#if effectiveAdminId}
         <div class="divider"></div>
         <span class="admin-id mono" title="Admin session active">🛡 @{effectiveAdminId}</span>
-        <a use:link href="/admin/builds">Admin · Builds</a>
-        <a use:link href="/admin/users">Admin · Users</a>
-        <a use:link href="/admin/admins">Admin · Admins</a>
-        <a use:link href="/admin/runners">Admin · Runners</a>
-        <button class="logout-btn" onclick={adminLogout}>Admin Logout</button>
-      {:else}
-        <a use:link href="/admin/login" class="admin-link">Admin</a>
+        <!-- TASK-077: admin 진입점은 단일 링크. 각 admin 섹션 (Builds /
+             Users / Admins / Runners) 사이의 이동은 페이지 상단
+             <AdminTabs /> 가 담당한다. -->
+        <a use:link href="/admin/builds">Admin</a>
       {/if}
       <div class="divider"></div>
       <a href="/openapi.json" target="_blank" rel="noopener">API</a>
@@ -118,12 +110,12 @@
     max-width: 1440px;
     margin: 0 auto;
   }
-  .brand { 
-    display: inline-flex; 
-    align-items: center; 
-    gap: var(--space-sm); 
-    color: var(--color-text-primary); 
-    font-weight: var(--weight-semibold); 
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-sm);
+    color: var(--color-text-primary);
+    font-weight: var(--weight-semibold);
     font-size: var(--size-lg);
     letter-spacing: -0.01em;
   }
@@ -138,15 +130,15 @@
     background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-info));
     box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
   }
-  .logo { 
-    color: white; 
+  .logo {
+    color: white;
     font-size: var(--size-lg);
     line-height: 1;
   }
-  nav { 
-    display: flex; 
-    align-items: center; 
-    gap: var(--space-lg); 
+  nav {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
   }
   nav a {
     color: var(--color-text-secondary);

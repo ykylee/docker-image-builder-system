@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * AdminRunners — runner registry management page (TASK-069).
+   * AdminRunners — runner registry management page (TASK-069 + TASK-076).
    *
    * Runner self-registers on first claim (idempotent — `RUNNER_ID` env
    * 가 첫 claim 의 body 에 실려 옴). 이 페이지는 admin 의 가시성 +
@@ -13,11 +13,15 @@
    * DISABLE 로 토글하면 다음 claim 부터 reason=RUNNER_DISABLED 로 거절된다
    * (in-flight 빌드만 완료되고 새 claim 못 잡음). Header (TASK-048) 가
    * admin allow-list 에 userId 가 있으면 auto-enable 해준다.
+   *
+   * TASK-076: 별도 adminId store 가 사라졌다. effectiveAdminId = userId
+   * 그 자체이며, userId 가 없으면 Login 으로 redirect 한다.
    */
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import AdminTabs from "../components/AdminTabs.svelte";
   import StatusPill from "../components/StatusPill.svelte";
-  import { adminIdStore, userIdStore } from "../lib/session.js";
+  import { userIdStore } from "../lib/session.js";
   import type {
     AdminRunner,
     AdminRunnerListResponse,
@@ -29,9 +33,9 @@
     patchAdminRunnerStatus
   } from "../lib/api.js";
 
-  let adminId = $derived($adminIdStore);
   let userId = $derived($userIdStore);
-  let effectiveAdminId = $derived(adminId ?? userId);
+  // TASK-076: effective admin id = userId 그 자체.
+  let effectiveAdminId = $derived(userId);
 
   let runners = $state<AdminRunner[]>([]);
   let loading = $state(true);
@@ -40,8 +44,10 @@
   let filter = $state<"ALL" | "ACTIVE" | "DISABLED">("ALL");
 
   onMount(async () => {
+    // TASK-076: 더 이상 /admin/login 으로 가지 않는다 — admin 진입점은
+    // 일반 Login 과 동일하다.
     if (!effectiveAdminId) {
-      push("/admin/login");
+      push("/");
       return;
     }
     await refresh();
@@ -128,6 +134,8 @@
 </script>
 
 <section class="page">
+  <AdminTabs />
+
   <header class="page-head">
     <div>
       <h1>Runner Registry</h1>

@@ -3,20 +3,31 @@ import { render, screen, cleanup, waitFor } from "@testing-library/svelte";
 
 import AdminRunners from "./AdminRunners.svelte";
 
+// TASK-077: AdminTabs 가 `$location` 을 구독하므로 mock store 가 필요.
+// vi.hoisted 로 묶어서 hoist-safe 한 writable store 생성.
+const { locStore } = vi.hoisted(() => ({
+  locStore: (
+    require("svelte/store") as typeof import("svelte/store")
+  ).writable<string>("/admin/runners")
+}));
 const pushMock = vi.fn();
 vi.mock("svelte-spa-router", () => ({
   push: (...args: unknown[]) => pushMock(...args),
-  link: (_node: HTMLAnchorElement) => ({ destroy() {}, update() {} })
+  link: (_node: HTMLAnchorElement) => ({ destroy() {}, update() {} }),
+  location: locStore
 }));
 
 const listAdminRunnersMock = vi.fn();
 const patchMock = vi.fn();
 const deleteMock = vi.fn();
 
-// session.js 의 adminIdStore / userIdStore 는 Svelte writable 이라서
-// 실제 import 한 뒤 localStorage pre-fill 로 잡는 게 가장 자연스럽다.
-// 어차피 vitest 의 beforeEach 가 setup.ts 보다 먼저 실행되므로 먼저
-// localStorage 를 set 한 뒤 import 가 unwrap 되도록 한다.
+// session.js 의 userIdStore 는 Svelte writable 이라서 실제 import 한 뒤
+// localStorage pre-fill 로 잡는 게 가장 자연스럽다. 어차피 vitest 의
+// beforeEach 가 setup.ts 보다 먼저 실행되므로 먼저 localStorage 를 set
+// 한 뒤 import 가 unwrap 되도록 한다.
+//
+// TASK-076: adminIdStore 가 사라졌다. userId 가 곧 admin id 이고
+// `X-Admin-Id` 헤더에도 그대로 실린다.
 vi.mock("../lib/api.js", () => ({
   listAdminRunners: (adminId: string) => listAdminRunnersMock(adminId),
   patchAdminRunnerStatus: (adminId: string, runnerId: string, status: string) =>
@@ -31,6 +42,7 @@ beforeEach(() => {
   patchMock.mockReset();
   deleteMock.mockReset();
   localStorage.clear();
+  locStore.set("/admin/runners");
 });
 
 afterEach(() => {
@@ -62,15 +74,31 @@ const fixture = {
   ]
 };
 
-describe("AdminRunners page (TASK-069)", () => {
-  it("redirects to /admin/login when no adminId is stored", async () => {
-    // localStorage.clear() 가 이미 호출된 상태 (beforeEach). adminId 없음.
+describe("AdminRunners page (TASK-069 + TASK-076 + TASK-077)", () => {
+  // TASK-077: 페이지 상단에 admin 섹션 탭이 노출된다.
+  it("renders the AdminTabs nav with all 4 sections", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminRunnersMock.mockResolvedValueOnce({ runners: [] });
     render(AdminRunners);
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/login"));
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Builds" })).toBeInTheDocument()
+    );
+    expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admins" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Runners" })).toBeInTheDocument();
+  });
+
+  // TASK-076: userId 가 없으면 Login 페이지(`/`) 로 redirect.
+  it("redirects to / when no userId is stored", async () => {
+    // localStorage.clear() 가 이미 호출된 상태 (beforeEach). userId 없음.
+    render(AdminRunners);
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
   });
 
   it("renders the registry snapshot after mount", async () => {
-    localStorage.setItem("adminId", "admin");
+    // TASK-076: admin 권한은 userId 그 자체. localStorage 의 userId 가 곧
+    // admin id 이고 X-Admin-Id 헤더에도 그대로 실린다.
+    localStorage.setItem("userId", "admin");
     listAdminRunnersMock.mockResolvedValueOnce(fixture);
     render(AdminRunners);
     await waitFor(() => {
@@ -83,7 +111,7 @@ describe("AdminRunners page (TASK-069)", () => {
   });
 
   it("exposes registry mutating handlers as buttons per row", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminRunnersMock.mockResolvedValueOnce(fixture);
     render(AdminRunners);
     await waitFor(() => expect(screen.getByText("runner-A")).toBeTruthy());
@@ -95,7 +123,7 @@ describe("AdminRunners page (TASK-069)", () => {
   });
 
   it("shows an empty-state hint when the registry has zero entries", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminRunnersMock.mockResolvedValueOnce({ runners: [] });
     render(AdminRunners);
     await waitFor(() => {
@@ -109,7 +137,7 @@ describe("AdminRunners page (TASK-069)", () => {
   // (ACTIVE / DISABLED) 가 추가되어 (TASK-072) 디자인 토큰 정렬 + semantic
   // 색상이 그대로 승계된다.
   it("renders ACTIVE / DISABLED runner status via canonical StatusPill with semantic tokens", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminRunnersMock.mockResolvedValueOnce(fixture);
     render(AdminRunners);
     await waitFor(() => expect(screen.getByText("runner-A")).toBeTruthy());
@@ -140,7 +168,7 @@ describe("AdminRunners page (TASK-069)", () => {
   // component-scoped `.pill` (hashed) 와 매치 안 되므로 회귀가드 의미
   // 자체가 canonical 승격으로 무효화됨.)
   it("no longer exposes inline pill.active / pill.off raw-rgb design", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminRunnersMock.mockResolvedValueOnce(fixture);
     render(AdminRunners);
     await waitFor(() => expect(screen.getByText("runner-A")).toBeTruthy());

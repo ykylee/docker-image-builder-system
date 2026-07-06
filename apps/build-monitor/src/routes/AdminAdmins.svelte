@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * AdminAdmins — admin allow-list management page (TASK-049).
+   * AdminAdmins — admin allow-list management page (TASK-049 + TASK-076).
    *
    * The page is reachable only by callers that the build-monitor
    * recognizes as admin. The admin allow-list itself comes from the
@@ -9,28 +9,33 @@
    * the "Admin · Admins" link when the caller's userId is in the
    * allow-list, so this page is the first surface where a new admin
    * can manage who else gets admin.
+   *
+   * TASK-076: 별도 adminId store 가 사라졌다. effectiveAdminId = userId
+   * 그 자체이며, admin 진입점은 일반 Login 과 동일하다.
    */
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
-  import { adminIdStore, userIdStore } from "../lib/session.js";
+  import AdminTabs from "../components/AdminTabs.svelte";
+  import { userIdStore } from "../lib/session.js";
   import { adminAllowListStore } from "../lib/admin-store.js";
   import type { AdminAllowListResponse, AdminAllowListRemoveResponse } from "../lib/api.js";
 
-  let adminId = $derived($adminIdStore);
   let userId = $derived($userIdStore);
   let admins = $derived($adminAllowListStore);
 
-  // effective admin id (admin session OR auto-enable via userId)
-  let effectiveAdminId = $derived(adminId ?? userId);
+  // TASK-076: effective admin id = userId 그 자체. 별도 admin session 이
+  // 없으므로 userId 만 체크하면 된다.
+  let effectiveAdminId = $derived(userId);
 
   let newAdminId = $state("");
   let error = $state<string | null>(null);
   let busy = $state(false);
 
-  // 초기 로드 + adminId 가 없으면 login 으로 redirect.
+  // 초기 로드 + userId 가 없으면 login 으로 redirect (TASK-076: 더 이상
+  // /admin/login 으로 가지 않는다 — admin 진입점은 일반 Login 과 동일).
   onMount(async () => {
     if (!effectiveAdminId) {
-      push("/admin/login");
+      push("/");
       return;
     }
     try {
@@ -99,7 +104,9 @@
 </script>
 
 <section class="admin-admins">
-  <h1>Admin · Admins</h1>
+  <AdminTabs />
+
+  <h1>Admins</h1>
   <p class="muted">
     현재 admin allow-list (Build Server <code>runtime.adminIds</code> 시드 + POST /admin/admins
     으로 추가된 항목). 첫 항목은 시드 보호 id (삭제 불가). 변경 사항은 in-process

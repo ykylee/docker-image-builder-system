@@ -5,10 +5,13 @@
  * list lives on the Build Server (`runtime.adminIds` seeded from
  * `ADMIN_IDS` env, mutated via `/admin/admins` endpoints). The build-
  * monitor fetches the list on demand so that:
- *  - The "Admin" link is auto-shown for callers whose userId is in the
- *    allow-list, even before they visit `/admin/login` (TASK-048).
+ *  - The admin nav links are auto-shown for callers whose userId is in
+ *    the allow-list, even before they visit `/admin/admins` (TASK-048).
  *  - The "Admin · Admins" page can list / add / remove admins through
  *    the same store (TASK-049).
+ *
+ * TASK-076: 별도 admin login 단계가 사라졌다. userId 가 곧 admin id 이고,
+ * allow-list 에 포함되면 Login 직후 admin 메뉴가 자동 노출된다.
  *
  * The store is intentionally non-reactive w.r.t. Svelte 5 runes; the
  * components that need it use `$state` in the consumer. We expose a

@@ -2,10 +2,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent, waitFor } from "@testing-library/svelte";
 import AdminBuilds from "./AdminBuilds.svelte";
 
+// TASK-077: AdminTabs 가 `$location` 을 구독하므로 mock store 가 필요.
+// vi.mock factory 가 hoist 되므로 store 는 factory 안에서 만들어서
+// closure 로 capture 한 뒤, 동시에 mock 반환 객체에도 노출한다. 테스트
+// 케이스는 `_locationStore` 를 통해 같은 writable 인스턴스에 접근.
+const { locStore } = vi.hoisted(() => ({
+  locStore: (
+    require("svelte/store") as typeof import("svelte/store")
+  ).writable<string>("/admin/builds")
+}));
 const pushMock = vi.fn();
 vi.mock("svelte-spa-router", () => ({
   push: (...args: unknown[]) => pushMock(...args),
-  link: (_node: HTMLAnchorElement) => ({ destroy() {}, update() {} })
+  link: (_node: HTMLAnchorElement) => ({ destroy() {}, update() {} }),
+  location: locStore
 }));
 
 const listAdminBuildsMock = vi.fn();
@@ -17,6 +27,7 @@ beforeEach(() => {
   pushMock.mockReset();
   listAdminBuildsMock.mockReset();
   localStorage.clear();
+  locStore.set("/admin/builds");
 });
 
 afterEach(() => {
@@ -45,14 +56,35 @@ const sample = (
 });
 
 describe("AdminBuilds", () => {
-  it("redirects to /admin/login when no adminId is stored", async () => {
+  // TASK-077: 페이지 상단에 admin 섹션 탭 (Builds / Users / Admins /
+  // Runners) 이 항상 노출되어 admin 영역 안에서 자유롭게 이동 가능.
+  it("renders the AdminTabs nav with all 4 sections", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminBuildsMock.mockResolvedValue({
+      builds: [],
+      nextCursor: null
+    });
     render(AdminBuilds);
-    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/admin/login"));
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "Builds" })).toBeInTheDocument()
+    );
+    expect(screen.getByRole("link", { name: "Users" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admins" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Runners" })).toBeInTheDocument();
+  });
+
+  // TASK-076: admin 진입점은 일반 Login 과 동일하다. userId 가 없으면
+  // `/admin/login` 이 아닌 `/` (Login 페이지) 로 redirect.
+  it("redirects to / when no userId is stored", async () => {
+    render(AdminBuilds);
+    await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/"));
     expect(listAdminBuildsMock).not.toHaveBeenCalled();
   });
 
-  it("calls listAdminBuilds with admin id and no owner filter by default", async () => {
-    localStorage.setItem("adminId", "admin");
+  it("calls listAdminBuilds with userId (acting as admin id) and no owner filter by default", async () => {
+    // TASK-076: admin 권한은 userId 그 자체. localStorage 의 userId 키가
+    // 곧 admin id 이고, X-Admin-Id 헤더에도 그대로 실린다.
+    localStorage.setItem("userId", "admin");
     listAdminBuildsMock.mockResolvedValue({
       builds: [sample("p-1", "QUEUED", "alice"), sample("p-2", "BUILDING", "bob")],
       nextCursor: null
@@ -68,7 +100,7 @@ describe("AdminBuilds", () => {
   });
 
   it("applies owner filter when Apply is clicked", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminBuildsMock.mockResolvedValue({
       builds: [sample("p-1", "QUEUED", "alice")],
       nextCursor: null
@@ -85,7 +117,7 @@ describe("AdminBuilds", () => {
   });
 
   it("shows an error banner when listAdminBuilds rejects", async () => {
-    localStorage.setItem("adminId", "admin");
+    localStorage.setItem("userId", "admin");
     listAdminBuildsMock.mockRejectedValue(new Error("forbidden"));
     render(AdminBuilds);
     const alert = await screen.findByRole("alert");
