@@ -252,16 +252,33 @@ func (c *Client) writeDeployResult(_ context.Context, buildID, resultRef, source
 	return nil
 }
 
-func (c *Client) runTag(ctx context.Context, sourceImage, targetRef string) error {
-	_, err := c.tagImageCmd(ctx, "tag", sourceImage, targetRef)
+// runWithTimeout 는 cli mode 의 docker invocation (tag / push / future
+// steps) 을 동일 pushTimeout 으로 강제 종료한다. v1 (TASK-068) 에서는
+// push 단계에만 context.WithTimeout 을 걸었는데 (moby #35407 의 docker
+// push stderr 진행률 + 1 retry 후 죽은 image 정리 의도), tag 단계는
+// caller ctx 그대로라 registry 가 죽었을 때 docker tag 가 무한히 block
+// 되는 운영 사고가 가능했다. TASK-071a 에서 tag 단계에도 같은 timeout
+// 을 묶어 deploy 의 docker invocation 단계 전체가 동일 budget 으로
+// 강제 종료되도록 한다.
+func (c *Client) runWithTimeout(parentCtx context.Context, fn func(ctx context.Context, args ...string) (string, error), args ...string) error {
+	timeoutCtx, cancel := context.WithTimeout(parentCtx, c.pushTimeout)
+	defer cancel()
+	_, err := fn(timeoutCtx, args...)
 	return err
 }
 
+// runTag 는 docker tag 단계를 pushTimeout 안에서 수행한다. registry 가
+// 죽어서 docker daemon 이 응답하지 않을 때 caller ctx 가 길게 잡혀있다면
+// pushTimeout (default 120s, RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS 으로
+// override) 안에서 끊긴다.
+func (c *Client) runTag(ctx context.Context, sourceImage, targetRef string) error {
+	return c.runWithTimeout(ctx, c.tagImageCmd, "tag", sourceImage, targetRef)
+}
+
+// runPush 는 docker push 단계에 pushTimeout 을 걸어 moby #35407 의
+// stderr 진행률 출력 중에도 호출자가 정한 budget 안에서 끝낸다.
 func (c *Client) runPush(ctx context.Context, targetRef string) error {
-	pushCtx, cancel := context.WithTimeout(ctx, c.pushTimeout)
-	defer cancel()
-	_, err := c.pushImageCmd(pushCtx, "push", targetRef)
-	return err
+	return c.runWithTimeout(ctx, c.pushImageCmd, "push", targetRef)
 }
 
 // defaultTagImageCmd 는 exec.CommandContext 로 docker tag 를 호출한다.

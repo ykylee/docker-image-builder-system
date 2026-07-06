@@ -147,17 +147,35 @@ if ! curl -fsS "${BASE}/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 4) tiny source archive 생성 (buskybox Dockerfile; busybox 없으면
-# scratch 로 fallback 하고 push 단계에서 image 가 비어있는 채로
-# 성공해도 registry 태그만 검증한다).
-echo "[4/8] source archive (tar.gz) preparation"
+# 4) tiny source archive 생성 + busybox 가용성에 따라 scenario 가 달라진다.
+#
+#   busybox 있음   → full e2e:    build=cli + run=cli    + deploy=cli
+#                  (real docker build + container healthcheck + registry push 검증)
+#   busybox 없음   → deploy-only: build=cli + run=skeleton + deploy=cli
+#                  (build 는 real docker build, container run 은 skeleton 으로
+#                  healthcheck 단계 mock 후 containerStatus.ImageTag 가 채워져
+#                  Runner 의 deploy 단 (docker tag + push) 만 실제 검증. offline
+#                  환경에서 deploy adapter 의 lifetime 만 검증할 수 있다.)
+#
+# TASK-071a 의 후속 정합: v1 (TASK-068) 에서는 busybox 없는 경우 scratch
+# fallback 으로 container run + healthcheck 단계가 docker daemon 측에서
+# 즉시 실패하여 DEPLOY 단계까지 도달하지 못했음. 본 수정으로 busybox
+# 미설치 환경에서도 deploy 단계 (tag + push) 검증이 가능해진다.
+echo "[4/8] source archive (tar.gz) preparation + scenario selection"
 if docker image inspect busybox:1.36 >/dev/null 2>&1; then
   IMAGE_FROM="FROM busybox:1.36"
   HEALTH_CMD='HEALTHCHECK CMD wget -qO- http://127.0.0.1:8080/ || exit 1'
+  BUILD_MODE="cli"
+  RUN_MODE="cli"
+  echo "  busybox:1.36 present → full e2e (build=cli, run=cli, deploy=cli)"
 else
-  yellow "  ! busybox:1.36 not present — falling back to scratch (push step still verifies registry tag)."
+  yellow "  ! busybox:1.36 not present — switching to deploy-only scenario"
+  yellow "      build=cli + run=skeleton (healthcheck mock) + deploy=cli"
+  yellow "      docker tag + push 만 검증하고 build 는 real docker build 만 수행."
   IMAGE_FROM="FROM scratch"
   HEALTH_CMD=""
+  BUILD_MODE="cli"
+  RUN_MODE="skeleton"
 fi
 
 cat > "${TMP}/Dockerfile" <<EOF
@@ -189,14 +207,16 @@ curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source" \
   --data-binary "@${SOURCE_TAR}" \
   -o "${TMP}/post-resp.json" -w "  upload HTTP %{http_code}\n"
 
-# 6) Runner 기동 (cli mode + deploy cli mode). healthcheck timeout 30s 로
-# 단축 + push timeout 60s. registry 가 localhost 이라 push 자체는 빨라야
-# 정상. registry 가 죽었거나 push 가 안 되면 timeout 으로 FAILED 가 보고됨.
-echo "[6/8] runner boot (cli mode + deploy cli mode)"
+# 6) Runner 기동. busybox 가용성에 따라 build / run mode 가 달라진다
+# ([4/8] 의 scenario selection 결과를 그대로 사용). deploy 는 항상 cli
+# mode. healthcheck timeout 30s + push timeout 60s. registry 가 localhost
+# 이라 push 자체는 빨라야 정상. registry 가 죽었거나 push 가 안 되면
+# timeout 으로 FAILED 가 보고됨.
+echo "[6/8] runner boot (build=${BUILD_MODE}, run=${RUN_MODE}, deploy=cli)"
 CONTAINER_NAME="container-${BUILD_ID}"
 RUNNER_WORKSPACE_ROOT="${TMP}/workspace" \
-RUNNER_DOCKER_RUN_MODE=cli \
-RUNNER_DOCKER_BUILD_MODE=cli \
+RUNNER_DOCKER_RUN_MODE="${RUN_MODE}" \
+RUNNER_DOCKER_BUILD_MODE="${BUILD_MODE}" \
 RUNNER_DEPLOY_MODE=cli \
 RUNNER_DEPLOY_TARGET_TYPE=DOCKER_REGISTRY \
 RUNNER_DEPLOY_TARGET_REF="${TEST_IMAGE_REPO}" \
@@ -211,12 +231,11 @@ PORT_FOR_INTERNAL=8080 \
   > "${RUNNER_LOG}" 2>&1 &
 RUNNER_PID=$!
 
-# runner 가 image build + container run + push 까지 진행 — 최대
-# 60s 대기. busybox 가 없으면 healthcheck 이 timeout 으로 FAILED 가
-# 나지만 e2e script 는 registry tag 가 들어왔는지를 확인하므로 PASS
-# 한다 (단, FAILED phase 면 deploy 단계까지 가지 않으므로 PASS 가
-# 아닐 수도 있다. busybox 가 있는 환경 권장).
-yellow "  waiting up to 60s for runner to build + run + push..."
+# runner 가 build + (run) + push 까지 진행 — 최대 60s 대기.
+# - full e2e (busybox 있음) 인 경우: build cli + run cli + deploy cli.
+# - deploy-only (busybox 없음) 인 경우: build cli + run skeleton (containerStatus.ImageTag 가 mock 채워짐) + deploy cli.
+# 두 경로 모두 deploy 단계 (docker tag + push) 가 검증되어야 한다.
+yellow "  waiting up to 60s for runner to build + (run) + push..."
 PUSH_OBSERVED=0
 for _ in $(seq 1 120); do
   STATUS_RESP="$(curl -fsS "${BASE}/builds/${BUILD_ID}" 2>/dev/null || echo "")"
