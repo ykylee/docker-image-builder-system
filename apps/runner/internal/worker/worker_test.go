@@ -90,6 +90,41 @@ func TestWorker_StopsOnContextCancel(t *testing.T) {
 	}
 }
 
+// TestWorker_ClaimBackoff_ExponentialWithCap 은 consecutive failure 에 대한
+// backoff 가 exponential 로 증가하고 5분 cap 을 넘지 않는지 검증.
+//
+//	pollInterval = 1s 기준:
+//	  failures=0 → 0
+//	  failures=1 → 1s
+//	  failures=2 → 2s
+//	  failures=3 → 4s
+//	  failures=10 → 5m (cap)
+func TestWorker_ClaimBackoff_ExponentialWithCap(t *testing.T) {
+	cfg := config.Config{
+		PollInterval: 1 * time.Second,
+	}
+	w := &Worker{config: cfg}
+
+	tests := []struct {
+		failures int
+		want     time.Duration
+	}{
+		{0, 0},
+		{1, 1 * time.Second},
+		{2, 2 * time.Second},
+		{3, 4 * time.Second},
+		{4, 8 * time.Second},
+		{10, 5 * time.Minute}, // cap
+		{100, 5 * time.Minute},
+	}
+	for _, tc := range tests {
+		got := w.claimBackoff(tc.failures)
+		if got != tc.want {
+			t.Errorf("claimBackoff(%d) = %s, want %s", tc.failures, got, tc.want)
+		}
+	}
+}
+
 func TestWorker_HappyPath_PhasesReported(t *testing.T) {
 	fc := &tickerClient{buildID: "b-7"}
 	cfg := config.Config{

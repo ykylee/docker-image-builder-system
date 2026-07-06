@@ -66,10 +66,13 @@ tmp/
 .gitlab-ci.yml
 .circleci
 
-# Docker
-Dockerfile
-.dockerignore
-docker-compose*.yml
+# Docker — Dockerfile / compose / .dockerignore 자체는 build context 에
+# 포함. image build 시 docker 가 직접 디스크에서 읽는다. `-f Dockerfile`
+# 명시 시 docker 가 build context 와 별도로 -f 지정 파일을 사용하므로
+# exclude 가 필수 아님. 관용적 패턴 — exclude 하지 않음.
+#
+# (Dockerfile / docker-compose*.yml / .dockerignore 은 .dockerignore 에서
+#  제외하지 않음)
 
 # 기존 docs 의 일부 (release note 류) 는 유지해도 무방하지만 베이스는 제외
 # 필요시 명시적으로 Dockerfile / compose 에 mount 가능.

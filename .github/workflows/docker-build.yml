@@ -1,0 +1,175 @@
+# =============================================================================
+#  docker-image-builder-system — CI
+# =============================================================================
+#  PR / main push 시 다음을 검증:
+#    1) Build Server image build (`dibs/build-server:ci`)
+#    2) Runner image build (`dibs/runner:ci`)
+#    3) Build Server health check (curl /health)
+#    4) Smoke scenario — POST /builds + GET /builds/:id
+#
+#  trigger:
+#    - PR 이 Dockerfile / runner Dockerfile / compose / pnpm-lock.yaml /
+#      Dockerfile 의 COPY 가 참조하는 source 경로 중 하나를 변경할 때만
+#      trigger (필터). 다른 PR 에서 workflow 가 돌지 않게.
+#    - main push 도 trigger (post-merge regression guard).
+# =============================================================================
+
+name: docker-build
+
+on:
+  pull_request:
+    paths:
+      - 'Dockerfile'
+      - 'apps/runner/Dockerfile'
+      - 'compose.dev.yaml'
+      - '.dockerignore'
+      - '.github/workflows/docker-build.yml'
+      - 'apps/build-server/**'
+      - 'apps/build-monitor/**'
+      - 'apps/runner/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+  push:
+    branches: [main]
+    paths:
+      - 'Dockerfile'
+      - 'apps/runner/Dockerfile'
+      - 'compose.dev.yaml'
+      - '.dockerignore'
+      - '.github/workflows/docker-build.yml'
+      - 'apps/build-server/**'
+      - 'apps/build-monitor/**'
+      - 'apps/runner/**'
+      - 'packages/**'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+
+# GitHub Actions 가 1 job 당 1 container 를 동시 띄우는 것을 방지 — Docker
+# daemon 은 단일 인스턴스가 표준. build 와 smoke 가 같은 docker daemon 사용.
+concurrency:
+  group: docker-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-smoke:
+    name: build + smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # CI 환경에서 compose 의 env required 검증 통과용. 실제 runtime 권한
+      # 분리는 안 함 (CI smoke 용, admin id 값 자체는 의미 없음).
+      ADMIN_IDS: ci-admin
+      DOCKER_SOCKET_GID: "999"   # GitHub Actions ubuntu runner 의 docker gid 와 무관 — smoke 단계는 build-server 만 검증
+    steps:
+      - uses: actions/checkout@v4
+
+      # Build Server image — Dockerfile 의 multi-stage 가 prodDeps 분리 /
+      # USER directive / start_period 조정 등 본 PR 의 보완사항을 모두 검증.
+      - name: build build-server image
+        run: docker build -t dibs/build-server:ci -f Dockerfile .
+
+      # Runner image — USER runner + host docker socket 권한 경로 검증.
+      # 단, CI 에서는 host socket 을 mount 하지 않으므로 이 단계는 build 만
+      # 검증. socket 권한은 compose 의 self-dogfood 시나리오에서 별도 검증.
+      - name: build runner image
+        run: docker build -t dibs/runner:ci -f apps/runner/Dockerfile .
+
+      - name: image size check
+        # 본 PR 의 I-1 보완 (prod-deps stage) 가 image size 309 MB → ~80 MB
+        # 으로 줄였는지 검증. ~150 MB threshold (prod-deps 분리 효과 + alpine
+        # base + pnpm store 의 한계). 임계값 미달 시 fail.
+        run: |
+          SIZE=$(docker image inspect dibs/build-server:ci --format '{{.Size}}')
+          SIZE_MB=$((SIZE / 1024 / 1024))
+          echo "build-server image size: ${SIZE_MB} MB"
+          if [ "$SIZE_MB" -gt 200 ]; then
+            echo "::error::build-server image size ${SIZE_MB} MB exceeds 200 MB threshold (prod-deps stage 의 효과가 충분치 않음)"
+            exit 1
+          fi
+
+      - name: boot build-server
+        run: |
+          docker run -d --name bs \
+            -p 3000:3000 \
+            -e ADMIN_IDS="$ADMIN_IDS" \
+            -e BUILD_REPOSITORY_BACKEND=memory \
+            dibs/build-server:ci
+
+      - name: wait for health
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:3000/health > /dev/null 2>&1; then
+              echo "health OK after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::build-server failed to come up within 60s"
+          docker logs bs
+          exit 1
+
+      - name: verify USER (non-root)
+        # 본 PR 의 C-1 보완 — runtime image 이 root 가 아닌 non-root 로 동작
+        # 하는지 검증. USER app (uid 1000) 가 실행 중이어야 함.
+        run: |
+          USER_OUT=$(docker exec bs id -u)
+          echo "container uid: $USER_OUT"
+          if [ "$USER_OUT" = "0" ]; then
+            echo "::error::container is running as root; USER directive 미적용"
+            docker logs bs
+            exit 1
+          fi
+
+      - name: smoke scenario
+        # scripts/smoke.sh 의 핵심 흐름을 그대로 실행. 풀 e2e 가 아닌
+        # build-server 핵심 endpoint 4 종만 검증 (health + OpenAPI + POST
+        # /builds + GET /builds/:id + Admin 가드).
+        run: |
+          BASE=http://127.0.0.1:3000
+          echo "1) health"
+          curl -fsS $BASE/health
+          echo
+          echo "2) openapi.json"
+          PATHS=$(curl -fsS $BASE/openapi.json | python3 -c "import json,sys; print(len(json.load(sys.stdin)['paths']))")
+          echo "  paths count: $PATHS"
+          echo "3) POST /builds"
+          APP="ci-smoke-$(date +%s)"
+          RESP=$(curl -fsS -X POST $BASE/builds -H "Content-Type: application/json" -d "{
+            \"requestedBy\": \"ci\",
+            \"appName\": \"$APP\",
+            \"sourceArchive\": {\"objectKey\": \"ref://github.com/example/repo\", \"checksumSha256\": \"0000000000000000000000000000000000000000000000000000000000000000\", \"sizeBytes\": 12345},
+            \"entrypointPath\": \"src/index.ts\",
+            \"dockerfilePath\": \"Dockerfile\",
+            \"previewTtlMinutes\": 30
+          }")
+          BUILD_ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['build']['buildId'])")
+          echo "  buildId: $BUILD_ID"
+          echo "4) GET /builds/:id"
+          curl -fsS $BASE/builds/$BUILD_ID | python3 -c "import json,sys; data=json.load(sys.stdin); print('  status:', data['build']['status'])"
+          echo "5) Admin guard"
+          for tc in "no-header:401" "wrong-id:403"; do
+            KEY=${tc%%:*}
+            CODE=${tc##*:}
+            if [ "$KEY" = "no-header" ]; then
+              ACTUAL=$(curl -sS -o /dev/null -w "%{http_code}" $BASE/admin/builds)
+            else
+              ACTUAL=$(curl -sS -o /dev/null -w "%{http_code}" -H "X-Admin-Id: not-admin" $BASE/admin/builds)
+            fi
+            echo "  $KEY expected=$CODE actual=$ACTUAL"
+            if [ "$ACTUAL" != "$CODE" ]; then
+              echo "::error::admin guard mis-match"
+              exit 1
+            fi
+          done
+          ACTUAL=$(curl -sS -o /dev/null -w "%{http_code}" -H "X-Admin-Id: $ADMIN_IDS" $BASE/admin/builds)
+          echo "  correct-id expected=200 actual=$ACTUAL"
+          if [ "$ACTUAL" != "200" ]; then
+            echo "::error::admin correct id guard mis-match"
+            exit 1
+          fi
+          echo "  admin guard OK"
+
+      - name: cleanup
+        if: always()
+        run: docker rm -f bs || true

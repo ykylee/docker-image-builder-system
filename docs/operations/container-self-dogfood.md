@@ -11,22 +11,48 @@
 docker build -t dibs/build-server:dev -f Dockerfile .
 docker build -t dibs/runner:dev -f apps/runner/Dockerfile .
 
-# 2) compose up (memory backend)
-DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3) \
-  docker compose -f compose.dev.yaml up -d
+# 2) 필수 env 명시 — silent fallback 없음
+#    ADMIN_IDS: 운영자가 명시적으로 주입해야 하는 admin secret.
+#    DOCKER_SOCKET_GID: 호스트의 docker group gid (root:docker 0660 socket R/W).
+export ADMIN_IDS="admin,yky.lee"   # 또는 본인 환경에 맞는 admin id 리스트
+export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
 
-# 3) 확인
+# 3) compose up (memory backend)
+docker compose -f compose.dev.yaml up -d
+
+# 4) 확인
 docker compose -f compose.dev.yaml ps
 curl -fsS http://127.0.0.1:3000/health
 docker compose -f compose.dev.yaml logs runner --follow
 
-# 4) tear down
+# 5) tear down
 docker compose -f compose.dev.yaml down -v
 ```
 
-`DOCKER_SOCKET_GID` 가 host 의 docker group gid 와 일치해야 docker socket
-R/W 가능. gid 조회 실패 시 999 fallback (대부분 우분투 계열 호스트에서는
-실제 docker gid 로 덮어쓰지 않으면 동작 안 함 — 본인 환경에 맞춰 명시).
+**필수 env 변수를 export 하지 않으면 compose up 이 명시적 에러로 fail** —
+운영자가 임의의 fallback 으로 동작하지 않도록 의도된 strict 모드:
+
+```
+error while interpolating services.build-server.environment.ADMIN_IDS:
+  required variable ADMIN_IDS is missing a value:
+  ADMIN_IDS must be set, e.g. "admin,yky.lee"
+```
+
+## 보안 / 운영 가드 (PR #28 self-review amend)
+
+- **non-root 실행**: `build-server` 는 `app` (uid 1500), `runner` 는 `runner`
+  (uid 1500) 으로 실행. image 안에서 root 권한은 빌드 시점에만 사용.
+- **ADMIN_IDS default 부재**: image 의 `ENV` 에 `ADMIN_IDS=` 박지 않음.
+  PROJECT_PROFILE §3 (admin secret 정책)에 따라 운영자가 명시적으로 주입.
+- **DOCKER_SOCKET_GID strict**: silent fallback (`-999`) 제거. `:-` 대신
+  `:?` 로 강제. silent permission error 방지.
+- **prod-deps stage 분리**: runtime image 는 devDependencies (tsc, vite,
+  puppeteer 등) 가 제외된 prod deps 만 포함. image size **309 MB → 169 MB**.
+- **start_period 15초**: postgres backend 의 cold start (applyMigrations
+  포함) 가 5초보다 길 수 있어 HEALTHCHECK 가 여유롭게 기다림.
+- **runner backoff / circuit-breaker**: build-server 가 down 됐을 때
+  매 5초마다 "connection refused" 폭주 대신 exponential backoff 적용.
+  `attempt 1 → 5s, 2 → 10s, 3 → 20s, 4 → 40s, ...`, 5분 cap.
 
 ## Self-Dogfood 시나리오
 
@@ -132,26 +158,42 @@ docker compose -f compose.dev.yaml exec postgres psql -U dibs -d dibs -c "\dt"
 docker compose -f compose.dev.yaml logs build-server --tail  # applyMigrations 자동 적용 확인
 ```
 
-## 알려진 한계 (TASK-078 PR 본문에서 정리)
+## 알려진 한계 (amend 적용 후 잔존 항목)
 
-1. **runtime image size 309MB** — node_modules 에 devDependencies 가 모두 포함.
-   prod-only subset 분리(`pnpm deploy` / 별도 stage 분리)는 후속 TASK.
-2. **runner 의 docker socket 공유** — host docker 데몬과 동등 권한. 운영
-   환경에서는 rootless runner 또는 DinD 도입 권장. (본 compose 의 의도는
-   self-dogfood — 운영 가이드 아님.)
+1. **runtime image size 169 MB** — prod-deps stage 분리 적용 후.
+   후속: alpine base 만 남고 pnpm store 가 가장 큰 단일 layer. distroless
+   검토 시 추가 30~40 MB 감소 가능.
+2. **runner 의 docker socket 공유** — host 데몬과 동등 권한. 운영 환경에서는
+   rootless runner 또는 DinD 도입 권장. (본 compose 의 의도는 self-dogfood —
+   운영 가이드 아님.)
 3. **postgres profile 의 host 의존성 없음** — 정상 검증 가능.
 
-## Resource Footprint (2026-07-06 검증 시점)
+## Resource Footprint (2026-07-06 amend 적용 후)
 
-| Image                       | Size    | Memory (idle) | Memory (active) | Notes                  |
-| --------------------------- | ------- | ------------- | --------------- | ---------------------- |
-| `dibs/build-server:dev`     | 309 MB  | 36 MiB        | (1 build) ≤ 60  | Node 20-alpine base    |
-| `dibs/runner:dev`           | 42.7 MB | 12 MiB        | (build 중) ≤ 60 | Alpine 3.20 + docker-cli |
+| Image                       | Size    | Memory (idle) | Memory (active) | Notes                                            |
+| --------------------------- | ------- | ------------- | --------------- | ------------------------------------------------ |
+| `dibs/build-server:dev`     | 169 MB  | 36 MiB        | (1 build) ≤ 60  | Node 20-alpine + prod deps only (devDeps 제거)   |
+| `dibs/runner:dev`           | 41 MB   | 12 MiB        | (build 중) ≤ 60 | Alpine 3.20 + docker-cli + non-root (uid 1500)   |
+
+container 모두 non-root (build-server: app@1500, runner: runner@1500).
+
+## CI (PR review 환경 보호)
+
+`.github/workflows/docker-build.yml` 이 PR / main push 시 다음을 검증:
+
+- 두 image 가 build 가능한지
+- build-server image size 가 200 MB 이하인지 (prod-deps stage 의 효과 유지)
+- container 가 `id -u` 0 (root) 가 아닌지
+- `/health` 통과
+- smoke scenario (`POST /builds` + `GET /builds/:id` + Admin 가드)
+
+trigger: `Dockerfile`, `apps/runner/Dockerfile`, `compose.dev.yaml`,
+`packages/**`, `apps/**`, `pnpm-lock.yaml`, `package.json` 변경 시만.
 
 ## Follow-up (후속 TASK 후보)
 
-- `pnpm deploy` 로 prod-only subset 분리 → build-server image 150 MB 이하 목표.
 - runner DinD / rootless 모드 — host docker dependency 제거.
 - Build Monitor 의 `.generated/openapi.d.ts` 를 CI 에서 build-server 의 live
   `/openapi.json` 으로 자동 갱신하는 workflow 추가 (현재는 repo commit 으로 운영).
 - container image registry push workflow (ghcr.io 와 GitHub Actions).
+- alpine base → distroless 검토 (image size 추가 30~40 MB 감소 가능).

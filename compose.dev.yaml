@@ -6,9 +6,18 @@
 #  build-server + runner + (옵션) postgres 를 같은 network 안에서 띄운다.
 #  메모리 backend 라면 postgres service 는 단순히 profile 으로 분리.
 #
+#  필수 환경 변수 (fallback 없이):
+#    - DOCKER_SOCKET_GID: 호스트의 docker group gid. host 의
+#      `/var/run/docker.sock` 권한 (root:docker 0660) 과 일치해야 runner 가
+#      socket 에 R/W 가능. 조회: `getent group docker | cut -d: -f3`.
+#      본인 환경에 맞춰 명시적으로 export. 예:
+#        export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
+#        docker compose -f compose.dev.yaml up -d
+#
 #  기본 흐름:
 #    - build-server: 포트 3000 노출. Build Monitor SPA dist 도 같은 포트에
 #      정적 mount + SPA fallback. /docs Swagger UI 도 동일 포트.
+#      HEALTHCHECK 가 /health 통과하면 runner 가 dependency 활성화.
 #    - runner: build-server 의 /builds/claim 을 polling. host docker socket
 #      을 공유 mount 해서 container 안에서 build/test/deploy 단계 실행.
 #    - postgres: `--profile postgres` 시에만 활성. DATABASE_URL env 로
@@ -16,6 +25,7 @@
 #
 #  사용 예:
 #    # memory backend
+#    export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
 #    docker compose -f compose.dev.yaml up -d
 #
 #    # postgres backend
@@ -40,20 +50,29 @@ services:
       dockerfile: Dockerfile
     image: dibs/build-server:dev
     container_name: dibs-build-server
+    # dev/self-dogfood 용 — 실패 시 자동 재시작. 무한 restart 방지하려면
+    # `on-failure: 5` 처럼 한계 명시 가능. 본 PR 은 default.
     restart: unless-stopped
+    # 운영자가 명시적으로 주입해야 하는 env (Dockerfile 에는 default 없음).
+    # - ADMIN_IDS 는 secret 처럼 취급 (PROJECT_PROFILE §3).
     environment:
       BUILD_REPOSITORY_BACKEND: memory
-      ADMIN_IDS: admin,yky.lee
+      ADMIN_IDS: ${ADMIN_IDS:?ADMIN_IDS must be set, e.g. "admin,yky.lee"}
       BUILD_MONITOR_DIST_PATH: /app/apps/build-monitor/dist
       NODE_ENV: production
     ports:
       - "3000:3000"
     healthcheck:
+      # 15초 start_period — postgres backend 의 cold start (applyMigrations)
+      # 가 5초보다 길 수 있어 여유. memory backend 에서는 1~2초 안에 health.
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
       interval: 10s
       timeout: 3s
-      start_period: 5s
+      start_period: 15s
       retries: 5
+    # build-server 메모리 한계 — postgres backend 의 applyMigrations / 일반
+    # REST traffic 의 여유. 운영 시에는 pod level 에서 별도 설정.
+    mem_limit: 512m
 
   runner:
     build:
@@ -61,7 +80,10 @@ services:
       dockerfile: apps/runner/Dockerfile
     image: dibs/runner:dev
     container_name: dibs-runner
-    restart: unless-stopped
+    # on-failure: 실패 시에만 재시작. backoff 정책은 runner binary 내부에서
+    # 처리 (후속 TASK). docker-level restart 는 socket 권한 미스매치 등
+    # 설정 오류로 인한 무한 restart 방지.
+    restart: on-failure
     depends_on:
       build-server:
         condition: service_healthy
@@ -73,15 +95,16 @@ services:
     # build/test/deploy 단계 실행. self-dogfood 용 단순화 (DinD 미사용).
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    # 동등 권한 — privileged 없이 socket 만 mount. host docker group 과
-    # container 의 docker group 이 gid 일치해야 socket read/write 가능.
-    # 운영 환경에서는 rootless runner 또는 DinD 도입이 권장.
+    # host 의 docker group gid 를 supplementary group 으로 추가. socket R/W
+    # 권한 (root:docker 0660) 에 필요한 gid. silent fallback 없이 명시 강제.
+    # 자기 환경에 맞춰 export 후 사용:
+    #   export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
+    #   docker compose -f compose.dev.yaml up -d
     group_add:
-      # host docker group gid (host 의 `getent group docker | cut -d: -f3`).
-      # 환경에 따라 다르므로 compose override 또는 `docker.sock-gid` env
-      # 등으로 외부화 가능 — self-dogfood 단계에서는 host 의 gid 와 일치
-      # 해야 동작. (대안: `group_add: ["999"]` 식으로 직접 gid 명시.)
-      - "${DOCKER_SOCKET_GID:-999}"
+      - "${DOCKER_SOCKET_GID:?DOCKER_SOCKET_GID must be set; run 'getent group docker | cut -d: -f3' on the host}"
+    # build/test/deploy 단계의 docker spawn + log stream 으로 메모리 footprint
+    # 가 변동. 256 MB 는 단일 build 한계 가정.
+    mem_limit: 512m
 
   # postgres backend. `--profile postgres` 일 때만 활성. memory backend 만
   # 쓰려면 이 service 를 무시한다.
@@ -103,6 +126,8 @@ services:
       timeout: 3s
       start_period: 5s
       retries: 10
+    # postgres 메모리 한계 — 운영에서는 별도 설정.
+    mem_limit: 512m
 
 volumes:
   postgres-data:
