@@ -506,3 +506,203 @@ describe("MemoryBuildRepository: phase timeline (TASK-050)", () => {
     assert.equal(same.response.phaseHistory.length, before.phaseHistory.length);
   });
 });
+
+// ---------------------------------------------------------------------------
+// TASK-081: multi-runner concurrent claim regression guard. When
+// two or more Runners poll `/builds/claim` simultaneously, the
+// repository must guarantee that a single QUEUED build is claimed
+// exactly once — and that the active-build gate releases only
+// after the in-flight build reaches a terminal phase
+// (COMPLETED/FAILED). Node.js executes synchronous code on a
+// single thread, but the BuildService wraps
+// `repository.claimNextBuild()` in two await calls
+// (`registerRunner` + `markRunnerSeen`) — so a second Runner can
+// enter `claimNextBuild` between the first's claim and the first's
+// registry update. The `active_build_exists` early-return in
+// `claimNextBuild` is the server-side guard.
+//
+// Production semantic across N build slots and M concurrent
+// Runners:
+//
+//   - Within a single claim cycle, exactly one Runner wins the
+//     oldest QUEUED build (`claimed`); the remaining Runners see
+//     `active_build_exists` and the queue holds.
+//   - After the winning Runner drives the build to a terminal
+//     phase (COMPLETED / FAILED), the next claim cycle advances
+//     to the next-oldest QUEUED build.
+//
+// These cases pin that semantic at the repository layer. The
+// companion `docs/operations/multi-runner-claim-2026-07-XX.md`
+// runs the same scenarios against a real multi-runner compose
+// deployment for the e2e confirmation.
+// ---------------------------------------------------------------------------
+describe("MemoryBuildRepository: claimNextBuild multi-runner atomic (TASK-081)", () => {
+  async function seedNQueueBuilds(
+    repo: ReturnType<typeof createMemoryBuildRepository>,
+    count: number
+  ): Promise<string[]> {
+    const ids: string[] = [];
+    for (let i = 0; i < count; i++) {
+      const buildId = await seedBuild(repo, {
+        appName: `p-race-${i}-${Math.random().toString(36).slice(2, 8)}`,
+        requestedBy: "yklee"
+      });
+      ids.push(buildId);
+    }
+    return ids;
+  }
+
+  // Drive a build from CLAIMED to COMPLETED so the next claim
+  // cycle can advance. The runner's full lifecycle is
+  // DOCKER_BUILD_STARTED → ... → COMPLETED; we shortcut to
+  // COMPLETED because `claimNextBuild` only checks `status in
+  // {CLAIMED, BUILDING, TEST_READY}` — anything else releases
+  // the active slot.
+  async function releaseClaimedBuild(
+    repo: ReturnType<typeof createMemoryBuildRepository>,
+    buildId: string
+  ): Promise<void> {
+    const result = await repo.updatePhase(buildId, "COMPLETED");
+    if (result.kind !== "ok") {
+      throw new Error(`failed to release ${buildId}: ${result.kind}`);
+    }
+  }
+
+  it("drains N queued builds across N sequential claim cycles (with release between cycles)", async () => {
+    const repo = createMemoryBuildRepository();
+    const ids = await seedNQueueBuilds(repo, 3);
+
+    // Cycle 1: claim the oldest build.
+    const first = await repo.claimNextBuild();
+    assert.equal(first.kind, "claimed");
+    if (first.kind !== "claimed") return;
+    assert.equal(first.response.build.buildId, ids[0]);
+    await releaseClaimedBuild(repo, first.response.build.buildId);
+
+    // Cycle 2: claim the next-oldest.
+    const second = await repo.claimNextBuild();
+    assert.equal(second.kind, "claimed");
+    if (second.kind !== "claimed") return;
+    assert.equal(second.response.build.buildId, ids[1]);
+    await releaseClaimedBuild(repo, second.response.build.buildId);
+
+    // Cycle 3: claim the third.
+    const third = await repo.claimNextBuild();
+    assert.equal(third.kind, "claimed");
+    if (third.kind !== "claimed") return;
+    assert.equal(third.response.build.buildId, ids[2]);
+    await releaseClaimedBuild(repo, third.response.build.buildId);
+
+    // Cycle 4: queue drained.
+    const empty = await repo.claimNextBuild();
+    assert.equal(empty.kind, "no_build_available");
+  });
+
+  it("yields exactly 1 claim + (N-1) active_build_exists when N runners race N builds in one cycle", async () => {
+    const repo = createMemoryBuildRepository();
+    const ids = await seedNQueueBuilds(repo, 5);
+
+    // Five Runners poll `/builds/claim` simultaneously. The
+    // server-side `active_build_exists` check (and the
+    // "skip source-less builds" gate from TASK-080) must yield
+    // exactly one `claimed` per cycle — never a duplicate build
+    // for any Runner, never a missing build for the oldest entry.
+    const results = await Promise.all([
+      repo.claimNextBuild(),
+      repo.claimNextBuild(),
+      repo.claimNextBuild(),
+      repo.claimNextBuild(),
+      repo.claimNextBuild()
+    ]);
+
+    const claimed = results.filter((r) => r.kind === "claimed");
+    const active = results.filter((r) => r.kind === "active_build_exists");
+
+    // Single-cycle guarantee: exactly 1 claim + 4 active. This
+    // is the production semantic — the first Runner wins, the
+    // other 4 see `active_build_exists` until the in-flight build
+    // reaches a terminal phase.
+    assert.equal(claimed.length, 1, "exactly one Runner wins per cycle");
+    assert.equal(active.length, 4, "remaining Runners see active_build_exists");
+    const activeIds = active.map(
+      (r) => (r as { build: { build: { buildId: string } } }).build.build.buildId
+    );
+    assert.equal(new Set(activeIds).size, 1, "all active responses reference the same in-flight build");
+
+    // The single claimed build must be the oldest of the seeded
+    // set — i.e. the first buildId pushed to `ids`.
+    const claimedId = (claimed[0] as { response: { build: { buildId: string } } }).response.build.buildId;
+    assert.equal(claimedId, ids[0]);
+  });
+
+  it("advances across multiple Promise.all cycles after each release", async () => {
+    // Two cycles of `Promise.all` with 3 Runners each, against 5
+    // builds. Cycle 1 picks the oldest, cycle 2 picks the
+    // second-oldest. After cycle 5, the queue is drained.
+    const repo = createMemoryBuildRepository();
+    const ids = await seedNQueueBuilds(repo, 5);
+
+    const collected: string[] = [];
+    for (let cycle = 0; cycle < 5; cycle++) {
+      const results = await Promise.all([
+        repo.claimNextBuild(),
+        repo.claimNextBuild(),
+        repo.claimNextBuild()
+      ]);
+      const claimedThisCycle = results.find((r) => r.kind === "claimed");
+      assert.ok(
+        claimedThisCycle,
+        `cycle ${cycle} must produce at least one claim`
+      );
+      if (!claimedThisCycle || claimedThisCycle.kind !== "claimed") return;
+      const claimedId = claimedThisCycle.response.build.buildId;
+      collected.push(claimedId);
+      await releaseClaimedBuild(repo, claimedId);
+    }
+
+    // All 5 builds claimed in oldest-first order.
+    assert.deepEqual(collected, ids);
+
+    // One more cycle: queue drained.
+    const drained = await Promise.all([
+      repo.claimNextBuild(),
+      repo.claimNextBuild(),
+      repo.claimNextBuild()
+    ]);
+    for (const r of drained) {
+      assert.equal(r.kind, "no_build_available");
+    }
+  });
+
+  it("yields 1 claim + (M-1) active_build_exists for M runners against K<M builds", async () => {
+    // 3 Runners race for 2 builds. Cycle 1 picks 1 build, the
+    // other 2 Runners see active_build_exists. After release,
+    // cycle 2 picks the second build.
+    const repo = createMemoryBuildRepository();
+    const ids = await seedNQueueBuilds(repo, 2);
+
+    const results = await Promise.all([
+      repo.claimNextBuild(),
+      repo.claimNextBuild(),
+      repo.claimNextBuild()
+    ]);
+
+    const claimed = results.filter((r) => r.kind === "claimed");
+    const active = results.filter((r) => r.kind === "active_build_exists");
+    const empty = results.filter((r) => r.kind === "no_build_available");
+
+    assert.equal(claimed.length, 1, "exactly one Runner wins when M > K");
+    assert.equal(active.length, 2, "remaining M-1 Runners see active_build_exists");
+    assert.equal(empty.length, 0, "no Runner should see no_build_available while K>0 are queued");
+
+    // After releasing the in-flight build, the second cycle
+    // claims the remaining build.
+    const claimedId = (claimed[0] as { response: { build: { buildId: string } } }).response.build.buildId;
+    await releaseClaimedBuild(repo, claimedId);
+    const secondCycle = await repo.claimNextBuild();
+    assert.equal(secondCycle.kind, "claimed");
+    if (secondCycle.kind !== "claimed") return;
+    const secondId = secondCycle.response.build.buildId;
+    assert.deepEqual([claimedId, secondId].sort(), [ids[0], ids[1]].sort());
+  });
+});
