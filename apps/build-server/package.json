@@ -18,6 +18,7 @@
     "@docker-image-builder-system/shared-contract": "workspace:*",
     "@fastify/swagger": "^9.7.0",
     "@fastify/swagger-ui": "^6.0.0",
+    "@fastify/static": "^9.0.0",
     "fastify": "^5.3.3",
     "zod": "^4.0.5"
   },

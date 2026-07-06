@@ -48,8 +48,20 @@
 
 ## 3. 기본 명령 (Commands)
 - 설치: `pnpm install` (`esbuild` 계열 승인 정책 때문에 환경에 따라 `ERR_PNPM_IGNORED_BUILDS`가 날 수 있으며, 이 경우 watch/dev dependency 승인 또는 direct `tsc` 검증으로 우회)
-- 로컬 실행: `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && ./node_modules/.bin/tsc -p packages/db/tsconfig.json && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js`
-- Postgres 실행: `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres DB_AUTO_BOOTSTRAP=true node apps/build-server/dist/apps/build-server/src/index.js`
+- 로컬 실행 (memory backend, Build Server API 만 — 단일 포트 mount 미사용): `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && ./node_modules/.bin/tsc -p packages/db/tsconfig.json && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js`
+- Postgres 실행 (memory backend 와 동일하게 Build Server API 만): `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres DB_AUTO_BOOTSTRAP=true node apps/build-server/dist/apps/build-server/src/index.js`
+- **단일 포트 reverse proxy (TASK-075)** — Build Server 가 build-monitor 의 vite build 산출물을 정적 mount + SPA fallback 으로 함께 노출, `:3000` 한 포트로 backend + frontend 동시 접근:
+  ```bash
+  # 1) build-monitor 의 vite build 산출물 생성 (workspace root 에서)
+  ./node_modules/.bin/tsc -p packages/{shared-contract,shared-config,db}/tsconfig.json && \
+    ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && \
+    (cd apps/build-monitor && ./node_modules/.bin/vite build) && \
+    BUILD_REPOSITORY_BACKEND=memory \
+    BUILD_MONITOR_DIST_PATH=apps/build-monitor/dist \
+    node apps/build-server/dist/apps/build-server/src/index.js
+  # 2) postgres backend 면 BUILD_REPOSITORY_BACKEND=postgres + DATABASE_URL + DB_AUTO_BOOTSTRAP=true 추가.
+  ```
+  그 다음 `curl http://127.0.0.1:3000/` (Build Monitor SPA), `curl http://127.0.0.1:3000/admin/login` (SPA deep link fallback), `curl http://127.0.0.1:3000/api/builds` (Build Server API) 모두 동일 port 로 동작. Build Monitor 의 `lib/api.ts` 가 `baseUrl: "/api"` 로 fetch 하기 때문에 `/api/*` 가 Build Server 의 자체 route (`/builds`, `/admin/*`) 로 307 transparent redirect. dev 환경에서는 vite dev (`:5173`) 가 별도 port 에 떠서 `/api/*` 를 `:3000` 으로 프록시 (vite.config.ts) — 그 경로는 그대로 유지. e2e 검증: `bash apps/build-server/scripts/e2e-single-port.sh`.
 - 빠른 테스트: `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/db/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json --noEmit && (cd apps/runner && go build ./...)`
 - 격리 테스트: `curl http://127.0.0.1:3000/health && curl -X POST http://127.0.0.1:3000/builds ...` (memory / postgres backend smoke 모두 확인 완료)
 - 실행 확인: `GET /health`, `POST /builds`, `GET /builds/:buildId`, `GET /builds/:buildId/logs` 응답과 `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus 정합성 점검
