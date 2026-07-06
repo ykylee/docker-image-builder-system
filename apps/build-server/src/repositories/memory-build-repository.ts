@@ -212,6 +212,12 @@ export function createMemoryBuildRepository(): BuildRepository {
       return build.logs;
     },
 
+    // TASK-080: a QUEUED build is only eligible for claim once
+    // its source archive bytes have been uploaded (mirrors the
+    // INNER JOIN against `build_source` in the postgres repo).
+    // Without this gate the Runner hits a 404 on
+    // `/builds/:id/source` immediately after the claim —
+    // see `docs/operations/dogfood-e2e-2026-07-06.md` §3.2.
     async claimNextBuild(): Promise<ClaimNextBuildResult> {
       const queueOrder = [...builds.values()].sort((a, b) => {
         return a.summary.createdAt.localeCompare(b.summary.createdAt);

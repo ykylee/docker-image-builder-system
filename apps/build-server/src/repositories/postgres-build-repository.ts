@@ -301,6 +301,13 @@ export class PostgresBuildRepository implements BuildRepository {
     return rows.map(mapBuildLogRow);
   }
 
+  // TASK-080: a QUEUED build is only eligible for claim once a
+  // row exists in `build_source` for it — the INNER JOIN below
+  // implements the source-upload race mitigation. Builds whose
+  // archive bytes have not yet been uploaded are silently skipped
+  // (the runner's next claim cycle will pick them up after the
+  // Skill finishes POSTing the archive). See
+  // `docs/operations/dogfood-e2e-2026-07-06.md` §3.2.
   async claimNextBuild(): Promise<ClaimNextBuildResult> {
     return this.db.transaction(async (tx) => {
       const [activeRow] = await tx

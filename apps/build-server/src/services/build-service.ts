@@ -83,6 +83,14 @@ export class BuildService {
     };
   }
 
+  // TASK-080: the underlying repository enforces a source-archive
+  // gate — a QUEUED build is only claimable once its
+  // `POST /builds/:id/source` upload has landed. Callers therefore
+  // see either a `claimed` result (source already on the server)
+  // or a `NO_BUILD_AVAILABLE` result (build is still QUEUED with
+  // no source bytes yet). This is intentional: the runner
+  // retries on the next poll cycle after the Skill finishes its
+  // upload.
   async claimNextBuild(runnerId?: string): Promise<ClaimResponse> {
     // Runner 가 자기 id 를 안 보냈거나 빈 문자열 — 호환을 위해 fallback id 로
     // auto-register 한다. 기존 빌드서버 호출 (runner_id 미전송) 도 그대로 동작.
