@@ -1,0 +1,75 @@
+# syntax patterns adapted from https://docs.docker.com/engine/reference/builder/#dockerignore-file
+
+# VCS
+.git
+.gitignore
+
+# OS / editor cruft
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# Node — build artifacts + transient caches (image 안에서 다시 생성)
+node_modules
+**/node_modules
+.npm
+.pnpm-store
+**/.pnpm-store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript build output (이미 dist 가 도커 빌드 시 생성됨)
+**/dist
+**/.tsbuildinfo
+
+# Python (skill_mcp 영역 — 이미지에서 안 씀)
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+.venv
+venv
+**/*.egg-info
+
+# Go (runner 영역 — 별도 Dockerfile 로 처리)
+apps/runner/bin/
+apps/runner/dist/
+**/.go-build/
+
+# Test / e2e / smoke 산출물 (필요시 runtime 에서 다시 생성)
+**/coverage/
+**/.nyc_output
+**/.cache
+.turbo
+.turbo-build
+
+# Project workflow meta (이미 main 에 commit 됨; runtime image 에 불필요)
+ai-workflow/
+.docs-venv
+docs/PROJECT_PROFILE.md
+docs/report
+docs/review
+
+# Logs / temp
+*.log
+*.tmp
+.tmp
+tmp/
+.temp
+
+# CI / editor settings
+.github
+.gitlab-ci.yml
+.circleci
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# 기존 docs 의 일부 (release note 류) 는 유지해도 무방하지만 베이스는 제외
+# 필요시 명시적으로 Dockerfile / compose 에 mount 가능.

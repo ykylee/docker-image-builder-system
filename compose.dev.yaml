@@ -1,0 +1,109 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — local self-dogfood compose
+# =============================================================================
+#  `docker compose -f compose.dev.yaml up --abort-on-container-exit` 으로
+#  build-server + runner + (옵션) postgres 를 같은 network 안에서 띄운다.
+#  메모리 backend 라면 postgres service 는 단순히 profile 으로 분리.
+#
+#  기본 흐름:
+#    - build-server: 포트 3000 노출. Build Monitor SPA dist 도 같은 포트에
+#      정적 mount + SPA fallback. /docs Swagger UI 도 동일 포트.
+#    - runner: build-server 의 /builds/claim 을 polling. host docker socket
+#      을 공유 mount 해서 container 안에서 build/test/deploy 단계 실행.
+#    - postgres: `--profile postgres` 시에만 활성. DATABASE_URL env 로
+#      build-server 가 schema_migrations 까지 자동 bootstrap.
+#
+#  사용 예:
+#    # memory backend
+#    docker compose -f compose.dev.yaml up -d
+#
+#    # postgres backend
+#    docker compose -f compose.dev.yaml --profile postgres up -d
+#
+#    # log 추적
+#    docker compose -f compose.dev.yaml logs -f build-server
+#
+#    # 종료 + cleanup
+#    docker compose -f compose.dev.yaml down -v
+#
+#  주의 (host 의 docker socket 공유):
+#    빌드된 container 가 host 데몬에서 spawn 됨. 동등 권한 → rootless
+#    DinD 또는 별도 runner node 도입 검토는 후속 TASK. (`compose.dev.yaml`
+#    의 의도 자체가 self-dogfood — 운영 가이드 아님).
+# =============================================================================
+
+services:
+  build-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: dibs/build-server:dev
+    container_name: dibs-build-server
+    restart: unless-stopped
+    environment:
+      BUILD_REPOSITORY_BACKEND: memory
+      ADMIN_IDS: admin,yky.lee
+      BUILD_MONITOR_DIST_PATH: /app/apps/build-monitor/dist
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3000/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 5s
+      retries: 5
+
+  runner:
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    image: dibs/runner:dev
+    container_name: dibs-runner
+    restart: unless-stopped
+    depends_on:
+      build-server:
+        condition: service_healthy
+    environment:
+      HOST_SERVER_BASE_URL: http://build-server:3000
+      RUNNER_ID: runner-compose-1
+      RUNNER_POLL_INTERVAL: 5s
+    # host docker socket 을 공유 mount → container 가 host 데몬을 통해
+    # build/test/deploy 단계 실행. self-dogfood 용 단순화 (DinD 미사용).
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # 동등 권한 — privileged 없이 socket 만 mount. host docker group 과
+    # container 의 docker group 이 gid 일치해야 socket read/write 가능.
+    # 운영 환경에서는 rootless runner 또는 DinD 도입이 권장.
+    group_add:
+      # host docker group gid (host 의 `getent group docker | cut -d: -f3`).
+      # 환경에 따라 다르므로 compose override 또는 `docker.sock-gid` env
+      # 등으로 외부화 가능 — self-dogfood 단계에서는 host 의 gid 와 일치
+      # 해야 동작. (대안: `group_add: ["999"]` 식으로 직접 gid 명시.)
+      - "${DOCKER_SOCKET_GID:-999}"
+
+  # postgres backend. `--profile postgres` 일 때만 활성. memory backend 만
+  # 쓰려면 이 service 를 무시한다.
+  postgres:
+    image: postgres:16-alpine
+    container_name: dibs-postgres
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: dibs
+      POSTGRES_PASSWORD: dibs
+      POSTGRES_DB: dibs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dibs -d dibs"]
+      interval: 5s
+      timeout: 3s
+      start_period: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+    driver: local
