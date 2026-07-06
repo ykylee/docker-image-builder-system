@@ -201,3 +201,54 @@ describe("Header", () => {
     expect(screen.queryByRole("link", { name: "Admin" })).toBeNull();
   });
 });
+// TASK-079 (skill 측 build request UI): Header 의 추가 nav 항목들 검증.
+describe("Header (TASK-079)", () => {
+  it("renders 'New Build' link when userId is set", () => {
+    localStorage.setItem("userId", "alice");
+    setAdminAllowList([]);
+    render(Header);
+    const newBuildLink = screen.getByRole("link", { name: /New Build/i });
+    expect(newBuildLink).toBeInTheDocument();
+    expect(newBuildLink.getAttribute("href")).toBe("/build-request");
+  });
+
+  it("hides 'New Build' link when userId is not set", () => {
+    setAdminAllowList([]);
+    render(Header);
+    expect(screen.queryByRole("link", { name: /New Build/i })).toBeNull();
+  });
+
+  it("renders 'API Console' (in-app Swagger UI) regardless of userId", () => {
+    setAdminAllowList([]);
+    render(Header);
+    const apiConsoleLink = screen.getByTestId("hdr-api-console");
+    expect(apiConsoleLink).toBeInTheDocument();
+    expect(apiConsoleLink.getAttribute("href")).toBe("/api-console");
+  });
+
+  it("renders 'OpenAPI' link to /openapi.json (external target=_blank)", () => {
+    setAdminAllowList([]);
+    render(Header);
+    const link = screen.getByTestId("hdr-openapi");
+    expect(link).toBeInTheDocument();
+    expect(link.getAttribute("href")).toBe("/openapi.json");
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+
+  it("renders 'Docs' link to /docs/ (external target=_blank)", () => {
+    setAdminAllowList([]);
+    render(Header);
+    const link = screen.getByTestId("hdr-docs");
+    expect(link).toBeInTheDocument();
+    expect(link.getAttribute("href")).toBe("/docs/");
+    expect(link.getAttribute("target")).toBe("_blank");
+  });
+
+  it("'New Build' link visible for admin users too (admin nav 와 독립)", () => {
+    localStorage.setItem("userId", "admin");
+    setAdminAllowList(["admin", "yky.lee"]);
+    render(Header);
+    expect(screen.getByRole("link", { name: /New Build/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Admin" })).toBeInTheDocument();
+  });
+});

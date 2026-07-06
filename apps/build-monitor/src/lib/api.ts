@@ -63,6 +63,16 @@ export type BuildListResponse = components["schemas"]["BuildListResponse"];
 export type BuildListQuery = components["schemas"]["BuildListQuery"];
 export type BuildLogEntry = components["schemas"]["BuildLogEntry"];
 
+// TASK-079 (skill 측 build request UI): BuildRequest payload + 응답 type 을
+// openapi-generated components schema 의 structural shape 와 동기화.
+// BuildRequest 자체는 .generated/openapi.d.ts 의 `BuildRequest` component
+// schema 와 1:1 매핑. submitBuildRequest 호출 시 BuildAcceptedResponse 와
+// BuildDuplicateResponse 를 모두 받을 수 있어 union 으로 노출.
+export type BuildRequestPayload = components["schemas"]["BuildRequest"];
+export type BuildAcceptedResponse = components["schemas"]["BuildAcceptedResponse"];
+export type BuildDuplicateResponse = components["schemas"]["BuildDuplicateResponse"];
+export type BuildRequestResponse = BuildAcceptedResponse | BuildDuplicateResponse;
+
 // BuildLogsResponse 는 OpenAPI 에 별도 schema 로 emit 되지 않음
 // (registerPath 의 response 가 inline `buildLogEntrySchema[]` 만 가리킴,
 // envelope 없음). 1차 inline 정의. 후속 PR 에서 buildLogsResponseSchema
@@ -116,6 +126,187 @@ export async function getBuildLogs(
     `/builds/${buildId}/logs`,
     { params: { path: { buildId }, query: since ? { since } : {} } }
   )) as BuildLogsResponse;
+}
+
+// TASK-079 (skill 측 build request UI): POST /builds helper.
+//
+// openapi-fetch 의 `POST` 동적 URL 치환 helper 를 직접 호출. 응답 envelope 은
+// 202 (BuildAcceptedResponse) 또는 409 (BuildDuplicateResponse) 둘 다 가능
+// — caller 가 `result.duplicate` 분기로 새 build 와 중복 build 를 구분.
+//
+// 표준 검증 시나리오:
+//   1. fresh appName → { accepted: true, duplicate: false, build }
+//   2. 같은 appName 재시도 → { accepted: false, duplicate: true, reason: "ACTIVE_BUILD_EXISTS", build }
+//   3. invalid payload → fetchFn 이 throw (openapi-fetch 가 4xx/5xx 를 error 로 wrapping)
+export async function submitBuildRequest(
+  payload: BuildRequestPayload,
+  options: { headers?: Record<string, string> } = {}
+): Promise<BuildRequestResponse> {
+  const fetchFn = (api as unknown as {
+    POST: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).POST;
+  const result = (await fetchFn("/builds", {
+    headers: {
+      "content-type": "application/json",
+      ...(options.headers ?? {})
+    },
+    body: payload
+  })) as {
+    data?: BuildRequestResponse;
+    error?: unknown;
+    response?: { status?: number };
+  };
+  if (result.data) {
+    return result.data;
+  }
+  const status = result.response?.status ?? 0;
+  throw new Error(
+    `POST /builds failed: ${status} ${JSON.stringify(result.error)}`
+  );
+}
+
+// TASK-079 셀프 리뷰 C-2 보완: submitBuildRequest 가 throw 한 error 를
+// BuildRequest UI 가 친화적으로 표시할 수 있도록 변환하는 helper.
+//
+// 백엔드 fastify-zod 가 잘못된 payload 에 대해 다음 envelope 으로 400/500
+// 응답:
+//   {
+//     statusCode: 500,
+//     error: "Internal Server Error",
+//     message: "[{expected:'string',code:'invalid_type',path:['appName'],message:'...'}, ...]"
+//   }
+// `message` 가 stringified JSON array 이고, 각 element 가 zod issue 의
+// structural shape (expected / code / path[] / message).
+//
+// 본 helper 는:
+//   1. message field 의 JSON array 를 parse 시도
+//   2. zod issue 들을 {path, message} 형태로 변환 (path 는 'a.b.c' 형식)
+//   3. summary 는 "N field(s) failed" 같은 짧은 한 줄 요약
+//
+// message 가 JSON parse 실패 시 (예: 일반 500 error), fieldErrors 는 empty
+// array 이고 summary 는 throw 된 Error 의 message 그대로 — caller 가 일반
+// error banner 에 표시 가능.
+export interface ParsedApiError {
+  /** 1줄 요약. error banner 에 표시. */
+  summary: string;
+  /** field-level 에러. zod issue 가 detected 된 경우에만 non-empty. */
+  fieldErrors: Array<{ path: string; message: string }>;
+}
+
+export function parseApiError(err: unknown): ParsedApiError {
+  const raw = err instanceof Error ? err.message : String(err);
+  // openapi-fetch 가 throw 하는 Error message 형식:
+  //   "POST /builds failed: 500 {"statusCode":500,...,\"message\":\"[...]\"}"
+  // 또는 inner JSON array 도 { } 를 포함하므로 단순 lastIndexOf 는 안 됨.
+  // 대신 "failed:" prefix 이후 첫 '{' 부터 brace-count 로 balanced
+  // envelope 추출. envelope 안의 모든 '{' / '}' 가 balanced 이므로 그 중
+  // 가장 마지막 '}' 가 outer envelope 의 closing brace.
+  const failedAt = raw.indexOf("failed:");
+  const searchStart = failedAt >= 0 ? failedAt : 0;
+  let jsonStart = -1;
+  for (let i = searchStart; i < raw.length; i++) {
+    if (raw[i] === "{") {
+      jsonStart = i;
+      break;
+    }
+  }
+  if (jsonStart === -1) {
+    return { summary: raw, fieldErrors: [] };
+  }
+  // brace-count 로 balanced JSON envelope 끝 찾기.
+  let depth = 0;
+  let jsonEnd = -1;
+  let inString = false;
+  let escape = false;
+  for (let i = jsonStart; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\" && inString) {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth++;
+    else if (ch === "}") {
+      depth--;
+      if (depth === 0) {
+        jsonEnd = i;
+        break;
+      }
+    }
+  }
+  if (jsonEnd === -1) {
+    return { summary: raw, fieldErrors: [] };
+  }
+  const jsonText = raw.slice(jsonStart, jsonEnd + 1);
+  let parsed: {
+    statusCode?: number;
+    error?: string;
+    message?: string | unknown[];
+  };
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    return { summary: raw, fieldErrors: [] };
+  }
+  // backend envelope: { statusCode, error, message } — message 가 stringified
+  // JSON array of zod issues.
+  if (typeof parsed.message !== "string") {
+    return {
+      summary: parsed.error
+        ? `${parsed.statusCode ?? "?"} ${parsed.error}`
+        : raw,
+      fieldErrors: []
+    };
+  }
+  // message 가 stringified JSON array 인지 시도.
+  let issues: Array<{
+    expected?: string;
+    code?: string;
+    path?: string[];
+    message?: string;
+  }>;
+  try {
+    const inner = JSON.parse(parsed.message);
+    if (Array.isArray(inner)) {
+      issues = inner as typeof issues;
+    } else {
+      // message 가 array 가 아니라 일반 string. 그냥 summary 에 노출.
+      return {
+        summary: parsed.message || raw,
+        fieldErrors: []
+      };
+    }
+  } catch {
+    // message 가 JSON 아님 (e.g., 단순 string error).
+    return {
+      summary: parsed.message || raw,
+      fieldErrors: []
+    };
+  }
+  const fieldErrors: ParsedApiError["fieldErrors"] = [];
+  for (const issue of issues) {
+    if (Array.isArray(issue.path) && issue.message) {
+      fieldErrors.push({
+        path: issue.path.join("."),
+        message: issue.message
+      });
+    }
+  }
+  const summary =
+    fieldErrors.length > 0
+      ? `${fieldErrors.length} field(s) failed: ${fieldErrors
+          .map((f) => f.path)
+          .join(", ")}`
+      : parsed.message || raw;
+  return { summary, fieldErrors };
 }
 
 // ---------------------------------------------------------------------------
