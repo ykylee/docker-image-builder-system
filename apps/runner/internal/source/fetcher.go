@@ -50,12 +50,23 @@ type Fetcher struct {
 
 // NewFetcher returns a Fetcher wired to `client` with `workspaceRoot`
 // as the parent directory for per-build workspaces.
+//
+// TASK-080: defaults are tuned for the source-upload race scenario.
+// `POST /builds/:id/source` may not have arrived yet when the Runner
+// claims the build; the previous defaults (1 retry × 500 ms) only
+// gave the upload a 500 ms window. The new defaults (3 retries with
+// exponential 1s/3s/9s backoff) cover the typical Skill upload
+// latency of a few seconds while still failing fast on a genuinely
+// missing archive. Callers that need a different policy can override
+// with `WithRetries`. See
+// `docs/operations/dogfood-e2e-2026-07-06.md` §3.2 for the race that
+// motivated this change.
 func NewFetcher(client hostclient.BuildControlClient, workspaceRoot string) *Fetcher {
 	return &Fetcher{
 		client:        client,
 		workspaceRoot: workspaceRoot,
-		maxRetries:    1,
-		retryBackoff:  500 * time.Millisecond,
+		maxRetries:    3,
+		retryBackoff:  1 * time.Second,
 	}
 }
 
@@ -132,20 +143,34 @@ func (f *Fetcher) Fetch(ctx context.Context, buildID string) (*ExtractResult, er
 	// Download with retry. A retry is only attempted on
 	// transport-level errors or 5xx responses — checksum
 	// mismatches (which `verifyChecksum` raises) are terminal.
+	//
+	// TASK-080: backoff doubles between attempts (capped at
+	// `retryBackoff * 3^maxRetries`). With the defaults of 1s +
+	// 3 retries, the schedule is 1s → 3s → 9s (~13s total wait).
+	// This is sized to comfortably absorb the Skill upload
+	// latency that the source-upload race produces while still
+	// failing fast on a genuinely missing archive.
 	var (
 		body     []byte
 		checksum string
 		size     int
 	)
 	attempts := f.maxRetries + 1
+	backoff := f.retryBackoff
 	for attempt := 0; attempt < attempts; attempt++ {
 		if attempt > 0 {
-			log.Printf("source.Fetcher: retry %d/%d for buildID=%s", attempt, f.maxRetries, buildID)
+			log.Printf("source.Fetcher: retry %d/%d for buildID=%s backoff=%s", attempt, f.maxRetries, buildID, backoff)
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
-			case <-time.After(f.retryBackoff):
+			case <-time.After(backoff):
 			}
+			// Exponential growth for the next attempt. The
+			// doubling keeps the worst-case wait bounded
+			// (≤ retryBackoff * 3^maxRetries) while still
+			// absorbing transient upload latency on the
+			// first attempt.
+			backoff *= 3
 		}
 		b, c, s, err := f.client.DownloadSource(ctx, buildID)
 		if err == nil {

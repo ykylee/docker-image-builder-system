@@ -242,6 +242,24 @@
 - TASK-036 PKG-006 Preview Queue + Readiness: 5종 schema (testDeployment/Queue/Ready/Status), BuildRepository 3 method (queueTestDeployment/reportPreviewStatus/getTestDeployment), 4 endpoint, Runner queue 2회 + ready 1회 자동 보고 (8 phase e2e)
 - 누적 회귀 265/265 OK (TS 37 + Go 13 + Python 215), 브랜치 `codex/backend-build-queue-2026-07-03` 10 commits (push 완료, PR 미오픈)
 
+## 2026-07-06 운영 검증 메모
+
+- `docs/operations/dogfood-e2e-2026-07-06.md` 신규 추가. 다음 세션은 이 문서를 먼저 읽으면 된다.
+- 실제 성공 build 1건 확인:
+  - `bab5995f-7741-4ffc-80ba-95d53684263d`
+  - preview `http://127.0.0.1:32770/health`
+  - build detail 에서 `Container test=SUCCESS`, `Deployment=SUCCESS`, `Result delivery=SUCCESS`
+- queue 검증:
+  - 러너 1대(`runner-dogfood-hostnet-2`) 기준 build 3건을 먼저 `QUEUED`로 적재한 뒤 순차 완료 확인
+  - 순서: `9562dc11-8f0a-46df-9709-026c8642cb12` → `854fda1b-d735-4cd6-9164-f86c798f5fe3` → `12ea7282-906e-40a9-8f71-5cc16ac8c47a`
+  - preview: `:32771`, `:32772`, `:32773` 모두 `{"status":"ok"}`
+- 재현된 이슈:
+  - `POST /builds` 직후 runner 가 먼저 claim 하면 `/builds/:id/source` fetch 가 `404 Source archive not found for build.` 로 실패할 수 있다.
+  - 실패 예시 build: `d4b86bb8-bfed-47c6-980c-ea4574796b1c`, `b20f5746-b71a-4c98-b0af-3ab361786660`, `b9d6d047-652a-40f9-93b5-a0c39bc3e3f9`
+- UI 메모:
+  - admin 화면은 global header 와 page-level admin tabs 가 함께 보여 hierarchy 가 다소 중첩되어 보인다.
+  - Build Request / Build Detail 대비 admin 화면의 시각 톤과 밀도 차이가 있어 일관성 점검 후보로 남긴다.
+
 ## Next Actions
 
 - [ ] memory fallback 을 계속 기본값으로 둘지, postgres 를 기본 개발 경로로 승격할지 결정
@@ -256,6 +274,9 @@
 - [x] TASK-038: Build Server OpenAPI/Swagger UI + CORS + DESIGN.md 1차안 부착 (PR #5). /openapi.json 10 paths + 17 components.schemas + 4 tags, /docs Swagger UI, hand-rolled CORS, DESIGN.md 1차안. 회귀 266/266 OK. 후속: frontend Vite+React 작업 또는 TASK-017 stdio transport 활성화.
 - [ ] docker.BuildImage 실제 구현 (Docker SDK + SOURCE_PREPARED/DOCKER_BUILD_STARTED 사이 실제 image build) — 현재 noop
 - [ ] Postgres testDeployment host/hostPort/expiresAt/internalPort 컬럼 정밀화 (1차 골격은 null 응답)
+- [ ] source upload race 완화 설계 (`POST /builds`와 `/builds/:id/source` 사이 claim 선점 방지 또는 runner fetch retry/backoff 강화)
+- [ ] 러너 2대 이상으로 병렬 claim / 동시 처리 검증
+- [ ] admin UI navigation hierarchy / visual consistency 정리
 
 - [x] TASK-039: Build Monitor frontend 부착 1차 골격 (PR #6) 완료. Svelte 5 + Vite + TypeScript.
 - [x] TASK-041: Build Monitor 프론트엔드 프리미엄 디자인 적용 완료. Light/Dark 모드 대응, Glassmorphism, Micro-animations 추가 (theme.css, tokens.css 전면 개편 및 UI 컴포넌트 프리미엄화).
@@ -290,3 +311,4 @@
 - docker.BuildImage 가 noop — 실제 image build / docker run / docker stop 후속. 현 단계에서는 phase 흐름만 canonical contract 와 정합.
 - phase 자동 status 전이 휴리스틱 (DOCKER_BUILD_STARTED→BUILDING 등) 단순 매핑. canonical phase machine 도입 시 invalid_transition 분기 활용.
 - Preview queue 2회 호출은 idempotent retry 의도였으나 interface 정돈 필요 (단일 queue + status 매핑).
+- self-dogfood 실제 런타임에서 source archive 업로드보다 runner claim 이 먼저 일어나면 build 가 404 source fetch 로 실패할 수 있다. 현재는 runner `DISABLED` → build/source 적재 → `ACTIVE` 순서로 우회 검증했다.

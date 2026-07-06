@@ -1,5 +1,5 @@
 import { strict as assert } from "node:assert";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { describe, it } from "node:test";
 
 import Fastify from "fastify";
@@ -30,6 +30,85 @@ const baseBody = {
   entrypointPath: "x"
 };
 
+// TASK-080: claimNextBuild now requires the source archive bytes to
+// have been uploaded before a QUEUED build is eligible. The
+// `seedBuildWithSource` helper threads a real (dummy) archive
+// through the service so existing claimNextBuild call sites can
+// stay one-liner. `seedRouteBuildWithSource` is the equivalent for
+// the route-level "POST /builds/claim" scenarios that go through
+// the HTTP layer.
+async function seedBuildWithSource(
+  service: BuildService,
+  base: { appName: string; requestedBy: string; entrypointPath?: string }
+): Promise<{ buildId: string }> {
+  const bytes = new Uint8Array(randomBytes(64));
+  const checksumSha256 = createHash("sha256").update(Buffer.from(bytes)).digest("hex");
+  const sizeBytes = bytes.byteLength;
+  const create = await service.createBuild({
+    appName: base.appName,
+    requestedBy: base.requestedBy,
+    sourceArchive: {
+      objectKey: `src/${base.appName}/archive.tar.gz`,
+      checksumSha256,
+      sizeBytes
+    },
+    entrypointPath: base.entrypointPath ?? baseBody.entrypointPath
+  });
+  if (!("accepted" in create) || !create.accepted) {
+    throw new Error(
+      `seedBuildWithSource: expected accepted, got ${JSON.stringify(create)}`
+    );
+  }
+  const buildId = create.build.buildId;
+  const upload = await service.storeSourceArchive(
+    buildId,
+    bytes,
+    checksumSha256,
+    sizeBytes
+  );
+  if (upload.kind !== "ok") {
+    throw new Error(`source upload failed: ${upload.kind}`);
+  }
+  return { buildId };
+}
+
+async function seedRouteBuildWithSource(
+  app: Awaited<ReturnType<typeof buildApp>>,
+  base: { appName: string; requestedBy: string; entrypointPath?: string }
+): Promise<string> {
+  const bytes = Buffer.from(randomBytes(64));
+  const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
+  const sizeBytes = bytes.byteLength;
+  const enq = await app.inject({
+    method: "POST",
+    url: "/builds",
+    payload: {
+      appName: base.appName,
+      requestedBy: base.requestedBy,
+      sourceArchive: {
+        objectKey: `src/${base.appName}/archive.tar.gz`,
+        checksumSha256,
+        sizeBytes
+      },
+      entrypointPath: base.entrypointPath ?? baseBody.entrypointPath
+    }
+  });
+  if (enq.statusCode !== 202) {
+    throw new Error(`seedRouteBuildWithSource: enq status ${enq.statusCode}`);
+  }
+  const buildId = (enq.json() as { build: { buildId: string } }).build.buildId;
+  const upload = await app.inject({
+    method: "POST",
+    url: `/builds/${buildId}/source`,
+    headers: { "content-type": "application/octet-stream" },
+    payload: bytes
+  });
+  if (upload.statusCode !== 201) {
+    throw new Error(`source upload status ${upload.statusCode}: ${upload.body}`);
+  }
+  return buildId;
+}
+
 describe("POST /builds/claim", () => {
   it("returns 200 with claimed=false / NO_BUILD_AVAILABLE on empty queue", async () => {
     const app = await buildApp();
@@ -47,12 +126,14 @@ describe("POST /builds/claim", () => {
 
   it("returns 200 with claimed=true after enqueueing one build", async () => {
     const app = await buildApp();
-    const enq = await app.inject({
-      method: "POST",
-      url: "/builds",
-      payload: baseBody
+    // TASK-080: claimNextBuild now requires the source archive
+    // bytes. The helper drives POST /builds + POST /builds/:id/source
+    // so the subsequent claim is eligible.
+    await seedRouteBuildWithSource(app, {
+      appName: baseBody.appName,
+      requestedBy: baseBody.requestedBy,
+      entrypointPath: baseBody.entrypointPath
     });
-    assert.equal(enq.statusCode, 202);
     const claim = await app.inject({
       method: "POST",
       url: "/builds/claim",
@@ -145,9 +226,10 @@ describe("POST /builds/:buildId/preview", () => {
   async function setupCompletedBuild() {
     const repo = createMemoryBuildRepository();
     const service = new BuildService(repo);
-    const create = await service.createBuild(baseBody);
-    if (!("accepted" in create) || !create.accepted) throw new Error("setup");
-    const buildId = create.build.buildId;
+    const { buildId } = await seedBuildWithSource(service, {
+      appName: baseBody.appName,
+      requestedBy: baseBody.requestedBy
+    });
     await service.claimNextBuild();
     await service.reportPhase(buildId, "SOURCE_PREPARED");
     await service.reportPhase(buildId, "DOCKER_BUILD_STARTED");
@@ -202,9 +284,10 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
     const { service, buildId } = await (async () => {
       const repo = createMemoryBuildRepository();
       const svc = new BuildService(repo);
-      const create = await svc.createBuild(baseBody);
-      if (!("accepted" in create) || !create.accepted) throw new Error("setup");
-      const id = create.build.buildId;
+      const { buildId: id } = await seedBuildWithSource(svc, {
+        appName: baseBody.appName,
+        requestedBy: baseBody.requestedBy
+      });
       await svc.claimNextBuild();
       await svc.reportPhase(id, "SOURCE_PREPARED");
       await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
@@ -252,9 +335,10 @@ describe("POST /builds/:buildId/deployment", () => {
     const { service, buildId } = await (async () => {
       const repo = createMemoryBuildRepository();
       const svc = new BuildService(repo);
-      const create = await svc.createBuild(baseBody);
-      if (!("accepted" in create) || !create.accepted) throw new Error("setup");
-      const id = create.build.buildId;
+      const { buildId: id } = await seedBuildWithSource(svc, {
+        appName: baseBody.appName,
+        requestedBy: baseBody.requestedBy
+      });
       await svc.claimNextBuild();
       await svc.reportPhase(id, "SOURCE_PREPARED");
       await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
@@ -321,9 +405,10 @@ describe("GET /builds/:buildId/test-deployment", () => {
   it("returns 200 with testDeployment after queue", async () => {
     const repo = createMemoryBuildRepository();
     const service = new BuildService(repo);
-    const create = await service.createBuild(baseBody);
-    if (!("accepted" in create) || !create.accepted) throw new Error("setup");
-    const id = create.build.buildId;
+    const { buildId: id } = await seedBuildWithSource(service, {
+      appName: baseBody.appName,
+      requestedBy: baseBody.requestedBy
+    });
     await service.claimNextBuild();
     await service.reportPhase(id, "DOCKER_BUILD_STARTED");
     await service.reportPhase(id, "DOCKER_BUILD_COMPLETED");
