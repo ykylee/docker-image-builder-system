@@ -197,6 +197,46 @@ func TestDeploy_CLIMode_PushFail_PropagatesError(t *testing.T) {
 	}
 }
 
+// TestDeploy_CLIMode_TagTimeout_PropagatesContextDeadline 는 TASK-071a 의
+// tag 단계 timeout 통합 회귀 가드. pushTimeout 1s + tagImageCmd 가
+// 5s 멈춤 → tag 단계에서 context deadline 으로 끊기며 push 는 호출되지
+// 않아야 한다.
+func TestDeploy_CLIMode_TagTimeout_PropagatesContextDeadline(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
+	t.Setenv("RUNNER_DEPLOY_MODE", "cli")
+	t.Setenv("RUNNER_DEPLOY_TARGET_REF", "registry.example.com/test-app")
+	t.Setenv("RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS", "1")
+
+	client := NewClient()
+	client.SetTagImageCmdForTest(func(ctx context.Context, args ...string) (string, error) {
+		select {
+		case <-time.After(5 * time.Second):
+			return "", errors.New("tag took too long")
+		case <-ctx.Done():
+			return "", fmt.Errorf("tag context done: %w", ctx.Err())
+		}
+	})
+	client.SetPushImageCmdForTest(func(ctx context.Context, args ...string) (string, error) {
+		t.Fatal("docker push should not be invoked when tag times out")
+		return "", nil
+	})
+
+	start := time.Now()
+	_, err := client.Deploy(context.Background(), "b-1", DeployOptions{SourceImage: "docker-image-builder-system/cli:b-1"})
+	elapsed := time.Since(start)
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "docker tag") {
+		t.Fatalf("expected error to mention docker tag, got: %v", err)
+	}
+	if elapsed > 3*time.Second {
+		t.Fatalf("expected tag to be cancelled by timeout within 3s, took %s", elapsed)
+	}
+}
+
 func TestDeploy_CLIMode_PushTimeout_PropagatesContextDeadline(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
