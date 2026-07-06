@@ -42,7 +42,7 @@ describe("BuildRow", () => {
     expect(row).toBeInTheDocument();
     // StatusPill 이 lifecycleStatus (canonical PREPARING_SOURCE) 를 우선 표시.
     expect(
-      screen.getByRole("status", { name: /Build status: PREPARING_SOURCE/i })
+      screen.getByRole("status", { name: /Status: PREPARING_SOURCE/i })
     ).toBeInTheDocument();
     // appName 노출 (legacy projectId/repositoryId 컬럼은 더 이상 렌더 안 함)
     expect(screen.getByText("demo-frontend")).toBeInTheDocument();
@@ -53,7 +53,7 @@ describe("BuildRow", () => {
   it("falls back to legacy status when lifecycleStatus is absent", () => {
     render(BuildRow, { build: sampleLegacyStatusOnly });
     expect(
-      screen.getByRole("status", { name: /Build status: BUILDING/i })
+      screen.getByRole("status", { name: /Status: BUILDING/i })
     ).toBeInTheDocument();
   });
 });

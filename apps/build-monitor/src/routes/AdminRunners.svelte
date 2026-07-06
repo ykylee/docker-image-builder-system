@@ -16,6 +16,7 @@
    */
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import StatusPill from "../components/StatusPill.svelte";
   import { adminIdStore, userIdStore } from "../lib/session.js";
   import type {
     AdminRunner,
@@ -180,9 +181,13 @@
           <tr class:disabled-row={r.status === "DISABLED"}>
             <td><code>{r.runnerId}</code></td>
             <td>
-              <span class="pill" class:active={r.status === "ACTIVE"} class:off={r.status === "DISABLED"}>
-                {r.status}
-              </span>
+              <!-- TASK-072: inline `<span class="pill" class:active class:off>` 마크업을
+                   canonical StatusPill 컴포넌트로 교체. RunnerStatus ("ACTIVE" /
+                   "DISABLED") 가 StatusPill 의 colorFor 매핑에 추가되어 (TASK-072)
+                   success / danger 색상으로 노출 — 운영자가 BuildsList (BuildSummary
+                   success/failed) 와 AdminRunners (RunnerStatus ACTIVE/DISABLED) 를
+                   번갈아 봐도 같은 색상 의미론으로 직관적. 디자인 토큰도 자동 follow. -->
+              <StatusPill status={r.status} />
             </td>
             <td class="r muted">{formatRelative(r.lastSeenAt)}</td>
             <td class="r">{r.buildsClaimed}</td>
@@ -334,32 +339,12 @@
     font-family: var(--font-mono);
     font-size: var(--size-xs);
   }
-  /* TASK-070 (PR #23): `.pill` 의 raw rgb (green-500 / rose-500) 와
-     `.btn-danger` / `.chip.active` 의 raw rgba 를 모두 canonical 디자인
-     토큰 (`--color-accent-success` / `--color-accent-danger` /
-     `--color-accent-primary`) 기반 `color-mix` 로 정렬. tokens.css 가
-     light / dark 모드별로 다른 톤을 emit 하므로 (light 모드 success =
-     #059669, danger = #dc2626) 단일 source-of-truth 가 자동 정렬됨.
-     rAF color-mix (chrome 111+ / firefox 113+ / safari 16.2+) — 2026
-     모던 브라우저 모두 지원. */
-  .pill {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: var(--radius-pill);
-    font-size: var(--size-xs);
-    font-weight: var(--weight-semibold);
-    letter-spacing: 0.04em;
-  }
-  .pill.active {
-    background: color-mix(in srgb, var(--color-accent-success) 16%, transparent);
-    color: var(--color-accent-success);
-    border: 1px solid color-mix(in srgb, var(--color-accent-success) 32%, transparent);
-  }
-  .pill.off {
-    background: color-mix(in srgb, var(--color-accent-danger) 12%, transparent);
-    color: var(--color-accent-danger);
-    border: 1px solid color-mix(in srgb, var(--color-accent-danger) 28%, transparent);
-  }
+  /* TASK-070 (PR #23) 에서 `.btn-danger` / `.chip.active` 의 raw rgba 를
+     canonical 디자인 토큰 기반 `color-mix` 로 정렬. tokens.css 의 light /
+     dark 모드별 자동 follow. TASK-072 에서 `.pill` / `.pill.active` / `.pill.off`
+     자체는 canonical StatusPill 컴포넌트로 승격하면서 제거 — runner row 의
+     status cell 은 이제 `<StatusPill status={r.status}>` 가 디자인 토큰과 의미
+     mapping 을 모두 가져간다 (colorFor ACTIVE → success / DISABLED → danger). */
   .err-cell {
     max-width: 240px;
     overflow: hidden;

@@ -121,7 +121,7 @@ describe("AdminUsers", () => {
     );
     // BuildRow 의 StatusPill 이 canonical lifecycleStatus 를 표시.
     expect(
-      screen.getByRole("status", { name: /Build status: COMPLETED/i })
+      screen.getByRole("status", { name: /Status: COMPLETED/i })
     ).toBeInTheDocument();
     // BuildRow 의 meta-cell 이 appName 을 표시.
     expect(screen.getByText("alice-app")).toBeInTheDocument();
