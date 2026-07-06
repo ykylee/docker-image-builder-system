@@ -1,7 +1,7 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { join, resolve } from "node:path";
 import {
   applyMigrations,
   createDbClientFromPool,
@@ -21,9 +21,18 @@ import { BuildService } from "../services/build-service.js";
 // TASK-064 운영 baseline — postgres backend 부팅 시
 // `apps/build-server/migrations/` 의 미적용 SQL 을 자동 적용한다.
 // `ensureDbSchema` 가 greenfield DDL 을 bootstrap 으로 만들고, 이어서
-// 0001~0003 의 brownfield migration 을 차례로 적용한다. 같은 트랜잭션
+// 0001~000N 의 brownfield migration 을 차례로 적용한다. 같은 트랜잭션
 // 안에서 처리되므로 partial failure 시 자동 rollback.
-const MIGRATIONS_DIR = new URL("../../migrations/", import.meta.url).pathname;
+//
+// runtime cwd 기준 상대 path 로 결정 — docker image (WORKDIR=/app) 와
+// local 실행 (cwd=REPO_ROOT) 모두 `apps/build-server/migrations/` 가
+// cwd 아래 존재. 이전 구현은 `import.meta.url` 의 `../../migrations/` 였는데
+// tsc 가 `dist/apps/build-server/src/app/create-app.js` 로 emit 하면
+// `../../migrations/` 가 `dist/apps/build-server/migrations/` 를 가리켜
+// postgres backend 부팅 시 ENOENT. TASK-075 와 동일한 함정이었으나
+// memory backend 가 applyMigrations 를 호출하지 않아 기존엔 잠복.
+// TASK-082 multi-runner postgres 운영 검증에서 봉인.
+const MIGRATIONS_DIR = join(process.cwd(), "apps/build-server/migrations");
 
 // TASK-075 단일 포트 reverse proxy. Build Server 가 build-monitor 의
 // vite build 산출물 (`apps/build-monitor/dist`) 을 정적 서빙 + SPA fallback 으로

@@ -1,0 +1,97 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — multi-runner + postgres self-dogfood override
+# =============================================================================
+#  TASK-082 의 운영 검증용 override. compose.dev.yaml 의 기본 1 runner 위에
+#  runner2 / runner3 를 추가 (TASK-081-B 의 memory backend 와 동일하게 3
+#  runner 동시 운영) 하고, 동시에 `--profile postgres` 로 postgres service
+#  를 활성화하여 build-server 의 backend 를 postgres 로 전환한다.
+#
+#  TASK-081-B 와의 차이:
+#    - build-server 의 BUILD_REPOSITORY_BACKEND: memory → postgres
+#    - DATABASE_URL: postgres service (compose 내부 DNS) 로 resolve
+#    - DB_AUTO_BOOTSTRAP: true — schema_migrations + 0001~N 자동 적용
+#    - depends_on 에 postgres healthy 조건 추가 (applyMigrations 이전에는
+#      build-server 가 health 통과 불가)
+#    - compose 실행 시 `--profile postgres` 를 함께 전달
+#
+#  사용:
+#    # 환경 변수 (TASK-078 / TASK-081-B 와 동일)
+#    export DOCKER_SOCKET_GID="$(stat -f %g ~/.colima/default/docker.sock \
+#      2>/dev/null || getent group docker | cut -d: -f3)"
+#    export ADMIN_IDS=admin
+#
+#    # postgres profile + 3 runner compose up
+#    docker compose -f compose.dev.yaml \
+#      -f compose.dev.runner-multi-postgres.yaml \
+#      --profile postgres \
+#      --project-name dibs-multi-runner-pg up -d
+#
+#    # log 추적
+#    docker compose ... logs -f build-server postgres runner runner2 runner3
+#
+#    # 종료 + cleanup (postgres volume 도 같이 drop)
+#    docker compose ... down -v
+#
+#  주의:
+#    - 새 runner service 의 build context / dockerfile / image 는 compose.dev.yaml
+#      의 runner 와 동일하게 명시 (extends 는 compose-spec 에서 deprecated).
+#    - DATABASE_URL 의 host `postgres` 는 compose 내부 DNS — 외부에서는
+#      `127.0.0.1:5432` 로 port forward 된다.
+#    - 모든 runner 가 host docker socket 을 공유 mount 한다 — 동일한 권한으로
+#      host 데몬 RPC 호출. self-dogfood 용 단순화. 운영에서는 rootless
+#      DinD 또는 별도 runner node 로 격리 검토 (후속 TASK).
+# =============================================================================
+
+services:
+  build-server:
+    environment:
+      BUILD_REPOSITORY_BACKEND: postgres
+      DATABASE_URL: postgres://dibs:dibs@postgres:5432/dibs
+      DB_AUTO_BOOTSTRAP: "true"
+      ADMIN_IDS: ${ADMIN_IDS:?ADMIN_IDS must be set, e.g. "admin,yky.lee"}
+      BUILD_MONITOR_DIST_PATH: /app/apps/build-monitor/dist
+      NODE_ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  runner2:
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    image: dibs/runner:dev
+    container_name: dibs-runner-2
+    restart: on-failure
+    depends_on:
+      build-server:
+        condition: service_healthy
+    environment:
+      HOST_SERVER_BASE_URL: http://build-server:3000
+      RUNNER_ID: runner-multi-2
+      RUNNER_POLL_INTERVAL: 5s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_SOCKET_GID:?DOCKER_SOCKET_GID must be set; run 'getent group docker | cut -d: -f3' on the host}"
+    mem_limit: 512m
+
+  runner3:
+    build:
+      context: .
+      dockerfile: apps/runner/Dockerfile
+    image: dibs/runner:dev
+    container_name: dibs-runner-3
+    restart: on-failure
+    depends_on:
+      build-server:
+        condition: service_healthy
+    environment:
+      HOST_SERVER_BASE_URL: http://build-server:3000
+      RUNNER_ID: runner-multi-3
+      RUNNER_POLL_INTERVAL: 5s
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - "${DOCKER_SOCKET_GID:?DOCKER_SOCKET_GID must be set; run 'getent group docker | cut -d: -f3' on the host}"
+    mem_limit: 512m
