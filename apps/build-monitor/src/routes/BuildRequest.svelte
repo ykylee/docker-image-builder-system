@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
+  import StatusPill from "../components/StatusPill.svelte";
   import { userIdStore } from "../lib/session.js";
   import {
     submitBuildRequest,
+    parseApiError,
     type BuildRequestPayload,
     type BuildRequestResponse,
     type BuildAcceptedResponse,
@@ -30,6 +32,9 @@
   let loading = $state(true);
 
   // form fields. default 값은 preset 에서 일괄 교체.
+  // previewTtlMinutes default 60 은 backend zod schema 의 `default(60)` 와
+  // 일치 (TASK-079 셀프 리뷰 D-4 보완 — 사용자가 명시하지 않아도 backend
+  // 와 동일한 default 로 시작하도록).
   let appName = $state("");
   let requestedBy = $state("");
   let objectKey = $state("");
@@ -37,10 +42,13 @@
   let sizeBytes = $state(0);
   let entrypointPath = $state("src/index.ts");
   let dockerfilePath = $state("Dockerfile");
-  let previewTtlMinutes = $state(30);
+  let previewTtlMinutes = $state(60);
 
   let submitting = $state(false);
   let submitError = $state<string | null>(null);
+  // zod error 의 field-level 메시지. submitError 와 별개로 표시 — 사용자가
+  // 어떤 field 가 잘못되었는지 즉시 알 수 있도록 (TASK-079 셀프 리뷰 C-2).
+  let submitFieldErrors = $state<Array<{ path: string; message: string }>>([]);
 
   // 가장 최근 응답을 화면에 표시. accepted/duplicate 둘 다.
   let lastResult = $state<BuildRequestResponse | null>(null);
@@ -58,7 +66,7 @@
       sizeBytes = 12345;
       entrypointPath = "src/index.ts";
       dockerfilePath = "Dockerfile";
-      previewTtlMinutes = 30;
+      previewTtlMinutes = 60;
     } else if (kind === "minimal") {
       appName = `minimal-${ts}`;
       requestedBy = userId ?? "alice";
@@ -86,6 +94,16 @@
     appName = `random-${ts}-${rnd}`;
   }
 
+  // TASK-079 셀프 리뷰 I-2 보완: form reset — Reset 버튼이 호출.
+  // lastResult / submitError / submitFieldErrors 모두 초기화하고 hello preset
+  // 으로 재충전. build list 로 navigation 하지 않음 (의도와 일치).
+  function resetForm() {
+    lastResult = null;
+    submitError = null;
+    submitFieldErrors = [];
+    applyPreset("hello");
+  }
+
   onMount(async () => {
     // userId 가 없으면 Login 페이지로 redirect (다른 인증 필요 route 와 동일).
     if (!userId) {
@@ -102,31 +120,39 @@
 
   async function submit() {
     submitError = null;
-    lastResult = null;
+    submitFieldErrors = [];
     // form validation — zod 가 backend 에서도 검증하지만 client-side sanity
     // check 로 빠르게 피드백. BuildRequest schema 그대로.
+    // TASK-079 셀프 리뷰 I-3 보완: previewTtlMinutes / dockerfilePath 도 검증.
+    // 모든 error 는 field-level 로 누적하여 submitFieldErrors 에 push →
+    // 사용자가 어떤 field 가 잘못되었는지 즉시 식별 가능.
+    const errs: Array<{ path: string; message: string }> = [];
     if (!appName || appName.length < 1) {
-      submitError = "appName is required (BuildRequest schema)";
-      return;
+      errs.push({ path: "appName", message: "Required. Canonical app identity." });
     }
     if (!requestedBy || requestedBy.length < 1) {
-      submitError = "requestedBy is required";
-      return;
+      errs.push({ path: "requestedBy", message: "Required. Owner userId." });
     }
     if (!objectKey || objectKey.length < 1) {
-      submitError = "sourceArchive.objectKey is required";
-      return;
+      errs.push({ path: "sourceArchive.objectKey", message: "Required. Skill 이 발행한 archive reference." });
     }
     if (!checksumSha256 || checksumSha256.length < 1) {
-      submitError = "sourceArchive.checksumSha256 is required";
-      return;
+      errs.push({ path: "sourceArchive.checksumSha256", message: "Required. 64 hex chars expected." });
     }
     if (sizeBytes < 0 || !Number.isFinite(sizeBytes)) {
-      submitError = "sourceArchive.sizeBytes must be a non-negative integer";
-      return;
+      errs.push({ path: "sourceArchive.sizeBytes", message: "Non-negative integer." });
     }
     if (!entrypointPath || entrypointPath.length < 1) {
-      submitError = "entrypointPath is required";
+      errs.push({ path: "entrypointPath", message: "Required. Container 시작점." });
+    }
+    if (!dockerfilePath || dockerfilePath.length < 1) {
+      errs.push({ path: "dockerfilePath", message: "Required. Default 'Dockerfile'." });
+    }
+    if (!Number.isInteger(previewTtlMinutes) || previewTtlMinutes <= 0) {
+      errs.push({ path: "previewTtlMinutes", message: "Positive integer. Default 60." });
+    }
+    if (errs.length > 0) {
+      submitFieldErrors = errs;
       return;
     }
 
@@ -148,7 +174,15 @@
       };
       lastResult = await submitBuildRequest(payload);
     } catch (e) {
-      submitError = e instanceof Error ? e.message : String(e);
+      // TASK-079 셀프 리뷰 C-2 보완: error 발생 시 raw 메시지를 그대로 표시
+      // 하지 않고 parseApiError helper 로 변환. zod field error 면
+      // submitFieldErrors 에 push, 그 외는 일반 submitError 에 push.
+      const parsed = parseApiError(e);
+      if (parsed.fieldErrors.length > 0) {
+        submitFieldErrors = parsed.fieldErrors;
+      } else {
+        submitError = parsed.summary;
+      }
     } finally {
       submitting = false;
     }
@@ -260,11 +294,33 @@
         <button type="submit" class="btn-primary" disabled={submitting} data-testid="req-submit">
           {submitting ? "Submitting…" : "Submit Build"}
         </button>
-        <button type="button" class="btn-secondary" onclick={() => push("/builds")} data-testid="req-cancel">
-          View Builds list
+        <!-- TASK-079 셀프 리뷰 I-2 보완: Reset form 버튼. cancel 버튼의
+             이름-동작 불일치를 해소. "View Builds list" 는 별도 버튼으로 분리
+             하여 navigation 의도를 명확히. -->
+        <button type="button" class="btn-secondary" onclick={resetForm} data-testid="req-reset">
+          Reset form
+        </button>
+        <button type="button" class="btn-secondary" onclick={() => push("/builds")} data-testid="req-list">
+          View Builds list →
         </button>
       </div>
     </form>
+
+    {#if submitFieldErrors.length > 0}
+      <!-- TASK-079 셀프 리뷰 C-2 보완: zod field error 를 field-level 로
+           노출. 사용자가 어떤 field 가 잘못되었는지 즉시 식별 가능. -->
+      <div class="banner error" role="alert" data-testid="req-field-errors">
+        <strong>Form validation failed</strong>
+        <ul class="field-errors">
+          {#each submitFieldErrors as fe (fe.path)}
+            <li>
+              <code class="field-path">{fe.path}</code>
+              <span class="field-msg">{fe.message}</span>
+            </li>
+          {/each}
+        </ul>
+      </div>
+    {/if}
 
     {#if submitError}
       <div class="banner error" role="alert" data-testid="req-error">
@@ -288,7 +344,11 @@
             <dt>buildId</dt>
             <dd class="mono">{lastResult.build.buildId}</dd>
             <dt>status</dt>
-            <dd><span class="chip status-{lastResult.build.status.toLowerCase()}">{lastResult.build.status}</span></dd>
+            <!-- TASK-079 셀프 리뷰 I-1 보완: StatusPill 컴포넌트 사용.
+                 canonical 12-status + legacy 2-status 전체 매핑을 reuse.
+                 build.lifecycleStatus 와 build.status 둘 다 emit 되므로
+                 StatusPill 이 자동으로 우선순위 결정 (canonical 우선). -->
+            <dd><StatusPill status={lastResult.build.status} lifecycleStatus={lastResult.build.lifecycleStatus} /></dd>
             <dt>phase</dt>
             <dd class="mono">{lastResult.build.phase}</dd>
             <dt>createdAt</dt>
@@ -315,7 +375,7 @@
             <dt>buildId</dt>
             <dd class="mono">{lastResult.build.buildId}</dd>
             <dt>status</dt>
-            <dd><span class="chip status-{lastResult.build.status.toLowerCase()}">{lastResult.build.status}</span></dd>
+            <dd><StatusPill status={lastResult.build.status} lifecycleStatus={lastResult.build.lifecycleStatus} /></dd>
             <dt>phase</dt>
             <dd class="mono">{lastResult.build.phase}</dd>
           </dl>
@@ -523,6 +583,39 @@
     border-color: var(--color-accent-danger);
     background: rgba(244, 63, 94, 0.08);
   }
+  /* TASK-079 셀프 리뷰 C-2 보완: field-level error list 스타일.
+       zod 가 반환한 path + message 를 한 줄씩 표시 — 사용자가 어떤 field 가
+       잘못되었는지 즉시 식별 가능. */
+  .field-errors {
+    list-style: none;
+    padding: 0;
+    margin: var(--space-sm) 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-xs);
+  }
+  .field-errors li {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-sm);
+    padding: var(--space-xs) 0;
+    font-size: var(--size-sm);
+  }
+  .field-path {
+    flex: 0 0 auto;
+    padding: 2px var(--space-sm);
+    background: var(--color-bg-surface-elevated);
+    border: 1px solid var(--color-accent-danger);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono, monospace);
+    font-size: var(--size-xs);
+    color: var(--color-accent-danger);
+    font-weight: var(--weight-semibold);
+  }
+  .field-msg {
+    flex: 1 1 auto;
+    color: var(--color-text-primary);
+  }
   .banner pre {
     margin: var(--space-sm) 0 0;
     white-space: pre-wrap;
@@ -590,19 +683,9 @@
     word-break: break-all;
   }
   .kv dd.mono { font-family: var(--font-mono, monospace); }
-  .chip {
-    display: inline-block;
-    padding: 2px var(--space-sm);
-    border-radius: var(--radius-pill);
-    font-family: var(--font-mono, monospace);
-    font-size: var(--size-xs);
-    font-weight: var(--weight-semibold);
-    color: white;
-  }
-  .chip.status-queued { background: var(--color-text-muted); }
-  .chip.status-building { background: var(--color-accent-info, #3b82f6); }
-  .chip.status-completed { background: var(--color-accent-success, #22c55e); }
-  .chip.status-failed { background: var(--color-accent-danger, #ef4444); }
+  /* TASK-079 셀프 리뷰 I-1 보완: chip CSS 제거. StatusPill 컴포넌트가
+       canonical 12-status + legacy 2-status 전체 매핑을 제공 (TASK-060
+       3차) — 본 페이지의 4 status 한정 custom chip 은 불완전. */
 
   .raw-payload {
     margin-top: var(--space-md);

@@ -44,10 +44,14 @@
   <header class="page-head">
     <div>
       <h1>API Console</h1>
+      <!-- TASK-079 셀프 리뷰 D-5 보완: "좌측 / 우측 navigation" 설명이
+           부정확. 본 페이지에는 iframe 만 있으며, 그 iframe 안의 Swagger UI
+           가 좌측 endpoint list + 우측 detail panel 인 layout 임을 명확히. -->
       <p class="muted">
         Build Server 의 OpenAPI contract 를 Swagger UI 로 렌더링합니다.
-        우측 iframe 의 <strong>Try it out</strong> 으로 직접 호출하거나,
-        좌측 / 우측 navigation 으로 endpoint 를 탐색할 수 있습니다.
+        iframe 안의 Swagger UI 의 <strong>좌측 endpoint list</strong> 에서
+        endpoint 를 선택하고, <strong>우측 detail panel</strong> 에서
+        <strong>Try it out</strong> 으로 직접 호출해볼 수 있습니다.
       </p>
     </div>
     <div class="actions">
