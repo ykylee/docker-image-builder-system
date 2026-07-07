@@ -5,17 +5,41 @@
 # runner-multi-3) 를 docker compose 로 띄우고, 5 build 를 POST 한 뒤:
 #
 #   1) 각 build 가 정확히 1 cycle 에 1 build 만 claim (단일 runner 점유)
-#   2) 충분 시간 후 5 build 모두 COMPLETED
+#   2) 충분 시간 후 5 build 모두 terminal phase
 #   3) admin /admin/runners 조회 시 3 row + buildsClaimed 가 분산
 #
 # 을 모두 검증. regression guard (TASK-081-A 의 memory-build-repository
 # 신규 4건) 의 production e2e 동등물.
+#
+# TASK-086 보강:
+#   - BASE URL 을 BUILD_SERVER_URL env override 가능하도록 정렬 (TASK-082
+#     `e2e-multi-runner-postgres.sh` 와 동일 패턴). 기본값은 compose 의
+#     `ports: "3000:3000"` mapping 으로 host 에서 접근 가능한 127.0.0.1:3000.
+#     이전 `http://build-server:3000` 는 docker network 내부 DNS 이름이라
+#     host shell 에서 실행 시 unreachable 이었던 결함 봉인.
+#   - [5/6] admin 분산 검증 의 Python heredoc 가 stdin pipe 를 hijack 하는
+#     결함 수정 (heredoc 는 bash redirections 중 가장 마지막에 처리되어
+#     pipe 의 stdin 을 덮어쓰므로 `sys.stdin.read()` 가 항상 빈 응답을
+#     받음 — JSON 파싱이 즉시 fail). env var 로 데이터를 전달하는 패턴으로
+#     교체.
+#   - [2/6] runner registry 등록 대기 30s → 90s. TASK-085 production
+#     semantic e2e 에서 같은 race (register 후 첫 poll cycle 까지 30-90s)
+#     가 관측되어 동일 결함이 본 스크립트에도 있음을 확인.
+#   - [0/6] compose up 에 `--build` 추가 — TASK-085 가 runner binary 를
+#     보강한 뒤에도 host 에 cached image 가 남아있으면 새 binary 미반영.
+#     후속 TASK 가 runner 를 또 변경할 때마다 의도 없이 모두 적용되도록.
+#   - project name 을 `dibs-multi-runner-$$` 로 변경 — 동일 스크립트의
+#     병렬 실행이나 다른 스크립트와의 port 충돌 방지.
 #
 # 사용:
 #   # 환경 변수 (TASK-078 / TASK-080 dogfood 와 동일)
 #   export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
 #   export ADMIN_IDS=admin
 #
+#   bash apps/build-server/scripts/e2e-multi-runner.sh
+#
+# 운영 환경 override 예:
+#   export BUILD_SERVER_URL=http://10.0.0.5:8080  # 외부 host 로 e2e
 #   bash apps/build-server/scripts/e2e-multi-runner.sh
 #
 # 시간: 약 2-4분 (build-server healthcheck 30-50s + 5 build lifecycle ~30-60s
@@ -62,23 +86,31 @@ export ADMIN_IDS
 
 # 임시 디렉터리 (build-server log, 임시 file 등).
 TMP="$(mktemp -d)"
+# TASK-086 보강: project name 에 $$ suffix — 병렬 실행 / port 충돌 방지.
+# 다른 스크립트 (e2e-multi-runner-postgres / e2e-production-semantic) 가 같은
+# 3000 port 를 expose 해도 다른 network 에서 띄우므로 충돌 없이 동시 실행 가능.
+# 기존 fixed project name `dibs-multi-runner` 가 다른 스크립트와 충돌했음.
+COMPOSE_PROJECT="dibs-multi-runner-$$"
 trap '
-  if [[ -n "${COMPOSE_PID:-}" ]]; then
-    docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml --project-name dibs-multi-runner down -v >/dev/null 2>&1 || true
-  fi
+  docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml \
+    --project-name "'"${COMPOSE_PROJECT}"'" down -v >/dev/null 2>&1 || true
   rm -rf "${TMP}"
 ' EXIT
 
-blue "[0/6] compose up — build-server + 3 runner"
+# compose up — build-server + 3 runner.
+# TASK-086 보강: --build 추가 — TASK-085 / 후속 TASK 가 runner binary 를
+# 변경했을 때 cached image 가 남아있으면 새 binary 미반영되는 silent failure
+# 를 방지. TASK-078 dogfood 와 동일하게 매번 image build.
+blue "[0/6] compose up — build-server + 3 runner (--build)"
 docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml \
-  --project-name dibs-multi-runner up -d \
+  --project-name "${COMPOSE_PROJECT}" up -d --build \
   >"${TMP}/compose-up.log" 2>&1
 if [[ $? -ne 0 ]]; then
   red "[fatal] docker compose up failed"
   cat "${TMP}/compose-up.log"
   exit 1
 fi
-green "  ✓ compose up"
+green "  ✓ compose up (project=${COMPOSE_PROJECT})"
 
 # build-server health 대기 (HEALTHCHECK start_period 15s + interval 10s).
 echo
@@ -86,7 +118,7 @@ blue "[1/6] build-server health 대기"
 HEALTHY=0
 for i in $(seq 1 60); do
   HEALTH="$(docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml \
-    --project-name dibs-multi-runner ps --format json 2>/dev/null \
+    --project-name "${COMPOSE_PROJECT}" ps --format json 2>/dev/null \
     | python3 -c 'import json,sys
 try:
   for line in sys.stdin:
@@ -105,19 +137,27 @@ done
 if [[ "${HEALTHY}" -ne 1 ]]; then
   red "[fatal] build-server did not become healthy in 60s"
   docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml \
-    --project-name dibs-multi-runner logs --tail=50 build-server
+    --project-name "${COMPOSE_PROJECT}" logs --tail=50 build-server
   exit 1
 fi
 green "  ✓ build-server healthy"
 
-# build-server IP 추출 (다른 service 가 DNS resolve 가능하므로 service name 사용).
-BASE="http://build-server:3000"
+# TASK-086 보강: BASE URL 을 BUILD_SERVER_URL env override 가능하도록 정렬.
+# `build-server` 는 docker network 내부 DNS 이름이라 host shell 에서
+# 실행 시 unreachable 이었던 결함 봉인. compose 의 `ports: "3000:3000"`
+# mapping 으로 host 의 127.0.0.1:3000 으로 접근 가능. 운영 환경에서 외부
+# build-server 를 가리키고 싶으면 BUILD_SERVER_URL 으로 override (TASK-082
+# `e2e-multi-runner-postgres.sh` 와 동일 패턴).
+BASE="${BUILD_SERVER_URL:-http://127.0.0.1:3000}"
 
 # 3 runner 가 admin 에 등록되는지 대기.
+# TASK-086 보강: timeout 30s → 90s. TASK-085 production semantic e2e 에서
+# 같은 race (register 후 첫 poll cycle 까지 30-90s) 가 관측되어 동일 결함이
+# 본 스크립트에도 있음을 확인. 90s 여유로 cover.
 echo
-blue "[2/6] 3 runner registry 등록 대기"
+blue "[2/6] 3 runner registry 등록 대기 (최대 90s)"
 REGISTERED=0
-for i in $(seq 1 30); do
+for i in $(seq 1 90); do
   RUNNERS="$(curl -fsS -H 'x-admin-id: admin' "${BASE}/admin/runners" 2>/dev/null || true)"
   COUNT="$(printf '%s' "${RUNNERS}" | python3 -c 'import json,sys
 try:
@@ -135,6 +175,9 @@ done
 if [[ "${REGISTERED}" -ne 1 ]]; then
   red "[fatal] expected 3 runners registered, got ${COUNT}"
   printf '%s\n' "${RUNNERS}" | head -3
+  # TASK-086 보강: 마지막 디버깅 단서 — runner container log tail.
+  docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml \
+    --project-name "${COMPOSE_PROJECT}" logs --tail=30 runner runner2 runner3 2>&1 | sed 's/^/    /' || true
   exit 1
 fi
 green "  ✓ 3 runners registered (${COUNT})"
@@ -236,9 +279,19 @@ green "  ✓ all 5 builds reached terminal phase (COMPLETED=${COMPLETED}, FAILED
 echo
 blue "[5/6] admin /admin/runners 분산 검증"
 RUNNERS="$(curl -fsS -H 'x-admin-id: admin' "${BASE}/admin/runners")"
-echo "${RUNNERS}" | python3 <<'PY'
-import json, sys
-data = json.loads(sys.stdin.read())
+# TASK-086 보강: heredoc + pipe 동시 사용 시 bash 가 heredoc 으로 stdin 을
+# override 하는 결함 수정. 이전 패턴은 `echo "${RUNNERS}" | python3 <<'PY'`
+# 였는데 이건 stdin pipe 를 무시하고 heredoc body 를 stdin 으로 노출 —
+# `sys.stdin.read()` 가 항상 빈 응답을 받아 JSON parse 가 즉시 fail. TASK-085
+# production semantic e2e 에서 같은 패턴이 우연히 동작했던 이유 (heredoc 안의
+# `${VAR}` 가 shell expansion 으로 JSON 받을 수 있어서) 도 본 스크립트에는
+# 적용 안 됨. 본 스크립트에서는 heredoc body 가 static 이므로 env var 를 통해
+# 데이터를 명시적으로 전달한다 — `os.environ["RUNNERS_JSON"]`. heredoc marker
+# 는 여전히 `<<'PY'` quoted 이라 heredoc body 의 모든 expand 가 비활성화되어
+# 회귀 안정성 유지.
+RUNNERS_JSON="${RUNNERS}" python3 <<'PY'
+import json, os, sys
+data = json.loads(os.environ["RUNNERS_JSON"])
 runners = data.get("runners", [])
 print(f"  {len(runners)} runners registered:")
 for r in runners:
@@ -267,7 +320,7 @@ green "  ✓ runner 분산 검증"
 echo
 blue "[6/6] compose down + cleanup"
 docker compose -f compose.dev.yaml -f compose.dev.runner-multi.yaml \
-  --project-name dibs-multi-runner down -v >"${TMP}/compose-down.log" 2>&1
+  --project-name "${COMPOSE_PROJECT}" down -v >"${TMP}/compose-down.log" 2>&1
 green "  ✓ compose down"
 
 echo
