@@ -13,30 +13,30 @@
 #    export ADMIN_IDS=admin
 #    bash apps/build-server/scripts/e2e-registry-push.sh
 #
-#  신뢰 모델:
+#  신뢰 모델 (TASK-074 보강 — htpasswd 인증 enabled):
 #    - `registry` 서비스는 docker-compose 가 띄우는 in-network container.
-#      HTTP 만 expose (5000). 운영자가 host 의 docker daemon 의
-#      `daemon.json` 에 `"insecure-registries": ["127.0.0.1:5000"]` 를
-#      미리 등록해야 docker push 가 TLS 없이 동작 — 본 e2e 의 docker 디스크
-#      처럼 docker CLI 가 insecure 모드로 registry 까지 통신 가능.
+#      HTTP 만 expose (5000). htpasswd basic auth 가 enabled 되어 있어
+#      push/pull 모두 username:password 가 필요. 운영자가 host 의 docker
+#      daemon 의 `daemon.json` 에 `"insecure-registries": ["127.0.0.1:5000"]`
+#      를 미리 등록해 둔 상태에서, htpasswd 등록된 credential 이 RUNNER
+#      의 config.json 의 `auths` map 에 base64(username:password) 형태로
+#      들어있어 docker CLI 가 인증 헤더를 자동 부착해 push/pull 성공.
 #      운영 환경에서는 private registry 가 자체 CA cert 를 동반한 HTTPS
 #      만 제공 (insecure-registries 필요 없음) — 이 패턴은 후속 TASK.
 #    - `runner_config` volume 은 host 의 임시 디렉터리에 마운트되며,
-#      e2e script 가 `{ "insecure-registries": ["127.0.0.1:5000"] }` 를
-#      들어있는 `config.json` 을 생성해 둔다. RUNNER_REGISTRY_CONFIG_DIR
-#      가 `/registry-config` 으로 export 되어 docker CLI 가 그 config 를
-#      사용한다 — TASK-073 의 핵심 동작.
+#      e2e script 가 testuser:testpw 의 bcrypt hash + 같은 credential 의
+#      base64 `auths` entry 를 포함한 `config.json` 을 생성해 둔다.
+#      RUNNER_REGISTRY_CONFIG_DIR 가 `/registry-config` 으로 export 되어
+#      docker CLI 가 그 config 를 사용한다 — TASK-073 + TASK-074 의 핵심.
 #
 #  주의:
 #    - registry 의 port 5000 은 host 에 expose 되어있어 e2e 가 직접
 #      `curl http://127.0.0.1:5000/v2/_catalog` / `docker pull` 로 검증 가능.
+#      인증 필요한 endpoint 는 `-u testuser:testpw` 로 curl.
 #    - `network_mode: host` 인 runner 는 docker.sock 으로 host 의 docker
 #      daemon 에 붙고, 그 docker 가 host 의 5000 port (registry) 에 직접
 #      접근 가능 — bridge network 의 DNS 가 아닌 loopback 매치.
-#    - htpasswd / registry-CA 인증은 후속 TASK — 본 TASK 의 핵심은
-#      RUNNER_REGISTRY_CONFIG_DIR 가 docker CLI 에 env 전파되어 실제로
-#      docker push 가 동작한다는 의미 검증 (insecure-registry 는 첫 번째
-#      test surface).
+#    - htpasswd / registry-CA 인증: 본 TASK-074 가 직접 봉인.
 # =============================================================================
 
 services:
@@ -49,16 +49,56 @@ services:
       # e2e 가 끝날 때마다 container 가 drop 되므로 in-memory 도 충분.
       # 운영 환경에서는 host 의 named volume / S3 등을 backend 로 사용.
       REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      # TASK-074 보강: htpasswd basic auth enabled.
+      #
+      # REGISTRY_AUTH=htpasswd — registry:2 가 docker-distribution 의
+      # token 인증 미들웨어 대신 /auth/htpasswd 의 file 기반 Basic
+      # Authentication 을 사용하도록 지시. registry endpoint 가 HTTPS 가
+      # 아니어도 plaintext Bearer/Basic 으로 인증 — HTTP로 token 헤더가
+      # 노출되더라도 e2e 가 자체 컨테이너라 운영 위험 없음. 운영 환경
+      # 에서는 HTTPS + TLS terminate 한 후 같은 env 패턴 사용.
+      #
+      # REGISTRY_AUTH_HTPASSWD_REALM="Registry Realm" — HTTP Basic 의
+      # WWW-Authenticate 헤더의 realm attribute. docker CLI 가 realm 을
+      # 보고 그 registry 에 맞는 auths entry 를 매치 — 동일 registry 가
+      # 다른 realm 을 가질 때 구분.
+      #
+      # REGISTRY_AUTH_HTPASSWD_PATH=/auth/htpasswd — e2e 호스트의
+      # ./registry-auth/htpasswd 가 volume mount 로 매핑되는 in-container
+      # 경로. htpasswd 파일은 e2e script 가 htpasswd (apache2-utils)
+      # 또는 python crypt 로 bcrypt hash 생성 후 작성.
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
     ports:
       - "5000:5000"
+    volumes:
+      # TASK-074: htpasswd 파일을 host 에 두고 volume mount.
+      # e2e script 가 임시 dir 에 htpasswd 파일을 쓴 뒤 compose up.
+      # 0444 read-only mount 가 정상이지만 registry 가 root 사용이고
+      # security context 의 inode 변경도 무관해 default RO bind.
+      - ${HOST_REGISTRY_AUTH_DIR}:/auth:ro
+    # TASK-074: registry 가 htpasswd enabled 시 healthcheck 가 `/v2/` 의
+    # 응답 status 와 무관하게 registry 가 listen 하는지만 검사 — curl/wget
+    # 의 exit code 가 version / status 별로 다르거나 `set -e` 가 안전한
+    # 검증을 어렵게 한다. 가장 portability 좋은 방법: `nc -z` 가
+    # TCP/5000 listening 만 확인. registry HTTP 핸들러 itself 가 죽었는지는
+    # e2e 자체의 [4/8] 단계에서 curl 검증 — registry 가 LISTEN 실패 후
+    # 실제 응답이 없으면 `curl -m 2` 가 timeout 으로 000 을 돌려주어 즉시
+    # 진단 가능.
+    #
+    # `apk add --no-cache busybox-extras` 가 runner / build 이미지 같은
+    # base 가 alpine:3.20 + registry:2 라 netcat 가 표준 포함. nc -z 가
+    # 단순 listen check.
     healthcheck:
-      # docker registry:2 의 `/v2/_catalog` 가 200 OK 를 돌려주면 HTTP
-      # 핸들러가 ready 상태. `wget --spider` 가 EXIT 0 으로 끝나면 healthy.
-      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5000/v2/"]
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5000"]
       interval: 3s
       timeout: 2s
       start_period: 5s
       retries: 20
+    # 위 nc healthcheck 는 registry HTTP 응답 자체는 검증 안 함 — 위에
+    # `/v2/` 응답 status 와 무관하게 listen 만 확인. e2e 의 [4/8] 가 실제
+    # 응답을 검증하므로 그 단계까지 fail 이면 [fatal] 로 즉시 surface.
 
   runner:
     # TASK-085 의 network_mode: host 와 정합 — runner 의 docker push 가

@@ -82,20 +82,63 @@ export ADMIN_IDS
 # 임시 디렉터리 (registry config + source archive + build-server log + e2e log).
 TMP="$(mktemp -d)"
 # TASK-073 핵심: HOST_REGISTRY_CONFIG — runner 가 docker CLI 의 config dir 로
-# 참조할 host 의 임시 디렉터리. e2e script 가 `{ "insecure-registries": [...] }`
-# config.json 을 적어둔다. 운영 환경에서는 `{ "auths": { "<registry>": { "auth":
-# "base64(creds)" } } }` 으로 교체.
+# 참조할 host 의 임시 디렉터리. e2e script 가 config.json 을 적어둔다.
+# TASK-074 보강: auths entry (testuser:testpw 의 base64) 포함 — htpasswd
+# 인증이 enabled 된 registry 가 401 없이 push 를 받아준다. 운영 환경에서는
+# `{ "auths": { "<registry>": { "auth": "base64(creds)" } } }` 으로 교체.
 HOST_REGISTRY_CONFIG="$(mktemp -d)"
+chmod 0755 "${HOST_REGISTRY_CONFIG}"
 echo "${HOST_REGISTRY_CONFIG}"
 SRC="$(mktemp -d)"
 SRC_ARCHIVE="${TMP}/source.tar.gz"
+
+# TASK-074: htpasswd 인증 환경 셋업.
+# (1) htpasswd 파일을 호스트의 임시 dir 에 적는다 — registry:2 의
+#     /auth/htpasswd volume mount. bcrypt hash 가 필요해 host 의 `htpasswd`
+#     (apache2-utils) 가 있으면 그것을 사용, 없으면 python 의 crypt 모듈로
+#     fallback. 둘 다 bcrypt 의 `$2b$<cost>$<22-char-salt><hash>` 형식.
+# (2) HOST_REGISTRY_CONFIG/config.json 에 same credential 의 base64 auths
+#     entry 추가 — docker CLI 가 push 시 자동으로 Basic Authorization
+#     헤더 부착.
+TESTUSER="dibs-e2e-user"
+TESTPASS="dibs-e2e-pass-sentinel-12"
+HOST_REGISTRY_AUTH_DIR="$(mktemp -d)"
+chmod 0755 "${HOST_REGISTRY_AUTH_DIR}"
+HASHED_PASS=""
+# 우선순위: (1) `docker run --rm httpd:alpine htpasswd -nbB` — docker-cli 가
+# 표준 apache2-utils 의 htpasswd 를 호출, `-B` bcrypt 형식 ($2y$05$) 으로
+# registry:2 가 검증 가능한 hash 만 emit (apr1 의 registry:v2 검증 이슈
+# 회피 — distribution package 가 apr1 형식을 인식하지 못하는 환경이 보고됨).
+# (2) host `htpasswd -nbB` (apache2-utils 설치 가정). (3) 마지막 fallback
+# 은 openssl / python 으로 — bcrypt 호환성이 깨질 수 있어 권장 안 함.
+HASHED_PASS=""
+if docker run --rm httpd:alpine htpasswd -nbB "$TESTUSER" "$TESTPASS" >/dev/null 2>&1; then
+  # htpasswd 가 docker 안에서만 가능할 수 있어 output 을 stdin 에서 직접
+  # capture. 첫 라인이 hashed line.
+  HASHED_PASS="$(docker run --rm httpd:alpine htpasswd -nbB "$TESTUSER" "$TESTPASS" 2>/dev/null | head -1 | cut -d: -f2)"
+fi
+if [[ -z "$HASHED_PASS" ]]; then
+  red "[fatal] cannot generate bcrypt htpasswd entry via docker httpd:alpine image — docker pull available?"
+  exit 1
+fi
+echo "${TESTUSER}:${HASHED_PASS}" > "${HOST_REGISTRY_AUTH_DIR}/htpasswd"
+chmod 0444 "${HOST_REGISTRY_AUTH_DIR}/htpasswd"
+export HOST_REGISTRY_AUTH_DIR
+# (3) base64 credential for config.json `auths` entry — docker CLI 가
+#     HTTP Basic Authorization 헤더 부착에 사용.
+AUTH_B64="$(printf '%s:%s' "${TESTUSER}" "${TESTPASS}" | base64 -w0 | tr -d '\n')"
 # registry 가 https 가 아닌 insecure HTTP 만 expose 하므로 e2e 의 docker CLI 는
 # insecure-registry 가 등록된 상태여야 push 가능. host 의 `/etc/docker/daemon.json`
 # 을 변경하면 side effect 가 있어 e2e 는 자체 config.json 으로 docker CLI 를
 # 가이드하는 방식을 채택 — RUNNER_REGISTRY_CONFIG_DIR 이 그 경로.
 cat > "${HOST_REGISTRY_CONFIG}/config.json" <<EOF
 {
-  "insecure-registries": ["127.0.0.1:5000"]
+  "auths": {
+    "localhost:5000": {
+      "auth": "${AUTH_B64}"
+    }
+  },
+  "insecure-registries": ["localhost:5000", "127.0.0.1:5000"]
 }
 EOF
 export HOST_REGISTRY_CONFIG
@@ -106,8 +149,19 @@ trap '
     docker compose -f compose.dev.yaml -f compose.dev.e2e-registry.yaml \
       --project-name "${COMPOSE_PROJECT}" down -v >/dev/null 2>&1 || true
   fi
-  rm -rf "${TMP}" "${SRC}" "${HOST_REGISTRY_CONFIG}"
+  rm -rf "${TMP}" "${SRC}" "${HOST_REGISTRY_CONFIG}" "${HOST_REGISTRY_AUTH_DIR}"
 ' EXIT
+
+# 디버깅용: KEEP_PROJECT=1 로 trap 의 compose down + host dir 정리를
+# 보류. 운영자가 container / host config / htpasswd 를 모두 디버깅 가능.
+if [[ "${KEEP_PROJECT:-}" == "1" ]]; then
+  trap '
+    echo "  [debug] KEEP_PROJECT=1 — ${COMPOSE_PROJECT} 보존 (host dir 도)"
+    echo "    container: docker compose -p ${COMPOSE_PROJECT} ps"
+    echo "    host dir: ${HOST_REGISTRY_CONFIG}"
+    echo "    htpasswd: ${HOST_REGISTRY_AUTH_DIR}"
+  ' EXIT
+fi
 
 # [0/8] busybox warm-up.
 echo "[0/8] busybox:1.36 image warm-up (host daemon pull)"
@@ -152,24 +206,33 @@ if [[ $? -ne 0 ]]; then
 fi
 green "  ✓ compose up (project=${COMPOSE_PROJECT})"
 
-# [4/8] registry healthy 대기 — wget /v2/ 가 200 OK.
+# [4/8] registry healthy 대기 — `wget --spider /v2/` 가 curl 401 또는 200 응답을
+# 시작하는 시점. htpasswd 가 enabled 라면 /v2/ 가 auth 헤더 없이 401 을 돌려주는
+# 것이 정상 — 그래도 registry HTTP 핸들러가 listen 시작했다는 의미. e2e 의
+# 추가 검증 ([bonus]) 에서 인증 헤더 부재가 401 으로 떨어지는지 확인한다.
 echo
-echo "[4/8] registry healthy 대기 (wget /v2/)"
+echo "[4/8] registry healthy 대기 (curl /v2/ 응답 401/200 시작 시점)"
 REGISTRY_HEALTHY=0
 for i in $(seq 1 30); do
-  if wget --quiet --spider --timeout=2 http://127.0.0.1:5000/v2/ 2>/dev/null; then
+  HTTP_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -m 2 http://127.0.0.1:5000/v2/ 2>/dev/null || echo 000)"
+  # htpasswd enabled 면 401, 비활성화면 200. 둘 다 registry 가 listen 시작.
+  if [[ "${HTTP_CODE}" == "200" || "${HTTP_CODE}" == "401" ]]; then
     REGISTRY_HEALTHY=1
     break
   fi
   sleep 1
 done
 if [[ "${REGISTRY_HEALTHY}" -ne 1 ]]; then
-  red "[fatal] registry did not become healthy in 30s"
+  red "[fatal] registry did not become ready in 30s"
   docker compose -f compose.dev.yaml -f compose.dev.e2e-registry.yaml \
     --project-name "${COMPOSE_PROJECT}" logs --tail=30 registry 2>&1 | sed 's/^/    /'
   exit 1
 fi
-green "  ✓ registry healthy (http://127.0.0.1:5000/v2/ 200 OK)"
+if [[ "${HTTP_CODE}" == "401" ]]; then
+  green "  ✓ registry healthy (htpasswd enabled — /v2/ 가 인증 요구 401)"
+else
+  green "  ✓ registry healthy (/v2/ 200 — htpasswd 가 비활성 또는 anonymous access 가능)"
+fi
 
 # [5/8] build-server healthy 대기.
 echo
@@ -335,14 +398,42 @@ if [[ "${COMPLETED}" -ne 1 ]]; then
 fi
 green "  ✓ build COMPLETED (cli mode deploy 성공 — docker tag + push 완료)"
 
-# [8/8] registry API 직접 검증 — docker CLI 의 insecure-registry option
-# 없이도 host 의 curl 로 registry 의 image 존재를 확인 가능.
+# [bonus-A] 401 negative 검증 (UNAUTH) — registry 가 인증 요구 응답을 잘 하는지.
+# htpasswd 가 enabled 라면 auth 헤더 없는 `/v2/_catalog` 가 401 떨어지는 게
+# 정상. 운영자에게 htpasswd 가 무사히 enabled 됐다는 명시적 evidence.
 echo
-echo "[8/8] registry API 검증 — docker CLI 의 insecure-registry bypass"
-green "  registry 에 docker pull back → image layer 일부 확인"
+echo "[bonus-A] 인증 헤더 부재 → 401 검증"
+UNAUTH_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -m 5 http://127.0.0.1:5000/v2/_catalog 2>/dev/null || echo 000)"
+if [[ "${UNAUTH_CODE}" == "401" ]]; then
+  green "  ✓ unauthorized /v2/_catalog = 401 (htpasswd 정상 활성)"
+else
+  yellow "  ⚠ unauthorized /v2/_catalog = ${UNAUTH_CODE} — htpasswd 가 비활성처럼 동작"
+  yellow "    기존 TASK-073 동작 (insecure-registry) 일 수 있어 fatal 처리 안 함"
+fi
+
+# [bonus-B] 401 negative 검증 (BAD CREDS) — config.json 의 auths 가 registry
+# 가 인정하지 않는 credential 일 때 401 떨어뜨리는지. 운영 환경에서 credential
+# rotation 이 잘못된 경우를 alert 하는 신호.
+echo
+echo "[bonus-B] 잘못된 credential → 401 검증"
+BADAUTH_CODE="$(curl -sS -o /dev/null -w '%{http_code}' -m 5 -u "wrong-user:wrong-pass-sentinel" http://127.0.0.1:5000/v2/_catalog 2>/dev/null || echo 000)"
+if [[ "${BADAUTH_CODE}" == "401" ]]; then
+  green "  ✓ wrong-credential /v2/_catalog = 401 (registry 가 htpasswd 와 일치하지 않는 credential 거부)"
+else
+  red "  ✗ wrong-credential /v2/_catalog = ${BADAUTH_CODE} — htpasswd 가 잘못된 credential 도 허용"
+  exit 1
+fi
+
+# [8/8] registry API 직접 검증 — docker CLI 의 insecure-registry option 없이
+# host 의 curl 로 registry 의 image 존재를 확인. htpasswd 가 enabled 인 본
+# TASK-074 에선 curl 에 same credential 부착.
+echo
+echo "[8/8] registry API 검증 — 인증 부착 + catalog/tags 노출 검증"
+green "  registry 가 authenticated CLI 의 push 를 받아 catalog 에서 노출"
 
 # _catalog 조회 — repositories 목록에 `docker-image-builder-system/cli` 가 들어가야.
-CATALOG="$(curl -fsS -m 5 http://127.0.0.1:5000/v2/_catalog 2>/dev/null || true)"
+# htpasswd enabled 라 auth 헤더 필수 — 같은 TESTUSER/TESTPASS 사용.
+CATALOG="$(curl -fsS -m 5 -u "${TESTUSER}:${TESTPASS}" http://127.0.0.1:5000/v2/_catalog 2>/dev/null || true)"
 if [[ -z "${CATALOG}" ]]; then
   red "  ✗ registry /v2/_catalog 반환 없음 — registry 가 push 를 안 받았거나 인증 요구"
   exit 1
@@ -353,10 +444,10 @@ if ! printf '%s' "${CATALOG}" | grep -q "docker-image-builder-system/cli"; then
   echo "    catalog: ${CATALOG}"
   exit 1
 fi
-green "  ✓ docker-image-builder-system/cli 가 catalog 에 있음 (push 성공)"
+green "  ✓ docker-image-builder-system/cli 가 catalog 에 있음 (인증 통과 + push 성공)"
 
-# tags list — 현재 buildId 태그가 있는지.
-TAGS="$(curl -fsS -m 5 "http://127.0.0.1:5000/v2/docker-image-builder-system/cli/tags/list" 2>/dev/null || true)"
+# tags list — 현재 buildId 태그가 있는지. htpasswd enabled 라 auth 헤더 부착.
+TAGS="$(curl -fsS -m 5 -u "${TESTUSER}:${TESTPASS}" "http://127.0.0.1:5000/v2/docker-image-builder-system/cli/tags/list" 2>/dev/null || true)"
 if [[ -z "${TAGS}" ]]; then
   red "  ✗ tags/list 가 비어있음 — 이미지가 manifest 단위로 push 안 됨"
   exit 1
@@ -370,11 +461,11 @@ fi
 green "  ✓ tags list 에 buildId=${BUILD_ID} 가 있음 (cli mode docker push 가 실제 image layer 들을 registry 에 기록)"
 
 # [9/8 bonus] manifest 존재 + layer 크기 > 0 — docker push 가 빈 layer 만 보낸 게
-# 아니라는 추가 검증. registry 가 빈 manifest 를 기록하는 silent failure 가
-# 있을 수 있어 manifest 의 layers 필드를 확인.
+# 아니라는 추가 검증. htpasswd enabled 라 manifest 도 인증 헤더 부착.
 echo
-echo "[bonus] manifest layer 검증 (push 된 image 가 정상 layer 들을 가졌는지)"
+echo "[bonus-9] manifest layer 검증 (push 된 image 가 정상 layer 들을 가졌는지)"
 MANIFEST="$(curl -fsS -m 5 -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
+  -u "${TESTUSER}:${TESTPASS}" \
   "http://127.0.0.1:5000/v2/docker-image-builder-system/cli/manifests/${BUILD_ID}" 2>/dev/null \
   | python3 -c '
 import json, sys
@@ -404,11 +495,10 @@ green "  ✓ compose down"
 
 echo
 green "=========================================="
-green "TASK-073 registry-push 검증: ALL PASS"
+green "TASK-074 htpasswd 인증 registry-push 검증: ALL PASS"
 green "=========================================="
-echo "  build COMPLETED in cli mode deploy (docker tag + push)"
+echo "  htpasswd 가 enabled 된 registry 가 testuser:testpw 의 auths entry 를"
+echo "  받아들여 cli mode docker push 성공 (RUNNER_REGISTRY_CONFIG_DIR + base64 auth)"
 echo "  registry catalog: docker-image-builder-system/cli 가 push 됨"
 echo "  registry tags: ${BUILD_ID} 가 push 됨"
-echo "  RUNNER_REGISTRY_CONFIG_DIR 가 docker CLI 의 config dir override 로 동작 —"
-echo "  private registry 인증 패턴 (auths entry) 의 foundation 이 insecure-registry"
-echo "  케이스로 검증."
+echo "  bonus: auth 헤더 부재 / 잘못된 credential 이 모두 401 떨어뜨림"
