@@ -159,6 +159,19 @@
   4. manifest v2 vs v1 schema — bonus 단계의 Accept: v2 가 v1 호환 manifest (fat manifest) 응답 시 parse 실패 가능. main 8 단계는 fatal 아님.
 - 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 7 packages 모두 PASS + config package 신규 6/6 PASS, svelte-check 0/0, `e2e-registry-push.sh` **ALL PASS** (~2-3 분: registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup).
 
+## 3.8 htpasswd 인증 registry push (TASK-074)
+- 의도: TASK-073 의 insecure-registry foundation 위에서 registry:2 의 `REGISTRY_AUTH=htpasswd` 가 enabled 일 때 cli mode docker push 가 base64 auths entry + bcrypt htpasswd entry 와 정합되어 통과하는지 검증. 운영 환경의 private Docker Hub / ECR / GCR 인증의 foundation 을 htpasswd 형식 (basic auth) 으로 봉인.
+- 핵심 변경:
+  - `compose.dev.e2e-registry.yaml` amend — `REGISTRY_AUTH: htpasswd` + `REGISTRY_AUTH_HTPASSWD_REALM: "Registry Realm"` + `REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd` env 3종 + `${HOST_REGISTRY_AUTH_DIR}:/auth:ro` volume mount + healthcheck `nc -z 127.0.0.1 5000` 로 단순화 (status code 무관 listen only).
+  - `apps/build-server/scripts/e2e-registry-push.sh` amend — `HOST_REGISTRY_AUTH_DIR` 임시 디렉터리 + `chmod 0755` (mktemp default 0700 의 uid mismatch 회피) + `docker run --rm httpd:alpine htpasswd -nbB` 로 bcrypt hash 생성 (apr1 의 registry:v2 검증 비호환 회피) + `config.json` 의 `auths` entry key `localhost:5000` 정렬 (push target URL 과 exact match) + insecure-registries `localhost:5000` + `127.0.0.1:5000` 둘 다 + bonus-A 인증 헤더 부재 → 401 검증 + bonus-B 잘못된 credential → 401 검증 + [8/8] 인증 부착 curl + bonus-9 manifest 검증 (TASK-073 와 동일).
+  - `docs/operations/registry-push-auth-2026-07-07.md` 운영 가이드 신규 (검증 결과 / 사용 절차 / TASK-073 foundation 위의 추가 4가지 보강 / 한계 / 빠른 재현 / K8s 운영 도입 패턴).
+- 사전 결함 + 보강 4건 (운영 가이드 §5):
+  1. config.json auths entry key 가 exact match — `localhost:5000` 정렬 (push target 의 URL 과 동일).
+  2. host 임시 디렉터리의 permission (mktemp default 0700) — `chmod 0755` 로 runner uid 1500 이 read 가능.
+  3. registry:2 가 apr1 hash format 을 인식 안 함 — `httpd:alpine htpasswd -nbB` 로 통일, bcrypt ($2y$) 형식.
+  4. KEEP_PROJECT=1 의 bind mount dangling source (debug 보강) — trap 의 `rm -rf` 도 보류, 운영자 manual cleanup 으로 debug 가능.
+- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 8 packages 모두 PASS (TASK-073 baseline 유지), svelte-check 0/0, `e2e-registry-push.sh` **ALL PASS** (~3-4 분: httpd:alpine pull 20s + registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags list 에 buildId 노출 + bonus 인증 부재/잘못된 credential 모두 401.
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함
