@@ -18,15 +18,29 @@ vi.mock("svelte-spa-router", () => ({
 
 const listAdminUsersMock = vi.fn();
 const listAdminBuildsMock = vi.fn();
+// TASK-084: ensureAdminAccess 기본 mock — 기본값은 isAdmin=true (admin 통과).
+// 비-admin 케이스 테스트가 필요한 describe 블록에서 mockResolvedValueOnce 로
+// override 한다. helper 가 호출되었는지 자체는 호출 횟수 / 호출 id 로 검증.
+const ensureAdminAccessMock = vi.fn();
 vi.mock("../lib/api", () => ({
   listAdminUsers: (id: string) => listAdminUsersMock(id),
   listAdminBuilds: (id: string, params: unknown) => listAdminBuildsMock(id, params)
+}));
+vi.mock("../lib/admin-guard.js", () => ({
+  ensureAdminAccess: (callerId: string) => ensureAdminAccessMock(callerId)
 }));
 
 beforeEach(() => {
   pushMock.mockReset();
   listAdminUsersMock.mockReset();
   listAdminBuildsMock.mockReset();
+  ensureAdminAccessMock.mockReset();
+  // 기본값: admin 으로 인정. 비-admin 케이스 테스트는 mockResolvedValueOnce 로 override.
+  ensureAdminAccessMock.mockResolvedValue({
+    isAdmin: true,
+    allowList: ["admin"],
+    reason: "NOT_IN_ALLOW_LIST"
+  });
   localStorage.clear();
   locStore.set("/admin/users");
 });
@@ -194,5 +208,49 @@ describe("AdminUsers", () => {
     );
     await fireEvent.click(screen.getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByTestId("build-row")).toBeNull());
+  });
+
+  // TASK-084: 비-admin user 의 deep link 진입 시 backend 호출 없이
+  // frontend 에서 거부 → AdminAccessDenied 패널 노출 + listAdminUsers
+  // 호출되지 않음. raw 403 envelope 대신 친절한 메시지가 화면에 떠야 한다.
+  it("shows AdminAccessDenied panel when caller is not in the admin allow-list", async () => {
+    localStorage.setItem("userId", "alice");
+    ensureAdminAccessMock.mockResolvedValueOnce({
+      isAdmin: false,
+      allowList: ["admin", "yky.lee"],
+      reason: "NOT_IN_ALLOW_LIST"
+    });
+    render(AdminUsers);
+    // listAdminUsers 가 호출되지 않아야 한다 (frontend 가드).
+    await waitFor(() =>
+      expect(screen.getByText(/Admin access required/i)).toBeInTheDocument()
+    );
+    expect(listAdminUsersMock).not.toHaveBeenCalled();
+    expect(listAdminBuildsMock).not.toHaveBeenCalled();
+    // bodyMessage 가 userId 를 포함하여 무엇이 잘못됐는지 직관.
+    // ("@alice" 가 bodyMessage + card-body 2 군데 나오므로 더 구체적으로 매칭.)
+    expect(
+      screen.getByText(/@alice is not on the current admin allow-list/)
+    ).toBeInTheDocument();
+    // 두 액션 모두 렌더.
+    expect(screen.getByTestId("admin-denied-go-builds")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-denied-switch-user")).toBeInTheDocument();
+  });
+
+  // TASK-084: ensureAdminAccess 가 backend 403 으로 거절된 케이스
+  // (가장 흔한 deep link 시나리오) — reason=FORBIDDEN 으로 reason-aware
+  // 메시지가 노출된다.
+  it("surfaces FORBIDDEN reason when the backend rejects the admin guard", async () => {
+    localStorage.setItem("userId", "alice");
+    ensureAdminAccessMock.mockResolvedValueOnce({
+      isAdmin: false,
+      allowList: [],
+      reason: "FORBIDDEN"
+    });
+    render(AdminUsers);
+    await waitFor(() =>
+      expect(screen.getByText(/is not authorized to view admin sections/i)).toBeInTheDocument()
+    );
+    expect(listAdminUsersMock).not.toHaveBeenCalled();
   });
 });
