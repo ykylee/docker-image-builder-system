@@ -1,0 +1,109 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — insecure-registry e2e compose override
+# =============================================================================
+#  TASK-076: insecure-registry only 운영 패턴 검증용 compose override.
+#
+#  htpasswd / REGISTRY_AUTH=htpasswd 와 같은 credential 인증을 모두 제거하고
+#  registry:2 의 anonymous access 모드만 운영 — internal network (VPC / k8s
+#  service mesh) 으로 외부 노출을 차단하고 권한 분리는 upstream (build-server
+#  / runner 의 자체 access control) 에서 처리하는 운영 모델.
+#
+#  사용:
+#    export DOCKER_SOCKET_GID="$(getent group docker | cut -d: -f3)"
+#    export ADMIN_IDS=admin
+#    bash apps/build-server/scripts/e2e-insecure-registry.sh
+#
+#  신뢰 모델:
+#    - registry 가 host 의 5000 port 에 노출. 운영 환경에서는 같은 host 가
+#      아니라 VPC / private subnet / firewall 으로 외부 차단.
+#    - 인증 미들웨어 없음 → registry 가 모든 push/pull 을 accept. 권한 분리는
+#      build-server / runner 측 access control (k8s RBAC / service mesh
+#      policy / 호스트 ACL) 에서 처리.
+#    - `insecure-registries` 가 config.json 에 명시 — http://localhost:5000
+#      에 TLS 없이 push 가능. 운영 환경에서는 mTLS / HTTPS terminate 가
+#      동일 compose 안에서 sibling sidecar 로 동작.
+#
+#  주의:
+#    - htpasswd / REGISTRY_AUTH / base64 credential / SIGHUP reload /
+#      htpasswd cache 정책 / credential rotation 모두 본 TASK 의 scope 밖.
+#    - image retention 운영 패턴은 `e2e-insecure-registry.sh` 안에서
+#      registry REST API 의 DELETE endpoint 로 직접 검증.
+# =============================================================================
+
+services:
+  registry:
+    image: registry:2
+    container_name: dibs-e2e-insecure-registry
+    restart: on-failure
+    environment:
+      REGISTRY_HTTP_SECRET: e2e-test-secret-insecure
+      # image lifecycle / GC: 운영 환경에서 image 가 누적되면 disk full.
+      # registry:2 의 DELETE API 가 정상 동작하려면 명시적 활성화 필수.
+      # 운영자가 image tag 별 retention policy (예: N 일 지난 image 자동
+      # 삭제 cron) 를 운영할 때 이 flag 가 gateway.
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      # storage driver: 운영 환경에서는 named volume / S3 / azure 등을
+      # 사용. e2e 는 ephemeral in-memory 또는 named volume 으로 충분.
+    ports:
+      - "5000:5000"
+    # TASK-076 의 insecure-registry 운영 모델:
+    # - REGISTRY_AUTH env 미설정 → registry:2 가 anonymous access 허용
+    # - host 가 5000 port 만 expose → host shell 에서 curl /v2/_catalog,
+    #   docker push/pull 모두 anonymous 로 동작
+    healthcheck:
+      # TASK-074 와 동일 — registry 가 listen 만 확인 (status code 무관).
+      # nc -z 가 가장 portability 좋음.
+      test: ["CMD", "nc", "-z", "127.0.0.1", "5000"]
+      interval: 3s
+      timeout: 2s
+      start_period: 5s
+      retries: 20
+
+  runner:
+    # TASK-085 의 network_mode: host 와 정합 — runner 의 docker push 가
+    # host 의 5000 port (registry) 에 직접 접근 가능.
+    network_mode: host
+    depends_on:
+      registry:
+        condition: service_healthy
+      build-server:
+        condition: service_healthy
+    environment:
+      HOST_SERVER_BASE_URL: http://127.0.0.1:3000
+      RUNNER_ID: runner-insecure-1
+      RUNNER_POLL_INTERVAL: 5s
+      # TASK-073 의 cli mode + insecure-registry foundation 그대로.
+      RUNNER_DOCKER_BUILD_MODE: cli
+      RUNNER_DOCKER_RUN_MODE: cli
+      RUNNER_DEPLOY_MODE: cli
+      # TASK-076 의 insecure-registry 운영 모델 — `auths` entry 없음.
+      # config.json 에는 insecure-registries 만 등록. docker CLI 가
+      # anonymous push 시도 (registry 가 anonymous accept).
+      RUNNER_REGISTRY_CONFIG_DIR: /registry-config
+      RUNNER_DEPLOY_TARGET_TYPE: DOCKER_REGISTRY
+      # TASK-073 보강: registry push 의 image path 가 그대로 repository
+      # 이름이 됨. docker push 가 registry endpoint 와 image name 을 `:` / `/`
+      # 로 split 하므로 `docker-image-builder-system/cli` 가 registry repo 로
+      # 들어가려면 targetRef 에 그 path 까지 포함.
+      RUNNER_DEPLOY_TARGET_REF: localhost:5000/docker-image-builder-system/cli
+      RUNNER_STOP_CONTAINER_ON_DONE: "true"
+      PREVIEW_INTERNAL_PORT: "8080"
+      RUNNER_HEALTHCHECK_PATH: /
+      RUNNER_HEALTHCHECK_TIMEOUT_SECONDS: "60"
+      RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS: "60"
+    volumes:
+      # host 의 임시 dir (e2e 가 insecure-registries 만 등록한 config.json
+      # 위치) 를 `/registry-config` 로 mount. RUNNER_REGISTRY_CONFIG_DIR env
+      # 와 정합.
+      - ${HOST_REGISTRY_CONFIG}:/registry-config:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    # group_add 는 compose 검증 시 항목 중복 검사로 — host 의 docker gid 와
+    # base image 의 docker group 이 같은 gid 로 잡혀 있으면 "items at 0 and 1
+    # are equal" 오류가 발생. Dockerfile 이 이미 `addgroup runner docker` 로
+    # docker group 의 supplementary 를 잡아두고 TASK-078 self-review 가 검증한
+    # 정렬. group_add 명시 불필요.
+    user: "runner"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
