@@ -10,9 +10,18 @@
   // StatusPill 컬러와 동등 의미 (현재 활성 segment) 로 톤 통일.
   import FilterChips from "../components/FilterChips.svelte";
   import BuildRow from "../components/BuildRow.svelte";
+  // TASK-084: 비-admin user 가 deep link 로 진입했을 때 노출되는 권한
+  // 없음 패널 — AdminBuilds / AdminUsers / AdminAdmins / AdminRunners
+  // 4 페이지가 동일 컴포넌트 + 동일 helper (ensureAdminAccess) 로
+  // 봉인한다.
+  import AdminAccessDenied from "../components/AdminAccessDenied.svelte";
   import type { AdminUserBuildSummary, BuildSummary } from "../lib/api";
   import { listAdminBuilds } from "../lib/api";
   import { userIdStore } from "../lib/session.js";
+  // TASK-084: admin allow-list fetch + contains 체크를 페이지 진입 시
+  // 1 회 수행. backend 호출 전 frontend 에서 거부하면 raw 403 envelope
+  // 대신 친절한 패널을 노출할 수 있다 (see admin-guard.ts).
+  import { ensureAdminAccess } from "../lib/admin-guard.js";
 
   // The admin response carries an extra requestedBy field on top of
   // BuildSummary. We keep the local state as the admin type so the
@@ -24,6 +33,12 @@
   }
   let loading = $state(true);
   let error = $state<string | null>(null);
+  // TASK-084: 비-admin user 의 deep link 진입 시 backend 호출 없이
+  // frontend 에서 거부 → AdminAccessDenied 패널 노출. reason 은
+  // ensureAdminAccess 의 결과 그대로 forwarding.
+  let accessDenied = $state<null | {
+    reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST";
+  }>(null);
   // TASK-076: admin 권한은 userId 그 자체다. 별도 adminId store 가
   // 사라졌으므로 `X-Admin-Id` 헤더도 userId 로 보낸다. userId 가
   // admin allow-list 에 없으면 backend 가 403 으로 거부하고 화면에
@@ -46,6 +61,17 @@
     if (!userId) {
       loading = false;
       push("/");
+      return;
+    }
+    // TASK-084: backend 호출 전 frontend 에서 admin 가드. 비-admin
+    // userId 면 친절한 권한 없음 패널을 노출하고 backend round-trip
+    // 은 생략한다. ensureAdminAccess 는 (1) adminAllowListStore 캐시가
+    // 비어있으면 refresh 시도, (2) callerId 기준 contains 체크 — 자세한
+    // 분류는 admin-guard.ts 의 docstring 참조.
+    const guard = await ensureAdminAccess(userId);
+    if (!guard.isAdmin) {
+      accessDenied = { reason: guard.reason };
+      loading = false;
       return;
     }
     await refresh(userId, ownerFilter);
@@ -90,6 +116,9 @@
   );
 </script>
 
+{#if accessDenied}
+  <AdminAccessDenied userId={userId} reason={accessDenied.reason} />
+{:else}
 <section class="page">
   <AdminTabs />
 
@@ -147,6 +176,7 @@
     </table>
   {/if}
 </section>
+{/if}
 
 <style>
   .page {

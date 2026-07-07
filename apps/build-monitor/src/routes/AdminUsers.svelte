@@ -2,10 +2,17 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import AdminTabs from "../components/AdminTabs.svelte";
+  // TASK-084: 비-admin user 의 deep link 진입 시 backend 호출 전에
+  // frontend 가드 — AdminAccessDenied 패널로 친절한 안내.
+  import AdminAccessDenied from "../components/AdminAccessDenied.svelte";
   import BuildRow from "../components/BuildRow.svelte";
   import type { AdminUserSummary, BuildSummary } from "../lib/api";
   import { listAdminBuilds, listAdminUsers } from "../lib/api";
   import { userIdStore } from "../lib/session.js";
+  // TASK-084: ensureAdminAccess helper 가 adminAllowListStore 캐시 +
+  // refresh 를 단일 source-of-truth 로 다룬다. AdminBuilds / AdminAdmins
+  // / AdminRunners 도 동일 helper 사용.
+  import { ensureAdminAccess } from "../lib/admin-guard.js";
 
   // TASK-076: admin 권한은 userId 그 자체다. 별도 adminId store 가
   // 사라졌으므로 `X-Admin-Id` 헤더도 userId 로 보낸다.
@@ -13,6 +20,11 @@
   let users = $state<AdminUserSummary[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
+  // TASK-084: 비-admin user 의 deep link 진입 시 backend 호출 없이
+  // frontend 에서 거부 → AdminAccessDenied 패널 노출.
+  let accessDenied = $state<null | {
+    reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST";
+  }>(null);
 
   // When the admin clicks a user row we set the selected user and load
   // their build history inline below the table. This keeps the page
@@ -40,6 +52,14 @@
     if (!userId) {
       loading = false;
       push("/");
+      return;
+    }
+    // TASK-084: backend 호출 전 frontend admin 가드 — 비-admin user 의
+    // raw 403 envelope 대신 친절한 패널을 노출한다.
+    const guard = await ensureAdminAccess(userId);
+    if (!guard.isAdmin) {
+      accessDenied = { reason: guard.reason };
+      loading = false;
       return;
     }
     await refresh(userId);
@@ -101,6 +121,9 @@
   }
 </script>
 
+{#if accessDenied}
+  <AdminAccessDenied userId={userId} reason={accessDenied.reason} />
+{:else}
 <section class="page">
   <AdminTabs />
 
@@ -196,6 +219,7 @@
     </section>
   {/if}
 </section>
+{/if}
 
 <style>
   .page {

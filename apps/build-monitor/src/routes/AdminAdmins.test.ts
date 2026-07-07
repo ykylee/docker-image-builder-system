@@ -66,8 +66,33 @@ vi.mock("../lib/admin-store.js", () => {
   };
 });
 
+// TASK-084: ensureAdminAccess mock — admin-store mock 과 동일한 helper
+// 가정이 유지되도록 mockResolvedValue 도 동일 allow-list 와 isAdmin=true
+// 를 기본값으로 둔다. 비-admin 케이스 테스트는 mockResolvedValueOnce 로 override.
+const ensureAdminAccessMock = vi.fn();
+vi.mock("../lib/admin-guard.js", () => ({
+  ensureAdminAccess: (callerId: string) => ensureAdminAccessMock(callerId)
+}));
+
 beforeEach(() => {
   pushMock.mockReset();
+  ensureAdminAccessMock.mockReset();
+  // default: admin-store mock 의 seed 와 동기화. callerId 가 adminAllowListRef
+  // 에 들어 있으면 통과, 아니면 거부.
+  ensureAdminAccessMock.mockImplementation(async (callerId: string) => {
+    if (adminAllowListRef.value.includes(callerId)) {
+      return {
+        isAdmin: true,
+        allowList: adminAllowListRef.value,
+        reason: "NOT_IN_ALLOW_LIST" as const
+      };
+    }
+    return {
+      isAdmin: false,
+      allowList: adminAllowListRef.value,
+      reason: "NOT_IN_ALLOW_LIST" as const
+    };
+  });
   localStorage.clear();
   setAdminAllowList([]);
   locStore.set("/admin/admins");
@@ -106,11 +131,10 @@ describe("AdminAdmins (TASK-049 + TASK-076 + TASK-077)", () => {
     localStorage.setItem("userId", "admin");
     setAdminAllowList(["admin", "yky.lee"]);
     render(AdminAdmins);
-    await Promise.resolve();
-    await Promise.resolve();
-    // 두 row 가 보여야 함.
-    expect(screen.getByText("@admin")).toBeInTheDocument();
-    expect(screen.getByText("@yky.lee")).toBeInTheDocument();
+    // TASK-084: ensureAdminAccess 가 onMount 첫 단계에서 호출되므로
+    // 기존 2-Promise 패턴으로는 부족. waitFor 로 데이터 렌더를 잡는다.
+    await waitFor(() => expect(screen.getByText("@admin")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("@yky.lee")).toBeInTheDocument());
     // seed badge.
     expect(screen.getByText(/seed \(protected\)/)).toBeInTheDocument();
   });
@@ -119,8 +143,7 @@ describe("AdminAdmins (TASK-049 + TASK-076 + TASK-077)", () => {
     localStorage.setItem("userId", "admin");
     setAdminAllowList(["admin", "yky.lee"]);
     render(AdminAdmins);
-    await Promise.resolve();
-    await Promise.resolve();
+    await waitFor(() => expect(screen.getByText("@admin")).toBeInTheDocument());
     const seedRow = screen.getByText("@admin").closest("tr");
     expect(seedRow).not.toBeNull();
     const removeBtn = seedRow?.querySelector("button.btn-danger") as HTMLButtonElement | null;
@@ -147,14 +170,13 @@ describe("AdminAdmins (TASK-049 + TASK-076 + TASK-077)", () => {
     localStorage.setItem("userId", "admin");
     setAdminAllowList(["admin", "yky.lee"]);
     render(AdminAdmins);
-    await Promise.resolve();
-    await Promise.resolve();
+    await waitFor(() => expect(screen.getByText("@admin")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("@yky.lee")).toBeInTheDocument());
     const row = screen.getByText("@yky.lee").closest("tr");
     const removeBtn = row?.querySelector("button.btn-danger") as HTMLButtonElement | null;
     expect(removeBtn).not.toBeNull();
     await fireEvent.click(removeBtn!);
-    await Promise.resolve();
-    expect(adminAllowListRef.value).not.toContain("yky.lee");
+    await waitFor(() => expect(adminAllowListRef.value).not.toContain("yky.lee"));
   });
 });
 
@@ -163,8 +185,9 @@ describe("AdminAdmins input validation (TASK-049 follow-up)", () => {
     localStorage.setItem("userId", "admin");
     setAdminAllowList(["admin"]);
     render(AdminAdmins);
-    await Promise.resolve();
-    await Promise.resolve();
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("userId")).toBeInTheDocument()
+    );
     const input = screen.getByPlaceholderText("userId") as HTMLInputElement;
     // 공백 포함 id — 정규식 위반.
     await fireEvent.input(input, { target: { value: "bad id" } });
@@ -181,12 +204,31 @@ describe("AdminAdmins input validation (TASK-049 follow-up)", () => {
     localStorage.setItem("userId", "admin");
     setAdminAllowList(["admin"]);
     render(AdminAdmins);
-    await Promise.resolve();
-    await Promise.resolve();
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText("userId")).toBeInTheDocument()
+    );
     const input = screen.getByPlaceholderText("userId") as HTMLInputElement;
     await fireEvent.input(input, { target: { value: "a/b" } });
     const submit = screen.getByRole("button", { name: /add admin/i });
     await fireEvent.click(submit);
     expect(adminAllowListRef.value).toEqual(["admin"]);
+  });
+});
+
+describe("AdminAdmins TASK-084 deep link UX", () => {
+  it("shows AdminAccessDenied panel when caller is not in the admin allow-list", async () => {
+    // userId 가 admin allow-list 에 없는 케이스.
+    localStorage.setItem("userId", "alice");
+    setAdminAllowList(["admin", "yky.lee"]);
+    render(AdminAdmins);
+    await waitFor(() =>
+      expect(screen.getByText(/Admin access required/i)).toBeInTheDocument()
+    );
+    // admin-store 가 refresh 되지 않아야 한다 (frontend 가드).
+    expect(adminAllowListRef.value).toEqual(["admin", "yky.lee"]);
+    expect(screen.getByTestId("admin-denied-go-builds")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-denied-switch-user")).toBeInTheDocument();
+    // table 영역은 렌더되지 않는다.
+    expect(screen.queryByPlaceholderText("userId")).toBeNull();
   });
 });

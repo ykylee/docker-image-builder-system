@@ -22,10 +22,22 @@ const listAdminBuildsMock = vi.fn();
 vi.mock("../lib/api", () => ({
   listAdminBuilds: (id: string, params: unknown) => listAdminBuildsMock(id, params)
 }));
+// TASK-084: ensureAdminAccess mock — 기본은 admin 통과. 비-admin 케이스
+// 테스트는 mockResolvedValueOnce 로 override.
+const ensureAdminAccessMock = vi.fn();
+vi.mock("../lib/admin-guard.js", () => ({
+  ensureAdminAccess: (callerId: string) => ensureAdminAccessMock(callerId)
+}));
 
 beforeEach(() => {
   pushMock.mockReset();
   listAdminBuildsMock.mockReset();
+  ensureAdminAccessMock.mockReset();
+  ensureAdminAccessMock.mockResolvedValue({
+    isAdmin: true,
+    allowList: ["admin"],
+    reason: "NOT_IN_ALLOW_LIST"
+  });
   localStorage.clear();
   locStore.set("/admin/builds");
 });
@@ -122,5 +134,23 @@ describe("AdminBuilds", () => {
     render(AdminBuilds);
     const alert = await screen.findByRole("alert");
     expect(alert.textContent).toMatch(/forbidden/);
+  });
+
+  // TASK-084: 비-admin user 의 deep link 진입 시 backend 호출 없이
+  // frontend 에서 거부 → AdminAccessDenied 패널 노출.
+  it("shows AdminAccessDenied panel when caller is not in the admin allow-list", async () => {
+    localStorage.setItem("userId", "alice");
+    ensureAdminAccessMock.mockResolvedValueOnce({
+      isAdmin: false,
+      allowList: ["admin", "yky.lee"],
+      reason: "NOT_IN_ALLOW_LIST"
+    });
+    render(AdminBuilds);
+    await waitFor(() =>
+      expect(screen.getByText(/Admin access required/i)).toBeInTheDocument()
+    );
+    // listAdminBuilds 가 호출되지 않아야 한다 (frontend 가드).
+    expect(listAdminBuildsMock).not.toHaveBeenCalled();
+    expect(screen.getByTestId("admin-denied-go-builds")).toBeInTheDocument();
   });
 });

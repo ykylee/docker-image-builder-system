@@ -109,6 +109,16 @@
 - Header sticky bar 의 `box-shadow: 0 1px 3px rgba(0,0,0,0.04)` 는 의미적으로 `--shadow-card` 와 구분되는 1px light-only shadow 라 후속 TASK (sticky-bar 디자인 토큰 신설) 후보로 보류.
 - 회귀 (TASK-083): TS 4 packages clean, build-monitor vitest **121/121 PASS** (TASK-079 baseline 114 → +7: FilterChips.test.ts 옵션 검증 6 + 디자인 토큰 `--shadow-glow` 사용 source-level 가드 1), build-server 123/123 동일, svelte-check 0 errors / 0 warnings, vite build OK (gzip js 37.25KB / css 6.27KB, chip 중복 CSS 통합으로 약간 감소), e2e-single-port PASS.
 
+## 3.4 Admin 가드 deep link UX (TASK-084)
+- 의도: TASK-076/077 의 admin 진입점 통일까지는 backend 가 401/403 으로 거부하지만 frontend 가 친절한 안내 없이 raw error envelope 을 그대로 노출하던 결함(`docs/operations/dogfood-e2e-review-and-followup-2026-07-06.md` §3.4 G-4 gap) 봉인. 비-admin user (`alice` 등 `ADMIN_IDS` env 부재) 가 `/admin/builds` 같은 deep link 를 직접 입력했을 때 backend 호출 없이 frontend 에서 거부 → `<AdminAccessDenied>` 패널이 reason-aware 메시지 + "Back to Builds" / "Switch user" 두 액션을 노출한다.
+- 핵심 컴포넌트 + helper (단일 source):
+  - `apps/build-monitor/src/lib/admin-guard.ts` — `ensureAdminAccess(callerId)` helper. adminAllowListStore 캐시가 비어 있으면 refresh 시도 후 `contains` 체크. 결과는 `{ isAdmin, allowList, reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST" }`. backend 가 401/403 으로 거절한 케이스만 `FORBIDDEN` 으로 표면화 — 나머지 (5xx / 빈 캐시) 는 `NOT_IN_ALLOW_LIST` fallback (사용자가 새로고침하면 재시도).
+  - `apps/build-monitor/src/components/AdminAccessDenied.svelte` — 공통 권한 없음 패널. `page-head` + danger accent h1 + Login.svelte `.card` 패턴 차용 카드 + 두 액션 (`Back to Builds` 는 userId 유지하며 `/builds` 로 이동, `Switch user` 는 userIdStore clear 후 `/` redirect).
+- amend: `AdminBuilds.svelte` / `AdminUsers.svelte` / `AdminAdmins.svelte` / `AdminRunners.svelte` — onMount 첫 단계에서 (1) `userId` 부재 시 push("/") (기존), (2) `ensureAdminAccess(userId)` 호출, (3) `!isAdmin` 시 `accessDenied` state set + 친절한 패널 노출. backend 호출 (listAdminBuilds / listAdminUsers / listAdminRunners / refresh)은 frontend 가드 통과 후에야 일어남 — raw 403 envelope 이 화면에 노출될 surface 가 사라진다.
+- Backend 동작은 변경 없음. Build Server 의 `X-Admin-Id` 401/403 envelope (TASK-049 / TASK-076) 은 그대로 유지 — frontend 가드 통과 후에도 backend 는 동일하게 한 번 더 검증 (defense in depth).
+- 신규 회귀 가드: `admin-guard.test.ts` 9건 (NO_USER / FORBIDDEN / NOT_IN_ALLOW_LIST 분기 + 캐시 hit / 5xx fallback). admin 페이지 test 4종 신규 케이스 합계 5건 (AdminBuilds/AdminUsers/AdminRunners/AdminAdmins 각 1건 + AdminUsers 의 FORBIDDEN 별도 1건) — 비-admin userId 시 accessDenied 분기 + backend API 미호출 검증.
+- 회귀 (TASK-084): TS 4 packages `tsc --noEmit` clean, build-monitor vitest **135/135 PASS** (TASK-083 baseline 121 → +14: admin-guard 9 + admin 페이지 회귀 가드 5), build-server 131/131 동일 (backend 변경 0), svelte-check 0 errors / 0 warnings, vite build OK (gzip js 38.23KB / css 6.44KB — AdminAccessDenied component 추가로 약간 증가), Go 7 packages PASS.
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함

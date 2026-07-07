@@ -25,6 +25,8 @@
   // 로 승격. AdminBuilds 와 같은 디자인 토큰 (`--shadow-glow`) 을 단일
   // source 로 공유 — 운영자가 두 페이지를 번갈아 봐도 같은 톤으로 직관.
   import FilterChips from "../components/FilterChips.svelte";
+  // TASK-084: 비-admin user 의 deep link 진입 시 frontend 가드.
+  import AdminAccessDenied from "../components/AdminAccessDenied.svelte";
   import { userIdStore } from "../lib/session.js";
   import type {
     AdminRunner,
@@ -36,10 +38,19 @@
     listAdminRunners,
     patchAdminRunnerStatus
   } from "../lib/api.js";
+  // TASK-084: ensureAdminAccess helper 가 adminAllowListStore 캐시 +
+  // refresh 를 단일 source-of-truth 로 다룬다.
+  import { ensureAdminAccess } from "../lib/admin-guard.js";
 
   let userId = $derived($userIdStore);
   // TASK-076: effective admin id = userId 그 자체.
   let effectiveAdminId = $derived(userId);
+
+  // TASK-084: 비-admin user 의 deep link 진입 시 backend 호출 없이
+  // frontend 에서 거부 → AdminAccessDenied 패널 노출.
+  let accessDenied = $state<null | {
+    reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST";
+  }>(null);
 
   let runners = $state<AdminRunner[]>([]);
   let loading = $state(true);
@@ -52,6 +63,14 @@
     // 일반 Login 과 동일하다.
     if (!effectiveAdminId) {
       push("/");
+      return;
+    }
+    // TASK-084: backend 호출 전 frontend admin 가드 — 비-admin user 의
+    // raw 403 envelope 대신 친절한 패널을 노출한다.
+    const guard = await ensureAdminAccess(effectiveAdminId);
+    if (!guard.isAdmin) {
+      accessDenied = { reason: guard.reason };
+      loading = false;
       return;
     }
     await refresh();
@@ -137,6 +156,9 @@
   }
 </script>
 
+{#if accessDenied}
+  <AdminAccessDenied userId={userId} reason={accessDenied.reason} />
+{:else}
 <section class="page">
   <AdminTabs />
 
@@ -233,6 +255,7 @@
     </table>
   {/if}
 </section>
+{/if}
 
 <style>
   .page {

@@ -16,8 +16,13 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import AdminTabs from "../components/AdminTabs.svelte";
+  // TASK-084: 비-admin user 의 deep link 진입 시 frontend 가드.
+  import AdminAccessDenied from "../components/AdminAccessDenied.svelte";
   import { userIdStore } from "../lib/session.js";
   import { adminAllowListStore } from "../lib/admin-store.js";
+  // TASK-084: ensureAdminAccess helper 가 adminAllowListStore 캐시 +
+  // refresh 를 단일 source-of-truth 로 다룬다.
+  import { ensureAdminAccess } from "../lib/admin-guard.js";
   import type { AdminAllowListResponse, AdminAllowListRemoveResponse } from "../lib/api.js";
 
   let userId = $derived($userIdStore);
@@ -26,6 +31,12 @@
   // TASK-076: effective admin id = userId 그 자체. 별도 admin session 이
   // 없으므로 userId 만 체크하면 된다.
   let effectiveAdminId = $derived(userId);
+
+  // TASK-084: 비-admin user 의 deep link 진입 시 backend 호출 없이
+  // frontend 에서 거부 → AdminAccessDenied 패널 노출.
+  let accessDenied = $state<null | {
+    reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST";
+  }>(null);
 
   let newAdminId = $state("");
   let error = $state<string | null>(null);
@@ -36,6 +47,14 @@
   onMount(async () => {
     if (!effectiveAdminId) {
       push("/");
+      return;
+    }
+    // TASK-084: backend 호출 전 frontend admin 가드. 비-admin user 의
+    // raw 403 envelope 대신 친절한 패널을 노출한다.
+    const guard = await ensureAdminAccess(effectiveAdminId);
+    if (!guard.isAdmin) {
+      accessDenied = { reason: guard.reason };
+      busy = false;
       return;
     }
     try {
@@ -103,6 +122,9 @@
   }
 </script>
 
+{#if accessDenied}
+  <AdminAccessDenied userId={userId} reason={accessDenied.reason} />
+{:else}
 <section class="page">
   <!-- TASK-083: page 구조를 다른 admin 페이지 (Builds / Users /
        Runners) 와 통일. `.page` wrapper + `<header class="page-head">`
@@ -191,6 +213,7 @@
   </table>
   </div>
 </section>
+{/if}
 
 <style>
   /* TASK-083: page wrapper 정합. 다른 admin 페이지 (Builds / Users /
