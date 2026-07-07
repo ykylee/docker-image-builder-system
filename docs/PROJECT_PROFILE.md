@@ -172,6 +172,18 @@
   4. KEEP_PROJECT=1 의 bind mount dangling source (debug 보강) — trap 의 `rm -rf` 도 보류, 운영자 manual cleanup 으로 debug 가능.
 - 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 8 packages 모두 PASS (TASK-073 baseline 유지), svelte-check 0/0, `e2e-registry-push.sh` **ALL PASS** (~3-4 분: httpd:alpine pull 20s + registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags list 에 buildId 노출 + bonus 인증 부재/잘못된 credential 모두 401.
 
+## 3.9 Credential rotation e2e (TASK-075)
+- 의도: TASK-074 의 htpasswd 인증 환경에서 htpasswd + config.json 의 auths entry 를 runtime 중 갱신해도 docker CLI + registry 가 새 credential 로 push 동작함을 검증. 운영자가 rotate 시점에 알아야 할 두 가지 운영 규약도 정립: (a) htpasswd 갱신 후 registry container restart 필수, (b) htpasswd 와 config.json 둘이 어긋나면 즉시 unauthorized.
+- 핵심 변경:
+  - `apps/build-server/scripts/e2e-credential-rotation.sh` 신규 — 9 단계 + 보너스 2 (busybox/registry warm-up → 초기 credential v1 셋업 → compose up → registry healthy → build-server healthy → runner registered → 첫 build (v1) push 통과 → htpasswd v2 + config.json v2 갱신 → SIGHUP+restart fallback → 두 번째 build (v2) push 통과 → 옛 credential 401 → 새 credential catalog 정상 + 두 buildId tags 노출).
+  - 사전 결함 + 보강 4건 동시 봉인 (운영 가이드 §5):
+    1. htpasswd file 0444 read-only 가 갱신 시 Permission denied (silent fail 위험) → `update_htpasswd()` 가 `chmod 0644` 후 redirect + `chmod 0444` 재부착.
+    2. `submit_and_wait()` 함수의 stdout 이 buildId 와 progress log 가 혼합 → log() helper + `>&2` redirect, stdout 에는 buildId 만.
+    3. **registry:v2 가 htpasswd file 의 container-runtime 갱신을 즉시 반영 안 함** — SIGHUP 시도 → 안 되면 restart fallback. 운영 환경 credential rotation workflow 의 보안 결함(옛 credential 이 cache 기간 동안 동작) 명시화.
+    4. v2 credential 갱신 후 옛 credential 의 즉시 무효화 → restart 후엔 즉시 401 보장 (htpasswd cache 가 새 file 로 reset).
+  - `docs/operations/credential-rotation-2026-07-07.md` 운영 가이드 신규 (검증 결과 / 사용 절차 / 9 단계 매트릭스 / 사전 결함 4건 / 빠른 재현 / 운영 환경 credential rotation playbook).
+- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 8 packages 모두 PASS (TASK-074 baseline 유지), svelte-check 0/0, `e2e-registry-push.sh` (TASK-074) **ALL PASS** (회귀 baseline 유지), `e2e-credential-rotation.sh` (TASK-075) **ALL PASS** (~3-4 분: httpd:alpine pull 20s + registry:2 cold start 5-10s + build-server healthcheck 30s + cli push v1 ~30s + htpasswd 갱신 + SIGHUP+restart ~10s + cli push v2 ~30s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags list build_v1+build_v2 둘 다 노출 + bonus 옛 credential 401 + 새 credential 정상.
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함
