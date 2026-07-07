@@ -896,6 +896,39 @@ export function createMemoryBuildRepository(): BuildRepository {
       return toAdminRunner(stored);
     },
 
+    // TASK-077: admin-initiated runner registration. Distinct surface from
+    // self-register on first claim — admin UI's "Register Runner" button
+    // creates a placeholder record so the admin can see which runner is
+    // expected to start, even before the runner process boots. Returns
+    // `{ kind: "duplicate" }` if the runnerId is already in the registry
+    // — admin UI surfaces this as 409 (the runner might have been
+    // pre-registered earlier, or might have self-registered on a prior
+    // claim; the operator should DELETE the stale record first if they
+    // want to re-register).
+    async createAdminRunner(
+      runnerId: string
+    ): Promise<
+      | { kind: "created"; runner: AdminRunner }
+      | { kind: "duplicate" }
+    > {
+      if (runners.has(runnerId)) {
+        return { kind: "duplicate" };
+      }
+      const now = nowIsoString();
+      const stored: StoredRunner = {
+        runnerId,
+        status: "ACTIVE",
+        firstSeenAt: now,
+        lastSeenAt: now,
+        buildsClaimed: 0,
+        buildsCompleted: 0,
+        currentBuildId: null,
+        lastError: null
+      };
+      runners.set(runnerId, stored);
+      return { kind: "created", runner: toAdminRunner(stored) };
+    },
+
     async markRunnerSeen(
       runnerId: string,
       currentBuildId: string | null,

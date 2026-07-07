@@ -1214,6 +1214,41 @@ export class PostgresBuildRepository implements BuildRepository {
     return rowToAdminRunner(row);
   }
 
+  // TASK-077: admin-initiated runner registration. INSERT with
+  // ON CONFLICT DO NOTHING — if the row already exists, the insert is
+  // a no-op and the `.returning()` array is empty, which we surface as
+  // `{ kind: "duplicate" }`. This pattern is atomic in a single SQL
+  // statement (no SELECT-then-INSERT race) and matches the in-memory
+  // repo's contract exactly.
+  async createAdminRunner(
+    runnerId: string
+  ): Promise<
+    | { kind: "created"; runner: AdminRunner }
+    | { kind: "duplicate" }
+  > {
+    const inserted = await this.db
+      .insert(runnerTable)
+      .values({
+        runnerId,
+        status: "ACTIVE",
+        firstSeenAt: sql`NOW()`,
+        lastSeenAt: sql`NOW()`,
+        buildsClaimed: 0,
+        buildsCompleted: 0,
+        currentBuildId: null,
+        lastError: null
+      })
+      .onConflictDoNothing({
+        target: runnerTable.runnerId
+      })
+      .returning();
+    const row = inserted[0];
+    if (!row) {
+      return { kind: "duplicate" };
+    }
+    return { kind: "created", runner: rowToAdminRunner(row) };
+  }
+
   async markRunnerSeen(
     runnerId: string,
     currentBuildId: string | null,

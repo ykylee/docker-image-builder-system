@@ -24,6 +24,8 @@ import {
   adminRunnerListResponseSchema,
   adminRunnerPatchRequestSchema,
   adminRunnerPatchResponseSchema,
+  adminRunnerRegisterRequestSchema,
+  adminRunnerRegisterResponseSchema,
   adminRunnerSchema,
   adminUserBuildSummarySchema,
   adminUserListResponseSchema,
@@ -99,7 +101,13 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "AdminRunnerListResponse", schema: adminRunnerListResponseSchema },
   { id: "AdminRunnerPatchRequest", schema: adminRunnerPatchRequestSchema },
   { id: "AdminRunnerPatchResponse", schema: adminRunnerPatchResponseSchema },
-  { id: "AdminRunnerDeleteResponse", schema: adminRunnerDeleteResponseSchema }
+  { id: "AdminRunnerDeleteResponse", schema: adminRunnerDeleteResponseSchema },
+  // TASK-077: admin-initiated runner registration. Distinct from
+  // self-register on first claim — admin UI's "Register Runner" button
+  // pre-registers a runner record so the admin can see which runner is
+  // expected to start, even before the runner process boots.
+  { id: "AdminRunnerRegisterRequest", schema: adminRunnerRegisterRequestSchema },
+  { id: "AdminRunnerRegisterResponse", schema: adminRunnerRegisterResponseSchema }
 ];
 
 // Component registry. We keep a Map from canonical component id to a
@@ -349,6 +357,35 @@ registry.registerPath({
 // (Runner 가 별도 등록 절차 없이 첫 POST /builds/claim 호출 시 자동으로
 // ACTIVE record 생성). Admin 이 DISABLE 로 토글하면 다음 claim 부터
 // reason=RUNNER_DISABLED 로 거절된다.
+
+// TASK-077: admin-initiated runner registration. Distinct surface from
+// self-register on first claim — admin UI's "Register Runner" button
+// pre-registers a runner record so the admin can see it in the registry
+// before the runner process boots. The runner record starts as ACTIVE with
+// zero counters; once the runner actually boots and self-registers on its
+// first claim, the existing self-register refreshes lastSeenAt without
+// changing status. Idempotent at the storage level (ON CONFLICT DO
+// NOTHING), but a duplicate runnerId returns 409 so the admin UI can
+// surface the misconfiguration.
+registry.registerPath({
+  method: "post",
+  path: "/admin/runners",
+  description:
+    "Admin-only. Pre-register a runner record so the admin can see it in the registry before the runner process boots. The runner record starts as ACTIVE with zero counters; once the runner actually starts and self-registers on its first claim, the existing self-register refreshes lastSeenAt without changing status. Idempotent at the storage level (ON CONFLICT DO NOTHING), but a duplicate runnerId returns 409 so the admin UI can surface the misconfiguration.",
+  tags: ["Admin"],
+  request: {
+    body: { content: { "application/json": { schema: component("AdminRunnerRegisterRequest") as never } } }
+  },
+  responses: {
+    201: {
+      description: "Runner pre-registered (record created).",
+      content: { "application/json": { schema: component("AdminRunnerRegisterResponse") as never } } },
+    400: { description: "Invalid body (empty runnerId, extra fields, type mismatch)." },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." },
+    409: { description: "Runner already registered (duplicate runnerId)." }
+  }
+});
 registry.registerPath({
   method: "get",
   path: "/admin/runners",

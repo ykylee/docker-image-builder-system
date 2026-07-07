@@ -252,6 +252,21 @@ export interface BuildRepository {
   // listRunners returns the full registry in stable id order for the
   // /admin/runners page.
   registerRunner(runnerId: string): Promise<AdminRunner>;
+  // TASK-077: admin-initiated runner registration. Distinct from the
+  // self-register on first claim — admin UI's "Register Runner" button
+  // creates a placeholder record so the admin can see which runner is
+  // expected to start, even before the runner process boots. Returns
+  // `{ kind: "created", runner }` on success, `{ kind: "duplicate" }`
+  // when the runnerId already exists in the registry. Idempotency is
+  // intentional at the storage level (registerRunner is idempotent for
+  // self-register), but at the admin-intent level a duplicate runnerId
+  // is a misconfiguration that the admin UI surfaces as 409.
+  createAdminRunner(
+    runnerId: string
+  ): Promise<
+    | { kind: "created"; runner: AdminRunner }
+    | { kind: "duplicate" }
+  >;
   markRunnerSeen(
     runnerId: string,
     currentBuildId: string | null,

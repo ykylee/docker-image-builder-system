@@ -27,6 +27,14 @@
   import FilterChips from "../components/FilterChips.svelte";
   // TASK-084: 비-admin user 의 deep link 진입 시 frontend 가드.
   import AdminAccessDenied from "../components/AdminAccessDenied.svelte";
+  // TASK-077: RegisterRunnerModal — admin 이 신규 cluster / k8s pod /
+  // EC2 instance 에서 runner 를 띄우기 전에, 그 runner 가 곧 들어온다는
+  // 것을 admin UI 에 미리 등록할 수 있다. Pre-registration 된 runner
+  // record 는 status=ACTIVE + firstSeenAt=now() + lastSeenAt=now() 로
+  // placeholder 생성되며, 그 runner 가 실제 띄워져 첫 claim 을 보내면
+  // 기존 self-register 가 counter / currentBuildId 만 갱신한다 (seamless
+  // 통합). 같은 runnerId 로 두 번 호출 시 409.
+  import RegisterRunnerModal from "../components/RegisterRunnerModal.svelte";
   import { userIdStore } from "../lib/session.js";
   import type {
     AdminRunner,
@@ -57,6 +65,11 @@
   let error = $state<string | null>(null);
   let busyId = $state<string | null>(null);
   let filter = $state<"ALL" | "ACTIVE" | "DISABLED">("ALL");
+  // TASK-077: RegisterRunnerModal 의 open state. 부모가 토글 — modal
+  // 안에서 submit 성공시 onSuccess() 로 refresh 트리거 + close. modal 안
+  // 자체적으로 open=false fallback 도 갖고 있어 부모의 close 호출 없어도
+  // 안정적으로 닫힌다.
+  let registerModalOpen = $state(false);
 
   onMount(async () => {
     // TASK-076: 더 이상 /admin/login 으로 가지 않는다 — admin 진입점은
@@ -171,12 +184,29 @@
         {runners.filter((r) => r.status === "DISABLED").length} disabled
       </p>
     </div>
-    <FilterChips
-      options={["ALL", "ACTIVE", "DISABLED"]}
-      selected={filter}
-      onSelect={(v) => (filter = v as typeof filter)}
-      ariaLabel="Status filter"
-    />
+    <div class="page-head-actions">
+      <FilterChips
+        options={["ALL", "ACTIVE", "DISABLED"]}
+        selected={filter}
+        onSelect={(v) => (filter = v as typeof filter)}
+        ariaLabel="Status filter"
+      />
+      <!--
+        TASK-077: "Register Runner" 버튼 — admin 이 신규 cluster / k8s pod
+        / EC2 instance 에서 runner 를 띄우기 전에, 그 runner 가 곧 들어온다는
+        것을 admin UI 에 미리 등록. 클릭시 modal 토글, modal 안에서 submit
+        성공시 onSuccess → refresh() 호출 + modal close. 실패 (400/401/403/
+        409) 시 modal 은 닫히지 않고 inline error 표시.
+      -->
+      <button
+        type="button"
+        class="btn-primary"
+        onclick={() => (registerModalOpen = true)}
+        data-testid="register-runner-open"
+      >
+        + Register Runner
+      </button>
+    </div>
   </header>
 
   {#if loading}
@@ -254,6 +284,19 @@
       </tbody>
     </table>
   {/if}
+
+  <!--
+    TASK-077: RegisterRunnerModal — admin 이 "+ Register Runner" 버튼으로
+    토글. submit 성공시 onSuccess() 가 refresh() 를 호출해 runner list 를
+    재요청 + modal close. 실패 (400/401/403/409) 시 modal 안 inline error
+    가 표시되어 modal 은 닫히지 않음 — 운영자가 같은 context 에서 즉시 retry.
+  -->
+  <RegisterRunnerModal
+    bind:open={registerModalOpen}
+    onSuccess={async () => {
+      await refresh();
+    }}
+  />
 </section>
 {/if}
 

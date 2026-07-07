@@ -11,7 +11,10 @@ import {
   adminRunnerListResponseSchema,
   adminRunnerPatchRequestSchema,
   adminRunnerPatchResponseSchema,
-  adminUserListResponseSchema
+  adminRunnerRegisterRequestSchema,
+  adminRunnerRegisterResponseSchema,
+  adminUserListResponseSchema,
+  type AdminRunner
 } from "@docker-image-builder-system/shared-contract";
 
 import type { BuildService } from "../services/build-service.js";
@@ -326,6 +329,58 @@ export async function registerAdminRoutes(
   // reason=RUNNER_DISABLED 로 거절된다. 후속 cancellation / rejoin 같은
   // extension 은 PR scope 밖.
   // -------------------------------------------------------------------------
+
+  // TASK-077: admin-initiated runner registration. 기존 흐름은 runner 가
+  // /builds/claim 의 body 에 RUNNER_ID 를 실어 보내는 self-register 였는데,
+  // 운영자가 신규 cluster / k8s pod / EC2 instance 에서 runner 를 띄우기 전에
+  // "이 runner 가 곧 들어온다" 라는 pre-registration 이 어려웠다. 본 endpoint
+  // 가 admin UI 의 "Register Runner" 버튼의 backend — admin 이 runnerId 를
+  // 미리 등록해 두면 운영자가 어떤 runner 가 cluster 에서 동작하는지 admin UI
+  // 에서 즉시 가시화. self-register 와는 별개 surface — admin runner record
+  // 가 ACTIVE + firstSeenAt=now() placeholder 로 생성되고, 그 runner 가
+  // 실제 띄워져 첫 claim 을 보내면 기존 markRunnerSeen 가 counter /
+  // currentBuildId 만 갱신한다 (seamless 통합). 같은 runnerId 로 두 번 호출
+  // 시 409 — duplicate.
+  app.post(
+    "/admin/runners",
+    async (request, reply) => {
+      const callerId = adminIdHeaderSchema.safeParse(
+        request.headers[ADMIN_ID_HEADER]
+      );
+      if (!callerId.success) {
+        return reply.status(401).send({
+          message: "Admin id header missing.",
+          header: ADMIN_ID_HEADER
+        });
+      }
+      if (!isAdmin(callerId.data)) {
+        return reply.status(403).send({
+          message: "Caller is not in the admin allow-list.",
+          callerId: callerId.data
+        });
+      }
+      const body = adminRunnerRegisterRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        return reply.status(400).send({
+          message: "Invalid runner register request body.",
+          issues: body.error.issues
+        });
+      }
+      const result = await buildService.createAdminRunner(body.data.runnerId);
+      if (result.kind === "duplicate") {
+        return reply.status(409).send({
+          message: "Runner already registered.",
+          runnerId: body.data.runnerId
+        });
+      }
+      // result.kind === "created" — early-return 으로 duplicate 배제 후
+      // result 가 `{ kind: "created"; runner: AdminRunner }` 로 narrow.
+      const runner: AdminRunner = result.runner;
+      return reply
+        .status(201)
+        .send(adminRunnerRegisterResponseSchema.parse({ runner }));
+    }
+  );
 
   app.get("/admin/runners", async (request, reply) => {
     const callerId = adminIdHeaderSchema.safeParse(
