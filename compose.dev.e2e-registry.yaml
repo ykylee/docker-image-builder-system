@@ -1,0 +1,120 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — registry-push e2e compose override
+# =============================================================================
+#  TASK-073: docker CLI 의 registry 인증 config dir 를 RUNNER_REGISTRY_CONFIG_DIR
+#  env 로 주입 — private Docker Hub / ECR / GCR 인증이 필요한 운영 환경의
+#  foundation. 본 override 는 insecure 모드의 local registry:2 를 띄워
+#  e2e 가 외부 의존성 없이 cli mode docker push → registry pull back 검증이
+#  가능하도록 한다.
+#
+#  사용:
+#    export DOCKER_SOCKET_GID="$(getent group docker | cut -d: -f3)"
+#    export ADMIN_IDS=admin
+#    bash apps/build-server/scripts/e2e-registry-push.sh
+#
+#  신뢰 모델:
+#    - `registry` 서비스는 docker-compose 가 띄우는 in-network container.
+#      HTTP 만 expose (5000). 운영자가 host 의 docker daemon 의
+#      `daemon.json` 에 `"insecure-registries": ["127.0.0.1:5000"]` 를
+#      미리 등록해야 docker push 가 TLS 없이 동작 — 본 e2e 의 docker 디스크
+#      처럼 docker CLI 가 insecure 모드로 registry 까지 통신 가능.
+#      운영 환경에서는 private registry 가 자체 CA cert 를 동반한 HTTPS
+#      만 제공 (insecure-registries 필요 없음) — 이 패턴은 후속 TASK.
+#    - `runner_config` volume 은 host 의 임시 디렉터리에 마운트되며,
+#      e2e script 가 `{ "insecure-registries": ["127.0.0.1:5000"] }` 를
+#      들어있는 `config.json` 을 생성해 둔다. RUNNER_REGISTRY_CONFIG_DIR
+#      가 `/registry-config` 으로 export 되어 docker CLI 가 그 config 를
+#      사용한다 — TASK-073 의 핵심 동작.
+#
+#  주의:
+#    - registry 의 port 5000 은 host 에 expose 되어있어 e2e 가 직접
+#      `curl http://127.0.0.1:5000/v2/_catalog` / `docker pull` 로 검증 가능.
+#    - `network_mode: host` 인 runner 는 docker.sock 으로 host 의 docker
+#      daemon 에 붙고, 그 docker 가 host 의 5000 port (registry) 에 직접
+#      접근 가능 — bridge network 의 DNS 가 아닌 loopback 매치.
+#    - htpasswd / registry-CA 인증은 후속 TASK — 본 TASK 의 핵심은
+#      RUNNER_REGISTRY_CONFIG_DIR 가 docker CLI 에 env 전파되어 실제로
+#      docker push 가 동작한다는 의미 검증 (insecure-registry 는 첫 번째
+#      test surface).
+# =============================================================================
+
+services:
+  registry:
+    image: registry:2
+    container_name: dibs-e2e-registry
+    restart: on-failure
+    environment:
+      REGISTRY_HTTP_SECRET: e2e-test-secret
+      # e2e 가 끝날 때마다 container 가 drop 되므로 in-memory 도 충분.
+      # 운영 환경에서는 host 의 named volume / S3 등을 backend 로 사용.
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+    ports:
+      - "5000:5000"
+    healthcheck:
+      # docker registry:2 의 `/v2/_catalog` 가 200 OK 를 돌려주면 HTTP
+      # 핸들러가 ready 상태. `wget --spider` 가 EXIT 0 으로 끝나면 healthy.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5000/v2/"]
+      interval: 3s
+      timeout: 2s
+      start_period: 5s
+      retries: 20
+
+  runner:
+    # TASK-085 의 network_mode: host 와 정합 — runner 의 docker push 가
+    # host 의 5000 port (registry) 에 직접 접근 가능. TASK-085 의
+    # production-semantic 검증 패턴 (cli mode + busybox source) 을 재사용.
+    network_mode: host
+    depends_on:
+      registry:
+        condition: service_healthy
+      build-server:
+        condition: service_healthy
+    environment:
+      HOST_SERVER_BASE_URL: http://127.0.0.1:3000
+      RUNNER_ID: runner-compose-1
+      RUNNER_POLL_INTERVAL: 5s
+      # TASK-073: cli mode 의 deploy 가 핵심 — 실제 docker tag + push 가
+      # 일어남. network_mode=host 으로 host 의 docker daemon 의
+      # `/var/run/docker.sock` 에 접근.
+      RUNNER_DOCKER_BUILD_MODE: cli
+      RUNNER_DOCKER_RUN_MODE: cli
+      RUNNER_DEPLOY_MODE: cli
+      # private registry 의 인증 정보를 추가한다면 `RUNNER_REGISTRY_CONFIG_DIR`
+      # 가 가리키는 dir 의 config.json 의 `auths` map 에 username:password
+      # 형태로 적는다. e2e 는 insecure-registry 만 쓰므로 auths 비움.
+      RUNNER_REGISTRY_CONFIG_DIR: /registry-config
+      RUNNER_DEPLOY_TARGET_TYPE: DOCKER_REGISTRY
+      # TASK-073 보강: registry push 의 image path 가 그대로 repository
+      # 이름이 됨. docker push 가 registry endpoint 와 image name 을 `:` / `/`
+      # 로 split 하므로 `docker-image-builder-system/cli` 가 registry repo 로
+      # 들어가려면 targetRef 에 그 path 까지 포함 — 본 override 가
+      # `localhost:5000/docker-image-builder-system/cli` 로 잡으면 push image 는
+      # `localhost:5000/docker-image-builder-system/cli:<buildId>` 가 되고
+      # registry catalog 에 `docker-image-builder-system/cli` repo 가 노출됨.
+      RUNNER_DEPLOY_TARGET_REF: localhost:5000/docker-image-builder-system/cli
+      RUNNER_STOP_CONTAINER_ON_DONE: "true"
+      PREVIEW_INTERNAL_PORT: "8080"
+      RUNNER_HEALTHCHECK_PATH: /
+      RUNNER_HEALTHCHECK_TIMEOUT_SECONDS: "60"
+      RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS: "60"
+    volumes:
+      # host 의 임시 dir (e2e 가 만든 config.json 위치) 를 `/registry-config`
+      # 로 mount. RUNNER_REGISTRY_CONFIG_DIR env 와 정합.
+      - ${HOST_REGISTRY_CONFIG}:/registry-config:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    # group_add 는 compose 검증 시 항목 중복 검사로 — host 의 docker gid 와
+    # base image (alpine:3.20 + docker-cli 패키지) 의 docker group 이 같은 gid
+    # 로 잡혀 있으면 "items at 0 and 1 are equal" 오류가 발생. Dockerfile 이
+    # 이미 `addgroup runner docker` 로 docker group 의 supplementary 를 잡아두고
+    # `/var/run/docker.sock` 의 root:docker 0660 이 일치 — TASK-078 self-review
+    # 가 검증한 정렬. docker 가 잘 동작 안하면 e2e 의 build 단계에서 명확히
+    # surface 되니 운영자가 `docker exec <runner> groups runner` 로 즉시 진단 가능.
+    # e2e 환경에서 `getent group docker` 가 host 의 docker daemon 접근용 gid 를
+    # 반환하고 Dockerfile 의 `addgroup runner docker` 가 매칭. group_add 명시
+    # 불필요 — host docker gid 가 base image 의 docker group gid 와 같으면 위
+    # compose 오류가 발생함.
+    user: "runner"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
