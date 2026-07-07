@@ -131,6 +131,18 @@
   - compose bridge network 의 host namespace 격리 → `network_mode: host` override.
 - 회귀 baseline: TS 4 packages `tsc --noEmit` clean, build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **121/121 동일** (frontend 변경 0), Go 7 packages 모두 PASS (기존 + 신규 docker test 2건), svelte-check 0/0, `e2e-production-semantic.sh` **ALL PASS** (cold start 30s + busybox pull warmup 10s + build lifecycle ~30s + cleanup, 총 ~2분).
 
+## 3.6 e2e-multi-runner.sh BASE + heredoc 결함 봉인 (TASK-086)
+- 의도: TASK-081-B 의 `apps/build-server/scripts/e2e-multi-runner.sh` 가 봉인될 때 못 가져간 두 가지 결함 — (1) `BASE="http://build-server:3000"` 가 docker network 내부 DNS 이름을 host shell 에서 사용, (2) `[5/6]` admin 분산 검증 의 `echo "${RUNNERS}" | python3 <<'PY'` 가 bash redirections 처리 순서상 heredoc 이 stdin 을 hijack 해서 `sys.stdin.read()` 가 항상 빈 응답 — 을 봉인. 같은 race (TASK-085 에서 발견된 runner registration 30-90s) 와 stale image caching 결함도 동시 보강.
+- 핵심 변경 (amend 1 file + sibling follow-on):
+  - `apps/build-server/scripts/e2e-multi-runner.sh` — `BASE="${BUILD_SERVER_URL:-http://127.0.0.1:3000}"` (TASK-082 동일 패턴), `[2/6]` runner registry 대기 30s → 90s, `[0/6] compose up` 에 `--build` 추가 (runner image caching 회피), project name 에 `$$` suffix (병렬 실행 안전), `[5/6]` heredoc 를 `RUNNERS_JSON="${RUNNERS}" python3 <<'PY'` + `os.environ["RUNNERS_JSON"]` 패턴으로 교체.
+  - `apps/build-server/scripts/e2e-production-semantic.sh` follow-on — TASK-085 의 `[6/7]` 10 phase 검증 의 `printf '%s' "${LOGS_JSON}" | python3 <<PY` 도 동일 heredoc stdin hijack 결함 (그래서 우연히 동작 — `${LOGS_JSON}` shell expand 로 우회). env var 패턴 + `<<'PY'` quoted marker 로 견고화. log JSON 의 `'''` / escape 시퀀스에 silent fail 하지 않게 됨.
+- 사전 결함 + 보강 4건:
+  - `BASE="http://build-server:3000"` 가 host shell 에서 unresolved → `BASE="${BUILD_SERVER_URL:-...127.0.0.1:3000}"` 로 정렬 (TASK-082 동일).
+  - heredoc 가 stdin pipe 를 hijack → env var 명시적 전달 패턴으로 교체.
+  - runner registration 대기 30s 가 부족 (TASK-085 의 `30-90s` race 와 동일) → 90s 로 확장.
+  - compose 가 cached image 사용 시 runner binary 변경 미반영 → `[0/6] compose up` 에 `--build` 추가.
+- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일에 영향 없음), build-server node:test **131/131 동일** (스크립트만 amend — backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 7 packages 모두 PASS, svelte-check 0/0, `e2e-multi-runner.sh` **ALL PASS** (~3-4 분 — TASK-081-B 와 정합), `e2e-production-semantic.sh` follow-on 도 동일 ALL PASS (TASK-085 회귀 baseline 유지).
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함

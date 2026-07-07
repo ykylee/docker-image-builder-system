@@ -319,16 +319,19 @@ fi
 green "  ✓ build COMPLETED"
 
 # 6) 10 phase + preview URL 검증.
+# TASK-086 보강: heredoc + pipe 의 stdin hijack 결함 수정. 이전 패턴
+# `printf '%s' "${LOGS_JSON}" | python3 <<PY` 는 bash redirections 처리 순서
+# 상 heredoc 이 마지막에 stdin 을 덮어써 pipe 데이터가 무시되고 heredoc body
+# 의 `${LOGS_JSON}` 가 shell expand 로 들어가는 우회 path 에 의존했음 — log
+# JSON 이 `'''` 나 escape sequence 를 포함하면 silent fail 위험. env var 로
+# 명시적 데이터 전달 + `<<'PY'` quoted marker 로 heredoc body 의 모든 expand
+# 비활성화 (회귀 안정성). sibling e2e-multi-runner.sh 와 동일한 패턴.
 echo
 echo "[6/7] build log phase 검증 (10 phase + preview URL)"
 LOGS_JSON="$(curl -fsS "${BASE}/builds/${BUILD_ID}/logs" 2>/dev/null || true)"
-printf '%s' "${LOGS_JSON}" | python3 <<PY || exit 1
-import json, sys, re
-try:
-  d = json.loads('''${LOGS_JSON}''')
-except Exception as e:
-  print(f"  ✗ log JSON parse failed: {e}")
-  sys.exit(1)
+LOGS_JSON="${LOGS_JSON}" python3 <<'PY' || exit 1
+import json, os, sys
+d = json.loads(os.environ["LOGS_JSON"])
 expected = [
   "REQUEST_ACCEPTED",
   "QUEUE_CLAIMED",
