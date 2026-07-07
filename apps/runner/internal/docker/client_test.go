@@ -349,3 +349,90 @@ func TestRunContainerCliModeInspectTemplateParsesAndExtractsHostPort(t *testing.
 		t.Errorf("expected RuntimeURL to embed introspected host port, got %s", status.RuntimeURL)
 	}
 }
+
+// TASK-085 보강: docker run -d 가 즉시 return 해도 container 의 NetworkSettings.Ports
+// 가 docker daemon 의 port binding 종료 시점까지 populate 되지 않을 수 있다. inspect 가
+// 너무 빨리 호출되면 empty 응답 → hostPort=0 → healthcheck port 0 timeout. RunContainer
+// 가 최대 5 회까지 retry 해서 port 가 보일 때까지 대기해야 한다.
+func TestRunContainerCliModeInspectRetriesUntilPortAppears(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
+	t.Setenv("RUNNER_DOCKER_BUILD_MODE", "skeleton")
+	t.Setenv("RUNNER_DOCKER_RUN_MODE", "cli")
+
+	client := NewClient()
+
+	// 처음 2 회는 empty 응답 (port binding 미완), 3 회째에 32776 응답.
+	// retry loop 가 HostPort=32776 으로 확정하고 break 해야 한다.
+	attemptCount := 0
+	client.SetRunDockerInspectCmdForTest(func(ctx context.Context, args []string) (string, error) {
+		attemptCount++
+		if attemptCount < 3 {
+			return "", nil
+		}
+		return "32776", nil
+	})
+	client.runContainerCmd = func(ctx context.Context, args ...string) error {
+		return nil
+	}
+
+	status, err := client.RunContainer(context.Background(), ContainerRunOptions{
+		ImageTag:        "img:tag",
+		ContainerName:   "container-test-retry",
+		HostPort:        0,
+		InternalPort:    8080,
+		HealthcheckPath: "/",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if attemptCount != 3 {
+		t.Errorf("expected 3 inspect attempts (2 empty + 1 success), got %d", attemptCount)
+	}
+	if status.HostPort != 32776 {
+		t.Errorf("expected HostPort=32776 from inspect retry, got %d", status.HostPort)
+	}
+}
+
+// TASK-085 보강: 모든 inspect 시도 (5 회) 가 empty 응답이면 hostPort 가 0 으로
+// 남고 caller (WaitForHealth) 가 port 0 으로 healthcheck 시도해 timeout 으로
+// fail 한다. 이는 caller 의 명시적 port (s.hostPortOverride) 또는 BuildService
+// 의 port collision retry 정책으로 보강되어야 하지만, 현재의 silent fallback
+// 동작을 회귀 가드로 박제 — silent 0 → 명확한 0.
+func TestRunContainerCliModeInspectAllAttemptsEmptyLeavesHostPortZero(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
+	t.Setenv("RUNNER_DOCKER_BUILD_MODE", "skeleton")
+	t.Setenv("RUNNER_DOCKER_RUN_MODE", "cli")
+
+	client := NewClient()
+
+	attemptCount := 0
+	client.SetRunDockerInspectCmdForTest(func(ctx context.Context, args []string) (string, error) {
+		attemptCount++
+		return "", nil
+	})
+	client.runContainerCmd = func(ctx context.Context, args ...string) error {
+		return nil
+	}
+
+	status, err := client.RunContainer(context.Background(), ContainerRunOptions{
+		ImageTag:        "img:tag",
+		ContainerName:   "container-test-empty",
+		HostPort:        0,
+		InternalPort:    8080,
+		HealthcheckPath: "/",
+	})
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+	if attemptCount != 5 {
+		t.Errorf("expected 5 inspect attempts (max retry), got %d", attemptCount)
+	}
+	if status.HostPort != 0 {
+		t.Errorf("expected HostPort=0 after all retries failed, got %d", status.HostPort)
+	}
+	if !strings.Contains(status.RuntimeURL, ":0/") {
+		t.Errorf("expected RuntimeURL to embed port=0 fallback, got %s", status.RuntimeURL)
+	}
+}
