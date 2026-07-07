@@ -1,0 +1,78 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — production-semantic e2e compose override
+# =============================================================================
+#  TASK-085: busybox/scratch Dockerfile + 실제 tar.gz source archive 로 build 가
+#  COMPLETED 까지 가는 production semantic e2e 검증용 override. compose.dev.yaml
+#  의 `runner` service 를 그대로 두고 (`dibs-runner`, RUNNER_ID=runner-compose-1),
+#  Runner 가 실제 docker build / docker run / healthcheck 까지 cli mode 로
+#  수행하도록 env 를 override.
+#
+#  사용:
+#    export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
+#    export ADMIN_IDS=admin
+#    docker compose -f compose.dev.yaml -f compose.dev.e2e-production.yaml \
+#      --project-name dibs-prod-e2e up -d
+#
+#    bash apps/build-server/scripts/e2e-production-semantic.sh
+#
+#    docker compose -f compose.dev.yaml -f compose.dev.e2e-production.yaml \
+#      --project-name dibs-prod-e2e down -v
+#
+#  핵심 env override:
+#    - RUNNER_DOCKER_BUILD_MODE=cli  — 실제 `docker build` 실행 (skeleton 이 emit
+#      하는 manifest 만으로는 production semantic 검증 불가).
+#    - RUNNER_DOCKER_RUN_MODE=cli    — 실제 `docker run` + healthcheck HTTP GET.
+#      HostPort=0 일 때 docker 가 자동 할당한 host port 를 `docker inspect` 로
+#      readback 한 뒤 previewUrl 로 노출.
+#    - RUNNER_DEPLOY_MODE=skeleton   — 외부 registry push 안 함. deploy 단계를
+#      workspace/<buildID>/deploy-result.json emit 으로 갈음. e2e 의 production
+#      semantic 은 build → run → healthcheck → REPORT_PREVIEW_READY 까지가 본질.
+#    - RUNNER_STOP_CONTAINER_ON_DONE=true — build 완료 직후 container 자동 stop.
+#      e2e 의 [5] 단계가 "container 가 cleanup 됐는지" 를 검증할 수 있게 함.
+#    - PREVIEW_INTERNAL_PORT=8080    — busybox httpd 가 listen 하는 port.
+#    - RUNNER_HEALTHCHECK_PATH=/     — busybox httpd 가 GET / 에서 index.html 을
+#      serve 하므로 curl http://127.0.0.1:8080/ 가 200 OK.
+#    - RUNNER_HEALTHCHECK_TIMEOUT_SECONDS=60 — busybox image pull (cold) +
+#      httpd bind 시간 여유.
+#
+#  주의:
+#    - skeleton → cli 전환의 부수효과: runner 가 host docker socket 을 통해
+#      busybox image pull 을 시도한다. 인터넷 / local registry 미가용 환경이면
+#      e2e 가 timeout 으로 fail. 사전에 `docker pull busybox:1.36` 으로 warm-up
+#      가능 (e2e script 가 자동 처리).
+#    - host docker socket 권한 (root:docker 0660) 이므로 group_add 로 host
+#      docker gid 가 runner user 의 supplementary group 으로 주입되어야 함.
+#      compose.dev.yaml 의 runner 와 동일하게 `${DOCKER_SOCKET_GID:?...}` 강제.
+# =============================================================================
+
+services:
+  runner:
+    # TASK-085 보강: e2e 의 production semantic 검증은 host docker socket 으로
+    # spawn 한 child container 의 published host port 에 직접 접근해야 한다.
+    # 기본 bridge network 에선 runner container 의 127.0.0.1 이 자기 자신을
+    # 가리키므로 host port (auto-assign) 가 unreachable. `network_mode: host`
+    # 로 host 의 network namespace 를 공유하면 child container 의 host port 가
+    # runner 의 localhost 에 그대로 노출된다. dogfood e2e-2026-07-06.md §2.2
+    # 의 `bab5995f-...` build (preview URL `http://127.0.0.1:32770/health`)
+    # 가 host network 에서 동작한 결과와 정합.
+    network_mode: host
+    environment:
+      # network_mode: host 일 때 build-server 는 docker-compose 가 expose 한
+      # 0.0.0.0:3000 으로 접근 가능 — 127.0.0.1 로도 resolve 됨.
+      HOST_SERVER_BASE_URL: http://127.0.0.1:3000
+      RUNNER_ID: runner-compose-1
+      RUNNER_POLL_INTERVAL: 5s
+      # TASK-085: production-semantic 검증용 override. 기본값 (skeleton) 에서
+      # cli 로 전환 — build → run → healthcheck 까지 실제 docker 호출이 일어나야
+      # COMPLETED 까지 가는 운영 시나리오의 e2e 가 가능.
+      RUNNER_DOCKER_BUILD_MODE: cli
+      RUNNER_DOCKER_RUN_MODE: cli
+      RUNNER_DEPLOY_MODE: skeleton
+      PREVIEW_INTERNAL_PORT: "8080"
+      RUNNER_HEALTHCHECK_PATH: /
+      RUNNER_HEALTHCHECK_TIMEOUT_SECONDS: "60"
+      # e2e 종료 시 container 가 host 에 남지 않도록 자동 cleanup.
+      RUNNER_STOP_CONTAINER_ON_DONE: "true"
+      # registry push timeout 은 skeleton mode 에선 무시되지만 env 명시.
+      RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS: "30"

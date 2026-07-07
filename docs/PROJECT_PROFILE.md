@@ -119,6 +119,18 @@
 - 신규 회귀 가드: `admin-guard.test.ts` 9건 (NO_USER / FORBIDDEN / NOT_IN_ALLOW_LIST 분기 + 캐시 hit / 5xx fallback). admin 페이지 test 4종 신규 케이스 합계 5건 (AdminBuilds/AdminUsers/AdminRunners/AdminAdmins 각 1건 + AdminUsers 의 FORBIDDEN 별도 1건) — 비-admin userId 시 accessDenied 분기 + backend API 미호출 검증.
 - 회귀 (TASK-084): TS 4 packages `tsc --noEmit` clean, build-monitor vitest **135/135 PASS** (TASK-083 baseline 121 → +14: admin-guard 9 + admin 페이지 회귀 가드 5), build-server 131/131 동일 (backend 변경 0), svelte-check 0 errors / 0 warnings, vite build OK (gzip js 38.23KB / css 6.44KB — AdminAccessDenied component 추가로 약간 증가), Go 7 packages PASS.
 
+## 3.5 Production semantic 운영 검증 (TASK-085)
+- 의도: TASK-081-B / TASK-082 의 dummy (size 0 source) 검증이 build 가 FAILED 로 끝나는 시나리오만 다뤘던 한계를 보완. busybox/scratch Dockerfile + 실제 `tar.gz` source archive 로 build 가 COMPLETED 까지 가는 운영 시나리오 자동 재현. `docs/operations/dogfood-e2e-2026-07-06.md` §2.2 의 `bab5995f-…-95d53684263d` (수동 dogfood) 의 자동 재현 동등물.
+- 핵심 변경:
+  - `apps/build-server/scripts/e2e-production-semantic.sh` 신규 — 7 단계 자동 검증 (busybox pull warm-up → compose up → build-server health → runner registry → source archive POST → build COMPLETED → 10 phase + preview URL 검증 → container cleanup).
+  - `compose.dev.e2e-production.yaml` 신규 override — single runner + `RUNNER_DOCKER_BUILD_MODE=cli` / `RUNNER_DOCKER_RUN_MODE=cli` / `RUNNER_DEPLOY_MODE=skeleton` / `RUNNER_STOP_CONTAINER_ON_DONE=true` / `PREVIEW_INTERNAL_PORT=8080` / `RUNNER_HEALTHCHECK_PATH=/` / `RUNNER_HEALTHCHECK_TIMEOUT_SECONDS=60` / `network_mode: host` (host network namespace 공유로 spawn container 의 published host port 가 runner 의 localhost 에 노출).
+  - `apps/runner/internal/docker/client.go` 보강 — `RunContainer` 의 host port auto-assign path 의 `docker inspect` 를 최대 5 회 × 200ms 로 retry. 빈 응답 시 다음 시도까지 대기, port 가 확인된 즉시 break. 회귀 가드 `TestRunContainerCliModeInspectRetriesUntilPortAppears` + `TestRunContainerCliModeInspectAllAttemptsEmptyLeavesHostPortZero` 신규.
+- 사전 결함 + 보강 3건 (자세한 내역은 `docs/operations/production-semantic-2026-07-07.md` §5):
+  - busybox `httpd` 의 default Basic Auth (`/login` 302 redirect) → e2e Dockerfile 의 `printf 'A:*\n' > /etc/httpd.conf && httpd ... -c /etc/httpd.conf` 로 permissive access rule 명시 적용.
+  - docker inspect race (hostPort=0) → 위 retry 보강.
+  - compose bridge network 의 host namespace 격리 → `network_mode: host` override.
+- 회귀 baseline: TS 4 packages `tsc --noEmit` clean, build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **121/121 동일** (frontend 변경 0), Go 7 packages 모두 PASS (기존 + 신규 docker test 2건), svelte-check 0/0, `e2e-production-semantic.sh` **ALL PASS** (cold start 30s + busybox pull warmup 10s + build lifecycle ~30s + cleanup, 총 ~2분).
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함

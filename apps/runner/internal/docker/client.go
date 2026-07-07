@@ -367,16 +367,32 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 		// 실패한다 — 이전 (TASK-067 1차 PR) 가 이 버그를 안고 있었고 skeleton
 		// mode (mock 38124) 에선 가려져 있었음. cli mode + auto-assign path 의
 		// 첫 live container smoke (Scenario 5) 에서 결정적으로 드러남.
-		inspectArgs := []string{
-			"inspect",
-			"--format",
-			fmt.Sprintf("{{(index (index .NetworkSettings.Ports \"%d/tcp\") 0).HostPort}}", opts.InternalPort),
-			opts.ContainerName,
-		}
-		hostPortStr, err := c.runDockerInspectCmd(ctx, inspectArgs)
-		if err == nil && hostPortStr != "" {
-			if p, parseErr := strconv.Atoi(strings.TrimSpace(hostPortStr)); parseErr == nil {
-				hostPort = p
+		// TASK-085 보강: docker run -d 가 즉시 return 해도 container 의
+		// NetworkSettings.Ports 는 docker 가 port binding 을 마무리할 때까지
+		// populate 되지 않을 수 있다 — inspect 가 너무 빨리 호출되면 empty
+		// 응답이 와서 hostPort 가 0 으로 남고 healthcheck 가 port 0 으로
+		// 시도해 timeout 으로 fail 한다. 최대 5 회, 200ms 간격으로 retry.
+		const maxInspectAttempts = 5
+		for attempt := 1; attempt <= maxInspectAttempts; attempt++ {
+			inspectArgs := []string{
+				"inspect",
+				"--format",
+				fmt.Sprintf("{{(index (index .NetworkSettings.Ports \"%d/tcp\") 0).HostPort}}", opts.InternalPort),
+				opts.ContainerName,
+			}
+			hostPortStr, err := c.runDockerInspectCmd(ctx, inspectArgs)
+			if err == nil && hostPortStr != "" {
+				if p, parseErr := strconv.Atoi(strings.TrimSpace(hostPortStr)); parseErr == nil {
+					hostPort = p
+					break
+				}
+			}
+			if attempt < maxInspectAttempts {
+				select {
+				case <-ctx.Done():
+					return nil, ctx.Err()
+				case <-time.After(200 * time.Millisecond):
+				}
 			}
 		}
 	}
