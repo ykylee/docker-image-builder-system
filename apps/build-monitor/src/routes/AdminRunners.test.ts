@@ -20,6 +20,7 @@ vi.mock("svelte-spa-router", () => ({
 const listAdminRunnersMock = vi.fn();
 const patchMock = vi.fn();
 const deleteMock = vi.fn();
+const createAdminRunnerMock = vi.fn();
 
 // session.js 의 userIdStore 는 Svelte writable 이라서 실제 import 한 뒤
 // localStorage pre-fill 로 잡는 게 가장 자연스럽다. 어차피 vitest 의
@@ -33,7 +34,12 @@ vi.mock("../lib/api.js", () => ({
   patchAdminRunnerStatus: (adminId: string, runnerId: string, status: string) =>
     patchMock(adminId, runnerId, status),
   deleteAdminRunner: (adminId: string, runnerId: string) =>
-    deleteMock(adminId, runnerId)
+    deleteMock(adminId, runnerId),
+  // TASK-077: RegisterRunnerModal 의 submit 이 호출 — adminId 와
+  // body 가 정합으로 전달되어야 하고, 성공/실패 응답이 admin UI 의
+  // 모달 close / inline error 표시에 정확히 매핑되어야 한다.
+  createAdminRunner: (adminId: string, body: { runnerId: string }) =>
+    createAdminRunnerMock(adminId, body)
 }));
 // TASK-084: ensureAdminAccess mock — 기본값은 admin 통과.
 const ensureAdminAccessMock = vi.fn();
@@ -46,6 +52,7 @@ beforeEach(() => {
   listAdminRunnersMock.mockReset();
   patchMock.mockReset();
   deleteMock.mockReset();
+  createAdminRunnerMock.mockReset();
   ensureAdminAccessMock.mockReset();
   ensureAdminAccessMock.mockResolvedValue({
     isAdmin: true,
@@ -205,5 +212,172 @@ describe("AdminRunners page (TASK-069 + TASK-076 + TASK-077)", () => {
     );
     expect(listAdminRunnersMock).not.toHaveBeenCalled();
     expect(screen.getByTestId("admin-denied-go-builds")).toBeInTheDocument();
+  });
+});
+
+// TASK-077: admin-initiated runner registration via the "+ Register Runner"
+// button. Modal 안에서 adminId + body 가 정합으로 전달되어야 하고, 성공/
+// 실패 응답이 modal close / inline error 표시에 정확히 매핑되어야 한다.
+describe("AdminRunners + Register Runner modal (TASK-077)", () => {
+  it("renders a '+ Register Runner' button in the page header", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminRunnersMock.mockResolvedValueOnce({ runners: [] });
+    render(AdminRunners);
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("register-runner-open")
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByTestId("register-runner-open").textContent).toMatch(
+      /Register Runner/
+    );
+  });
+
+  it("clicking the button opens the modal with an input field", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminRunnersMock.mockResolvedValueOnce({ runners: [] });
+    render(AdminRunners);
+    const openBtn = await waitFor(() =>
+      screen.getByTestId("register-runner-open")
+    );
+    openBtn.click();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("register-runner-modal")
+      ).toBeInTheDocument()
+    );
+    expect(screen.getByTestId("register-runner-input")).toBeInTheDocument();
+    expect(screen.getByTestId("register-runner-submit")).toBeInTheDocument();
+  });
+
+  it("successful submit closes the modal, calls createAdminRunner, and refreshes the list", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminRunnersMock
+      .mockResolvedValueOnce({ runners: [] }) // initial load
+      .mockResolvedValueOnce({
+        // refresh() after success
+        runners: [
+          {
+            runnerId: "runner-pre-1",
+            status: "ACTIVE",
+            firstSeenAt: "2026-07-07T00:00:00.000Z",
+            lastSeenAt: "2026-07-07T00:00:00.000Z",
+            buildsClaimed: 0,
+            buildsCompleted: 0,
+            currentBuildId: null,
+            lastError: null
+          }
+        ]
+      });
+    createAdminRunnerMock.mockResolvedValueOnce({
+      runner: {
+        runnerId: "runner-pre-1",
+        status: "ACTIVE",
+        firstSeenAt: "2026-07-07T00:00:00.000Z",
+        lastSeenAt: "2026-07-07T00:00:00.000Z",
+        buildsClaimed: 0,
+        buildsCompleted: 0,
+        currentBuildId: null,
+        lastError: null
+      }
+    });
+    render(AdminRunners);
+    const openBtn = await waitFor(() =>
+      screen.getByTestId("register-runner-open")
+    );
+    openBtn.click();
+    const input = (await waitFor(() =>
+      screen.getByTestId("register-runner-input")
+    )) as HTMLInputElement;
+    const submit = (await waitFor(() =>
+      screen.getByTestId("register-runner-submit")
+    )) as HTMLButtonElement;
+    input.value = "runner-pre-1";
+    // input dispatch change event for Svelte two-way binding.
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    submit.click();
+    await waitFor(() => {
+      expect(createAdminRunnerMock).toHaveBeenCalledWith("admin", {
+        runnerId: "runner-pre-1"
+      });
+    });
+    // list 가 refresh 로 두 번째 호출되는지 — initial + refresh.
+    await waitFor(() => {
+      expect(listAdminRunnersMock).toHaveBeenCalledTimes(2);
+    });
+    // modal 이 close 되었는지 — modal element 가 없어야 함.
+    expect(screen.queryByTestId("register-runner-modal")).toBeNull();
+  });
+
+  it("a 409 (duplicate) error keeps the modal open and shows an inline message", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminRunnersMock.mockResolvedValue({ runners: [] });
+    // createAdminRunner 가 409 시뮬레이션 — api.ts helper 가
+    // `throw new Error(\`409: Runner already registered.\`)` 와 같이 던진다는
+    // contract 와 정합.
+    createAdminRunnerMock.mockRejectedValueOnce(
+      new Error("409: Runner already registered.")
+    );
+    render(AdminRunners);
+    const openBtn = await waitFor(() =>
+      screen.getByTestId("register-runner-open")
+    );
+    openBtn.click();
+    const input = (await waitFor(() =>
+      screen.getByTestId("register-runner-input")
+    )) as HTMLInputElement;
+    const submit = (await waitFor(() =>
+      screen.getByTestId("register-runner-submit")
+    )) as HTMLButtonElement;
+    input.value = "runner-dup";
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    submit.click();
+    // inline error 메시지 가 보여야 함.
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("register-runner-error")
+      ).toBeInTheDocument()
+    );
+    expect(
+      screen.getByTestId("register-runner-error").textContent
+    ).toMatch(/409/);
+    // modal 은 여전히 open (error 시 close 안 함).
+    expect(
+      screen.getByTestId("register-runner-modal")
+    ).toBeInTheDocument();
+    // refresh 가 호출되지 않아야 함 (실패했으므로).
+    expect(listAdminRunnersMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("a 400 (invalid body) error from the backend also keeps the modal open with the message", async () => {
+    localStorage.setItem("userId", "admin");
+    listAdminRunnersMock.mockResolvedValue({ runners: [] });
+    createAdminRunnerMock.mockRejectedValueOnce(
+      new Error("400: Invalid body (empty runnerId, extra fields, type mismatch).")
+    );
+    render(AdminRunners);
+    const openBtn = await waitFor(() =>
+      screen.getByTestId("register-runner-open")
+    );
+    openBtn.click();
+    const input = (await waitFor(() =>
+      screen.getByTestId("register-runner-input")
+    )) as HTMLInputElement;
+    const submit = (await waitFor(() =>
+      screen.getByTestId("register-runner-submit")
+    )) as HTMLButtonElement;
+    input.value = "  "; // whitespace only — client-side pre-validation에서
+    // 4xx 가 나지 않을 수 있지만, server-side 400 시에도 modal 이 close
+    // 안 하고 inline error 가 surface 되어야 한다.
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    submit.click();
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("register-runner-error")
+      ).toBeInTheDocument()
+    );
+    expect(
+      screen.getByTestId("register-runner-modal")
+    ).toBeInTheDocument();
   });
 });

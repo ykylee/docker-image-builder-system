@@ -201,6 +201,25 @@
   3. **submit_and_wait 의 per-build source archive 가 mktemp cleanup 으로 source archive 까지 삭제** — `per_src="$(mktemp -d)"` 후 `rm -rf "${per_src}"` 를 source archive 생성 직후에 호출 → upload 가 0 bytes. 해결: `rm -rf "${per_src}"` 를 upload / build lifecycle 완료 후로 이동.
 - 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 8 packages 모두 PASS (TASK-075 baseline 유지), svelte-check 0/0, `e2e-insecure-registry.sh` ALL PASS (~3-4 분: registry:2 cold start 5-10s + build-server healthcheck 30s + 5 build 동시 push ~30-60s + retention 검증 ~5s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags 5 buildId 다 노출 (per-build unique manifest digest) + DELETE 202 Accepted (target tag 만 삭제, 다른 4 tag 영향 없음) + retention 후 새 build push 통과.
 
+## 3.11 Admin-initiated runner registration (TASK-077)
+- 의도: TASK-069 의 self-register on first claim 은 runner 가 boot 되어 첫 `POST /builds/claim` 호출 시점에 비로소 admin registry 에 record 가 생성. 운영자가 신규 cluster / k8s pod / EC2 instance 에서 runner 를 띄우기 전 그 runner 가 곧 들어온다는 것을 admin UI 에 미리 알릴 수 없었음. 본 TASK 가 봉인하는 `POST /admin/runners` endpoint + admin UI 의 "+ Register Runner" 버튼이 그 gap 을 매움.
+- 핵심 변경:
+  - `packages/shared-contract/src/build/runner-registry.ts` amend — `adminRunnerRegisterRequestSchema` (runnerId 만, strict) + `adminRunnerRegisterResponseSchema` (adminRunnerSchema wrap). empty / extra field / type mismatch → 400 (strict schema).
+  - `packages/db` schema 변경 없음 (기존 `runner` table 그대로 사용).
+  - `apps/build-server/src/routes/admin-routes.ts` amend — `POST /admin/runners` endpoint 신규. 401 (X-Admin-Id missing) / 403 (non-admin) / 400 (invalid body) / 409 (duplicate) / 201 (created) 응답.
+  - `apps/build-server/src/services/build-service.ts` amend — `createAdminRunner(runnerId)` method.
+  - `apps/build-server/src/repositories/{memory,postgres}-build-repository.ts` amend — `createAdminRunner()` method (memory: `Map.has` check, postgres: `INSERT … ON CONFLICT DO NOTHING` — atomic). 반환 타입: `{ kind: "created"; runner }` / `{ kind: "duplicate" }`.
+  - `apps/build-server/src/app/openapi.ts` amend — `AdminRunnerRegisterRequest` + `AdminRunnerRegisterResponse` component 등록 + POST path 등록 (201/400/401/403/409).
+  - `apps/build-monitor/src/lib/api.ts` amend — `createAdminRunner(adminId, body)` helper + `AdminRunnerRegisterRequest/Response` type re-export.
+  - `apps/build-monitor/src/components/RegisterRunnerModal.svelte` 신규 — runnerId input + Enter/Escape 키보드 / backdrop click → close. 성공시 (201) close + onSuccess, 실패 (400/401/403/409) 시 inline error 표시 + modal 유지.
+  - `apps/build-monitor/src/routes/AdminRunners.svelte` amend — page-head 의 `page-head-actions` div 에 "+ Register Runner" 버튼 + `<RegisterRunnerModal bind:open={registerModalOpen} onSuccess={refresh} />`. submit 성공시 `refresh()` 호출.
+- 사전 결함 + 보강 4건 (운영 가이드 §5):
+  1. **strict schema 의 extra fields 거부** — zod `.strict()` 가 admin 의 typing 실수를 400 으로 거부. backend 가 새 field 를 받기 전 contract 정합성 보장.
+  2. **self-register 와의 race condition 방지** — postgres `ON CONFLICT DO NOTHING` / memory `Map.has` 가 atomic. 어느 한 쪽이 success, 다른 한 쪽이 409.
+  3. **admin UI 의 modal close vs error 표기 policy** — error 시 modal 닫지 않음 (재시도 가능). 성공시에만 close + refresh.
+  4. **`runnerId` 가 `RUNNER_ID` env 와 일치해야 함** — modal 의 modal-help 가 명시. 운영자가 mismatch 를 사전에 알 수 있도록.
+- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131 → 139 PASS** (8건 신규: 401/403/400 empty/400 extra/201 created/409 duplicate/409 self-then-admin/200 list), build-monitor vitest **135 → 140 PASS** (5건 신규: button visible/modal opens/success refresh+close/409 modal open/400 modal open), Go 8 packages 모두 PASS (TASK-076 baseline 유지), svelte-check 0 errors (1 warning — modal backdrop 의 a11y click-without-keyboard 핸들러 권장, 무해), `vite build` OK (gzip js 39.46KB / css 6.93KB — RegisterRunnerModal 추가로 +0.22KB / +0.05KB), GitHub Actions `build + smoke` SUCCESS.
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함

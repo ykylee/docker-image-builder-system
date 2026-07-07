@@ -577,3 +577,61 @@ export async function deleteAdminRunner(
   }
   return result.data;
 }
+
+// ---------------------------------------------------------------------------
+// TASK-077: admin-initiated runner registration.
+//
+// Mirrors server-side AdminRunnerRegisterRequest / AdminRunnerRegisterResponse
+// (TASK-077의 신규 endpoint — `packages/shared-contract/src/build/runner-registry.ts`).
+// Build Server exposes:
+//
+//   POST   /admin/runners               -> AdminRunnerRegisterResponse (201 Created)
+//
+//   Error surface:
+//   - 400:  invalid body (empty runnerId, extra fields, type mismatch)
+//   - 401:  X-Admin-Id header missing
+//   - 403:  caller not in admin allow-list
+//   - 409:  runnerId already in the registry
+//
+// The createAdminRunner helper throws an `Error` whose `message` is prefixed
+// with the HTTP status code so the admin UI can surface the precise reason
+// ("409: Runner already registered." vs "400: Invalid body."). The AdminRunners
+// page catches the error and shows it inline next to the Register button —
+// the modal is dismissed on success but stays open on error so the operator
+// can correct the input without losing their context.
+// ---------------------------------------------------------------------------
+
+export interface AdminRunnerRegisterRequest {
+  runnerId: string;
+}
+
+export interface AdminRunnerRegisterResponse {
+  runner: AdminRunner;
+}
+
+export async function createAdminRunner(
+  adminId: string,
+  body: AdminRunnerRegisterRequest
+): Promise<AdminRunnerRegisterResponse> {
+  const fetchFn = (api as unknown as {
+    POST: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).POST;
+  const result = (await fetchFn("/admin/runners", {
+    headers: { "x-admin-id": adminId, "content-type": "application/json" },
+    body: body
+  })) as {
+    data?: AdminRunnerRegisterResponse;
+    response?: { status?: number };
+  };
+  if (!result.data) {
+    const status = result.response?.status ?? 0;
+    // status code prefix 가 admin UI 의 inline error 메시지에서 그대로
+    // surface 되도록 — backend envelope 의 message 와 prefix 가 같아 admin
+    // UI 가 두 layer 의 error 표기를 일관되게 보여준다.
+    const envelope = (result as unknown as { error?: { message?: string } })
+      .error;
+    const detail = envelope?.message ? `: ${envelope.message}` : "";
+    throw new Error(`${status}${detail}`);
+  }
+  return result.data;
+}

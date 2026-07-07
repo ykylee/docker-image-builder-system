@@ -140,3 +140,47 @@ export const adminRunnerDeleteResponseSchema = z
   });
 
 export type AdminRunnerDeleteResponse = z.infer<typeof adminRunnerDeleteResponseSchema>;
+
+// TASK-077: admin-initiated runner registration. Self-register on first
+// claim (TASK-069) 만으로는 운영자가 신규 cluster / k8s pod / EC2
+// instance 에서 runner 를 띄우기 전에 "이 runner 가 곧 들어온다" 라는
+// pre-registration 이 어려웠다. 본 endpoint 가 admin UI 의 "Register
+// Runner" 버튼의 backend. Pre-registration 된 runner record 는 status=ACTIVE
+// + firstSeenAt=now() + lastSeenAt=now() 로 placeholder 생성. 그 runner 가
+// 실제 띄워져 첫 claim 을 보내면 기존 self-register 가 counter / currentBuildId
+// 만 갱신하므로 seamless 통합. Idempotent — 같은 runnerId 로 두 번 호출 시
+// 409 (duplicate) 반환.
+export const adminRunnerRegisterRequestSchema = z
+  .object({
+    runnerId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .meta({
+        description:
+          "Canonical runner id. Must match the `RUNNER_ID` env the runner process boots with — otherwise its first claim will be rejected (mismatched-id). Pre-registration with the wrong id is a misconfiguration that the admin UI cannot auto-detect; the same is true for self-registration."
+      })
+  })
+  .strict()
+  .meta({
+    id: "AdminRunnerRegisterRequest",
+    description:
+      "Request body for POST /admin/runners. The runnerId must be unique within the registry (a duplicate returns 409). Status fields (buildsClaimed/currentBuildId/etc.) are not user-supplied — they are derived from the runner's own claim activity after the runner starts."
+  });
+
+export type AdminRunnerRegisterRequest = z.infer<typeof adminRunnerRegisterRequestSchema>;
+
+export const adminRunnerRegisterResponseSchema = z
+  .object({
+    runner: adminRunnerSchema.meta({
+      description:
+        "The freshly registered runner record. `status` is ACTIVE (admin can later PATCH to DISABLE), `firstSeenAt` and `lastSeenAt` are both set to the registration time (will be replaced by the runner's first claim timestamp)."
+    })
+  })
+  .meta({
+    id: "AdminRunnerRegisterResponse",
+    description: "Response body for POST /admin/runners."
+  });
+
+export type AdminRunnerRegisterResponse = z.infer<typeof adminRunnerRegisterResponseSchema>;

@@ -195,8 +195,20 @@ export class BuildService {
    * routes 가 repository 직접 호출하지 않아도 되고, 라우팅 책임이 service
    * (도메인) 안에 모인다. v1 에선 단순 위임.
    */
-  listAdminRunners() {
+   listAdminRunners() {
     return this.repository.listRunners();
+  }
+
+  // TASK-077: admin-initiated runner registration. Distinct surface from
+  // the self-register on first claim — admin UI's "Register Runner" button
+  // creates a placeholder record so the admin can see which runner is
+  // expected to start, even before the runner process boots. The thin
+  // domain wrapper exists so the route can map the repo's
+  // `{ kind: "created" | "duplicate" }` discriminated union to a 201
+  // (Created) / 409 (Conflict) response cleanly, without leaking repo
+  // types into the route handler.
+  async createAdminRunner(runnerId: string) {
+    return this.repository.createAdminRunner(runnerId);
   }
 
   setAdminRunnerStatus(runnerId: string, status: RunnerStatus) {
