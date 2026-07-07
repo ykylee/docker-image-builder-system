@@ -143,6 +143,22 @@
   - compose 가 cached image 사용 시 runner binary 변경 미반영 → `[0/6] compose up` 에 `--build` 추가.
 - 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일에 영향 없음), build-server node:test **131/131 동일** (스크립트만 amend — backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 7 packages 모두 PASS, svelte-check 0/0, `e2e-multi-runner.sh` **ALL PASS** (~3-4 분 — TASK-081-B 와 정합), `e2e-production-semantic.sh` follow-on 도 동일 ALL PASS (TASK-085 회귀 baseline 유지).
 
+## 3.7 Private registry 인증 foundation (TASK-073)
+- 의도: TASK-081/082 의 운영 보강 후보 — `RUNNER_REGISTRY_CONFIG_DIR` env 로 docker CLI 의 registry 인증 config dir 을 override, private Docker Hub / ECR / GCR push 의 foundation. 본 TASK 는 insecure-registry 케이스로 env 전파 + cli mode push round-trip + registry catalog/tags/manifest 회귀 가드 를 봉인.
+- 핵심 변경:
+  - `apps/runner/internal/config/config.go` amend — `Config.RegistryConfigDir` 필드 + `parseString("RUNNER_REGISTRY_CONFIG_DIR", "")` (default empty → docker default `~/.docker/config.json` 사용, 회귀 없음).
+  - `apps/runner/cmd/runner/main.go` amend — `os.Setenv("DOCKER_CONFIG", cfg.RegistryConfigDir)` 호출, 후속 모든 docker CLI invocation (`docker tag` / `docker push`) 이 그 dir 의 config.json 사용. fatal on Setenv 실패.
+  - `apps/runner/internal/config/config_test.go` 신규 — `TestLoadRegistryConfigDirDefaultEmpty` + `TestLoadRegistryConfigDirFromEnv` + `TestLoadAllFieldsWithEnv` + `TestLoadPollIntervalDefaults` + `TestLoadPollIntervalAcceptsBareIntegerSeconds` + `TestSetenvIsObservableWithinSameProcess` 6/6 PASS.
+  - `compose.dev.e2e-registry.yaml` 신규 — `registry:2` container (HTTP 5000 + healthcheck `/v2/`) + `runner` override (`network_mode: host` + `RUNNER_DOCKER_BUILD_MODE=cli` / `RUNNER_DOCKER_RUN_MODE=cli` / `RUNNER_DEPLOY_MODE=cli` / `RUNNER_DEPLOY_TARGET_REF=localhost:5000/docker-image-builder-system/cli` / `RUNNER_REGISTRY_CONFIG_DIR=/registry-config` + host 의 임시 config.json volume mount).
+  - `apps/build-server/scripts/e2e-registry-push.sh` 신규 — 8 단계 + 보너스: busybox/registry warm-up → HOST_REGISTRY_CONFIG + config.json 생성 → compose up → registry healthy → build-server healthy → runner registered → source archive + cli push lifecycle → registry API catalog/tags 검증 → bonus manifest 검증.
+  - `docs/operations/registry-push-2026-07-07.md` 운영 가이드 (동기 / 환경 / 사용 절차 / 8 단계 매트릭스 / 사전 결함 4건 / 빠른 재현 / 후속 TASK).
+- 사전 결함 + 보강 4건 (운영 가이드 §5):
+  1. runner binary 에 `RUNNER_REGISTRY_CONFIG_DIR` 가 없었음 — config.go + main.go amend, `DOCKER_CONFIG` env 로 docker CLI 에 propagate.
+  2. compose 검증 시 `group_add` 항목 중복 — `group_add` 제거, Dockerfile 의 `addgroup runner docker` 에 의존 (TASK-078 권한 정렬 정합).
+  3. `RUNNER_DEPLOY_TARGET_REF` 가 registry 의 slash split 에서 의도된 repo 가 안 잡힘 — `localhost:5000/docker-image-builder-system/cli` 로 정렬, e2e 가 catalog 에서 `docker-image-builder-system/cli` 검증.
+  4. manifest v2 vs v1 schema — bonus 단계의 Accept: v2 가 v1 호환 manifest (fat manifest) 응답 시 parse 실패 가능. main 8 단계는 fatal 아님.
+- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 7 packages 모두 PASS + config package 신규 6/6 PASS, svelte-check 0/0, `e2e-registry-push.sh` **ALL PASS** (~2-3 분: registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup).
+
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함
