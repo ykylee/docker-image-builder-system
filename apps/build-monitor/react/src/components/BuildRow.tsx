@@ -54,7 +54,14 @@ export function BuildRow({
     color: "var(--color-text-secondary)",
     fontSize: "var(--size-sm)",
     fontWeight: "var(--weight-medium)",
-    fontFamily: "var(--font-mono)"
+    fontFamily: "var(--font-mono)",
+    // 길이가 긴 appName (e.g. feature/test-environment-deployment) 도
+    // row 한 줄 유지 + ellipsis 로 시각 정리. hover/active 시
+    // title attr 이 tooltip 으로 노출되어 운영자가 full name 확인.
+    maxWidth: "0",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap"
   };
   const timeStyle: CSSProperties = {
     color: "var(--color-text-muted)",

@@ -116,6 +116,35 @@
   text-align: right;
 }
 
+/* Body row 시각 polish — TASK-090 self-review follow-up.
+ *
+ * Light theme 에서 table row hover 가 너무 미묘해서 운영자가 scan 하기
+ * 어려움. hover 시 left border accent (indigo) + background tint 로
+ * row 자체가 시각 anchor 가 되도록 보강. Svelte BuildRow.svelte 의
+ * `row:hover { background: var(--color-bg-surface-elevated); }` 정합.
+ *
+ * row 의 border-bottom + table 의 overflow:hidden + radius-lg 가
+ * 마지막 row 의 하단 border 에 겹침 효과를 일으킴 — :global(tbody >
+ * tr.row:last-child) td { border-bottom: none; } 으로 정리 (Svelte
+ * 정합).
+ */
+.builds-table tbody tr {
+  position: relative;
+  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.builds-table tbody tr:hover {
+  background: var(--color-bg-surface-elevated);
+}
+
+.builds-table tbody tr:hover td:first-child {
+  box-shadow: inset 4px 0 0 var(--color-accent-primary);
+}
+
+.builds-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
 .muted {
   color: var(--color-text-muted);
 }
