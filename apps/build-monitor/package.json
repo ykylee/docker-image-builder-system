@@ -3,12 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Svelte 5 + Vite + TypeScript frontend for the Docker Image Builder Build Server Monitor. PR #6 1차 골격. Token CSS 변수화, /openapi.json 기반 client, BuildRow/StatusPill/PhaseTimeline/LogStream 컴포넌트.",
+  "description": "Svelte 5 + React 19 (Astryx) + Vite + TypeScript frontend for the Docker Image Builder Build Server Monitor. PR #6 1차 골격 (Svelte). TASK-088 — Svelte 빌드와 공존하는 React + Astryx 부트스트랩 PoC (회귀 영향 0).",
   "scripts": {
     "dev": "vite --port 5173",
+    "dev:react": "vite --config vite.react.config.ts --port 5174",
     "build": "vite build",
+    "build:react": "vite build --config vite.react.config.ts",
     "preview": "vite preview --port 4173",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check:react": "tsc --noEmit -p tsconfig.react.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "predev": "tsx scripts/generate-openapi.ts",
@@ -17,21 +20,30 @@
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^4.0.0",
-    "@testing-library/svelte": "^5.2.4",
     "@testing-library/jest-dom": "^6.5.0",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/svelte": "^5.2.4",
     "@tsconfig/svelte": "^5.0.4",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
+    "openapi-typescript": "^7.4.4",
     "svelte": "^5.1.0",
     "svelte-check": "^4.0.4",
     "tslib": "^2.7.0",
+    "tsx": "^4.20.3",
     "typescript": "^5.6.3",
     "vite": "^5.4.8",
-    "vitest": "^2.1.2",
-    "openapi-typescript": "^7.4.4",
-    "tsx": "^4.20.3"
+    "vitest": "^2.1.2"
   },
   "dependencies": {
+    "@astryxdesign/core": "^0.1.4",
+    "@astryxdesign/theme-neutral": "^0.1.4",
     "openapi-fetch": "^0.13.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-router-dom": "^7.18.1",
     "svelte-spa-router": "^4.0.1"
   }
 }
