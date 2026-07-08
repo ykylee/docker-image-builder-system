@@ -1,0 +1,131 @@
+/* TASK-089: Login 페이지 React 마이그레이션.
+ *
+ * Svelte routes/Login.svelte <style> 와 시각 정합 — 자체 디자인 토큰
+ * (apps/build-monitor/src/lib/tokens.css) 를 그대로 import. Astryx 가
+ * 별도 디자인 시스템이라 tokens.css 와 namespace 가 겹치지 않으며, 본
+ * CSS 는 unlayered 이므로 Astryx layer cascade 위에 우선 적용된다
+ * (Login 은 Astryx 컴포넌트를 직접 사용하지 않음 — 향후 TopNav/AppShell
+ * 마이그레이션 시점 (TASK-088 이후) 에 Astryx CSS variable cascade 와
+ * 통합 결정).
+ *
+ * @import "../../../src/lib/tokens.css" 경로:
+ *   react/src/routes/Login.css → ../../../src/lib/tokens.css
+ *     apps/build-monitor/react/src/routes/Login.css
+ *     apps/build-monitor/react/src/routes/
+ *     apps/build-monitor/react/src/
+ *     apps/build-monitor/react/
+ *     apps/build-monitor/
+ *     apps/build-monitor/src/lib/tokens.css  ✓
+ */
+
+@import "../../../src/lib/tokens.css";
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* header (64) + main padding-top (space-lg) + main padding-bottom (space-lg) */
+  min-height: calc(100vh - 64px - var(--space-lg) * 2);
+  animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.card {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-modal);
+  padding: var(--space-xxl);
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.logo-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-info));
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  margin-bottom: var(--space-lg);
+}
+.logo {
+  color: white;
+  font-size: var(--size-xxl);
+  line-height: 1;
+}
+h1 {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--size-xl);
+  color: var(--color-text-primary);
+}
+.subtitle {
+  margin: 0 0 var(--space-xl);
+  color: var(--color-text-secondary);
+  font-size: var(--size-sm);
+}
+form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  text-align: left;
+}
+label {
+  font-size: var(--size-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+input {
+  width: 100%;
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  /* TASK-046 follow-up: light 모드 --color-border-strong 을
+     #cbd5e1 (1.36:1) → #7a889e (3.28:1) 로 올림. Login input 의 흐릿
+     한 border 가 토큰 한 곳에서 해결됨. */
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--size-md);
+  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+}
+input:focus {
+  outline: none;
+  border-color: var(--color-accent-primary);
+  box-shadow: 0 0 0 2px var(--color-focus-ring);
+}
+.btn-primary {
+  width: 100%;
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-primary);
+  color: white;
+  font-size: var(--size-md);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  border: none;
+  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+}
+.btn-primary:hover {
+  background: var(--color-accent-primary-hover);
+  box-shadow: var(--shadow-glow);
+  transform: translateY(-1px);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
