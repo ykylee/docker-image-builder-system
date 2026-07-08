@@ -1,0 +1,154 @@
+/* TASK-090: BuildsList 페이지 styles.
+ *
+ * Svelte src/routes/BuildsList.svelte <style> 와 시각 정합 — 자체 디자인
+ * 토큰 (apps/build-monitor/src/lib/tokens.css) 을 직접 @import. Login.css
+ * 와 동일한 패턴. 향후 Astryx CSS variable cascade 통합 시점에 tokens.css
+ * 자체 교체 검토.
+ *
+ * FilterChips 컴포넌트 디자인은 Svelte 와 같은 토큰 (`--shadow-glow` +
+ * `--color-accent-primary` 배경) 을 그대로 사용 — TASK-083 의 canonical
+ * 디자인과 정합.
+ */
+
+@import "../../../src/lib/tokens.css";
+
+.list-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxl);
+  animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.list-page h1 {
+  margin: 0;
+  font-size: var(--size-xxl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--color-text-primary), var(--color-text-muted));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.chips {
+  display: inline-flex;
+  gap: var(--space-xs);
+  background: var(--color-bg-surface);
+  padding: var(--space-xs);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
+}
+
+/* chip 비활성 상태 contrast — TASK-090 self-review 보강.
+ *
+ * Svelte FilterChips 컴포넌트와 정합 유지하면서 React 빌드의 dark mode
+ * 가독성 보강. 비활성 chip 의 surface 배경 + text-secondary 조합이
+ * dark mode (#13151c + #a0a8b4) 에서 너무 묻혀서, 운영자가 한눈에
+ * chip row 자체를 인식하지 못하는 issue. surface-elevated 배경 +
+ * border-subtle + text-primary 본문으로 contrast 올림.
+ *
+ * hover 는 canvas 배경 + border-strong 으로 미세 강조 — active 의 primary
+ * 배경 + glow 와 시각 hierarchy 분리.
+ */
+.chip {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-elevated);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--size-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.chip:hover {
+  background: var(--color-bg-canvas);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-primary);
+}
+
+.chip--active {
+  background: var(--color-accent-primary);
+  color: white;
+  border-color: var(--color-accent-primary);
+  box-shadow: var(--shadow-glow);
+}
+
+.builds-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.builds-table thead th {
+  text-align: left;
+  padding: var(--space-md) var(--space-lg);
+  background: var(--color-bg-surface-elevated);
+  color: var(--color-text-muted);
+  font-size: var(--size-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.builds-table thead th.r {
+  text-align: right;
+}
+
+/* Body row 시각 polish — TASK-090 self-review follow-up.
+ *
+ * Light theme 에서 table row hover 가 너무 미묘해서 운영자가 scan 하기
+ * 어려움. hover 시 left border accent (indigo) + background tint 로
+ * row 자체가 시각 anchor 가 되도록 보강. Svelte BuildRow.svelte 의
+ * `row:hover { background: var(--color-bg-surface-elevated); }` 정합.
+ *
+ * row 의 border-bottom + table 의 overflow:hidden + radius-lg 가
+ * 마지막 row 의 하단 border 에 겹침 효과를 일으킴 — :global(tbody >
+ * tr.row:last-child) td { border-bottom: none; } 으로 정리 (Svelte
+ * 정합).
+ */
+.builds-table tbody tr {
+  position: relative;
+  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.builds-table tbody tr:hover {
+  background: var(--color-bg-surface-elevated);
+}
+
+.builds-table tbody tr:hover td:first-child {
+  box-shadow: inset 4px 0 0 var(--color-accent-primary);
+}
+
+.builds-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.err {
+  color: var(--color-accent-danger);
+}
