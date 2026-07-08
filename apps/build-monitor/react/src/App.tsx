@@ -36,6 +36,7 @@ export function App(): ReactElement {
 function BuildsPlaceholder(): ReactElement {
   return (
     <section
+      data-testid="builds-placeholder"
       style={{
         padding: "var(--space-xxl)",
         fontFamily: "var(--font-sans, system-ui, sans-serif)",

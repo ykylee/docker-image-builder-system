@@ -56,6 +56,14 @@ function subscribe(notifyListener: () => void): () => void {
  * Login submit 결과로만 호출되어야 하는 setter. 임의 컴포넌트가 직접
  * 호출하면 session invariant 가 깨지므로 주의 — Svelte session.ts 의
  * SessionStore.set 과 동일한 single-entry 의미.
+ *
+ * Cross-tab dispatch:
+ *   다른 탭/창의 storage 변경은 브라우저가 자동으로 `storage` 이벤트를
+ *   fire 한다. 그러나 동일 탭에서는 직접 dispatch 하지 않으면 우리
+ *   subscribe 의 storage listener 가 fire 하지 않는다. Safari / older
+ *   Firefox 등 일부 환경은 동일 탭 dispatchStorageEvent 도 무시하기
+ *   때문에, 정합 보강을 위해 명시적으로 dispatch 한다. jsdom 과
+ *   Chromium / Firefox 최신 버전에서는 동일 탭에서도 fire 된다.
  */
 export function setUserId(value: string | null): void {
   if (typeof window !== "undefined" && typeof window.localStorage !== "undefined") {
@@ -64,6 +72,14 @@ export function setUserId(value: string | null): void {
     } else {
       window.localStorage.setItem(USER_ID_KEY, value);
     }
+    // 동일 탭 storage listener 들에게 명시 알림 — 일부 환경 (Safari)
+    // 은 동일 탭 dispatchStorageEvent 를 무시하므로 fire 되지 않을 수
+    // 있으나, fire 되는 환경에서는 추가 안전망 역할. listener set 의
+    // notify() 가 primary cross-listener 경로.
+    window.dispatchEvent(new StorageEvent("storage", {
+      key: USER_ID_KEY,
+      newValue: value
+    }));
   }
   notify();
 }

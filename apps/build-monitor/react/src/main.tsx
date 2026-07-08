@@ -22,6 +22,7 @@ import { BrowserRouter } from "react-router-dom";
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 
+import { ErrorBoundary } from "@/lib/ErrorBoundary";
 import { App } from "@/App";
 
 const container = document.getElementById("app-react");
@@ -31,10 +32,12 @@ if (container === null) {
 
 createRoot(container).render(
   <StrictMode>
-    <BrowserRouter>
-      <Theme theme={neutralTheme}>
-        <App />
-      </Theme>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Theme theme={neutralTheme}>
+          <App />
+        </Theme>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>
 );

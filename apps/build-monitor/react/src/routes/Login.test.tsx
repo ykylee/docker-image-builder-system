@@ -79,18 +79,37 @@ describe("Login (React + react-router-dom)", () => {
 // 시점에 재사용된다. 본 smoke 는 Login session 의 cross-tab semantics
 // 가 의도대로 동작함을 보장하기 위해 1 case 포함.
 describe("setUserId cross-tab semantics", () => {
-  it("emits a storage event so other tabs see the new value", () => {
+  it("dispatches a storage event so cross-tab listeners (and same-tab ones, where supported) see the new value", () => {
     const onStorage = vi.fn();
     window.addEventListener("storage", onStorage);
 
     setUserId("remote-user");
 
-    // 같은 탭에서 setUserId 가 storage 이벤트를 dispatch 하는 것은
-    // 일반적이지만 (브라우저 별로 다름) 보장은 안 된다. 본 smoke 는
-    // localStorage 자체가 갱신됐는지만 검증한다 — cross-tab 자체는
-    // 별도 e2e 시나리오.
+    // jsdom 환경에서는 동일 탭 dispatchStorageEvent 가 fire 한다.
+    // Safari 등 일부 환경은 동일 탭 dispatch 를 무시하지만, 우리
+    // subscribe 의 listener set 순회 (notify) 가 primary cross-listener
+    // 경로이므로 storage dispatch 자체는 보조 안전망.
     expect(localStorage.getItem(USER_ID_KEY)).toBe("remote-user");
-    expect(onStorage).toBeDefined(); // listener attach sanity
+    expect(onStorage).toHaveBeenCalled();
+    const event = onStorage.mock.calls[0]?.[0] as StorageEvent;
+    expect(event.key).toBe(USER_ID_KEY);
+    expect(event.newValue).toBe("remote-user");
+
+    window.removeEventListener("storage", onStorage);
+  });
+
+  it("dispatches storage event with newValue=null when clearing", () => {
+    localStorage.setItem(USER_ID_KEY, "to-clear");
+    const onStorage = vi.fn();
+    window.addEventListener("storage", onStorage);
+
+    setUserId(null);
+
+    expect(localStorage.getItem(USER_ID_KEY)).toBeNull();
+    expect(onStorage).toHaveBeenCalled();
+    const event = onStorage.mock.calls[0]?.[0] as StorageEvent;
+    expect(event.key).toBe(USER_ID_KEY);
+    expect(event.newValue).toBeNull();
 
     window.removeEventListener("storage", onStorage);
   });

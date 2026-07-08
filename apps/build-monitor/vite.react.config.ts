@@ -30,6 +30,13 @@ export default defineConfig({
     outDir: path.resolve(__dirname, "dist-react"),
     emptyOutDir: true
   },
+  // publicDir 은 Svelte 빌드 (vite.config.ts) 와 같은 `public/` 디렉터리를
+  // 공유. favicon.svg 등 정적 자산이 React 빌드 결과에도 포함되도록 한다
+  // — root 가 `react/` 인 상태에서 publicDir 만 외부 경로를 가리키므로
+  // vite 가 dev 시점에는 dev server 의 /favicon.svg 를, build 시점에는
+  // dist-react/ 루트로 favicon.svg 를 복사한다. PR 본문 self-review
+  // follow-up 보강 — 미설정 시 HTML 의 /favicon.svg 가 404.
+  publicDir: path.resolve(__dirname, "public"),
   server: {
     port: 5174,
     strictPort: true,

@@ -44,8 +44,6 @@ describe("App (router shell)", () => {
 
   it("renders the BuildsPlaceholder on /builds (TASK-090 예정)", () => {
     renderAt("/builds");
-    expect(
-      screen.getByRole("heading", { name: /Builds \(TASK-090/i })
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("builds-placeholder")).toBeInTheDocument();
   });
 });
