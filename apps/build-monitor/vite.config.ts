@@ -13,17 +13,20 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // 은 .tsx / .jsx. `pnpm dev` (default Svelte) 와 `pnpm dev:react` (별도
 // config vite.react.config.ts) 로 두 빌드를 독립 운영. PR 1 의 회귀
 // 영향 0 검증: Svelte 빌드 + Svelte 테스트는 모두 기존 baseline 유지.
+//
+// TASK-089: alias `@` 를 react/src/ 로 정합. tsconfig.react.json paths
+// `@/*` → react/src/* 와 1:1 정렬. Svelte src/ 는 alias `@` 를 쓰지
+// 않아 vitest 환경에서 Svelte test (jsdom, Svelte component tests) 가
+// 영향 받지 않음. main.tsx 가 빌드 단계에서는 vite.react.config.ts 의
+// 별도 alias 를 쓰므로 default vite.config.ts alias 는 vitest 전용.
 export default defineConfig({
   plugins: [svelte(), react()],
   resolve: {
     conditions: process.env.VITEST ? ["browser"] : undefined,
-    // TASK-088: tsconfig.react.json 의 paths 와 정합. App.test.tsx 와
-    // main.tsx 가 `@/react/App` 으로 import — vite/vitest 의 import-analysis
-    // 가 해석할 수 있도록 mirror alias 필요. tsconfig paths 는 typecheck
-    // 단계 전용이라 runtime import 에는 영향 없음. vite.react.config.ts
-    // 와 같은 path.resolve(__dirname, "src") 패턴으로 정합.
+    // TASK-089: alias `@` → react/src/. Svelte src/ 는 @/... import 를
+    // 쓰지 않으므로 vitest 양쪽 환경에서 안전.
     alias: {
-      "@": path.resolve(__dirname, "src")
+      "@": path.resolve(__dirname, "react/src")
     }
   },
   server: {

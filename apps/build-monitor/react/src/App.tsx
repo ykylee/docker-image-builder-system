@@ -1,41 +1,52 @@
-// TASK-088 Astryx 부트스트랩 PoC — React + Astryx 첫 컴포넌트.
+// TASK-089: App shell — react-router-dom v7 라우터 통합.
 //
-// React 19 + Astryx v0.1.4 + @vitejs/plugin-react + @testing-library/react
-// 정합 검증. Build Server 영향 0 — 이 파일은 apps/build-monitor/src/react/
-// 하위에만 존재하고 빌드 결과는 apps/build-monitor/dist-react/ 로 떨어지며
-// Build Server 의 mountBuildMonitorDist (apps/build-monitor/dist/) 와 격리.
+// TASK-088 PoC (단일 페이지 VStack + Button) 에서 출발, 본격 마이그레이션
+// 의 첫 페이지 (Login) + placeholder Builds 페이지 + default redirect +
+// wildcard fallback 으로 확장. 추후 TASK-090~094 에서 BuildsList,
+// BuildDetail, BuildRequest, ApiConsole, Admin* 페이지를 동일 패턴으로
+// route 로 추가.
 //
-// 향후 PR (TASK-089~094) 에서:
-//   - StatusPill (colorFor 매핑) → Astryx Badge / Tag
-//   - Header → Astryx TopNav / AppShell
-//   - Login / BuildsList / BuildDetail / BuildRequest / ApiConsole / Admin* → 페이지 단위 마이그레이션
-//   - 디자인 토큰 (tokens.css light/dark) → Astryx CSS variable cascade 통합
+// 라우팅 결정:
+//   /              → /login (replace, default 진입)
+//   /login         → Login
+//   /builds        → BuildsPlaceholder (TASK-090 Svelte BuildsList 마이그
+//                   션 시 교체)
+//   *              → /login (replace, fallback — 미지정 path 진입 차단)
+//
+// Build Server (TASK-093) 의 mountBuildMonitorDist 가 SPA fallback 을
+// 제공할 때까지 client-side 라우터만 동작 — /builds 직접 URL 입력 시
+// 404 가능. TASK-089 범위는 client routing 으로 한정.
 
-import { Button } from "@astryxdesign/core/Button";
-import { VStack } from "@astryxdesign/core/Layout";
 import type { ReactElement } from "react";
+import { Navigate, Route, Routes } from "react-router-dom";
+
+import { Login } from "@/routes/Login";
 
 export function App(): ReactElement {
   return (
-    <VStack gap={4}>
-      <h1>Build Monitor — React + Astryx PoC</h1>
-      <p>
-        Astryx v0.1.4 (Meta, MIT, 10일 된 베타) 가 우리 build-monitor 에
-        부트스트랩 됐다. 이 페이지는 <code>dist-react/</code> 로 빌드되며
-        기존 Svelte 빌드 (Build Server 가 mount) 와 격리되어 있다.
+    <Routes>
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/builds" element={<BuildsPlaceholder />} />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+    </Routes>
+  );
+}
+
+function BuildsPlaceholder(): ReactElement {
+  return (
+    <section
+      style={{
+        padding: "var(--space-xxl)",
+        fontFamily: "var(--font-sans, system-ui, sans-serif)",
+        color: "var(--color-text-primary, inherit)"
+      }}
+    >
+      <h1>Builds (TASK-090 예정)</h1>
+      <p style={{ color: "var(--color-text-secondary, #666)" }}>
+        Login 성공 후 진입하는 첫 페이지. TASK-090 에서 Svelte routes/BuildsList.svelte
+        를 React 컴포넌트로 마이그레이션하면서 교체한다.
       </p>
-      <p data-testid="poc-status">
-        <strong>상태:</strong> React 19 + @astryxdesign/core + theme-neutral
-        모두 정상 로드.
-      </p>
-      <Button
-        label="Astryx Button (PoC)"
-        variant="primary"
-        onClick={() => {
-          // eslint-disable-next-line no-alert
-          window.alert("Astryx Button click — PoC OK");
-        }}
-      />
-    </VStack>
+    </section>
   );
 }

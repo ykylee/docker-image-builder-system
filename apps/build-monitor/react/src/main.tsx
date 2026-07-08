@@ -1,19 +1,27 @@
-// TASK-088 React + Astryx 진입점. Svelte 빌드 (apps/build-monitor/dist/) 와
-// 완전히 독립적 — Build Server 의 mountBuildMonitorDist 가 mount 하는
-// 경로는 그대로 Svelte dist. React 빌드 (apps/build-monitor/dist-react/)
-// 는 dev:react (port 5174) 와 build:react 로만 노출.
+// TASK-089: React + Astryx + react-router-dom 진입점.
 //
-// CSS import 순서가 layer cascade 를 결정한다 (Astryx 가이드):
-//   reset.css      → @layer reset
-//   astryx.css     → @layer astryx-base (컴포넌트 default 스타일)
-//   theme-neutral  → @layer astryx-theme (토큰 override)
-// 순서 뒤집히면 컴포넌트 default 가 theme 토큰을 덮어 디자인 시스템 무너짐.
+// TASK-088 PoC 에서 Theme 만 감쌌던 것에서 react-router-dom v7
+// BrowserRouter 까지 합쳐 SPA shell 진입점으로 격상. Svelte 빌드와
+// 완전히 독립 — Build Server mountBuildMonitorDist 영향 0.
+//
+// Router 위치: Theme 안쪽. react-router-dom 의 Outlet/context 가
+// Theme CSS variable cascade 아래에 들어가지만 Login 자체가 Astryx
+// 컴포넌트를 안 쓰므로 시각 영향 없음. 향후 TASK-090+ 에서 Astryx
+// AppShell/TopNav 가 router-aware navigation 을 쓸 때 Theme 안쪽
+// router 위치가 정합이다.
+//
+// StrictMode: React 19 권장. Login 의 useEffect (mount-only redirect)
+// 가 StrictMode 에서 mount/unmount/mount 두 번 fire 하지만 의도된
+// 동작 — replace navigate 가 idempotent.
 
 import "@/globals.css";
 
+import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
+
 import { App } from "@/App";
 
 const container = document.getElementById("app-react");
@@ -22,7 +30,11 @@ if (container === null) {
 }
 
 createRoot(container).render(
-  <Theme theme={neutralTheme}>
-    <App />
-  </Theme>
+  <StrictMode>
+    <BrowserRouter>
+      <Theme theme={neutralTheme}>
+        <App />
+      </Theme>
+    </BrowserRouter>
+  </StrictMode>
 );

@@ -1,33 +1,51 @@
-// TASK-088 Astryx 부트스트랩 PoC 의 vitest + @testing-library/react 검증.
-// 회귀 영향 0 검증의 일부 — Build Server 영향 없음, build-monitor 기존
-// vitest 140+ baseline 유지 + 본 test 1건 신규 추가.
+// TASK-089: App shell (router) 검증.
 //
-// 검증 항목:
-//   (1) Astryx Button 컴포넌트가 react-dom 으로 렌더링
-//   (2) Button label 텍스트가 DOM 에 노출
-//   (3) Astryx 글로벌 토큰 (--color-text-primary) 이 document root 에 주입
+// Login.test.tsx 가 Login 컴포넌트 자체의 3 시나리오 (redirect, store,
+// empty submit) 를 검증하는 동안, App.test.tsx 는 라우터 통합 —
+//   /        → Navigate → /login (Login 폼 렌더)
+//   /login   → Login 폼 렌더
+//   /builds  → BuildsPlaceholder (TASK-090 에서 Svelte BuildsList
+//              마이그레이션 시 교체)
+//   *        → Navigate → /login fallback
+// 을 MemoryRouter initialEntries 로 검증한다.
+//
+// vitest + RTL + jsdom 환경에서 react-router-dom 은 BrowserRouter 의
+// history API 보다 MemoryRouter 가 안정적 — URL state 를 메모리 안에서
+// 관리하므로 jsdom 의 window.history 의존을 피한다.
 
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
-// 상대경로 import — vitest 는 vite.config.ts (Svelte vitest config) 의 alias
-// `@` → src 를 쓰므로 `@/App` 해석 실패. 본 test 는 vitest + RTL + jsdom
-// 환경에서 Svelte vitest 인프라는 그대로 쓰고 React 컴포넌트만 검증.
-// React 빌드 (vite.react.config.ts) 의 alias `@` → react/src 와는 별개.
-import { App } from "./App";
 
-describe("App (React + Astryx PoC)", () => {
-  it("renders Astryx Button with the PoC label and the status text", () => {
-    render(
+import { App } from "@/App";
+
+function renderAt(path: string): void {
+  render(
+    <MemoryRouter initialEntries={[path]}>
       <Theme theme={neutralTheme}>
         <App />
       </Theme>
-    );
+    </MemoryRouter>
+  );
+}
 
-    expect(screen.getByTestId("poc-status")).toHaveTextContent(/React 19/);
+describe("App (router shell)", () => {
+  it("renders the Login form on /login", () => {
+    renderAt("/login");
+    expect(screen.getByLabelText(/user id/i)).toBeInTheDocument();
+  });
+
+  it("redirects / to /login and renders the Login form", () => {
+    renderAt("/");
+    expect(screen.getByLabelText(/user id/i)).toBeInTheDocument();
+  });
+
+  it("renders the BuildsPlaceholder on /builds (TASK-090 예정)", () => {
+    renderAt("/builds");
     expect(
-      screen.getByRole("button", { name: "Astryx Button (PoC)" })
+      screen.getByRole("heading", { name: /Builds \(TASK-090/i })
     ).toBeInTheDocument();
   });
 });
