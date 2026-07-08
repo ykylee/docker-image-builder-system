@@ -1,33 +1,33 @@
 {
-  "extends": "@tsconfig/svelte/tsconfig.json",
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["svelte", "vite/client"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "react",
+    "types": ["vite/client", "node", "@testing-library/jest-dom"],
     "isolatedModules": true,
-    "verbatimModuleSyntax": true,
+    "verbatimModuleSyntax": false,
     "resolveJsonModule": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["react/src/*"]
+    }
   },
   "include": [
-    "src/**/*.ts",
-    "src/**/*.svelte",
-    "vite.config.ts",
-    "svelte.config.js"
-  ],
-  "exclude": [
-    "src/react/**",
-    "node_modules/**",
-    "dist/**",
-    "dist-react/**"
+    "react/src/**/*.ts",
+    "react/src/**/*.tsx",
+    "vite.react.config.ts"
   ]
 }

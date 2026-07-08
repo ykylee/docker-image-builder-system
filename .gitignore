@@ -6,6 +6,8 @@
 /.agents/
 node_modules/
 dist/
+# TASK-088: React + Astryx PoC 빌드 output. Svelte dist/ 와 격리.
+dist-react/
 coverage/
 *.tsbuildinfo
 
@@ -17,3 +19,8 @@ coverage/
 # output 디렉터리는 .visual/ 로 local-only.
 .visual/
 apps/build-monitor/.visual/
+
+# Playwright MCP CLI cache (TASK-088 검증 중 자동 생성). 캡쳐/snapshot/
+# console-log 일회성 산출물 — workspace root 에만 떨어지며 같은 이름이
+# agent session 간 충돌나지 않도록 local-only.
+.playwright-cli/

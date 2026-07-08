@@ -1,0 +1,25 @@
+/* TASK-088 Astryx theme CSS imports.
+ *
+ * Layer cascade (Astryx 가이드):
+ *   reset.css      → @layer reset        (브라우저 default 리셋)
+ *   astryx.css     → @layer astryx-base  (컴포넌트 default 스타일)
+ *   theme-neutral  → @layer astryx-theme (토큰 override)
+ *
+ * 순서 뒤집히면 컴포넌트 default 가 theme 토큰을 덮어 디자인 시스템 무너짐.
+ * neutral theme 은 muted minimal 스타터 — light + dark 모두 지원.
+ * 운영 환경에 따라 theme-butter / theme-chocolate / theme-gothic / theme-matcha
+ * / theme-stone / theme-y2k 로 교체 가능 (TASK-089 이후 결정).
+ */
+
+@import "@astryxdesign/core/reset.css";
+@import "@astryxdesign/core/astryx.css";
+@import "@astryxdesign/theme-neutral/theme.css";
+
+/* PoC 화면 최소 레이아웃 — Astryx VStack/HStack 컴포넌트로 후속 PR 에서 교체. */
+#app-react {
+  min-height: 100vh;
+  padding: var(--spacing-8, 32px);
+  font-family: var(--font-family-sans, system-ui, -apple-system, sans-serif);
+  color: var(--color-text-primary, inherit);
+  background: var(--color-background-body, transparent);
+}
