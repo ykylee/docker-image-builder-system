@@ -28,6 +28,7 @@
   "include": [
     "react/src/**/*.ts",
     "react/src/**/*.tsx",
+    ".generated/openapi.d.ts",
     "vite.react.config.ts"
   ]
 }
