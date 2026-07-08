@@ -41,18 +41,34 @@
 }
 
 .chips {
-  display: flex;
+  display: inline-flex;
   gap: var(--space-xs);
+  background: var(--color-bg-surface);
+  padding: var(--space-xs);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
 }
 
+/* chip 비활성 상태 contrast — TASK-090 self-review 보강.
+ *
+ * Svelte FilterChips 컴포넌트와 정합 유지하면서 React 빌드의 dark mode
+ * 가독성 보강. 비활성 chip 의 surface 배경 + text-secondary 조합이
+ * dark mode (#13151c + #a0a8b4) 에서 너무 묻혀서, 운영자가 한눈에
+ * chip row 자체를 인식하지 못하는 issue. surface-elevated 배경 +
+ * border-subtle + text-primary 본문으로 contrast 올림.
+ *
+ * hover 는 canvas 배경 + border-strong 으로 미세 강조 — active 의 primary
+ * 배경 + glow 와 시각 hierarchy 분리.
+ */
 .chip {
-  padding: var(--space-xs) var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border-strong);
-  background: var(--color-bg-surface);
-  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-bg-surface-elevated);
+  color: var(--color-text-primary);
   font-family: var(--font-sans);
-  font-size: var(--size-xs);
+  font-size: var(--size-sm);
   font-weight: var(--weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -61,7 +77,8 @@
 }
 
 .chip:hover {
-  background: var(--color-bg-surface-elevated);
+  background: var(--color-bg-canvas);
+  border-color: var(--color-border-strong);
   color: var(--color-text-primary);
 }
 
