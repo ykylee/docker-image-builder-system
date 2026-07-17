@@ -1,11 +1,11 @@
-// TASK-089/090: App shell (router) 검증.
+// TASK-089/090/091: App shell (router) 검증.
 //
-// Login.test.tsx / BuildsList.test.tsx 가 각 컴포넌트 자체의 시나리오를
-// 검증하는 동안, App.test.tsx 는 라우터 통합 —
+// Login.test.tsx / BuildsList.test.tsx / BuildDetail.test.tsx 가 각
+// 컴포넌트 자체의 시나리오를 검증하는 동안, App.test.tsx 는 라우터 통합 —
 //   /        → Navigate → /login (Login 폼 렌더)
 //   /login   → Login 폼 렌더
 //   /builds  → BuildsList (TASK-090; userId setItem + listBuilds mock)
-//   /builds/:id → BuildDetailPlaceholder (TASK-091 예정)
+//   /builds/:id → BuildDetail (TASK-091; loading state + buildId 표시)
 //   *        → Navigate → /login fallback
 // 을 MemoryRouter initialEntries 로 검증한다.
 //
@@ -22,8 +22,12 @@ import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 import { App } from "@/App";
 
 const listBuildsMock = vi.fn();
+const getBuildMock = vi.fn();
+const getBuildLogsMock = vi.fn();
 vi.mock("@/lib/api", () => ({
-  listBuilds: (params: unknown) => listBuildsMock(params)
+  listBuilds: (params: unknown) => listBuildsMock(params),
+  getBuild: (id: string) => getBuildMock(id),
+  getBuildLogs: (id: string) => getBuildLogsMock(id)
 }));
 
 function renderAt(path: string): void {
@@ -39,6 +43,18 @@ function renderAt(path: string): void {
 beforeEach(() => {
   listBuildsMock.mockReset();
   listBuildsMock.mockResolvedValue({ builds: [], nextCursor: null });
+  // BuildDetail 의 getBuild / getBuildLogs 가 resolve 안 되면 loading state
+  // 가 그대로 남아 있어 회귀 가드 (placeholder 가 mount 되지 않음) 가 가능.
+  // infinite promise 로 명시적 "영원히 pending" 상태를 만들어 loading
+  // placeholder 가 mount 되는지 확인.
+  getBuildMock.mockReset();
+  getBuildMock.mockImplementation(
+    () => new Promise(() => undefined)
+  );
+  getBuildLogsMock.mockReset();
+  getBuildLogsMock.mockImplementation(
+    () => new Promise(() => undefined)
+  );
   localStorage.clear();
 });
 
@@ -59,8 +75,13 @@ describe("App (router shell)", () => {
     expect(screen.getByRole("heading", { name: "Builds" })).toBeInTheDocument();
   });
 
-  it("renders the BuildDetailPlaceholder on /builds/:id (TASK-091 예정)", () => {
+  it("renders the BuildDetail on /builds/:id (TASK-091)", () => {
     renderAt("/builds/00000000-0000-0000-0000-000000000001");
-    expect(screen.getByTestId("build-detail-placeholder")).toBeInTheDocument();
+    // getBuildMock 이 infinite pending — BuildDetail 의 loading state 가
+    // 그대로 노출되는지 검증 (placeholder 가 mount 되지 않음).
+    expect(screen.getByTestId("build-detail-loading")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Loading build 00000000-0000-0000-0000-000000000001/)
+    ).toBeInTheDocument();
   });
 });

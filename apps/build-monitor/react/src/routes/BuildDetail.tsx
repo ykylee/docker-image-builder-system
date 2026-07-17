@@ -1,0 +1,329 @@
+// TASK-091: BuildDetail (React) — /builds/:buildId 의 canonical 4 block +
+// PhaseTimeline + LogStream + Legacy preview 마이그레이션.
+//
+// Svelte src/routes/BuildDetail.svelte 와 1:1 정합. canonical build/test/
+// deploy/result-delivery block 은 그대로 노출하고, legacy preview-* field 는
+// deprecated 배지와 함께 보존 (TASK-060 follow-up 에서 제거 예정).
+//
+// 데이터 흐름: react-router-dom useParams + Promise.all([getBuild, getBuildLogs]).
+// race 회피 — useEffect cleanup flag 로 stale fetch 결과 setState 차단
+// (React StrictMode 의 mount/unmount/mount 2회 fire 에서도 정합).
+
+import { useEffect, useState } from "react";
+import type { CSSProperties, ReactElement } from "react";
+import { Link, useParams } from "react-router-dom";
+
+import {
+  getBuild,
+  getBuildLogs,
+  type BuildLogsResponse,
+  type BuildStatusResponse
+} from "@/lib/api";
+import { LogStream } from "@/components/LogStream";
+import { PhaseTimeline } from "@/components/PhaseTimeline";
+import { StatusPill } from "@/components/StatusPill";
+
+import "./BuildDetail.css";
+
+// loading / not-found placeholder 스타일.
+const placeholderStyle: CSSProperties = {
+  padding: "var(--space-xxl, 32px)",
+  fontFamily: "var(--font-family-sans, system-ui, sans-serif)",
+  color: "var(--color-text-primary)"
+};
+
+// datalist key 생성 helper — label 의 padding/breaks 없이 한 줄 노출.
+function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) {
+    return "—";
+  }
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return iso;
+  }
+  return date.toLocaleString();
+}
+
+export function BuildDetail(): ReactElement {
+  // useParams 가 `{ buildId: string }` 으로 narrow — optional chaining 으로
+  // undefined (deep link 진입 시점) / 빈 string 모두 fallback.
+  const params = useParams<{ buildId: string }>();
+  const buildId = params.buildId ?? "";
+
+  const [build, setBuild] = useState<BuildStatusResponse | null>(null);
+  const [logs, setLogs] = useState<BuildLogsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // buildId 가 빈 string 이면 early return — deep link 와 placeholder 의
+    // 안전 정합. URL 직접 입력 + mount 직후 race 회피.
+    if (!buildId) {
+      setLoading(false);
+      return;
+    }
+
+    // StrictMode mount/unmount/mount 2회 fire 대응 — cleanup flag 로
+    // 첫 effect 의 setState 가 두 번째 effect 의 fetch 완료 후 stale 결과를
+    // 덮어쓰지 않도록 차단.
+    let cancelled = false;
+
+    setLoading(true);
+    setError(null);
+
+    (async () => {
+      try {
+        const [b, l] = await Promise.all([
+          getBuild(buildId),
+          getBuildLogs(buildId).catch(() => null)
+        ]);
+        if (cancelled) {
+          return;
+        }
+        setBuild(b);
+        setLogs(l as BuildLogsResponse | null);
+      } catch (e) {
+        if (cancelled) {
+          return;
+        }
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [buildId]);
+
+  if (loading) {
+    return (
+      <section
+        className="detail"
+        data-testid="build-detail-loading"
+        style={placeholderStyle}
+      >
+        <p className="muted">Loading build {buildId}…</p>
+      </section>
+    );
+  }
+
+  if (error || !build) {
+    return (
+      <section
+        className="detail"
+        data-testid="build-detail-error"
+        style={placeholderStyle}
+      >
+        <p className="err" role="alert">
+          {error ?? "Build not found."}
+        </p>
+        <Link to="/builds" className="back-link" data-testid="back-to-builds">
+          ← Back to builds
+        </Link>
+      </section>
+    );
+  }
+
+  return (
+    <section className="detail" data-testid="build-detail">
+      {/* TASK-091 self-review amend 1: 정상 상태에서도 페이지 상단에
+       * Back link 노출. Svelte BuildDetail 은 BuildRow 의 buildId <Link> 가
+       * 자연스러운 back path 였지만, React BuildDetail 은 standalone 이라
+       * 명시적 Back 이 운영자 UX 에 더 자연스러움. error state 와 동일
+       * data-testid 로 회귀 가드 일관성 유지. */}
+      <Link to="/builds" className="back-link" data-testid="back-to-builds">
+        ← Back to builds
+      </Link>
+
+      <header className="head">
+        <h1 className="mono">{build.build.buildId}</h1>
+        <StatusPill
+          status={build.build.status}
+          lifecycleStatus={build.build.lifecycleStatus}
+        />
+      </header>
+
+      <dl className="meta">
+        <div>
+          <dt>App</dt>
+          <dd className="mono">{build.build.appName}</dd>
+        </div>
+        <div>
+          <dt>Created</dt>
+          <dd>{formatDateTime(build.build.createdAt)}</dd>
+        </div>
+        <div>
+          <dt>Updated</dt>
+          <dd>{formatDateTime(build.build.updatedAt)}</dd>
+        </div>
+        <div>
+          <dt>Phase</dt>
+          <dd className="mono">{build.build.phase}</dd>
+        </div>
+        <div>
+          <dt>Lifecycle</dt>
+          <dd className="mono">
+            {build.build.lifecycleStatus ?? build.build.status}
+          </dd>
+        </div>
+        <div>
+          <dt>Last error</dt>
+          <dd className="mono">
+            {build.lastError
+              ? `${build.lastError.code}: ${build.lastError.message}`
+              : "—"}
+          </dd>
+        </div>
+      </dl>
+
+      {/* TASK-060: canonical build/test/deploy/result-delivery sections.
+       * Build lifecycle / Container test / Deployment / Result delivery 가
+       * source of truth. legacy preview-* 는 아래 deprecated section 으로
+       * 분리. */}
+      <section className="block" data-testid="block-lifecycle">
+        <h2>Build lifecycle</h2>
+        <dl className="kv">
+          <div>
+            <dt>Status</dt>
+            <dd className="mono">
+              {build.lifecycle?.status ??
+                build.build.lifecycleStatus ??
+                build.build.status}
+            </dd>
+          </div>
+          <div>
+            <dt>Started</dt>
+            <dd>{formatDateTime(build.lifecycle?.startedAt)}</dd>
+          </div>
+          <div>
+            <dt>Finished</dt>
+            <dd>{formatDateTime(build.lifecycle?.finishedAt)}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="block" data-testid="block-test">
+        <h2>Container test</h2>
+        <dl className="kv">
+          <div>
+            <dt>Status</dt>
+            <dd className="mono">{build.test?.status ?? "NOT_STARTED"}</dd>
+          </div>
+          <div>
+            <dt>Container running</dt>
+            <dd>
+              {build.test?.containerRunning === null ||
+              build.test?.containerRunning === undefined
+                ? "—"
+                : String(build.test.containerRunning)}
+            </dd>
+          </div>
+          <div>
+            <dt>Health check</dt>
+            <dd>
+              {build.test?.healthCheckPassed === null ||
+              build.test?.healthCheckPassed === undefined
+                ? "—"
+                : String(build.test.healthCheckPassed)}
+            </dd>
+          </div>
+          <div>
+            <dt>Port open</dt>
+            <dd>
+              {build.test?.portOpen === null ||
+              build.test?.portOpen === undefined
+                ? "—"
+                : String(build.test.portOpen)}
+            </dd>
+          </div>
+          <div>
+            <dt>Stability window</dt>
+            <dd>
+              {build.test?.stabilityWindowPassed === null ||
+              build.test?.stabilityWindowPassed === undefined
+                ? "—"
+                : String(build.test.stabilityWindowPassed)}
+            </dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="block" data-testid="block-deploy">
+        <h2>Deployment</h2>
+        <dl className="kv">
+          <div>
+            <dt>Status</dt>
+            <dd className="mono">{build.deploy?.status ?? "NOT_STARTED"}</dd>
+          </div>
+          <div>
+            <dt>Target type</dt>
+            <dd className="mono">{build.deploy?.targetType ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>Result ref</dt>
+            <dd className="mono">{build.deploy?.resultRef ?? "—"}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="block" data-testid="block-result-delivery">
+        <h2>Result delivery</h2>
+        <dl className="kv">
+          <div>
+            <dt>Status</dt>
+            <dd className="mono">
+              {build.resultDelivery?.status ?? "NOT_STARTED"}
+            </dd>
+          </div>
+          <div>
+            <dt>Mode</dt>
+            <dd className="mono">{build.resultDelivery?.mode ?? "—"}</dd>
+          </div>
+          <div>
+            <dt>Delivered at</dt>
+            <dd>{formatDateTime(build.resultDelivery?.deliveredAt)}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="block" data-testid="block-phases">
+        <h2>Phases</h2>
+        <PhaseTimeline
+          phaseHistory={build.phaseHistory ?? []}
+          currentPhase={build.currentPhase ?? null}
+        />
+      </section>
+
+      {/* Legacy preview-era fields — TASK-060 follow-up 에서 제거 예정. */}
+      <section className="block deprecated" data-testid="block-legacy-preview">
+        <h2>
+          Legacy preview <span className="badge">deprecated</span>
+        </h2>
+        <dl className="kv">
+          <div>
+            <dt>Preview status</dt>
+            <dd className="mono">{build.build.previewStatus}</dd>
+          </div>
+          <div>
+            <dt>Preview URL</dt>
+            <dd className="mono">{build.build.previewUrl ?? "—"}</dd>
+          </div>
+        </dl>
+        <p className="muted small">
+          Source of truth: see the <strong>Container test</strong> and
+          <strong> Deployment</strong> sections above. Removal planned once
+          admin / build-list consumers stop reading these legacy fields.
+        </p>
+      </section>
+
+      <section className="block" data-testid="block-logs">
+        <h2>Logs</h2>
+        <LogStream entries={logs?.logs ?? []} />
+      </section>
+    </section>
+  );
+}
