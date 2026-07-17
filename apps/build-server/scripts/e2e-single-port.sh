@@ -25,9 +25,12 @@ cd "${REPO_ROOT}"
 
 # Build Monitor 가 빌드 안 된 환경인지 확인 — 없으면 skip (CI 첫 build
 # 직전이라 dist 가 없을 수 있다).
-if [[ ! -f "apps/build-monitor/dist/index.html" ]]; then
-  printf '\033[33m%s\033[0m\n' "build-monitor/dist/index.html not found — skipping single-port reverse-proxy e2e."
-  echo "  hint: pnpm --filter @docker-image-builder-system/build-monitor build"
+# TASK-093: React dist-react 도 함께 검증 — Svelte + React 2 dist 모두 빌드돼야
+# 단일 port reverse proxy 가 React primary SPA + Svelte legacy deep link 모두
+# 응답 가능.
+if [[ ! -f "apps/build-monitor/dist/index.html" ]] || [[ ! -f "apps/build-monitor/dist-react/index.html" ]]; then
+  printf '\033[33m%s\033[0m\n' "build-monitor/dist/index.html or dist-react/index.html not found — skipping single-port reverse-proxy e2e."
+  echo "  hint: pnpm --filter @docker-image-builder-system/build-monitor build && (cd apps/build-monitor && pnpm build:react)"
   exit 0
 fi
 
@@ -78,16 +81,18 @@ if ! curl -fsS "${BASE}/health" >/dev/null 2>&1; then
   exit 1
 fi
 
-# 2) 정적 mount 검증.
-echo "[2/4] GET /  →  dist/index.html (정적 mount)"
+# 2) 정적 mount 검증 — TASK-093 이후 React dist 가 primary SPA (`/`).
+#    React index.html 은 `<div id="app-react">`, Svelte index.html 은 `<div id="root">`
+#    둘 중 하나만 응답해도 정상 (둘 다 mount 시 React 가 응답).
+echo "[2/4] GET /  →  React dist (primary SPA, TASK-093)"
 INDEX_CT="$(curl -fsS "${BASE}/" -o /tmp/index.html -w '%{http_code}')"
-if [[ "${INDEX_CT}" != "200" ]] || ! grep -q "<div id='root'>\|<div id=\"root\">\|<body>" /tmp/index.html; then
-  red "  ✗ GET / did not return dist/index.html"
+if [[ "${INDEX_CT}" != "200" ]] || ! grep -q "<div id='app-react'>\|<div id=\"app-react\">\|<body>" /tmp/index.html; then
+  red "  ✗ GET / did not return React dist/index.html (TASK-093 primary)"
   echo "    status: ${INDEX_CT}"
   head -10 /tmp/index.html || true
   exit 1
 fi
-green "  ✓ GET / 200 (HTML)"
+green "  ✓ GET / 200 (React SPA HTML)"
 
 # 3) SPA fallback 검증 — deep link.
 echo "[3/4] SPA fallback (GET /admin/login)"
@@ -99,6 +104,17 @@ if [[ "${DEEP_CT}" != "200" ]] || ! grep -q "<body>" /tmp/deep.html; then
   exit 1
 fi
 green "  ✓ GET /admin/login 200 (SPA fallback HTML)"
+
+# 3.5) Svelte legacy deep link — TASK-093 의 secondary mount 검증.
+echo "[3.5/4] Svelte legacy deep link (GET /svelte)"
+SVELTE_CT="$(curl -fsS "${BASE}/svelte" -o /tmp/svelte.html -w '%{http_code}')"
+if [[ "${SVELTE_CT}" != "200" ]] || ! grep -q "<div id='root'>\|<div id=\"root\">\|<body>" /tmp/svelte.html; then
+  red "  ✗ GET /svelte did not return Svelte dist/index.html"
+  echo "    status: ${SVELTE_CT}"
+  head -10 /tmp/svelte.html || true
+  exit 1
+fi
+green "  ✓ GET /svelte 200 (Svelte legacy SPA HTML)"
 
 # 4) API 검증 — /api/builds 는 307 redirect → /builds (200 JSON).
 echo "[4/4] API reverse — GET /api/builds (307 → /builds)"
