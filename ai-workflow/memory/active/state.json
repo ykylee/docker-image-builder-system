@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-08T14:35:00Z",
-  "purpose_digest": "TASK-088 (React + Astryx 부트스트랩 PoC) + TASK-089 (Login 1 페이지 React 마이그레이션) + TASK-090 (BuildsList 페이지 React 마이그레이션) main 합류 회수 sync. PR 본질: Svelte → React frontend rewrite 7-PR 시리즈 1~3단계. commit 5개 — `27d1035` TASK-088 PoC 본체, `a312123` TASK-089 Login 본체, `8dab9f6` TASK-089 self-review amend 4 area 봉인 (favicon.svg / React ErrorBoundary / localStorage cross-tab storage / data-testid), `8c5eb92` TASK-090 BuildsList 본체, `af41c8d` TASK-090 self-review UI polish (light theme / chip wrapper Svelte FilterChips 정합 / chip 비활성 contrast / StatusPill sizing), `db87d04` TASK-090 self-review follow-up (table row hover / 마지막 row border / appName ellipsis). PR #43 squash merge main 합류 (`0547c95`, 2026-07-08). 회귀 baseline: TS 4 packages clean, build-monitor vitest **141 → 158 PASS** (TASK-089 Login 8 + TASK-090 BuildsList 18 신규; Svelte 140 baseline 유지), svelte-check 0/1 (TASK-077 baseline 무해), tsc -p tsconfig.react.json clean, vite build:react gzip js **87.27KB** / css **27.29KB**, Build Server memory mode e2e PASS (seed build `task-090-demo-app` QUEUED → /api/builds → BuildsList), 5176 e2e light theme PASS (/ → /login → /builds → chip + QUEUED pill + buildId link + appName + relative time), CI (docker-build) ✅ pass 1m 6s. Build Server `mountBuildMonitorDist` 영향 0. 회귀 영향 0 — Svelte build-monitor 운영 baseline 모두 그대로 유지. 다음: TASK-091 BuildDetail 페이지 React 마이그레이션 진입 (사용자 결정 대기). workflow meta sync (state rev 109→110, handoff 78→79, work_backlog 73→74, backlog index 43→44 / latest 21→22) 같은 sync commit 안에 포함.",
-  "purpose_digest_rev": 110,
+  "generated_at": "2026-07-08T22:05:00Z",
+  "purpose_digest": "TASK-091 (BuildDetail 페이지 React 마이그레이션) main 합류 회수 sync. PR 본질: Svelte → React frontend rewrite 7-PR 시리즈 4단계. branch `grok/task-091-build-detail-2026-07-08` (main `be72de0` base), commit `2910a7c`. Svelte `routes/BuildDetail.svelte` (308 lines) → React `routes/BuildDetail.tsx` 1:1 정합 + PhaseTimeline + LogStream React 컴포넌트 신규 + api.ts getBuild/getBuildLogs 추가 + App.tsx placeholder → BuildDetail 교체. self-review amend 2 area 봉인 (페이지 상단 Back link + PhaseTimeline 수직 연결선 CSS rule). 회귀 baseline: TS 4 packages clean, build-monitor vitest **158 → 166 PASS** (BuildDetail page 8 신규), svelte-check 0/1 (TASK-077 baseline 무해), tsc -p tsconfig.react.json clean, vite build:react gzip js **89.53KB** / css **27.76KB** (TASK-090 baseline 87.27KB → +2.26KB), Build Server mountBuildMonitorDist 영향 0. 다음: TASK-092 lib layer (Zustand store 분리 / openapi-fetch 정합 / visual diff baseline) 또는 TASK-093 Build Server dist swap 진입 (사용자 결정 대기). 회귀 영향 0 — Svelte build-monitor 운영 baseline 모두 그대로 유지. workflow meta sync (state rev 110→111, handoff 79→80, work_backlog 74→75, backlog index 44→45 / latest 22→23) 같은 sync commit 안에 포함.",
+  "purpose_digest_rev": 111,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,14 +27,16 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "Svelte → React frontend rewrite 7-PR 시리즈가 본격 진행 중이다. TASK-088 PoC + TASK-089 Login + TASK-090 BuildsList 1~3단계 모두 main 합류. React 19 + Astryx v0.1.4 + react-router-dom v7 + openapi-fetch 기반 SPA 구조. Svelte build-monitor 운영 baseline 모두 그대로 유지 (vitest 158/158 PASS, svelte-check 0/1, vite build Svelte 정상, Build Server mountBuildMonitorDist 영향 0). PR #43 (TASK-088/089 묶음) squash merge main 합류 (`0547c95`, 2026-07-08).",
-    "current_axis": "Svelte → React frontend rewrite 7-PR 시리즈 (TASK-088 PoC → TASK-089 Login → TASK-090 BuildsList → TASK-091 BuildDetail → TASK-092 lib layer → TASK-093 Build Server dist swap → TASK-094 Svelte 정리). 1~3단계 main 합류 완료, 4단계 TASK-091 진입 대기.",
-    "current_focus": "TASK-091 BuildDetail 페이지 React 마이그레이션 — /builds/:buildId placeholder → BuildDetail.tsx + openapi-fetch GET /builds/{buildId} + PhaseTimeline + LogStream React 컴포넌트. 사용자 결정 대기.",
+    "current_baseline": "Svelte → React frontend rewrite 7-PR 시리즈가 본격 진행 중이다. TASK-088 PoC + TASK-089 Login + TASK-090 BuildsList + TASK-091 BuildDetail 1~4단계 모두 main 합류. React 19 + Astryx v0.1.4 + react-router-dom v7 + openapi-fetch + BuildDetail 4 block + PhaseTimeline + LogStream. Svelte build-monitor 운영 baseline 모두 그대로 유지 (vitest 166/166 PASS, svelte-check 0/1, vite build Svelte 정상, Build Server mountBuildMonitorDist 영향 0). PR (TASK-091) commit `2910a7c` main 합류.",
+    "current_axis": "Svelte → React frontend rewrite 7-PR 시리즈 (TASK-088 PoC → TASK-089 Login → TASK-090 BuildsList → TASK-091 BuildDetail → TASK-092 lib layer → TASK-093 Build Server dist swap → TASK-094 Svelte 정리). 1~4단계 main 합류 완료, 5단계 TASK-092 진입 대기.",
+    "current_focus": "TASK-092 lib layer (Zustand store 분리 / openapi-fetch 정합 / visual diff baseline) 또는 TASK-093 Build Server dist swap — 사용자 결정 대기.",
     "blocked_items": [],
     "recent_done_items": [
-      "TASK-088 React + Astryx 부트스트랩 PoC (main `27d1035` 합류, PR #43 squash merge `0547c95`)",
-      "TASK-089 Login 1 페이지 React 마이그레이션 (main `a312123` + self-review amend `8dab9f6` 합류)",
+      "TASK-091 BuildDetail 페이지 React 마이그레이션 (branch `grok/task-091-build-detail-2026-07-08`, commit `2910a7c` main 합류)",
       "TASK-090 BuildsList 페이지 React 마이그레이션 (main `1d05db3` + self-review amend 2차 `af41c8d` + `db87d04` 합류)",
+      "TASK-089 Login 1 페이지 React 마이그레이션 (main `a312123` + self-review amend `8dab9f6` 합류)",
+      "TASK-088 React + Astryx 부트스트랩 PoC (main `27d1035` 합류, PR #43 squash merge `0547c95`)",
+      "TASK-087 Nextcloud CalDAV helper 봉인 회수 sync",
       "TASK-077 admin-initiated runner registration (PR #42 `6847f1e` main 합류)",
       "TASK-076 insecure-registry only 운영 패턴 검증 (PR #41 `8012942` main 합류)",
       "TASK-075 credential rotation e2e (PR #40 `8e0b228` main 합류)",
@@ -55,21 +57,22 @@
       "TASK-075 단일 포트 reverse proxy (PR #26 `809f1da` main 합류)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 79,
+    "handoff_rev": 80,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 74,
-    "latest_rev": 22,
+    "index_rev": 75,
+    "latest_rev": 23,
     "in_progress_items": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-07.md",
-    "task_count": 3,
+    "task_count": 4,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
       "TASK-088 React + Astryx 부트스트랩 PoC (rev 1 sync 봉인)",
       "TASK-089 Login 1 페이지 React 마이그레이션 (rev 2 sync 봉인)",
-      "TASK-090 BuildsList 페이지 React 마이그레이션 (rev 2 sync 봉인)"
+      "TASK-090 BuildsList 페이지 React 마이그레이션 (rev 2 sync 봉인)",
+      "TASK-091 BuildDetail 페이지 React 마이그레이션 (rev 3 sync 봉인)"
     ],
     "index_rev": "42",
     "latest_rev": "19"
@@ -79,8 +82,9 @@
     "ai-workflow/memory/active/session_handoff.md",
     "ai-workflow/memory/active/work_backlog.md",
     "ai-workflow/memory/active/backlog/2026-07-08.md",
-    "apps/build-monitor/react/src/routes/BuildsList.tsx",
-    "apps/build-monitor/react/src/routes/Login.tsx"
+    "apps/build-monitor/react/src/routes/BuildDetail.tsx",
+    "apps/build-monitor/react/src/components/PhaseTimeline.tsx",
+    "apps/build-monitor/react/src/components/LogStream.tsx"
   ],
   "repository_assessment": {
     "path": "ai-workflow/memory/active/repository_assessment.md",
