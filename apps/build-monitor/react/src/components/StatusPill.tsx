@@ -63,22 +63,23 @@ export function StatusPill({
     // 와 의미상 동일. Svelte scoped CSS 가 --pill-color 를 자동 인식하는
     // 반면 React 는 inline style 로 직접 주입.
     //
-    // TASK-090 self-review 보강 — padding/font-size/background-alpha 키워�서
-    // dark mode 가독성 ↑. 운영자가 build row 를 스캔할 때 StatusPill 의
-    // 상태가 시각 anchor 역할. Svelte StatusPill.svelte 와 디자인 토큰은
-    // 정합 유지 (padding 6px, size-sm) + background alpha 15% → 20% 로
-    // pill 자체의 presence 강화.
+    // TASK-096: 디자인 토큰 baseline 정합. TASK-090 의 self-review 에서
+    // padding/font-size/background-alpha 키워서 dark mode 가독성 ↑ 보강이
+    // 있었으나, Svelte StatusPill.svelte 와 의미상 1:1 정합이라는
+    // TASK-090 PR description 과 정합하지 않음. 본 TASK 에서 Svelte
+    // baseline 으로 통일 — 양쪽 모두 padding 4px / size-xs / background
+    // alpha 15% / border alpha 30% / box-shadow 8px.
     ["--pill-color" as string]: color,
     display: "inline-block",
-    padding: "6px var(--space-lg)",
+    padding: "4px var(--space-md)",
     borderRadius: "var(--radius-pill)",
-    background: "color-mix(in srgb, var(--pill-color) 20%, transparent)",
+    background: "color-mix(in srgb, var(--pill-color) 15%, transparent)",
     color: "var(--pill-color)",
-    border: "1px solid color-mix(in srgb, var(--pill-color) 35%, transparent)",
+    border: "1px solid color-mix(in srgb, var(--pill-color) 30%, transparent)",
     boxShadow:
-      "0 0 10px color-mix(in srgb, var(--pill-color) 18%, transparent)",
+      "0 0 8px color-mix(in srgb, var(--pill-color) 15%, transparent)",
     fontFamily: "var(--font-mono)",
-    fontSize: "var(--size-sm)",
+    fontSize: "var(--size-xs)",
     fontWeight: "var(--weight-semibold)",
     textTransform: "uppercase",
     letterSpacing: "0.05em",
