@@ -1,0 +1,40 @@
+/* TASK-097: AdminTabs (React) styles.
+ *
+ * Svelte AdminTabs.svelte 의 <style> 과 의미상 1:1 정합. 디자인 토큰
+ * 자동 follow — globals.css cascade 와 정합.
+ *
+ * Inline style 우선이지만, hover 시 ::hover 와 active 시 디자인 토큰
+ * 자동 follow 위한 CSS rule 보조.
+ */
+
+.admin-tabs {
+  display: inline-flex;
+  gap: var(--space-xs);
+  padding: var(--space-xs);
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-card);
+}
+
+.admin-tab {
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-secondary);
+  font-size: var(--size-sm);
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  transition: color var(--motion-duration-fast) var(--motion-easing-standard),
+              background var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.admin-tab:hover {
+  color: var(--color-text-primary);
+  text-decoration: none;
+}
+
+.admin-tab.active {
+  background: var(--color-accent-primary);
+  color: white;
+  box-shadow: var(--shadow-glow);
+}
