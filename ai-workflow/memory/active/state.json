@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-08T23:35:00Z",
-  "purpose_digest": "TASK-095 (M4.5 Group A — Header / ThemeToggle / FilterChips React 마이그레이션) main 합류 회수 sync. PR 본질: frontend rewrite 7-PR 시리즈 후속 M4.5 의 1단계. branch `grok/task-095-header-theme-react-2026-07-08` (main `1ab566d` base). Header + ThemeToggle + FilterChips 의 React 측 신규 추가. BuildRow 는 이미 React 측 (TASK-090) 존재. 신규 8종: Header.tsx / Header.css / ThemeToggle.tsx / FilterChips.tsx / adminAllowListStore.ts + 4 test 파일. 수정 2종: App.tsx (모든 라우트가 Header 공유), api.ts (adminAllowList helper + types). Svelte 측 컴포넌트 (Header.svelte / ThemeToggle.svelte / FilterChips.svelte / BuildRow.svelte) 는 그대로 유지 — cross-framework 공존. TASK-096+ 에서 Svelte routes React 마이그레이션 + Svelte scaffold 일괄 정리. 결정: 옵션 A 채택. 사전 결함 + 보강: ThemeToggle `window.matchMedia` jsdom 부재 try/catch fallback; adminAllowListStore 의 Svelte store mock 호환성 → Zustand setState 직접 set; admin `/admin/admins` path 가 generated openapi.d.ts 에 부재 → apiGet/apiSend 캐스팅. 회귀 baseline: TS 5 packages clean, build-monitor vitest **173 → 204 PASS** (신규 31: Header 14 / ThemeToggle 5 / FilterChips 7 / store 5), svelte-check 0/1 (TASK-077 baseline 무해), build-server tests 동일 (영향 0), vite build:react 정상 (gzip js 91.03KB / css 28.10KB), vite build svelte 정상. 다음: TASK-096 Group B (StatusPill + 디자인 토큰 정합) 또는 TASK-097 Group C (Admin 진입점 React 마이그레이션) 진입 (사용자 결정 대기). workflow meta sync (state rev 114→115, handoff 83→84, work_backlog 78→79, backlog index 48→49 / latest 26→27) 같은 sync commit 안에 포함.",
-  "purpose_digest_rev": 115,
+  "generated_at": "2026-07-08T23:45:00Z",
+  "purpose_digest": "TASK-096 (M4.5 Group B — StatusPill 디자인 토큰 baseline 정합) main 합류 회수 sync. PR 본질: frontend rewrite 시리즈 M4.5 2단계. branch `grok/task-096-statuspill-design-tokens-2026-07-08` (main `4dcd2aa` base). TASK-090 self-review 의 디자인 강화분 (React StatusPill 의 padding 6px / size-sm / alpha 20%) 이 Svelte StatusPill baseline (padding 4px / size-xs / alpha 15%) 과 미세하게 달라 양쪽 컴포넌트가 의미상 1:1 정합이 아니었음. 본 TASK 에서 React StatusPill 을 Svelte baseline 으로 통일. 수정 1종: StatusPill.tsx (padding/font-size/alpha baseline 정합). 신규 2종: StatusPill.test.tsx (23 케이스 — canonical 12 + legacy preview 5 + RunnerStatus 2 + EXPIRED/UNKNOWN/lifecycleStatus 3 + 디자인 baseline 검증 1) + 운영 가이드 (design-tokens-react-svelte-2026-07-08.md). colorFor 매핑 (canonical 12 + legacy preview + RunnerStatus) 와 lifecycleStatus 우선 + aria-label 'Status: <STATUS>' + role='status' 는 그대로 1:1 정합. 결정: 옵션 A (React StatusPill 디자인 토큰만 Svelte baseline 으로 통일. 디자인 토큰 시스템 단일화는 후속 TASK). 디자인 토큰 단일화 (TASK-096.5 / M4.6) — Svelte tokens.css vs React globals.css 의 디자인 토큰 시스템 자체 통일 (옵션 A: Svelte 폐기 + Astryx 단일 / 옵션 B: 양쪽 병행 / 옵션 C: 통합 파일 추출). 회귀 baseline: TS 5 packages clean, build-monitor vitest **204 → 227 PASS** (신규 23), svelte-check 0/1 (TASK-077 baseline 무해), build-server tests 동일 (영향 0), vite build:react 정상 (gzip js 91.04KB / css 28.10KB, TASK-095 baseline 91.03KB → +0.01KB), vite build svelte 정상 (영향 0). 다음: TASK-097 Group C (Admin 진입점 React 마이그레이션: AdminTabs + AdminAccessDenied) 진입 (사용자 결정 대기). workflow meta sync (state rev 115→116, handoff 84→85, work_backlog 79→80, backlog index 49→50 / latest 27→28) 같은 sync commit 안에 포함.",
+  "purpose_digest_rev": 116,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "Svelte → React frontend rewrite 7-PR 시리즈 종료 + M4.5 Group A (TASK-095) main 합류. React 19 + Astryx v0.1.4 + react-router-dom v7 + openapi-fetch + Zustand 5.x store + Header / ThemeToggle / FilterChips 통합. Build Server 는 React dist-react/ 만 mount. Svelte 측 컴포넌트는 cross-framework 공존 유지. vitest 204/204 PASS, svelte-check 0/1, build-server 142/142 PASS. App.tsx 가 모든 라우트에서 Header 공유.",
-    "current_axis": "M4.5 admin / build-request / api-console React 마이그레이션 8+ PR 시리즈. Group A (TASK-095) 완료 → B/C/D/E/F/G 순서로 진행.",
-    "current_focus": "사용자 결정 대기 — (a) TASK-096 Group B (StatusPill + 디자인 토큰), (b) TASK-097 Group C (Admin 진입점), (c) 다른 TASK 우선.",
+    "current_baseline": "Svelte → React frontend rewrite 7-PR 시리즈 + M4.5 Group A (TASK-095) + Group B (TASK-096) main 합류. StatusPill 디자인 토큰 Svelte baseline 정합 — 양쪽 의미상 1:1 정합 회복. vitest 227/227 PASS, svelte-check 0/1, build-server 142/142 PASS. 디자인 토큰 단일화는 후속 TASK 로 분리.",
+    "current_axis": "M4.5 admin / build-request / api-console React 마이그레이션 8+ PR 시리즈. Group A (TASK-095) + Group B (TASK-096) 완료 → C/D/E/F/G 순서로 진행.",
+    "current_focus": "사용자 결정 대기 — (a) TASK-097 Group C (Admin 진입점 React 마이그레이션: AdminTabs + AdminAccessDenied), (b) 디자인 토큰 단일화 (TASK-096.5 / M4.6) 먼저, (c) 다른 TASK 우선.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-096 M4.5 Group B (StatusPill 디자인 토큰 baseline 정합) — branch `grok/task-096-statuspill-design-tokens-2026-07-08`, main 합류",
       "TASK-095 M4.5 Group A (Header / ThemeToggle / FilterChips React 마이그레이션) — branch `grok/task-095-header-theme-react-2026-07-08`, main 합류",
       "TASK-094 Svelte 코드 정리 (frontend rewrite 7-PR 시리즈 final) — commit `d8763d7` main 합류 (PR #48)",
       "TASK-093 Build Server dist swap (React 빌드 mount) — commit `e1ca2a5` main 합류 (PR #47)",
@@ -58,15 +59,15 @@
       "TASK-078 container self-dogfood (PR #28)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 84,
+    "handoff_rev": 85,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 79,
-    "latest_rev": 27,
+    "index_rev": 80,
+    "latest_rev": 28,
     "in_progress_items": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-07.md",
-    "task_count": 8,
+    "task_count": 9,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -77,20 +78,19 @@
       "TASK-092 lib layer (Zustand store 분리) (rev 4 sync 봉인)",
       "TASK-093 Build Server dist swap (React 빌드 mount) (rev 5 sync 봉인)",
       "TASK-094 Svelte 코드 정리 (rev 6 sync 봉인)",
-      "TASK-095 M4.5 Group A (Header / ThemeToggle / FilterChips React) (rev 7 sync 봉인)"
+      "TASK-095 M4.5 Group A (Header / ThemeToggle / FilterChips React) (rev 7 sync 봉인)",
+      "TASK-096 M4.5 Group B (StatusPill 디자인 토큰 baseline 정합) (rev 8 sync 봉인)"
     ],
     "index_rev": "42",
     "latest_rev": "19"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
-    "docs/operations/svelte-cleanup-2026-07-08.md",
+    "docs/operations/design-tokens-react-svelte-2026-07-08.md",
     "ai-workflow/memory/active/session_handoff.md",
     "ai-workflow/memory/active/work_backlog.md",
     "ai-workflow/memory/active/backlog/2026-07-08.md",
-    "apps/build-monitor/react/src/components/Header.tsx",
-    "apps/build-monitor/react/src/components/ThemeToggle.tsx",
-    "apps/build-monitor/react/src/components/FilterChips.tsx"
+    "apps/build-monitor/react/src/components/StatusPill.tsx"
   ],
   "repository_assessment": {
     "path": "ai-workflow/memory/active/repository_assessment.md",
