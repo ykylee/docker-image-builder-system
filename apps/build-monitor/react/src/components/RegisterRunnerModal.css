@@ -1,0 +1,148 @@
+/* TASK-098: RegisterRunnerModal (React) styles.
+ *
+ * Svelte RegisterRunnerModal.svelte 와 의미상 1:1 정합. 디자인 토큰
+ * 자동 follow.
+ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--color-bg-elevated, #1e1e1e);
+  color: var(--color-text, #f0f0f0);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: var(--shadow-modal, 0 8px 32px rgba(0, 0, 0, 0.5));
+  width: min(480px, 92vw);
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border, #333);
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.modal-close {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted, #aaa);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.25rem;
+}
+
+.modal-close:hover {
+  color: var(--color-text, #f0f0f0);
+}
+
+.modal-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.modal-help {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-muted, #aaa);
+  line-height: 1.4;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.modal-label {
+  font-size: 0.85rem;
+  color: var(--color-text-muted, #aaa);
+  font-family: monospace;
+}
+
+.modal-field input {
+  padding: 0.5rem 0.7rem;
+  background: var(--color-bg-input, #2a2a2a);
+  border: 1px solid var(--color-border, #444);
+  border-radius: 4px;
+  color: var(--color-text, #f0f0f0);
+  font-family: monospace;
+}
+
+.modal-field input:focus {
+  outline: none;
+  border-color: var(--color-accent-primary, #5b8def);
+}
+
+.modal-field input:disabled {
+  opacity: 0.6;
+}
+
+.modal-error {
+  margin: 0;
+  padding: 0.6rem 0.8rem;
+  background: rgba(220, 80, 80, 0.15);
+  border: 1px solid var(--color-accent-danger, #c85050);
+  border-radius: 4px;
+  color: var(--color-accent-danger, #ff8080);
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--color-border, #333);
+}
+
+.btn-primary,
+.btn-secondary {
+  padding: 0.5rem 1.1rem;
+  border-radius: 4px;
+  border: 0;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-primary {
+  background: var(--color-accent-primary, #5b8def);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--color-bg-input, #2a2a2a);
+  color: var(--color-text, #f0f0f0);
+  border: 1px solid var(--color-border, #444);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-border, #333);
+}

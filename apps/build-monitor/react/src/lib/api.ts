@@ -111,7 +111,7 @@ export type AdminAllowListResponse = {
 };
 
 function apiSend(
-  method: "POST" | "DELETE",
+  method: "POST" | "DELETE" | "PATCH",
   path: string,
   callerId: string,
   body?: unknown
@@ -156,5 +156,117 @@ export async function removeAdminFromAllowList(
     `/admin/admins/${target}`,
     callerId
   )) as { removed: string; admins: string[] };
+  return result;
+}
+
+// TASK-098: admin 페이지 endpoint helpers.
+// Svelte src/lib/api.ts 의 listAdminBuilds / listAdminUsers 와 1:1 정합.
+// X-Admin-Id header 가 Build Server 의 admin 가드 (401/403) 통과 필수.
+//
+// generated openapi.d.ts 가 /admin/builds 와 /admin/users 의 response
+// schema 를 가지고 있어 AdminListBuildsResponse / AdminUserListResponse
+// 타입 export 가능. /admin/runners 는 schema 미생성 — RunnerStatus union
+// 으로 inline cast.
+
+export type AdminUserBuildSummary = components["schemas"]["AdminUserBuildSummary"];
+export type AdminListBuildsResponse = components["schemas"]["AdminListBuildsResponse"];
+export type AdminUserListResponse = components["schemas"]["AdminUserListResponse"];
+
+export type ListAdminBuildsParams = {
+  requestedBy?: string;
+  status?: string;
+  limit?: number;
+  cursor?: string;
+};
+
+export async function listAdminBuilds(
+  callerId: string,
+  params: ListAdminBuildsParams = {}
+): Promise<AdminListBuildsResponse> {
+  const query: Record<string, string | number | undefined> = {};
+  if (params.requestedBy) query.requestedBy = params.requestedBy;
+  if (params.status) query.status = params.status;
+  if (params.limit !== undefined) query.limit = params.limit;
+  if (params.cursor) query.cursor = params.cursor;
+
+  const result = (await apiGet(
+    "/admin/builds",
+    "/admin/builds",
+    { params: { query }, headers: { "X-Admin-Id": callerId } }
+  )) as AdminListBuildsResponse;
+  return result;
+}
+
+export async function listAdminUsers(
+  callerId: string
+): Promise<AdminUserListResponse> {
+  const result = (await apiGet(
+    "/admin/users",
+    "/admin/users",
+    { headers: { "X-Admin-Id": callerId } }
+  )) as AdminUserListResponse;
+  return result;
+}
+
+export type RunnerStatus = "ACTIVE" | "DISABLED";
+
+export type AdminRunner = {
+  runnerId: string;
+  status: RunnerStatus;
+  lastSeenAt: string | null;
+  claimsCount: number;
+  buildsClaimed: number;
+};
+
+export type AdminRunnerListResponse = {
+  runners: AdminRunner[];
+};
+
+export async function listAdminRunners(
+  callerId: string
+): Promise<AdminRunnerListResponse> {
+  const result = (await apiGet(
+    "/admin/runners",
+    "/admin/runners",
+    { headers: { "X-Admin-Id": callerId } }
+  )) as AdminRunnerListResponse;
+  return result;
+}
+
+export async function disableAdminRunner(
+  callerId: string,
+  runnerId: string
+): Promise<AdminRunner> {
+  const result = (await apiSend(
+    "PATCH",
+    `/admin/runners/${runnerId}`,
+    callerId,
+    { status: "DISABLED" }
+  )) as AdminRunner;
+  return result;
+}
+
+export async function enableAdminRunner(
+  callerId: string,
+  runnerId: string
+): Promise<AdminRunner> {
+  const result = (await apiSend(
+    "PATCH",
+    `/admin/runners/${runnerId}`,
+    callerId,
+    { status: "ACTIVE" }
+  )) as AdminRunner;
+  return result;
+}
+
+export async function deleteAdminRunner(
+  callerId: string,
+  runnerId: string
+): Promise<{ deleted: string }> {
+  const result = (await apiSend(
+    "DELETE",
+    `/admin/runners/${runnerId}`,
+    callerId
+  )) as { deleted: string };
   return result;
 }
