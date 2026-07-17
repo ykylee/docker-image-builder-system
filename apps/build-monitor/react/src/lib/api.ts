@@ -99,3 +99,62 @@ export async function getBuildLogs(buildId: string): Promise<BuildLogsResponse> 
     { params: { path: { buildId } } }
   )) as BuildLogsResponse;
 }
+
+// TASK-095: admin allow-list helpers. Svelte `lib/api.ts` 의 listAdminAllowList /
+// addAdminToAllowList / removeAdminFromAllowList 와 1:1 정합. X-Admin-Id
+// header 가 Build Server 의 admin 가드 (401/403) 를 통과해야 응답.
+// generated openapi.d.ts 가 admin/admins 경로의 response envelope 를
+// 완전히 추론하지 못해 `unknown` 으로 받아 inline cast.
+
+export type AdminAllowListResponse = {
+  admins: string[];
+};
+
+function apiSend(
+  method: "POST" | "DELETE",
+  path: string,
+  callerId: string,
+  body?: unknown
+): Promise<unknown> {
+  const fn = (api as unknown as Record<string, (p: string, init: unknown) => Promise<unknown>>)[method];
+  return fn(path, {
+    headers: { "X-Admin-Id": callerId },
+    body
+  });
+}
+
+export async function listAdminAllowList(
+  callerId: string
+): Promise<AdminAllowListResponse> {
+  const result = (await apiGet(
+    "/admin/admins",
+    "/admin/admins",
+    { headers: { "X-Admin-Id": callerId } }
+  )) as AdminAllowListResponse;
+  return result;
+}
+
+export async function addAdminToAllowList(
+  callerId: string,
+  newAdminId: string
+): Promise<AdminAllowListResponse> {
+  const result = (await apiSend(
+    "POST",
+    "/admin/admins",
+    callerId,
+    { adminId: newAdminId }
+  )) as AdminAllowListResponse;
+  return result;
+}
+
+export async function removeAdminFromAllowList(
+  callerId: string,
+  target: string
+): Promise<{ removed: string; admins: string[] }> {
+  const result = (await apiSend(
+    "DELETE",
+    `/admin/admins/${target}`,
+    callerId
+  )) as { removed: string; admins: string[] };
+  return result;
+}

@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-08T23:25:00Z",
-  "purpose_digest": "TASK-094 (Svelte 코드 정리 — frontend rewrite 7-PR 시리즈 final) main 합류 회수 sync. PR 본질: TASK-088~093 의 frontend rewrite 시리즈 final 단계. branch `grok/task-094-svelte-cleanup-2026-07-08` (main `8395702` base). TASK-093 의 Svelte legacy mount + env + SPA fallback 분기 모두 폐기. 삭제 4종: BuildDetail.svelte (308 lines) / PhaseTimeline.svelte / LogStream.svelte / PhaseTimeline.test.ts — 모두 React 마이그레이션 완료 (TASK-091). 신규 1종: BuildDetailRedirect.svelte — Svelte SPA 의 `/builds/<id>` 진입 시 React SPA 의 동등 path 로 `window.location.assign` 즉시 redirect. Build Server `mountBuildMonitorDist` — Svelte 분기 + `mountSvelteIndexHtml` helper + `BUILD_MONITOR_DIST_PATH` env + `/svelte/*` SPA fallback 모두 삭제. React `@fastify/static` 만 mount + raw `fs.createReadStream` 으로 SPA fallback 응답. 유지 (의도적 scope): admin / build-request / api-console 등 운영 중 Svelte routes — React 마이그레이션은 후속 시리즈 (8+ PR) 에서 진행. `svelte` / `svelte-spa-router` package 유지. 결정: 옵션 A 채택 (BuildDetail/PhaseTimeline/LogStream + Build Server Svelte mount 정리, admin/build-request 는 후속 시리즈). 사전 결함 + 보강: `/builds/<id>` 가 Build Server wildcard GET route 매치 → UUID validation 500 (정직한 동작, 운영자 UX 는 React SPA 의 `<Link>` 클릭 사용). 신규 회귀 가드 1건 (UUID validation 500) + 기존 Svelte legacy 가드 5건 폐기. 회귀 baseline: TS 5 packages clean, build-server node:test **143 → 142 PASS** (Svelte legacy 5건 폐기 + 신규 1건), build-monitor vitest **178 → 173 PASS** (PhaseTimeline.test.ts 5건 제거), svelte-check 0/1 (TASK-077 baseline 무해), vite build:react 정상 (gzip js 89.96KB / css 27.81KB), vite build svelte 정상 (운영 중인 admin / build-request pages 정합 유지). frontend rewrite 7-PR 시리즈 종료. 다음: M4.5 admin / build-request / api-console React 마이그레이션 또는 다른 TASK (사용자 결정 대기). workflow meta sync (state rev 113→114, handoff 82→83, work_backlog 77→78, backlog index 47→48 / latest 25→26) 같은 sync commit 안에 포함.",
-  "purpose_digest_rev": 114,
+  "generated_at": "2026-07-08T23:35:00Z",
+  "purpose_digest": "TASK-095 (M4.5 Group A — Header / ThemeToggle / FilterChips React 마이그레이션) main 합류 회수 sync. PR 본질: frontend rewrite 7-PR 시리즈 후속 M4.5 의 1단계. branch `grok/task-095-header-theme-react-2026-07-08` (main `1ab566d` base). Header + ThemeToggle + FilterChips 의 React 측 신규 추가. BuildRow 는 이미 React 측 (TASK-090) 존재. 신규 8종: Header.tsx / Header.css / ThemeToggle.tsx / FilterChips.tsx / adminAllowListStore.ts + 4 test 파일. 수정 2종: App.tsx (모든 라우트가 Header 공유), api.ts (adminAllowList helper + types). Svelte 측 컴포넌트 (Header.svelte / ThemeToggle.svelte / FilterChips.svelte / BuildRow.svelte) 는 그대로 유지 — cross-framework 공존. TASK-096+ 에서 Svelte routes React 마이그레이션 + Svelte scaffold 일괄 정리. 결정: 옵션 A 채택. 사전 결함 + 보강: ThemeToggle `window.matchMedia` jsdom 부재 try/catch fallback; adminAllowListStore 의 Svelte store mock 호환성 → Zustand setState 직접 set; admin `/admin/admins` path 가 generated openapi.d.ts 에 부재 → apiGet/apiSend 캐스팅. 회귀 baseline: TS 5 packages clean, build-monitor vitest **173 → 204 PASS** (신규 31: Header 14 / ThemeToggle 5 / FilterChips 7 / store 5), svelte-check 0/1 (TASK-077 baseline 무해), build-server tests 동일 (영향 0), vite build:react 정상 (gzip js 91.03KB / css 28.10KB), vite build svelte 정상. 다음: TASK-096 Group B (StatusPill + 디자인 토큰 정합) 또는 TASK-097 Group C (Admin 진입점 React 마이그레이션) 진입 (사용자 결정 대기). workflow meta sync (state rev 114→115, handoff 83→84, work_backlog 78→79, backlog index 48→49 / latest 26→27) 같은 sync commit 안에 포함.",
+  "purpose_digest_rev": 115,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,12 +27,13 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "Svelte → React frontend rewrite 7-PR 시리즈 모두 종료. TASK-088 PoC + TASK-089 Login + TASK-090 BuildsList + TASK-091 BuildDetail + TASK-092 lib layer + TASK-093 Build Server dist swap + TASK-094 Svelte cleanup. BuildDetail / PhaseTimeline / LogStream Svelte 코드 모두 삭제. Build Server 는 React dist-react/ 만 mount. Svelte 측 BuildDetail 진입점은 BuildDetailRedirect stub 이 React SPA 로 즉시 redirect. vitest 173/173 PASS, build-server node:test 142/142 PASS, svelte-check 0/1. admin / build-request / api-console 의 Svelte routes 는 후속 시리즈에서 React 마이그레이션 진행.",
-    "current_axis": "Svelte → React frontend rewrite 7-PR 시리즈 종료. 후속: M4.5 admin / build-request / api-console React 마이그레이션 (8+ PR 시리즈, frontend rewrite 7-PR 시리즈와 동일 패턴).",
-    "current_focus": "사용자 결정 대기 — (a) M4.5 admin/build-request React 마이그레이션 8+ PR 시리즈, (b) 다른 TASK 우선 (예: Nextcloud Tasks build-monitor 통합, work_backlog 양방향 sync), (c) 운영 안정화 / 문서 마무리.",
+    "current_baseline": "Svelte → React frontend rewrite 7-PR 시리즈 종료 + M4.5 Group A (TASK-095) main 합류. React 19 + Astryx v0.1.4 + react-router-dom v7 + openapi-fetch + Zustand 5.x store + Header / ThemeToggle / FilterChips 통합. Build Server 는 React dist-react/ 만 mount. Svelte 측 컴포넌트는 cross-framework 공존 유지. vitest 204/204 PASS, svelte-check 0/1, build-server 142/142 PASS. App.tsx 가 모든 라우트에서 Header 공유.",
+    "current_axis": "M4.5 admin / build-request / api-console React 마이그레이션 8+ PR 시리즈. Group A (TASK-095) 완료 → B/C/D/E/F/G 순서로 진행.",
+    "current_focus": "사용자 결정 대기 — (a) TASK-096 Group B (StatusPill + 디자인 토큰), (b) TASK-097 Group C (Admin 진입점), (c) 다른 TASK 우선.",
     "blocked_items": [],
     "recent_done_items": [
-      "TASK-094 Svelte 코드 정리 — branch `grok/task-094-svelte-cleanup-2026-07-08`, main 합류 (frontend rewrite 7-PR 시리즈 final)",
+      "TASK-095 M4.5 Group A (Header / ThemeToggle / FilterChips React 마이그레이션) — branch `grok/task-095-header-theme-react-2026-07-08`, main 합류",
+      "TASK-094 Svelte 코드 정리 (frontend rewrite 7-PR 시리즈 final) — commit `d8763d7` main 합류 (PR #48)",
       "TASK-093 Build Server dist swap (React 빌드 mount) — commit `e1ca2a5` main 합류 (PR #47)",
       "TASK-092 lib layer (Zustand store 분리) — commit `f87bd78` main 합류 (PR #46)",
       "TASK-091 BuildDetail 페이지 React 마이그레이션 — commit `2910a7c` main 합류 (PR #45)",
@@ -40,35 +41,32 @@
       "TASK-089 Login 1 페이지 React 마이그레이션 — commit `a312123` main 합류",
       "TASK-088 React + Astryx 부트스트랩 PoC — commit `27d1035` main 합류 (PR #43)",
       "TASK-087 Nextcloud CalDAV helper 봉인 회수 sync",
-      "TASK-077 admin-initiated runner registration (PR #42 `6847f1e` main 합류)",
-      "TASK-076 insecure-registry only 운영 패턴 검증 (PR #41 `8012942` main 합류)",
-      "TASK-075 credential rotation e2e (PR #40 `8e0b228` main 합류)",
-      "TASK-074 htpasswd 인증 registry push e2e (PR #39 `d87a17c` main 합류)",
-      "TASK-073 RUNNER_REGISTRY_CONFIG_DIR + cli mode registry push e2e (PR #38 `cd01b99` main 합류)",
-      "TASK-086 e2e-multi-runner.sh BASE + heredoc 결함 봉인 (PR #37 `ab0be9e` main 합류)",
-      "TASK-085 production-semantic 운영 검증 보강 (PR #36 `c5e3008` main 합류)",
-      "TASK-084 admin 가드 deep link UX (PR #35 `32aebc7` main 합류)",
-      "TASK-083 admin UI visual + nav 정합 (PR #34 `e28779d` main 합류)",
-      "TASK-082 postgres backend multi-runner 운영 검증 (PR #33 `94a220a` main 합류)",
-      "TASK-081-B multi-runner 운영 검증 (PR #32 `ddae46a` main 합류)",
-      "TASK-081 multi-runner concurrent claim regression guard (PR #31 `16f17a0` main 합류)",
-      "TASK-080 source upload race mitigation (PR #30 `2e2d67a` main 합류)",
-      "TASK-079 skill 측 build request UI + API Console + Header nav 보완 (PR #29 `074a80c` main 합류)",
-      "TASK-078 container self-dogfood (PR #28 `661925a` main 합류)",
-      "TASK-077 admin-initiated runner registration (PR #42 main 합류)",
-      "TASK-076/077 admin 진입점 + 메뉴 통합 (PR #27 `0eb0ad7` main 합류)",
-      "TASK-075 단일 포트 reverse proxy (PR #26 `809f1da` main 합류)"
+      "TASK-077 admin-initiated runner registration (PR #42)",
+      "TASK-076 insecure-registry only 운영 패턴 검증 (PR #41)",
+      "TASK-075 credential rotation e2e (PR #40)",
+      "TASK-074 htpasswd 인증 registry push e2e (PR #39)",
+      "TASK-073 RUNNER_REGISTRY_CONFIG_DIR + cli mode registry push e2e (PR #38)",
+      "TASK-086 e2e-multi-runner.sh BASE + heredoc 결함 봉인 (PR #37)",
+      "TASK-085 production-semantic 운영 검증 보강 (PR #36)",
+      "TASK-084 admin 가드 deep link UX (PR #35)",
+      "TASK-083 admin UI visual + nav 정합 (PR #34)",
+      "TASK-082 postgres backend multi-runner 운영 검증 (PR #33)",
+      "TASK-081-B multi-runner 운영 검증 (PR #32)",
+      "TASK-081 multi-runner concurrent claim regression guard (PR #31)",
+      "TASK-080 source upload race mitigation (PR #30)",
+      "TASK-079 skill 측 build request UI + API Console + Header nav 보완 (PR #29)",
+      "TASK-078 container self-dogfood (PR #28)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 83,
+    "handoff_rev": 84,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 78,
-    "latest_rev": 26,
+    "index_rev": 79,
+    "latest_rev": 27,
     "in_progress_items": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-07.md",
-    "task_count": 7,
+    "task_count": 8,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -78,7 +76,8 @@
       "TASK-091 BuildDetail 페이지 React 마이그레이션 (rev 3 sync 봉인)",
       "TASK-092 lib layer (Zustand store 분리) (rev 4 sync 봉인)",
       "TASK-093 Build Server dist swap (React 빌드 mount) (rev 5 sync 봉인)",
-      "TASK-094 Svelte 코드 정리 (rev 6 sync 봉인)"
+      "TASK-094 Svelte 코드 정리 (rev 6 sync 봉인)",
+      "TASK-095 M4.5 Group A (Header / ThemeToggle / FilterChips React) (rev 7 sync 봉인)"
     ],
     "index_rev": "42",
     "latest_rev": "19"
@@ -89,8 +88,9 @@
     "ai-workflow/memory/active/session_handoff.md",
     "ai-workflow/memory/active/work_backlog.md",
     "ai-workflow/memory/active/backlog/2026-07-08.md",
-    "apps/build-monitor/src/routes/BuildDetailRedirect.svelte",
-    "apps/build-server/src/app/create-app.ts"
+    "apps/build-monitor/react/src/components/Header.tsx",
+    "apps/build-monitor/react/src/components/ThemeToggle.tsx",
+    "apps/build-monitor/react/src/components/FilterChips.tsx"
   ],
   "repository_assessment": {
     "path": "ai-workflow/memory/active/repository_assessment.md",
