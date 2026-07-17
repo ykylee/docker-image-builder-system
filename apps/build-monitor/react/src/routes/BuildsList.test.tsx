@@ -11,6 +11,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { BuildsList } from "./BuildsList";
 import { USER_ID_KEY } from "@/lib/useUserId";
+import { useBuildsListStore } from "@/lib/stores/buildsListStore";
 
 const navigateMock = vi.fn();
 const listBuildsMock = vi.fn();
@@ -31,11 +32,15 @@ vi.mock("@/lib/api", () => ({
 beforeEach(() => {
   navigateMock.mockReset();
   listBuildsMock.mockReset();
+  // TASK-092: store 가 페이지 lifecycle 외부에 살아있으므로 매 테스트마다
+  // reset 으로 이전 테스트의 builds / loading / error / filter 상태 격리.
+  useBuildsListStore.getState().reset();
   localStorage.clear();
 });
 
 afterEach(() => {
   cleanup();
+  useBuildsListStore.getState().reset();
   localStorage.clear();
 });
 

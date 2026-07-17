@@ -1,27 +1,23 @@
-// TASK-091: BuildDetail (React) — /builds/:buildId 의 canonical 4 block +
+// TASK-091/092: BuildDetail (React) — /builds/:buildId 의 canonical 4 block +
 // PhaseTimeline + LogStream + Legacy preview 마이그레이션.
 //
 // Svelte src/routes/BuildDetail.svelte 와 1:1 정합. canonical build/test/
 // deploy/result-delivery block 은 그대로 노출하고, legacy preview-* field 는
 // deprecated 배지와 함께 보존 (TASK-060 follow-up 에서 제거 예정).
 //
-// 데이터 흐름: react-router-dom useParams + Promise.all([getBuild, getBuildLogs]).
-// race 회피 — useEffect cleanup flag 로 stale fetch 결과 setState 차단
-// (React StrictMode 의 mount/unmount/mount 2회 fire 에서도 정합).
+// 데이터 흐름: react-router-dom useParams + Zustand useBuildDetailStore
+// (TASK-092) — useState 4개 + Promise.all lifecycle 을 store action 으로
+// 통합. StrictMode mount/unmount/mount 2회 fire 대응은 store 내부의
+// AbortSignal guard 가 처리.
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { Link, useParams } from "react-router-dom";
 
-import {
-  getBuild,
-  getBuildLogs,
-  type BuildLogsResponse,
-  type BuildStatusResponse
-} from "@/lib/api";
 import { LogStream } from "@/components/LogStream";
 import { PhaseTimeline } from "@/components/PhaseTimeline";
 import { StatusPill } from "@/components/StatusPill";
+import { useBuildDetailStore } from "@/lib/stores/buildDetailStore";
 
 import "./BuildDetail.css";
 
@@ -50,53 +46,32 @@ export function BuildDetail(): ReactElement {
   const params = useParams<{ buildId: string }>();
   const buildId = params.buildId ?? "";
 
-  const [build, setBuild] = useState<BuildStatusResponse | null>(null);
-  const [logs, setLogs] = useState<BuildLogsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // 개별 selector 로 구독 — store 전체 re-render 회피.
+  const build = useBuildDetailStore((s) => s.build);
+  const logs = useBuildDetailStore((s) => s.logs);
+  const loading = useBuildDetailStore((s) => s.loading);
+  const error = useBuildDetailStore((s) => s.error);
+  const fetchBuild = useBuildDetailStore((s) => s.fetchBuild);
+  const reset = useBuildDetailStore((s) => s.reset);
 
   useEffect(() => {
     // buildId 가 빈 string 이면 early return — deep link 와 placeholder 의
     // 안전 정합. URL 직접 입력 + mount 직후 race 회피.
     if (!buildId) {
-      setLoading(false);
+      reset();
       return;
     }
 
-    // StrictMode mount/unmount/mount 2회 fire 대응 — cleanup flag 로
-    // 첫 effect 의 setState 가 두 번째 effect 의 fetch 완료 후 stale 결과를
-    // 덮어쓰지 않도록 차단.
-    let cancelled = false;
-
-    setLoading(true);
-    setError(null);
-
-    (async () => {
-      try {
-        const [b, l] = await Promise.all([
-          getBuild(buildId),
-          getBuildLogs(buildId).catch(() => null)
-        ]);
-        if (cancelled) {
-          return;
-        }
-        setBuild(b);
-        setLogs(l as BuildLogsResponse | null);
-      } catch (e) {
-        if (cancelled) {
-          return;
-        }
-        setError(e instanceof Error ? e.message : String(e));
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
-      }
-    })();
+    const controller = new AbortController();
+    fetchBuild({ buildId, signal: controller.signal });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
+
+    // reset / fetchBuild 는 store/action reference 로 안정적.
+    // buildId 가 바뀔 때만 fetch 재시작.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buildId]);
 
   if (loading) {
