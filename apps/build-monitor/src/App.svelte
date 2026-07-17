@@ -3,7 +3,10 @@
   import Header from "./components/Header.svelte";
   import Login from "./routes/Login.svelte";
   import BuildsList from "./routes/BuildsList.svelte";
-  import BuildDetail from "./routes/BuildDetail.svelte";
+  // TASK-094: BuildDetail 은 React BuildDetail.tsx 로 마이그레이션 완료.
+  // Svelte 측 진입점은 BuildDetailRedirect stub — React SPA 의
+  // `/builds/<id>` 로 즉시 redirect.
+  import BuildDetailRedirect from "./routes/BuildDetailRedirect.svelte";
   // TASK-079 (skill 측 build request UI): BuildRequest 페이지는 일반
   // userId 로그인 직후 진입. admin 여부와 무관하게 모든 인증된 사용자가
   // 접근 가능 — skill 이 build 요청을 제출하는 흐름을 사용자가 직접 시험.
@@ -20,7 +23,7 @@
   const routes = {
     "/": Login,
     "/builds": BuildsList,
-    "/builds/:buildId": BuildDetail,
+    "/builds/:buildId": BuildDetailRedirect,
     // TASK-079: skill 측 build request UI 진입점. 일반 인증 사용자
     // (admin 여부 무관) 가 POST /builds payload 를 직접 작성해 lifecycle
     // 을 시험할 수 있는 페이지.

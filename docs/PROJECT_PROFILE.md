@@ -232,19 +232,19 @@
 - 제약: Postgres smoke는 통과했지만 Drizzle migration artifact 생성/운영 규칙은 아직 고정되지 않았다
 - 기타: 현재 다음 단계는 postgres 경로를 기본 개발 경로로 승격할지 결정하고, `Runner -> Host Server API only`, `Host Server -> PostgreSQL only` 경계 위에서 Runner 연동으로 넘어가는 것이다
 
-## 3.12 React 빌드 mount 운영 패턴 (TASK-093)
-- 의도: TASK-075 의 단일 포트 reverse proxy 위에서 Svelte 빌드를 React 빌드로 swap. Svelte → React frontend rewrite 7-PR 시리즈 6단계. React 빌드(`apps/build-monitor/dist-react/`) 가 primary SPA — `/` + `/assets/*` + `/favicon.svg` + SPA fallback. Svelte 빌드는 legacy deep link 호환을 위해 `/svelte` + `/svelte/` GET 만 raw stream 으로 응답 (TASK-094 의 Svelte 코드 정리까지 보존).
+## 3.12 React 빌드 mount 운영 패턴 (TASK-093 + TASK-094)
+- 의도: TASK-075 의 단일 포트 reverse proxy 위에서 Svelte 빌드를 React 빌드로 swap 후 Svelte legacy mount 제거. Svelte → React frontend rewrite 7-PR 시리즈 6~7단계 (final). React 빌드(`apps/build-monitor/dist-react/`) 만 primary SPA — `/` + `/assets/*` + `/favicon.svg` + SPA fallback. Svelte 빌드는 Build Server 가 더 이상 mount 하지 않음 (TASK-094 에서 Svelte legacy mount + env + SPA fallback 분기 모두 폐기).
 - 핵심 변경:
-  - `apps/build-server/src/app/create-app.ts` `mountBuildMonitorDist` — React `@fastify/static` (decorateReply: true) + Svelte raw fastify route + `fs.createReadStream` + `mountSvelteIndexHtml` helper. SPA fallback 우선순위: `/svelte/*` deep link → Svelte index.html, 그 외 unknown path → React index.html.
-  - 신규 env `BUILD_MONITOR_REACT_DIST_PATH` (default `apps/build-monitor/dist-react`). 기존 `BUILD_MONITOR_DIST_PATH` (default `apps/build-monitor/dist`) 유지.
-  - 신규 test 12건 (React primary + Svelte legacy + API/Swagger 404 + `/api/*` 307 rewrite) — `apps/build-server/tests/static-serve.test.ts`.
+  - `apps/build-server/src/app/create-app.ts` `mountBuildMonitorDist` — React `@fastify/static` (decorateReply: true) 만 mount. SPA fallback: 그 외 unknown path → React index.html (`fs.createReadStream` raw stream). `BUILD_MONITOR_DIST_PATH` env + `mountSvelteIndexHtml` helper + `/svelte/*` SPA fallback 모두 삭제.
+  - env 단일: `BUILD_MONITOR_REACT_DIST_PATH` (default `apps/build-monitor/dist-react`).
+  - 신규 진입점 `apps/build-monitor/src/routes/BuildDetailRedirect.svelte` — Svelte SPA 의 `/builds/:buildId` 진입 시 React SPA 의 `/builds/<id>` 로 즉시 redirect (`window.location.assign`). React BuildDetail 이 `useParams` 로 buildId 추출.
+  - 운영 중인 admin / build-request / api-console 페이지 (App.svelte / Header.svelte / BuildRow.svelte / StatusPill.svelte / AdminTabs.svelte / BuildRequest.svelte / ApiConsole.svelte / Admin{Admins,Builds,Runners,Users}.svelte 등) 는 Svelte 유지 — React 마이그레이션은 후속 시리즈에서 진행. `svelte` / `svelte-spa-router` package 유지.
 - 운영 명령 (Build Server 단일 port):
   ```bash
-  # 1) Build Monitor 의 두 빌드 모두 생성
-  ./apps/build-monitor/node_modules/.bin/vite build  # Svelte dist/
-  (cd apps/build-monitor && ./node_modules/.bin/vite build --config vite.react.config.ts)  # React dist-react/
+  # 1) React 빌드 생성 (Svelte 빌드는 운영 중 페이지용으로 유지하지만 Build Server 가 mount 하지 않음)
+  (cd apps/build-monitor && ./node_modules/.bin/vite build --config vite.react.config.ts)
 
-  # 2) Build Server 부팅 (env 둘 다 기본값 — React primary)
+  # 2) Build Server 부팅 (React dist 만 검증)
   ./node_modules/.bin/tsc -p packages/{shared-contract,shared-config,db}/tsconfig.json && \
     ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && \
     BUILD_REPOSITORY_BACKEND=memory \
@@ -252,13 +252,14 @@
   ```
   그 다음 한 port 에서:
   - `curl http://127.0.0.1:3000/` → React index.html (primary SPA)
-  - `curl http://127.0.0.1:3000/svelte` → Svelte index.html (legacy deep link)
+  - `curl http://127.0.0.1:3000/admin/login` → React index.html (SPA fallback, `/admin/*` deep link)
   - `curl http://127.0.0.1:3000/api/builds` → Build Server API (307 transparent redirect)
+  - `curl http://127.0.0.1:3000/builds/<uuid>` → Build Server 의 `GET /builds/:buildId` route (UUID validation 통과 시 200 JSON; non-uuid 입력 시 500 zod validation)
 - 사전 결함 + 보강:
-  - `@fastify/static` 의 `decorateReply: true` 가 단일 dist 만 지원 (중복 등록 시 throw) → React 만 `@fastify/static` + Svelte 는 raw route + stream.
-  - React 의 index.html 이 `/assets/*` 와 `/favicon.svg` 참조 → `@fastify/static` prefix `/` 가 모든 asset 정상 응답.
-  - 운영 환경에서 Svelte dist 가 빌드되지 않은 경우 (TASK-094 완료 후) → `BUILD_MONITOR_DIST_PATH=` 빈 값 또는 미설정 + svelte dist 디렉터리 부재 시 setNotFoundHandler 가 `/svelte/*` 에 404 응답.
-- 회귀 baseline: TS 5 packages `tsc --noEmit` clean, build-server node:test **131 → 143 PASS** (TASK-075 baseline 131 + 신규 회귀 가드 12), build-monitor vitest 178/178 동일 (영향 0), Go 76/76 동일, svelte-check 0/1.
+  - `mountBuildMonitorDist` 가 Svelte 분기 없이 React 만 mount — `@fastify/static` decorateReply decorator 충돌 회피 단순화.
+  - `/builds/<id>` direct URL 입력 → Build Server 의 wildcard GET route 가 UUID validation 으로 거절 (500). 운영자는 React BuildDetail 진입은 `/api/builds/<id>` (Build Server 가 응답) 또는 `<Link>` 클릭 사용. 정직한 동작.
+  - `BuildDetailRedirect.svelte` 가 Svelte SPA 의 `/builds/<id>` deep link → React SPA 로 redirect — 동일 localStorage `userId` 가 양쪽 SPA 의 session 으로 공유 (cross-tab dispatch 정합).
+- 회귀 baseline: TS 5 packages `tsc --noEmit` clean, build-server node:test **131 → 142 PASS** (TASK-075 baseline 131 + 신규 회귀 가드 11), build-monitor vitest 178 → 173 PASS (PhaseTimeline.test.ts 5건 제거), Go 76/76 동일, svelte-check 0/1.
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
