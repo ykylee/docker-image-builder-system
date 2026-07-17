@@ -20,6 +20,8 @@ import { Theme } from "@astryxdesign/core/theme";
 import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 
 import { App } from "@/App";
+import { useBuildsListStore } from "@/lib/stores/buildsListStore";
+import { useBuildDetailStore } from "@/lib/stores/buildDetailStore";
 
 const listBuildsMock = vi.fn();
 const getBuildMock = vi.fn();
@@ -55,6 +57,9 @@ beforeEach(() => {
   getBuildLogsMock.mockImplementation(
     () => new Promise(() => undefined)
   );
+  // TASK-092: store 격리 — 매 테스트마다 reset 으로 이전 테스트 상태 누수 차단.
+  useBuildsListStore.getState().reset();
+  useBuildDetailStore.getState().reset();
   localStorage.clear();
 });
 
@@ -75,7 +80,7 @@ describe("App (router shell)", () => {
     expect(screen.getByRole("heading", { name: "Builds" })).toBeInTheDocument();
   });
 
-  it("renders the BuildDetail on /builds/:id (TASK-091)", () => {
+  it("renders the BuildDetail on /builds/:id (TASK-091)", async () => {
     renderAt("/builds/00000000-0000-0000-0000-000000000001");
     // getBuildMock 이 infinite pending — BuildDetail 의 loading state 가
     // 그대로 노출되는지 검증 (placeholder 가 mount 되지 않음).
@@ -83,5 +88,8 @@ describe("App (router shell)", () => {
     expect(
       screen.getByText(/Loading build 00000000-0000-0000-0000-000000000001/)
     ).toBeInTheDocument();
+    // TASK-092: store 의 loading state 도 함께 true 인지 검증.
+    expect(useBuildDetailStore.getState().loading).toBe(true);
+    expect(useBuildDetailStore.getState().build).toBeNull();
   });
 });

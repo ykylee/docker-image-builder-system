@@ -19,6 +19,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 
 import { BuildDetail } from "@/routes/BuildDetail";
 import * as api from "@/lib/api";
+import { useBuildDetailStore } from "@/lib/stores/buildDetailStore";
 
 vi.mock("@/lib/api", async () => {
   const actual =
@@ -115,6 +116,14 @@ function renderAt(id: string) {
 beforeEach(() => {
   vi.mocked(api.getBuild).mockReset();
   vi.mocked(api.getBuildLogs).mockReset();
+  // TASK-092: store 가 페이지 lifecycle 외부에 살아있으므로 매 테스트마다
+  // reset 으로 이전 테스트의 build / logs / loading / error 격리.
+  useBuildDetailStore.getState().reset();
+});
+
+afterEach(() => {
+  cleanup();
+  useBuildDetailStore.getState().reset();
 });
 
 afterEach(() => {
