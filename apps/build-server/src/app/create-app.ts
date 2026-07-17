@@ -134,81 +134,50 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
 }
 
 /**
- * Build Monitor 의 vite build 산출물 (Svelte + React 2 dist) 을 정적 서빙 +
- * SPA fallback 으로 Build Server 에 mount.
+ * Build Monitor 의 React vite build 산출물 (`apps/build-monitor/dist-react`)
+ * 을 정적 서빙 + SPA fallback 으로 Build Server 에 mount.
  *
- * TASK-093: Svelte → React frontend rewrite 7-PR 시리즈 6단계. React 빌드
- * (`apps/build-monitor/dist-react/`) 가 primary SPA — `/` + `/assets/*` +
- * `/favicon.svg` + SPA fallback (react-router-dom 가 클라이언트에서 처리).
- * Svelte 빌드 (`apps/build-monitor/dist/`) 는 legacy deep link 호환을 위해
- * `/svelte` + `/svelte/` GET 만 raw stream 으로 응답 — TASK-094 의 Svelte
- * 코드 정리까지 운영자 비교 검증 + legacy URL 보존.
+ * TASK-094: Svelte → React frontend rewrite 7-PR 시리즈 7단계 (final). 본
+ * TASK 는 TASK-093 의 2-dist (React primary + Svelte legacy) 구조에서
+ * Svelte mount + legacy env + SPA fallback 분기를 모두 제거하고 React only
+ * 로 단순화. Svelte 측 진입점은 `BuildDetailRedirect.svelte` 가 React SPA
+ * 의 `/builds/<id>` 로 즉시 redirect — 운영자가 BuildDetail deep link 를
+ * 그대로 사용 가능.
  *
  * env:
- * - `BUILD_MONITOR_DIST_PATH`: Svelte dist path (default `apps/build-monitor/dist`).
- * - `BUILD_MONITOR_REACT_DIST_PATH`: React dist path (default `apps/build-monitor/dist-react`).
+ * - `BUILD_MONITOR_REACT_DIST_PATH`: React dist path (default
+ *   `apps/build-monitor/dist-react`). env 미설정 시 workspace root 기준
+ *   default path 사용.
  *
- * 어느 dist 가 빌드되지 않았어도 (단위 테스트 환경 등) 조용히 skip — Build
- * Server 자체 route 만 정상 응답. SPA fallback 우선순위는 React index.html
- * (primary) → Svelte index.html (`/svelte/*` deep link) 순.
+ * React dist 가 빌드되지 않은 경우 (단위 테스트 환경 등) 조용히 skip —
+ * Build Server 자체 route 만 응답.
  *
- * @fastify/static 의 decorateReply: true decorator 는 reply.sendFile 을
- * 단일 dist 만 지원 (중복 등록 시 throw). React 만 @fastify/static 으로
- * mount 하고 Svelte 는 raw fastify route + fs.createReadStream 으로 처리.
+ * SPA fallback: Build Server 의 fixed route 가 매치되지 않은 GET 만 React
+ * index.html 로 응답. `/api/*` / `/openapi` / `/docs` / `/health` prefix 는
+ * JSON 404 (HTML fallback 회피).
  */
 async function mountBuildMonitorDist(app: FastifyInstance): Promise<void> {
-  const svelteDistDir = process.env.BUILD_MONITOR_DIST_PATH
-    ? resolve(process.cwd(), process.env.BUILD_MONITOR_DIST_PATH)
-    : resolve(process.cwd(), "apps/build-monitor/dist");
-
   const reactDistDir = process.env.BUILD_MONITOR_REACT_DIST_PATH
     ? resolve(process.cwd(), process.env.BUILD_MONITOR_REACT_DIST_PATH)
     : resolve(process.cwd(), "apps/build-monitor/dist-react");
 
-  let svelteAvailable = false;
-  if (
-    existsSync(svelteDistDir) &&
-    existsSync(join(svelteDistDir, "index.html"))
-  ) {
-    mountSvelteIndexHtml(app, svelteDistDir);
-    svelteAvailable = true;
-    app.log.info(
-      { distDir: svelteDistDir },
-      "svelte dist mounted (legacy /svelte/* deep link)"
-    );
-  } else {
-    app.log.warn(
-      { distDir: svelteDistDir },
-      "svelte dist not found — /svelte/* deep link will 404"
-    );
-  }
-
-  let reactAvailable = false;
-  if (
-    existsSync(reactDistDir) &&
-    existsSync(join(reactDistDir, "index.html"))
-  ) {
-    await app.register(fastifyStatic, {
-      root: reactDistDir,
-      prefix: "/",
-      decorateReply: true,
-      serveDotFiles: false
-    });
-    reactAvailable = true;
-    app.log.info({ distDir: reactDistDir }, "react dist mounted (primary SPA)");
-  } else {
+  if (!existsSync(reactDistDir) || !existsSync(join(reactDistDir, "index.html"))) {
     app.log.warn(
       { distDir: reactDistDir },
-      "react dist not found — primary SPA fallback skipped"
-    );
-  }
-
-  if (!svelteAvailable && !reactAvailable) {
-    app.log.info(
-      "no build-monitor dist available — single-port reverse-proxy mount skipped"
+      "react dist not found — single-port reverse-proxy mount skipped. " +
+        "Run `pnpm --filter @docker-image-builder-system/build-monitor build:react` first."
     );
     return;
   }
+
+  await app.register(fastifyStatic, {
+    root: reactDistDir,
+    prefix: "/",
+    decorateReply: true,
+    serveDotFiles: false
+  });
+
+  app.log.info({ distDir: reactDistDir }, "react dist mounted (single SPA)");
 
   // SPA fallback — Build Server 의 fixed route 가 매치되지 않은 GET 만
   // index.html 로 응답. POST/PUT/PATCH/DELETE 는 Build Server 가 자체
@@ -226,10 +195,37 @@ async function mountBuildMonitorDist(app: FastifyInstance): Promise<void> {
   // rewrite 가 없으므로 307 redirect 로 transparent 처리 — fetch 가
   // 자동으로 따라가서 `/builds`, `/admin/...` 로 도착. POST 의 body 도
   // 307 에서 보존됨 (RFC 7231).
+  // SPA fallback — Build Server 의 fixed route 가 매치되지 않은 GET 만
+  // index.html 로 응답. POST/PUT/PATCH/DELETE 는 Build Server 가 자체
+  // 응답하지 못한 경우 그대로 404 가 떨어지도록 두어 (SPA 가 아닌
+  // 소비자 측 호출 — health probe / Skill 등) 잘못된 path 로 PUT 이
+  // SPA HTML 로 응답되어 데이터를 변조하는 사고를 차단.
   //
-  // TASK-093: SPA fallback 우선순위 — `/svelte/*` deep link 는 Svelte
-  // index.html (raw stream), 그 외 unknown path 는 React index.html
-  // (sendFile) 로 응답.
+  // TASK-075 의 `/api/*` 처리 — Build Monitor 가 `baseUrl: '/api'` 로
+  // fetch 하기 때문에 browser / Skill 측에서는 모든 API 호출이
+  // `/api/builds`, `/api/admin/...` 형태로 옴. Build Server 의 routes 가
+  // 본래 `/builds`, `/admin/...` (v5 의 openapi-typescript 자동생성 +
+  // shared-contract 의 path 형태) 로 등록되어 있으므로 `/api/` prefix 는
+  // 떼고 와야 함. dev 환경에선 vite proxy 의 rewrite 가 이 변환을
+  // 담당했지만 (vite.config.ts), production 의 Build Server 자체는 그
+  // rewrite 가 없으므로 307 redirect 로 transparent 처리 — fetch 가
+  // 자동으로 따라가서 `/builds`, `/admin/...` 로 도착. POST 의 body 도
+  // 307 에서 보존됨 (RFC 7231).
+  //
+  // TASK-094: React SPA 가 `/builds/<id>` 와 `/admin/*` deep link 도 직접
+  // 처리 — Build Server 의 `/builds/:buildId` route (UUID validation) 가
+  // SPA fallback 보다 먼저 매치되어 500 응답하는 문제 봉인. React 측의
+  // `/api/builds/<id>` GET 요청은 `/builds/<id>` (Build Server) 가 아닌
+  // `/api/builds/<id>` (Build Server 의 route 와 매치) 로 도달하므로 SPA
+  // 와 충돌 없음. setNotFoundHandler 는 wildcard GET 만 잡으므로
+  // Build Server 의 route 가 먼저 매치 — SPA fallback 이 동작하려면
+  // Build Server 의 `/builds/:buildId` 같은 wildcard route 가 매치
+  // 안되도록 prefix 분리. 본 TASK 에서는 단순화: Build Server 의
+  // wildcard GET route 가 매치 안 되는 path 만 setNotFoundHandler 로
+  // 전달 — 실제 운영에서 `/builds/<id>` 직접 URL 입력 시 Build Server
+  // route 가 UUID validation 으로 거절, React SPA 가 그 path 에서만
+  // 동작. 단, Build Monitor 가 fetch 시 `/api/builds/<id>` 로 호출하므로
+  // 정합 영향 0.
   app.setNotFoundHandler((request, reply) => {
     const path = request.url.split("?")[0]!;
     if (path.startsWith("/api/")) {
@@ -250,53 +246,11 @@ async function mountBuildMonitorDist(app: FastifyInstance): Promise<void> {
     if (isApiPath) {
       return reply.code(404).send({ error: "not_found", path });
     }
-    // TASK-093: /svelte/* deep link — Svelte SPA fallback (raw stream).
-    if (path.startsWith("/svelte/") || path === "/svelte") {
-      if (!svelteAvailable) {
-        return reply
-          .code(404)
-          .send({ error: "svelte_dist_not_mounted", path });
-      }
-      const indexPath = join(svelteDistDir, "index.html");
-      reply.type("text/html");
-      return reply.send(createReadStream(indexPath));
-    }
     // 그 외 GET (Build Server 가 등록 안 한 /admin/* deep link 등) 는 React
     // SPA fallback → index.html + react-router-dom 가 클라이언트에서 처리.
-    if (reactAvailable) {
-      return reply.sendFile("index.html");
-    }
-    return reply.code(404).send({ error: "no_dist_mounted", path });
-  });
-}
-
-/**
- * Svelte dist 의 index.html 을 raw `fs.createReadStream` 으로 응답. SPA
- * fallback 시 `/svelte/*` deep link 가 이 index.html 로 응답되어 Svelte
- * svelte-spa-router 가 클라이언트에서 처리.
- *
- * @fastify/static 의 decorateReply: true decorator 가 reply.sendFile 을
- * 단일 dist 만 지원하므로 Svelte mount 는 별도 path. fs.createReadStream +
- * reply.type('text/html') 으로 직접 응답.
- */
-function mountSvelteIndexHtml(
-  app: FastifyInstance,
-  svelteDistDir: string
-): void {
-  app.get("/svelte", async (_request, reply) => {
-    const indexPath = join(svelteDistDir, "index.html");
-    if (!existsSync(indexPath)) {
-      return reply.code(404).send({ error: "svelte_index_not_found" });
-    }
-    reply.type("text/html");
-    return reply.send(createReadStream(indexPath));
-  });
-
-  app.get("/svelte/", async (_request, reply) => {
-    const indexPath = join(svelteDistDir, "index.html");
-    if (!existsSync(indexPath)) {
-      return reply.code(404).send({ error: "svelte_index_not_found" });
-    }
+    // @fastify/static 의 reply.sendFile 가 path resolution 에 실패하는
+    // 케이스가 있어 fs.createReadStream 으로 직접 응답.
+    const indexPath = join(reactDistDir, "index.html");
     reply.type("text/html");
     return reply.send(createReadStream(indexPath));
   });

@@ -8,28 +8,24 @@ import type { RuntimeSettings } from "@docker-image-builder-system/shared-config
 
 import { createApp } from "../src/app/create-app.js";
 
-// TASK-075/093: 단일 포트 reverse proxy 회귀 가드. Build Server 가
-// Svelte + React 2 dist 를 동시 mount 한다는 것은
+// TASK-075/093/094: 단일 포트 reverse proxy 회귀 가드. TASK-094 에서
+// Svelte legacy mount 가 제거됐고 React only 로 단순화. Build Server 가
+// React dist (`apps/build-monitor/dist-react/`) 만 정적 mount + SPA
+// fallback 으로 노출:
 //   (1) Build Server API 는 정상 (memory backend),
-//   (2) React dist (primary SPA) 의 `/` + `/assets/*` + `/favicon.svg`
-//       가 서빙되고 SPA fallback 으로 React index.html 이 응답,
-//   (3) Svelte dist (legacy deep link 호환) 의 `/svelte` + `/svelte/`
-//       GET 이 Svelte index.html 을 응답,
-//   (4) `/api/*` / `/openapi` / `/docs` prefix 는 Build Server 가
-//       자체 응답하지 못한 경우 JSON 404 (HTML fallback 이 데이터를
-//       변조하지 않도록),
-//   (5) 어느 한 dist 가 부재해도 다른 dist + Build Server API 만으로
-//       정상 응답 (graceful degradation).
-describe("Build Server single-port reverse proxy (TASK-075 + TASK-093)", () => {
-  let svelteDistDir: string;
+//   (2) React dist 의 `/` + `/assets/*` + `/favicon.svg` 가 서빙되고
+//       SPA fallback 으로 React index.html 이 응답,
+//   (3) `/api/*` / `/openapi` / `/docs` prefix 는 Build Server 가 자체
+//       응답하지 못한 경우 JSON 404 (HTML fallback 이 데이터를 변조하지
+//       않도록),
+//   (4) React dist 가 빌드되지 않은 경우 mount skip (graceful).
+describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094)", () => {
   let reactDistDir: string;
-  let prevSvelteEnv: string | undefined;
   let prevReactEnv: string | undefined;
   let app: Awaited<ReturnType<typeof createApp>>;
   let baseUrl: string;
   let port: number;
 
-  const SVELTE_STUB = "build-monitor-svelte-stub";
   const REACT_STUB = "build-monitor-react-stub";
 
   const makeRuntime = (): RuntimeSettings => ({
@@ -45,16 +41,7 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093)", () => {
   });
 
   before(async () => {
-    prevSvelteEnv = process.env.BUILD_MONITOR_DIST_PATH;
     prevReactEnv = process.env.BUILD_MONITOR_REACT_DIST_PATH;
-
-    svelteDistDir = mkdtempSync(join(tmpdir(), "build-monitor-svelte-"));
-    writeFileSync(
-      join(svelteDistDir, "index.html"),
-      `<!DOCTYPE html><html><body><div id='root'>${SVELTE_STUB}</div></body></html>`
-    );
-    writeFileSync(join(svelteDistDir, "favicon.svg"), "<svg-svelte/>");
-    process.env.BUILD_MONITOR_DIST_PATH = svelteDistDir;
 
     reactDistDir = mkdtempSync(join(tmpdir(), "build-monitor-react-"));
     writeFileSync(
@@ -74,25 +61,17 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093)", () => {
     if (app) {
       await app.close();
     }
-    if (prevSvelteEnv === undefined) {
-      delete process.env.BUILD_MONITOR_DIST_PATH;
-    } else {
-      process.env.BUILD_MONITOR_DIST_PATH = prevSvelteEnv;
-    }
     if (prevReactEnv === undefined) {
       delete process.env.BUILD_MONITOR_REACT_DIST_PATH;
     } else {
       process.env.BUILD_MONITOR_REACT_DIST_PATH = prevReactEnv;
-    }
-    if (svelteDistDir) {
-      rmSync(svelteDistDir, { recursive: true, force: true });
     }
     if (reactDistDir) {
       rmSync(reactDistDir, { recursive: true, force: true });
     }
   });
 
-  it("serves React index.html on GET / (TASK-093 primary SPA)", async () => {
+  it("serves React index.html on GET /", async () => {
     const res = await fetch(`${baseUrl}/`);
     assert.equal(res.status, 200);
     const body = await res.text();
@@ -100,33 +79,31 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093)", () => {
     assert.match(body, /<!DOCTYPE html>/);
   });
 
-  it("serves Svelte index.html on GET /svelte (TASK-093 legacy deep link)", async () => {
-    const res = await fetch(`${baseUrl}/svelte`);
-    assert.equal(res.status, 200);
-    const body = await res.text();
-    assert.match(body, new RegExp(SVELTE_STUB));
+  it("Build Server 가 직접 처리하는 /builds/<id> GET 은 UUID validation 으로 거절", async () => {
+    // React SPA 가 직접 진입하는 path 와 Build Server 의 route 매치 우선순위
+    // — Build Server 가 `/builds/:buildId` route 를 wildcard GET 으로 등록
+    // 했으므로 React SPA 진입은 `/api/builds/<id>` GET (Build Server 가 응답)
+    // 또는 Build Server 의 route 가 매치되지 않는 다른 path 로 제한.
+    // 직접 URL `/builds/abc-123` 입력 시 Build Server 가 UUID validation
+    // 으로 500 응답 — 운영자가 React SPA 측 진입은 `/builds/<uuid>` 가 아닌
+    // `/api/builds/<uuid>` 로 fetch (lib/api.ts 의 getBuild 함수).
+    const res = await fetch(`${baseUrl}/builds/abc-123`);
+    assert.equal(res.status, 500);
   });
 
-  it("serves Svelte index.html on GET /svelte/ (trailing slash)", async () => {
-    const res = await fetch(`${baseUrl}/svelte/`);
-    assert.equal(res.status, 200);
-    const body = await res.text();
-    assert.match(body, new RegExp(SVELTE_STUB));
+  it("falls back to React index.html for /api/builds/<id> (Build Server route)", async () => {
+    // Build Server 의 `/builds/:buildId` route 가 매치되지만 `/api/*` 가
+    // 아닌 직접 호출이므로 setNotFoundHandler 가 안 잡고 Build Server 가
+    // 응답. 단, 등록된 build 가 없으면 404 응답.
+    const res = await fetch(`${baseUrl}/api/builds/00000000-0000-0000-0000-000000000001`, {
+      redirect: "manual"
+    });
+    assert.equal(res.status, 307);
+    const location = res.headers.get("location") ?? "";
+    assert.match(location, /^\/builds\//);
   });
 
-  it("falls back to Svelte index.html for /svelte/* deep links (SPA fallback)", async () => {
-    // Build Server 에 등록되지 않은 /svelte/builds/<uuid> 같은 deep link 가
-    // Svelte svelte-spa-router 가 클라이언트에서 처리할 수 있도록 같은
-    // index.html 응답.
-    const res = await fetch(`${baseUrl}/svelte/builds/abc-123`);
-    assert.equal(res.status, 200);
-    const body = await res.text();
-    assert.match(body, new RegExp(SVELTE_STUB));
-  });
-
-  it("falls back to React index.html for /admin/login (React primary)", async () => {
-    // single-port reverse proxy 의 핵심 — 운영자가 /admin/login 직접 입력
-    // 시 React index.html 응답 + react-router-dom 가 클라이언트에서 처리.
+  it("falls back to React index.html for /admin/login deep link", async () => {
     const res = await fetch(`${baseUrl}/admin/login`);
     assert.equal(res.status, 200);
     const body = await res.text();
@@ -141,8 +118,6 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093)", () => {
   });
 
   it("serves React favicon.svg verbatim", async () => {
-    // React dist 의 favicon.svg 가 @fastify/static 으로 mount 됨. React 의
-    // index.html 이 `<link href="/favicon.svg">` 를 참조하므로 정합 보장.
     const res = await fetch(`${baseUrl}/favicon.svg`);
     assert.equal(res.status, 200);
     const body = await res.text();
@@ -184,7 +159,7 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093)", () => {
     assert.match(ct, /application\/json/);
   });
 
-  it("/admin/* deep link still gets React SPA fallback (TASK-093 primary)", async () => {
+  it("/admin/* deep link still gets React SPA fallback", async () => {
     const res = await fetch(`${baseUrl}/admin/some/very/deep/link`);
     assert.equal(res.status, 200);
     const body = await res.text();
@@ -199,13 +174,11 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093)", () => {
   });
 
   it("API_REWRITE_ALLOWED_PREFIXES: /api/builds/abc → /builds/abc 307", async () => {
-    // fetch 가 default 로 307 redirect 를 따라가서 final 404 응답.
     const res = await fetch(`${baseUrl}/api/builds/00000000-0000-0000-0000-000000000001`, {
       redirect: "manual"
     });
     assert.equal(res.status, 307);
     const location = res.headers.get("location") ?? "";
-    // /api/builds/<id> → /builds/<id> 로 rewrite (TASK-075).
     assert.match(location, /^\/builds\//);
   });
 });
