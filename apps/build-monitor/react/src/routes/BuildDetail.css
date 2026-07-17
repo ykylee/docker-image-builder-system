@@ -1,0 +1,197 @@
+/* TASK-091: BuildDetail (React) page styles.
+ *
+ * Svelte src/routes/BuildDetail.svelte 의 <style> 과 의미상 1:1 정합.
+ * 디자인 토큰 — --color-text-primary / --color-text-secondary /
+ * --color-text-muted / --color-bg-surface-elevated / --color-border-subtle /
+ * --color-accent-primary / --color-accent-warning / --color-bg-canvas.
+ *
+ * detail / head / meta / block / kv / kv-with-meta / deprecated / badge /
+ * muted / err / small 클래스는 Svelte scoped CSS 와 동일 명명 + React 에서
+ * inline style 대신 CSS class 로 통일 (BuildDetail.tsx 의 styled wrapper
+ * 부담 ↓). React CSS module 미사용 — globals.css 와 통합 import 로 단순화.
+ */
+
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xxl, 32px);
+  padding: var(--space-xxl, 32px);
+  max-width: 1100px;
+  margin: 0 auto;
+  color: var(--color-text-primary);
+  font-family: var(--font-family-sans, system-ui, sans-serif);
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg, 16px);
+  flex-wrap: wrap;
+}
+
+.head h1 {
+  margin: 0;
+  font-size: var(--size-xxl, 24px);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.muted {
+  color: var(--color-text-muted);
+  font-size: var(--size-sm, 13px);
+  margin: 0;
+}
+
+.err {
+  color: var(--color-accent-danger, #dc2626);
+  font-size: var(--size-sm, 13px);
+  margin: 0;
+  padding: var(--space-md, 12px) var(--space-lg, 16px);
+  background: color-mix(in srgb, var(--color-accent-danger, #dc2626) 10%, transparent);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid color-mix(in srgb, var(--color-accent-danger, #dc2626) 35%, transparent);
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md, 12px);
+  padding: var(--space-lg, 16px);
+  background: var(--color-bg-surface-elevated);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md, 8px);
+  margin: 0;
+}
+
+.meta > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.meta dt {
+  font-size: var(--size-xs, 11px);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.meta dd {
+  margin: 0;
+  font-size: var(--size-sm, 13px);
+  color: var(--color-text-primary);
+}
+
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md, 12px);
+  padding: var(--space-lg, 16px);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-canvas, transparent);
+}
+
+.block h2 {
+  margin: 0;
+  font-size: var(--size-lg, 16px);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+.block.deprecated {
+  border-style: dashed;
+  background: transparent;
+}
+
+.block.deprecated h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+  color: var(--color-text-secondary);
+}
+
+.badge {
+  font-size: var(--size-xs, 11px);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px var(--space-sm, 8px);
+  background: color-mix(in srgb, var(--color-accent-warning, #f59e0b) 20%, transparent);
+  color: var(--color-accent-warning, #f59e0b);
+  border-radius: var(--radius-pill, 999px);
+  border: 1px solid color-mix(in srgb, var(--color-accent-warning, #f59e0b) 35%, transparent);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md, 12px);
+  margin: 0;
+}
+
+.kv > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kv dt {
+  font-size: var(--size-xs, 11px);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.kv dd {
+  margin: 0;
+  font-size: var(--size-sm, 13px);
+  color: var(--color-text-primary);
+}
+
+.small {
+  font-size: var(--size-xs, 11px);
+  color: var(--color-text-muted);
+}
+
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+  color: var(--color-accent-primary);
+  font-size: var(--size-sm, 13px);
+  text-decoration: none;
+  font-weight: var(--weight-medium);
+  margin-bottom: var(--space-md, 12px);
+  width: fit-content;
+}
+
+.back-link:hover {
+  text-decoration: underline;
+}
+
+.mono {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+/* TASK-091 self-review amend 3: PhaseTimeline 의 수직 연결선. Svelte 의
+ * .timeline::before pseudo-element 와 의미상 동일 — React inline style 로
+ * 는 동일한 효과를 낼 수 없으므로 data-testid="phase-timeline" 의 ::before
+ * 로 css 변수를 통해 노출. PhaseStep 의 z-index 1 이 이 라인 위에 dot 을
+ * 그리도록 분리. */
+[data-testid="phase-timeline"]::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 4.5px;
+  width: 2px;
+  background: var(--color-border-subtle);
+  z-index: 0;
+}

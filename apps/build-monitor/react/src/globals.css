@@ -23,3 +23,14 @@
   color: var(--color-text-primary, inherit);
   background: var(--color-background-body, transparent);
 }
+
+/* TASK-091: PhaseTimeline 의 in-progress dot pulse animation. Svelte
+ * PhaseTimeline.svelte 의 `@keyframes pulse` 와 의미상 동일. inline style 의
+ * animation property 와 매칭되도록 keyframe 이름도 동일하게 phase-pulse 로
+ * 통일 (Svelte 는 `@keyframes pulse` 였으나 namespace 충돌 회피 위해
+ * phase-pulse 로 rename).
+ */
+@keyframes phase-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+}
