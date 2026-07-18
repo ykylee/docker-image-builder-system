@@ -132,15 +132,17 @@ export function BuildRequest(): ReactElement {
   // React 가 dispatch 후에 동기화되지만, onSubmit handler 가 호출되는
   // 시점에는 React state 가 batched 상태로 남아 있을 수 있어 production
   // 환경에서도 같은 race 가 발생할 수 있음. refs 는 항상 최신 DOM 값.
+  // React 19 의 useRef<HTMLInputElement>(null) 는 RefObject<HTMLInputElement | null>
+  // 으로 추론되므로 명시적 | null 표기.
   const refs = {
-    appName: useRef<HTMLInputElement>(null),
-    requestedBy: useRef<HTMLInputElement>(null),
-    objectKey: useRef<HTMLInputElement>(null),
-    checksumSha256: useRef<HTMLInputElement>(null),
-    sizeBytes: useRef<HTMLInputElement>(null),
-    entrypointPath: useRef<HTMLInputElement>(null),
-    dockerfilePath: useRef<HTMLInputElement>(null),
-    previewTtlMinutes: useRef<HTMLInputElement>(null)
+    appName: useRef<HTMLInputElement | null>(null),
+    requestedBy: useRef<HTMLInputElement | null>(null),
+    objectKey: useRef<HTMLInputElement | null>(null),
+    checksumSha256: useRef<HTMLInputElement | null>(null),
+    sizeBytes: useRef<HTMLInputElement | null>(null),
+    entrypointPath: useRef<HTMLInputElement | null>(null),
+    dockerfilePath: useRef<HTMLInputElement | null>(null),
+    previewTtlMinutes: useRef<HTMLInputElement | null>(null)
   };
 
   // userId store + 첫 진입 시 default preset 적용.
@@ -197,7 +199,7 @@ export function BuildRequest(): ReactElement {
     // 를 ref 기반 read 로 우회. refs 는 React render 와 무관하게 항상 최신
     // DOM property 를 가리키므로 controlled input 의 .value 가 React state
     // 와 sync 되지 않은 시점에서도 안정적.
-    const readField = (ref: React.RefObject<HTMLInputElement>): string =>
+    const readField = (ref: React.RefObject<HTMLInputElement | null>): string =>
       ref.current?.value ?? "";
     const appNameValue = readField(refs.appName);
     const requestedByValue = readField(refs.requestedBy);

@@ -16,7 +16,6 @@
 //     helper 가 field-level banner 로 변환
 //   - Reset 버튼이 form / lastResult / errors 모두 초기화
 
-import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
