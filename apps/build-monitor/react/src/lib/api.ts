@@ -270,3 +270,135 @@ export async function deleteAdminRunner(
   )) as { deleted: string };
   return result;
 }
+
+// TASK-099: BuildRequest UI (POST /builds payload 직접 작성) helper.
+//
+// Svelte src/lib/api.ts 의 submitBuildRequest + parseApiError 와 1:1 정합.
+// 202 (BuildAcceptedResponse) 또는 409 (BuildDuplicateResponse) 둘 다 가능
+// — caller 가 `result.duplicate` 분기로 새 build 와 중복 build 를 구분.
+//
+// openapi-fetch 의 `POST` 동적 URL 치환 helper 를 직접 호출. generated
+// openapi.d.ts 가 BuildRequest / BuildAcceptedResponse / BuildDuplicateResponse
+// schema 를 모두 노출하므로 components alias 사용.
+export type BuildRequestPayload = components["schemas"]["BuildRequest"];
+export type BuildAcceptedResponse = components["schemas"]["BuildAcceptedResponse"];
+export type BuildDuplicateResponse = components["schemas"]["BuildDuplicateResponse"];
+export type BuildRequestResponse = BuildAcceptedResponse | BuildDuplicateResponse;
+
+export async function submitBuildRequest(
+  payload: BuildRequestPayload
+): Promise<BuildRequestResponse> {
+  const fetchFn = (api as unknown as {
+    POST: (p: string, init: ApiGetParams) => Promise<unknown>;
+  }).POST;
+  const result = (await fetchFn("/builds", {
+    headers: { "content-type": "application/json" },
+    body: payload
+  })) as {
+    data?: BuildRequestResponse;
+    error?: unknown;
+    response?: { status?: number };
+  };
+  if (result.data) {
+    return result.data;
+  }
+  const status = result.response?.status ?? 0;
+  throw new Error(
+    `POST /builds failed: ${status} ${JSON.stringify(result.error)}`
+  );
+}
+
+// TASK-099: parseApiError helper. submitBuildRequest 가 throw 한 error 를
+// BuildRequest UI 가 친화적으로 표시할 수 있도록 변환. zod field-level error
+// 가 들어있는 경우 field-level banner 에, 그 외는 일반 error banner 에.
+//
+// Svelte src/lib/api.ts 의 parseApiError 구현을 1:1 이식 — brace-count JSON
+// envelope 추출 + zod issue 의 path[] 를 dot-join 한 field-error 변환.
+export interface ParsedApiError {
+  /** 1줄 요약. error banner 에 표시. */
+  summary: string;
+  /** field-level 에러. zod issue 가 detected 된 경우에만 non-empty. */
+  fieldErrors: Array<{ path: string; message: string }>;
+}
+
+export function parseApiError(err: unknown): ParsedApiError {
+  const raw = err instanceof Error ? err.message : String(err);
+  const failedAt = raw.indexOf("failed:");
+  const searchStart = failedAt >= 0 ? failedAt : 0;
+  let jsonStart = -1;
+  for (let i = searchStart; i < raw.length; i++) {
+    if (raw[i] === "{") {
+      jsonStart = i;
+      break;
+    }
+  }
+  if (jsonStart === -1) {
+    return { summary: raw, fieldErrors: [] };
+  }
+  // brace-count 로 balanced JSON envelope 끝 찾기.
+  let depth = 0;
+  let jsonEnd = -1;
+  let inString = false;
+  let escape = false;
+  for (let i = jsonStart; i < raw.length; i++) {
+    const ch = raw[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (inString) {
+      if (ch === "\\") {
+        escape = true;
+        continue;
+      }
+      if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      continue;
+    }
+    if (ch === "{") {
+      depth += 1;
+    } else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) {
+        jsonEnd = i;
+        break;
+      }
+    }
+  }
+  if (jsonEnd === -1) {
+    return { summary: raw, fieldErrors: [] };
+  }
+  const jsonText = raw.slice(jsonStart, jsonEnd + 1);
+  let envelope: { message?: string } | null = null;
+  try {
+    envelope = JSON.parse(jsonText) as { message?: string };
+  } catch {
+    return { summary: raw, fieldErrors: [] };
+  }
+  // zod issue 추출 시도. message 가 JSON array 형태면 field-level error.
+  if (!envelope.message || envelope.message[0] !== "[") {
+    return { summary: envelope.message ?? raw, fieldErrors: [] };
+  }
+  let issues: Array<{ path?: string[]; message?: string }>;
+  try {
+    issues = JSON.parse(envelope.message) as Array<{
+      path?: string[];
+      message?: string;
+    }>;
+  } catch {
+    return { summary: envelope.message ?? raw, fieldErrors: [] };
+  }
+  const fieldErrors = issues.map((issue) => ({
+    path: (issue.path ?? []).join("."),
+    message: issue.message ?? "Invalid"
+  }));
+  const summary = `${fieldErrors.length} field(s) failed: ${fieldErrors
+    .map((fe) => fe.path)
+    .join(", ")}`;
+  return { summary, fieldErrors };
+}

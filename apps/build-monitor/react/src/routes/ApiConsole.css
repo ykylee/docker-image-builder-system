@@ -1,0 +1,160 @@
+/* TASK-099 (M4.5 Group E): ApiConsole (React) CSS.
+ *
+ * Svelte src/routes/ApiConsole.svelte 의 inline `<style>` block 을 1:1
+ * 정합으로 변환. 우리 Svelte tokens.css (react/src/tokens.css) 의 디자인
+ * 토큰을 직접 사용 — fallback 없음 (TASK-096.5 디자인 토큰 단일화).
+ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+  /* header 가 sticky 라서 viewport 에서 header 높이를 뺀 만큼 frame 이 차지. */
+  height: calc(100vh - 64px - var(--space-xl) * 2);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-lg);
+  flex-wrap: wrap;
+}
+
+.page-head h1 {
+  margin: 0;
+  font-size: var(--size-xxl);
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.02em;
+  background: linear-gradient(90deg, var(--color-text-primary), var(--color-text-muted));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.page-head .muted {
+  color: var(--color-text-muted);
+  margin-top: var(--space-xs);
+  max-width: 60ch;
+  line-height: var(--motion-duration-base);
+}
+
+.muted { color: var(--color-text-muted); }
+
+.actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.btn-primary {
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-primary);
+  color: white;
+  font-weight: var(--weight-semibold);
+  font-size: var(--size-sm);
+  border: none;
+  cursor: pointer;
+  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+  box-shadow: var(--shadow-glow);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-glow);
+}
+
+.btn-secondary {
+  padding: var(--space-sm) var(--space-xl);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-weight: var(--weight-medium);
+  font-size: var(--size-sm);
+  border: 1px solid var(--color-border-subtle);
+  cursor: pointer;
+  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+}
+
+.btn-secondary:hover {
+  color: var(--color-text-primary);
+  border-color: var(--color-text-secondary);
+}
+
+.frame-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 480px;
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-card);
+  background: white;
+}
+
+iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+}
+
+.overlay.error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-surface);
+  text-align: center;
+  padding: var(--space-lg);
+  gap: var(--space-md);
+}
+
+.overlay strong {
+  color: var(--color-accent-danger);
+  font-size: var(--size-lg);
+}
+
+.overlay p { color: var(--color-text-muted); }
+
+.hint-block {
+  background: var(--color-bg-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.hint-block summary {
+  cursor: pointer;
+  font-size: var(--size-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.hint-block p {
+  margin: var(--space-sm) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--size-sm);
+  line-height: var(--motion-duration-base);
+}
+
+.hint-block code {
+  background: var(--color-bg-surface-elevated);
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--size-xs);
+}
