@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-18T00:00:00Z",
-  "purpose_digest": "TASK-099 BuildRequest + ApiConsole React 마이그레이션 (M4.5 Group E) 1차 commit (`8a07881`). frontend rewrite 7-PR 시리즈 후속 M4.5 5단계 — 마지막 운영 중 Svelte 측 페이지 (BuildRequest + ApiConsole) 를 React 측으로 1:1 정합. 결정: 옵션 A (단일 PR, TASK-098 Admin 4종 패턴 동일). 본 commit (rev 120→121): 신규 6 file (BuildRequest.tsx + .css + .test.tsx / ApiConsole.tsx + .css + .test.tsx) + 수정 2 file (App.tsx routes 추가 / api.ts submitBuildRequest + parseApiError + 관련 타입 export) + 운영 가이드 1 file. 9 file / +1880 / -7. 핵심: input ref 패턴으로 native DOM value 직접 read (React state batching 우회) + fireEvent.submit(form) 으로 form submit trigger (RTL 14.x known issue 우회). 회귀 baseline: TS 5 packages clean, vitest 265/265 PASS (TASK-098 baseline 244 → +21 신규: BuildRequest 15 + ApiConsole 6), svelte-check 0/1, vite build:react 정상 (gzip js 99.08KB / css 30.62KB — baseline js 95.14KB → +3.94KB / css 29.63KB → +0.99KB), vite build svelte 정상. follow-up: TASK-100 Group F (App.svelte router 단순화) / TASK-101 Group G (Svelte scaffold 일괄 정리 — admin / build-request / api-console Svelte pages + components/routes 일괄 삭제 + svelte / svelte-spa-router package 정리). M4.5 시리즈 Group A~E (TASK-095~099) 완료 — Group F + G 후속. workflow meta sync (state rev 120→121, handoff 89→90, work_backlog 84→85, backlog index 54→55 / latest 32→33) 같은 sync commit 안에 포함.",
-  "purpose_digest_rev": 121,
+  "purpose_digest": "PR #53 (TASK-096.5 디자인 토큰 단일화 / `73c5081`) + PR #54 (TASK-099 BuildRequest + ApiConsole React 마이그레이션 / `e46f2f5`) main 합류 회수 sync. 본 세션은 2026-07-08 ~ 2026-07-18 의 단일 작업 흐름에서 frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 Group A~E (TASK-095~099) + 디자인 토큰 단일화 (TASK-096.5 / PR #53) 까지 14 TASK 연속 봉인. main HEAD `e46f2f5`. TASK-096.5 결정: 옵션 A' (Svelte tokens.css 단일 source-of-truth + Astryx Theme 컴포넌트 보호용 layer 분리). PR #53 self-review amend 5건 봉인 (trailing newline 부재 5 파일). TASK-099 결정: 옵션 A (단일 PR, TASK-098 Admin 4종 패턴 동일). cherry-pick 으로 TASK-099 의 본 TASK 만 main HEAD `73c5081` 에 정렬 후 PR #54 오픈 (TASK-096.5 부분 conflict 회피). PR #54 self-review amend 3건 봉인 — (C-1) React 19 type 정합 (`useRef<HTMLInputElement>(null)` 명시), (C-2) unused `act` import 제거, (I-3) trailing newline 부재 (BuildRequest.tsx / .test.tsx / ApiConsole.tsx / .test.tsx). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 265 (+258) / build-server 113 → 143 (+30) / TS 5 packages clean / svelte-check 0/1 / vite build:react gzip js 99.08KB / css 30.62KB / vite build svelte 정상. follow-up: TASK-100 Group F (App.svelte router 단순화) / TASK-101 Group G (Svelte scaffold 일괄 정리 — admin / build-request / api-console Svelte pages + components/routes 일괄 삭제 + svelte / svelte-spa-router package 정리). M4.5 시리즈 Group A~E main 합류 완료. workflow meta sync (state rev 121→122, handoff 90→91, work_backlog 85→86, backlog index 55→56 / latest 33→34) 같은 sync commit 안에 포함.",
+  "purpose_digest_rev": 122,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,13 +27,13 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-099 BuildRequest + ApiConsole React 마이그레이션 (M4.5 Group E) 1차 commit `8a07881`. main HEAD `8a07881` (TASK-099). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 265 (+258) / build-server 113 → 143 (+30) / TS 5 packages clean / svelte-check 0 errors 1 warning (TASK-077 baseline) / vite build:react gzip js 99.08KB / css 30.62KB (baseline js +3.94KB / css +0.99KB) / vite build svelte 정상. frontend rewrite 7-PR 시리즈 + M4.5 Group A~E (TASK-095~099) + 디자인 토큰 단일화 (TASK-096.5) + BuildRequest + ApiConsole React 마이그레이션 (TASK-099) 까지 13 TASK 연속 봉인 (2026-07-08 ~ 2026-07-18).",
-    "current_axis": "M4.5 admin / build-request / api-console React 마이그레이션 8-PR 시리즈 + 디자인 시스템 정합. Group A (TASK-095) + B (TASK-096) + C (TASK-097) + D (TASK-098) + E (TASK-099) + 디자인 토큰 단일화 (TASK-096.5) 완료 → F (TASK-100) / G (TASK-101) 순서로 진행. Task count = 13 / 14 (F~G pending).",
-    "current_focus": "TASK-099 1차 commit 완료. 후속 결정 대기 — (a) PR 오픈 → main 합류 후 TASK-100 Group F (App.svelte router 단순화) / (b) PR 오픈 → main 합류 후 TASK-101 Group G (Svelte scaffold 일괄 정리) / (c) 다른 TASK 우선.",
+    "current_baseline": "PR #53 (TASK-096.5 디자인 토큰 단일화 / `73c5081`) + PR #54 (TASK-099 BuildRequest + ApiConsole React 마이그레이션 / `e46f2f5`) main 합류. main HEAD `e46f2f5` (TASK-099 squash). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 265 (+258) / build-server 113 → 143 (+30) / TS 5 packages clean / svelte-check 0 errors 1 warning (TASK-077 baseline) / vite build:react gzip js 99.08KB / css 30.62KB / vite build svelte 정상. frontend rewrite 7-PR 시리즈 + M4.5 Group A~E (TASK-095~099) + 디자인 토큰 단일화 (TASK-096.5) + BuildRequest + ApiConsole React 마이그레이션 (TASK-099) 까지 14 TASK 연속 봉인 (2026-07-08 ~ 2026-07-18).",
+    "current_axis": "M4.5 admin / build-request / api-console React 마이그레이션 8-PR 시리즈 + 디자인 시스템 정합. Group A (TASK-095) + B (TASK-096) + C (TASK-097) + D (TASK-098) + E (TASK-099) + 디자인 토큰 단일화 (TASK-096.5) 완료 → F (TASK-100) / G (TASK-101) 순서로 진행. Task count = 14 / 15 (F~G pending).",
+    "current_focus": "TASK-099 (PR #54) main 합류 완료. 후속 결정 대기 — (a) TASK-100 Group F (App.svelte router 단순화) / (b) TASK-101 Group G (Svelte scaffold 일괄 정리) / (c) 다른 TASK 우선.",
     "blocked_items": [],
     "recent_done_items": [
-      "TASK-099 M4.5 Group E (BuildRequest + ApiConsole React 마이그레이션) — `8a07881` (2026-07-18, 본 세션)",
-      "TASK-096.5 디자인 토큰 단일화 (M4.6) — `1cf8d0c` (2026-07-18, 본 세션)",
+      "TASK-099 M4.5 Group E (BuildRequest + ApiConsole React 마이그레이션) — `e46f2f5` PR #54 main 합류 (2026-07-18, 본 세션)",
+      "TASK-096.5 디자인 토큰 단일화 (M4.6) — `73c5081` PR #53 main 합류 (2026-07-18, 본 세션)",
       "TASK-098 M4.5 Group D (Admin 페이지 4종 React 마이그레이션) — `3403c9e` PR #52 main 합류 (2026-07-08)",
       "TASK-097 M4.5 Group C (Admin 진입점 React 마이그레이션) — `7829c92` PR #51 main 합류",
       "TASK-096 M4.5 Group B (StatusPill 디자인 토큰 baseline 정합) — `6f05c37` PR #50 main 합류",
@@ -71,10 +71,8 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-18.md",
-    "task_count": 13,
-    "in_progress_items": [
-      "TASK-099 M4.5 Group E (BuildRequest + ApiConsole React 마이그레이션) (1차 commit `8a07881`, PR 오픈 대기)"
-    ],
+    "task_count": 14,
+    "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
       "TASK-088 React + Astryx 부트스트랩 PoC (rev 1 sync 봉인)",
@@ -88,11 +86,12 @@
       "TASK-096 M4.5 Group B (StatusPill 디자인 토큰 baseline 정합) (rev 8 sync 봉인)",
       "TASK-097 M4.5 Group C (Admin 진입점 React) (rev 9 sync 봉인)",
       "TASK-098 M4.5 Group D (Admin 페이지 4종) (rev 10 sync 봉인)",
-      "TASK-096.5 디자인 토큰 단일화 (M4.6) (rev 11 sync 봉인)",
-      "TASK-099 M4.5 Group E (BuildRequest + ApiConsole React 마이그레이션) (rev 12 sync 봉인)"
+      "TASK-096.5 디자인 토큰 단일화 (M4.6) (rev 11 sync 봉인, PR #53 main 합류)",
+      "TASK-099 M4.5 Group E (BuildRequest + ApiConsole React 마이그레이션) (rev 12 sync 봉인, PR #54 main 합류)",
+      "PR #53 + PR #54 main 합류 회수 sync (rev 13 sync 봉인)"
     ],
-    "index_rev": "44",
-    "latest_rev": "21"
+    "index_rev": "45",
+    "latest_rev": "22"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
