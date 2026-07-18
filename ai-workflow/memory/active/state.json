@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-18T00:00:00Z",
-  "purpose_digest": "TASK-101 Svelte scaffold 일괄 정리 (M4.5 Group G) 1차 commit (`aae7f31`). frontend rewrite 시리즈 후속 M4.5 7단계 (마지막) — Svelte 측 src/ 디렉터리 일괄 폐기 + 빌드 파이프라인 단순화. 결정: 옵션 A (src/ 일괄 삭제 + 설정 파일 단순화). 본 commit (rev 124→125): apps/build-monitor/src/ 전체 46 file 삭제 (App.svelte + components 8 + lib 7 + routes 16 + test 2 + main.ts) + tsconfig.json 삭제 (tsconfig.react.json 단일화) + 신규 1 file (react/src/test/setup.ts) + 수정 4 file (vite.config.ts / package.json / 2 css). 51 file / +32 / -7910. 운영 영향 0 (Svelte 측 src/ 가 production 에서 unreachable). 회귀 baseline: TS 5 packages clean, vitest 130/130 PASS (TASK-100 baseline 265 → 130, Svelte 측 135 케이스 일괄 삭제), vite build:react 정상 (gzip js 99.01KB / css 30.62KB — TASK-100 baseline과 거의 동일), svelte-check script 제거. 사전 결함 + 보강 4건: (1) vitest localStorage 부재 → React 측 src/test/setup.ts 신규, (2) @testing-library/jest-dom matcher 부재 → setup.ts 에 import 추가, (3) React 측 component CSS 의 Svelte 측 tokens.css import 깨짐 → 두 CSS @import 경로 React 측 tokens.css 로 교체, (4) useUserId.test.ts 부재 → Login.test.tsx 가 React 측 lib/useUserId.ts 사용 — 회귀 영향 0. 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. M4.5 8-PR 시리즈 (TASK-095~102) 완료 — 모든 Task 들이 main 합류. workflow meta sync (state rev 124→125, handoff 93→94, work_backlog 88→89, backlog index 58→59 / latest 36→37) 같은 sync commit 안에 포함.",
-  "purpose_digest_rev": 125,
+  "purpose_digest": "PR #56 (TASK-101 Svelte scaffold 일괄 정리 / `313ae2e`) main 합류 회수 sync. frontend rewrite 시리즈 후속 M4.5 7단계 (마지막) — Svelte 측 src/ 디렉터리 일괄 폐기 + 빌드 파이프라인 단순화 봉인. 결정: 옵션 A (src/ 일괄 삭제 + 설정 파일 단순화). main HEAD `313ae2e` (TASK-101 squash). 누적 회귀 baseline (main HEAD `313ae2e`, TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB — TASK-100 baseline과 거의 동일). 운영 영향 0 (Svelte 측 src/ 가 production 에서 unreachable). 사전 결함 + 보강 4건: (1) vitest localStorage 부재 → React 측 src/test/setup.ts 신규 (Svelte 측 setup.ts 의 localStorage / sessionStorage / matchMedia fallback 이식), (2) @testing-library/jest-dom matcher 부재 → setup.ts 에 import 추가, (3) React 측 component CSS 의 Svelte 측 tokens.css import 깨짐 → 두 CSS @import 경로 React 측 tokens.css 로 교체 (TASK-096.5 디자인 토큰 단일화 정합), (4) useUserId.test.ts 부재 → Login.test.tsx 가 React 측 lib/useUserId.ts 사용 — 회귀 영향 0. M4.5 8-PR 시리즈 (TASK-095~102) 완료 — 모든 Task 들이 main 합류. workflow meta sync (state rev 125→126, handoff 94→95, work_backlog 89→90, backlog index 59→60 / latest 37→38) 같은 sync commit 안에 포함.",
+  "purpose_digest_rev": 126,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,12 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-101 Svelte scaffold 일괄 정리 (M4.5 Group G) 1차 commit `aae7f31`. main HEAD `aae7f31` (TASK-101). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react gzip js 99.01KB / css 30.62KB. frontend rewrite 7-PR 시리즈 + M4.5 Group A~G (TASK-095~101) + 디자인 토큰 단일화 (TASK-096.5) + BuildRequest + ApiConsole React 마이그레이션 (TASK-099) + App.svelte router 단순화 (TASK-100) + Svelte scaffold 일괄 정리 (TASK-101) 까지 16 TASK 연속 봉인 (2026-07-08 ~ 2026-07-18).",
+    "current_baseline": "PR #56 (TASK-101 Svelte scaffold 일괄 정리 / `313ae2e`) main 합류. main HEAD `313ae2e` (TASK-101 squash). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react gzip js 99.01KB / css 30.62KB. frontend rewrite 7-PR 시리즈 + M4.5 Group A~G (TASK-095~101) + 디자인 토큰 단일화 (TASK-096.5) + BuildRequest + ApiConsole React 마이그레이션 (TASK-099) + App.svelte router 단순화 (TASK-100) + Svelte scaffold 일괄 정리 (TASK-101) 까지 16 TASK 연속 봉인 (2026-07-08 ~ 2026-07-18).",
     "current_axis": "M4.5 8-PR 시리즈 (TASK-095~102) 완료 — 모든 Task 들이 main 합류. 후속은 별도 사용자 결정.",
-    "current_focus": "TASK-101 1차 commit 완료. PR 오픈 → main 합류 후 사용자 결정 대기.",
+    "current_focus": "TASK-101 (PR #56) main 합류 완료. frontend rewrite + M4.5 전체 TASK 봉인. 후속 결정 대기.",
     "blocked_items": [],
     "recent_done_items": [
-      "TASK-101 M4.5 Group G (Svelte scaffold 일괄 정리) — `aae7f31` (2026-07-18, 본 세션)",
+      "TASK-101 M4.5 Group G (Svelte scaffold 일괄 정리) — `313ae2e` PR #56 main 합류 (2026-07-18, 본 세션)",
       "TASK-100 M4.5 Group F (App.svelte router 단순화) — `9dfbe08` PR #55 main 합류 (2026-07-18, 본 세션)",
       "TASK-099 M4.5 Group E (BuildRequest + ApiConsole React 마이그레이션) — `e46f2f5` PR #54 main 합류 (2026-07-18, 본 세션)",
       "TASK-096.5 디자인 토큰 단일화 (M4.6) — `73c5081` PR #53 main 합류 (2026-07-18, 본 세션)",
@@ -74,9 +74,7 @@
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-18.md",
     "task_count": 16,
-    "in_progress_items": [
-      "TASK-101 M4.5 Group G (Svelte scaffold 일괄 정리) (1차 commit `aae7f31`, PR 오픈 대기)"
-    ],
+    "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
       "TASK-088 React + Astryx 부트스트랩 PoC (rev 1 sync 봉인)",
@@ -94,10 +92,10 @@
       "TASK-099 M4.5 Group E (BuildRequest + ApiConsole React 마이그레이션) (rev 12 sync 봉인, PR #54 main 합류)",
       "PR #53 + PR #54 main 합류 회수 sync (rev 13 sync 봉인)",
       "TASK-100 M4.5 Group F (App.svelte router 단순화) (rev 14 sync 봉인, PR #55 main 합류)",
-      "TASK-101 M4.5 Group G (Svelte scaffold 일괄 정리) (rev 15 sync 봉인)"
+      "TASK-101 M4.5 Group G (Svelte scaffold 일괄 정리) (rev 15 sync 봉인, PR #56 main 합류)"
     ],
-    "index_rev": "48",
-    "latest_rev": "25"
+    "index_rev": "49",
+    "latest_rev": "26"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
