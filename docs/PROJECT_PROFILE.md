@@ -50,18 +50,18 @@
 - 설치: `pnpm install` (`esbuild` 계열 승인 정책 때문에 환경에 따라 `ERR_PNPM_IGNORED_BUILDS`가 날 수 있으며, 이 경우 watch/dev dependency 승인 또는 direct `tsc` 검증으로 우회)
 - 로컬 실행 (memory backend, Build Server API 만 — 단일 포트 mount 미사용): `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && ./node_modules/.bin/tsc -p packages/db/tsconfig.json && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js`
 - Postgres 실행 (memory backend 와 동일하게 Build Server API 만): `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres DB_AUTO_BOOTSTRAP=true node apps/build-server/dist/apps/build-server/src/index.js`
-- **단일 포트 reverse proxy (TASK-075)** — Build Server 가 build-monitor 의 vite build 산출물을 정적 mount + SPA fallback 으로 함께 노출, `:3000` 한 포트로 backend + frontend 동시 접근:
+- **단일 포트 reverse proxy (TASK-075)** — Build Server 가 build-monitor 의 React vite build 산출물 (`apps/build-monitor/dist-react/`) 을 정적 mount + SPA fallback 으로 함께 노출, `:3000` 한 포트로 backend + frontend 동시 접근:
   ```bash
-  # 1) build-monitor 의 vite build 산출물 생성 (workspace root 에서)
+  # 1) build-monitor 의 React vite build 산출물 생성 (workspace root 에서)
   ./node_modules/.bin/tsc -p packages/{shared-contract,shared-config,db}/tsconfig.json && \
     ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && \
-    (cd apps/build-monitor && ./node_modules/.bin/vite build) && \
+    (cd apps/build-monitor && ./node_modules/.bin/vite build --config vite.react.config.ts) && \
     BUILD_REPOSITORY_BACKEND=memory \
-    BUILD_MONITOR_DIST_PATH=apps/build-monitor/dist \
+    BUILD_MONITOR_REACT_DIST_PATH=apps/build-monitor/dist-react \
     node apps/build-server/dist/apps/build-server/src/index.js
   # 2) postgres backend 면 BUILD_REPOSITORY_BACKEND=postgres + DATABASE_URL + DB_AUTO_BOOTSTRAP=true 추가.
   ```
-  그 다음 `curl http://127.0.0.1:3000/` (Build Monitor SPA), `curl http://127.0.0.1:3000/admin/login` (SPA deep link fallback), `curl http://127.0.0.1:3000/api/builds` (Build Server API) 모두 동일 port 로 동작. Build Monitor 의 `lib/api.ts` 가 `baseUrl: "/api"` 로 fetch 하기 때문에 `/api/*` 가 Build Server 의 자체 route (`/builds`, `/admin/*`) 로 307 transparent redirect. dev 환경에서는 vite dev (`:5173`) 가 별도 port 에 떠서 `/api/*` 를 `:3000` 으로 프록시 (vite.config.ts) — 그 경로는 그대로 유지. e2e 검증: `bash apps/build-server/scripts/e2e-single-port.sh`.
+  그 다음 `curl http://127.0.0.1:3000/` (Build Monitor SPA), `curl http://127.0.0.1:3000/admin/builds` (SPA deep link fallback), `curl http://127.0.0.1:3000/api/builds` (Build Server API) 모두 동일 port 로 동작. Build Monitor 의 `react/src/lib/api.ts` 가 `baseUrl: "/api"` 로 fetch 하기 때문에 `/api/*` 가 Build Server 의 자체 route (`/builds`, `/admin/*`) 로 307 transparent redirect. dev 환경에서는 vite dev (`:5173`) 가 별도 port 에 떠서 `/api/*` 를 `:3000` 으로 프록시 (vite.config.ts) — 그 경로는 그대로 유지. e2e 검증: `bash apps/build-server/scripts/e2e-single-port.sh`.
 - 빠른 테스트: `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p packages/db/tsconfig.json --noEmit && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json --noEmit && (cd apps/runner && go build ./...)`
 - 격리 테스트: `curl http://127.0.0.1:3000/health && curl -X POST http://127.0.0.1:3000/builds ...` (memory / postgres backend smoke 모두 확인 완료)
 - 실행 확인: `GET /health`, `POST /builds`, `GET /builds/:buildId`, `GET /builds/:buildId/logs` 응답과 `state.json`, `session_handoff.md`, `work_backlog.md`의 current focus 정합성 점검
@@ -99,25 +99,26 @@
   - `GET /admin/users` — 빌드 history 가 있는 userId 별 `buildCount` / `lastBuildAt` rollup.
 - 인증: `X-Admin-Id` header 가 build server 의 `ADMIN_IDS` env (default `admin,yky.lee`) 에 포함될 때만 허용. 미일치 시 401 (header 누락) / 403 (not in allow-list).
 - OpenAPI: `Admin` tag 가 추가됐고 `/admin/*` paths, `AdminListBuildsQuery` / `AdminListBuildsResponse` / `AdminUserBuildSummary` / `AdminUserListResponse` components 가 emit 된다. `/docs` Swagger UI 에서 확인 가능.
-- build-monitor 측 진입점 (TASK-076 + TASK-077): `/admin/login` 라우트는 제거됐다. 일반 Login 페이지(`/`)에서 userId 입력 → localStorage `userId` 키에 저장 → admin allow-list (`ADMIN_IDS`) 에 해당 userId 가 포함되어 있으면 Header 가 단일 "Admin" 진입점을 자동 노출한다 (`X-Admin-Id` 헤더는 userId 그 자체로 채워짐). admin 섹션 (Builds / Users / Admins / Runners) 사이의 이동은 페이지 상단 공통 탭 바 `<AdminTabs />` (svelte-spa-router `$location` store 구독) 가 담당한다 — Header 는 더 이상 4개의 섹션 링크를 나열하지 않는다. 별도 admin login / admin logout 단계가 없다 — 일반 Logout 한 번에 userId 가 clear 되면 admin 메뉴도 함께 사라진다. userId 가 admin allow-list 에 없는 상태에서 `/admin/*` 라우트로 직접 진입하면 backend 가 401/403 으로 거부하고 화면에 에러가 노출된다.
-- 회귀 (TASK-077): TS 4 packages clean, build-monitor vitest 78/78 PASS (TASK-076 baseline 69 + 신규 AdminTabs.test.ts 4건 + Header 9→10 신규 TASK-077 회귀 가드 1건 + admin 페이지 4종 tab 노출 가드 4건) + svelte-check 0/0 + vite build OK (gzip js 32.79KB / css 5.14KB) + build-server 123/123 동일 + e2e-single-port PASS.
+- build-monitor 측 진입점 (TASK-076 + TASK-077 + TASK-084 + TASK-097 + TASK-098): `/admin/login` 라우트는 제거됐다. 일반 Login 페이지(`/login`)에서 userId 입력 → localStorage `userId` 키에 저장 → admin allow-list (`ADMIN_IDS`) 에 해당 userId 가 포함되어 있으면 React 측 `Header` 가 단일 "Admin" 진입점 (`/admin/builds`) 을 자동 노출한다 (`X-Admin-Id` 헤더는 userId 그 자체로 채워짐). admin 섹션 (Builds / Users / Admins / Runners) 사이의 이동은 페이지 상단 공통 탭 바 `<AdminTabs />` (React 측 `react/src/components/AdminTabs.tsx` + react-router-dom NavLink) 가 담당한다 — `Header` 는 더 이상 4개의 섹션 링크를 나열하지 않는다. 별도 admin login / admin logout 단계가 없다 — 일반 Logout 한 번에 userId 가 clear 되면 admin 메뉴도 함께 사라진다. userId 가 admin allow-list 에 없는 상태에서 `/admin/*` 라우트로 직접 진입하면 React 측 `<AdminAccessDenied />` 패널이 친절한 안내 + "Back to Builds" / "Switch user" 두 액션을 노출한다 (TASK-084 frontend 가드 — backend 의 401/403 envelope 직접 노출 회피). backend 동작은 변경 없음 (defense in depth — frontend 가드 통과 후에도 Build Server 의 `X-Admin-Id` 401/403 envelope 그대로 유지).
+- 회귀 (TASK-098 + TASK-100 + TASK-101 + 디자인 토큰 단일화 TASK-096.5 + 디자인 가드 TASK-084): TS 5 packages `tsc --noEmit` clean, build-monitor vitest **130/130 PASS** (TASK-088 baseline 7 → 244 in M4.5 → 130 in TASK-101 with Svelte 135 case 일괄 삭제), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리로 불필요), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, vite build svelte script 제거 (TASK-101), build-server 143/143 PASS (TASK-101 baseline), e2e-single-port PASS. frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~098 + TASK-099 + TASK-100 + TASK-101) + 디자인 토큰 단일화 (TASK-096.5) 까지 16 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-18).
 - 운영 가이드 (운영 환경 배포 시 필수): `ADMIN_IDS` 는 시크릿처럼 취급 — 외부 저장소/PR description/issue 에 노출 금지, 운영에선 CORS wildcard (`CORS_ORIGIN=true`) 를 끄고 명시 origin 화이트리스트로 제한. admin 인증은 평문 id 비교이므로 SSO/JWT 로의 마이그레이션은 후속 ADMIN-* task group 에서 다룬다.
 
-## 3.3 Build Monitor UI 정합 (TASK-083)
-- 의도: admin 4 페이지 (Builds / Users / Admins / Runners) + BuildsList 의 시각 정합 — `.page` wrapper + `<header class="page-head">` 컨테이너 + fadeIn 애니메이션 + h1 gradient text + `var(--size-xxl)` 단일 source, chip 디자인의 canonical 컴포넌트화 (FilterChips), raw rgba 잔재 4건의 `--shadow-glow` 디자인 토큰 정렬. AdminTabs 의 active tab 톤 (TASK-077 self-review amend) 과 FilterChips 의 active chip 톤이 같은 `--color-accent-primary` + `--shadow-glow` 로 통일되어 운영자가 페이지 간을 번갈아 봐도 동일 의미.
-- 신규: `apps/build-monitor/src/components/FilterChips.svelte` (status filter chip 디자인 단일 source, dark / light 모드별 자동 follow). amend: `AdminBuilds.svelte` / `AdminRunners.svelte` / `BuildsList.svelte` (중복 chip CSS + chip 영역 FilterChips 로 교체), `AdminAdmins.svelte` (`<header class="page-head">` 컨테이너 + h1 gradient + fadeIn + `.admins-content` 인너 컨테이너), `Header.svelte` (`.logo-wrapper` `--shadow-glow` 정렬).
-- Header sticky bar 의 `box-shadow: 0 1px 3px rgba(0,0,0,0.04)` 는 의미적으로 `--shadow-card` 와 구분되는 1px light-only shadow 라 후속 TASK (sticky-bar 디자인 토큰 신설) 후보로 보류.
-- 회귀 (TASK-083): TS 4 packages clean, build-monitor vitest **121/121 PASS** (TASK-079 baseline 114 → +7: FilterChips.test.ts 옵션 검증 6 + 디자인 토큰 `--shadow-glow` 사용 source-level 가드 1), build-server 123/123 동일, svelte-check 0 errors / 0 warnings, vite build OK (gzip js 37.25KB / css 6.27KB, chip 중복 CSS 통합으로 약간 감소), e2e-single-port PASS.
+## 3.3 Build Monitor UI 정합 (TASK-083 + TASK-095 + TASK-096 + TASK-096.5)
+- 의도: admin 4 페이지 (Builds / Users / Admins / Runners) + BuildsList + Login + BuildDetail + BuildRequest + ApiConsole + Header 의 시각 정합 — `.page` wrapper + `<header class="page-head">` 컨테이너 + fadeIn 애니메이션 + h1 gradient text + `var(--size-xxl)` 단일 source, chip 디자인의 canonical 컴포넌트화 (FilterChips), 디자인 토큰 단일화 (Svelte baseline 60+ 토큰 + light/dark cascade 의 React 측 사본 — `react/src/tokens.css`).
+- TASK-095 (Header / ThemeToggle / FilterChips React 마이그레이션): React 측 `apps/build-monitor/react/src/components/{Header, ThemeToggle, FilterChips}.tsx` 신규 추가 + `adminAllowListStore` (Zustand) + `Header` 가 모든 route 에서 mount (`App.tsx`).
+- TASK-096 (StatusPill 디자인 토큰 baseline 정합): React 측 `StatusPill.tsx` 가 12 canonical + 2 legacy + RunnerStatus 상태 매핑 + Svelte baseline 정합.
+- TASK-096.5 (디자인 토큰 단일화): Svelte `tokens.css` 가 단일 source-of-truth. React 측 `tokens.css` 사본이 우리 토큰 정의. Astryx Theme 컴포넌트 보호용 `theme.css` 별도 layer 분리. `globals.css` 의 placeholder fallback 정리 (`#app` → `#app-react` 정합).
+- 회귀: TS 5 packages `tsc --noEmit` clean, build-monitor vitest **130/130 PASS** (TASK-101 baseline), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**. Header sticky bar 의 1px light-only shadow 는 의미적으로 `--shadow-card` 와 구분되어 후속 TASK (sticky-bar 디자인 토큰 신설) 후보로 보류.
 
-## 3.4 Admin 가드 deep link UX (TASK-084)
-- 의도: TASK-076/077 의 admin 진입점 통일까지는 backend 가 401/403 으로 거부하지만 frontend 가 친절한 안내 없이 raw error envelope 을 그대로 노출하던 결함(`docs/operations/dogfood-e2e-review-and-followup-2026-07-06.md` §3.4 G-4 gap) 봉인. 비-admin user (`alice` 등 `ADMIN_IDS` env 부재) 가 `/admin/builds` 같은 deep link 를 직접 입력했을 때 backend 호출 없이 frontend 에서 거부 → `<AdminAccessDenied>` 패널이 reason-aware 메시지 + "Back to Builds" / "Switch user" 두 액션을 노출한다.
+## 3.4 Admin 가드 deep link UX (TASK-084 + TASK-097)
+- 의도: TASK-076/077 의 admin 진입점 통일까지는 backend 가 401/403 으로 거부하지만 frontend 가 친절한 안내 없이 raw error envelope 을 그대로 노출하던 결함(`docs/operations/dogfood-e2e-review-and-followup-2026-07-06.md` §3.4 G-4 gap) 봉인. 비-admin user (`alice` 등 `ADMIN_IDS` env 부재) 가 `/admin/builds` 같은 deep link 를 직접 입력했을 때 backend 호출 없이 frontend 에서 거부 → React 측 `<AdminAccessDenied />` 패널이 reason-aware 메시지 + "Back to Builds" / "Switch user" 두 액션을 노출한다.
 - 핵심 컴포넌트 + helper (단일 source):
-  - `apps/build-monitor/src/lib/admin-guard.ts` — `ensureAdminAccess(callerId)` helper. adminAllowListStore 캐시가 비어 있으면 refresh 시도 후 `contains` 체크. 결과는 `{ isAdmin, allowList, reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST" }`. backend 가 401/403 으로 거절한 케이스만 `FORBIDDEN` 으로 표면화 — 나머지 (5xx / 빈 캐시) 는 `NOT_IN_ALLOW_LIST` fallback (사용자가 새로고침하면 재시도).
-  - `apps/build-monitor/src/components/AdminAccessDenied.svelte` — 공통 권한 없음 패널. `page-head` + danger accent h1 + Login.svelte `.card` 패턴 차용 카드 + 두 액션 (`Back to Builds` 는 userId 유지하며 `/builds` 로 이동, `Switch user` 는 userIdStore clear 후 `/` redirect).
-- amend: `AdminBuilds.svelte` / `AdminUsers.svelte` / `AdminAdmins.svelte` / `AdminRunners.svelte` — onMount 첫 단계에서 (1) `userId` 부재 시 push("/") (기존), (2) `ensureAdminAccess(userId)` 호출, (3) `!isAdmin` 시 `accessDenied` state set + 친절한 패널 노출. backend 호출 (listAdminBuilds / listAdminUsers / listAdminRunners / refresh)은 frontend 가드 통과 후에야 일어남 — raw 403 envelope 이 화면에 노출될 surface 가 사라진다.
+  - `apps/build-monitor/react/src/lib/admin-guard.ts` — `ensureAdminAccess(callerId)` helper. `adminAllowListStore` (Zustand) 캐시가 비어 있으면 refresh 시도 후 `contains` 체크. 결과는 `{ isAdmin, allowList, reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST" }`. backend 가 401/403 으로 거절한 케이스만 `FORBIDDEN` 으로 표면화 — 나머지 (5xx / 빈 캐시) 는 `NOT_IN_ALLOW_LIST` fallback (사용자가 새로고침하면 재시도).
+  - `apps/build-monitor/react/src/components/AdminAccessDenied.tsx` — 공통 권한 없음 패널. `page-head` + danger accent h1 + Login.tsx `.card` 패턴 차용 카드 + 두 액션 (`Back to Builds` 는 userId 유지하며 `/builds` 로 이동, `Switch user` 는 userIdStore clear 후 `/login` redirect).
+- amend: `AdminBuilds.tsx` / `AdminUsers.tsx` / `AdminAdmins.tsx` / `AdminRunners.tsx` — useEffect 첫 단계에서 (1) `userId` 부재 시 navigate("/login") (기존), (2) `ensureAdminAccess(userId)` 호출, (3) `!isAdmin` 시 `accessDenied` state set + 친절한 패널 노출. backend 호출 (listAdminBuilds / listAdminUsers / listAdminRunners / refresh)은 frontend 가드 통과 후에야 일어남 — raw 403 envelope 이 화면에 노출될 surface 가 사라진다.
 - Backend 동작은 변경 없음. Build Server 의 `X-Admin-Id` 401/403 envelope (TASK-049 / TASK-076) 은 그대로 유지 — frontend 가드 통과 후에도 backend 는 동일하게 한 번 더 검증 (defense in depth).
-- 신규 회귀 가드: `admin-guard.test.ts` 9건 (NO_USER / FORBIDDEN / NOT_IN_ALLOW_LIST 분기 + 캐시 hit / 5xx fallback). admin 페이지 test 4종 신규 케이스 합계 5건 (AdminBuilds/AdminUsers/AdminRunners/AdminAdmins 각 1건 + AdminUsers 의 FORBIDDEN 별도 1건) — 비-admin userId 시 accessDenied 분기 + backend API 미호출 검증.
-- 회귀 (TASK-084): TS 4 packages `tsc --noEmit` clean, build-monitor vitest **135/135 PASS** (TASK-083 baseline 121 → +14: admin-guard 9 + admin 페이지 회귀 가드 5), build-server 131/131 동일 (backend 변경 0), svelte-check 0 errors / 0 warnings, vite build OK (gzip js 38.23KB / css 6.44KB — AdminAccessDenied component 추가로 약간 증가), Go 7 packages PASS.
+- 신규 회귀 가드: `admin-guard.test.ts` 4건 + admin 페이지 test 4종 신규 케이스 합계 5건 (AdminBuilds/AdminUsers/AdminRunners/AdminAdmins 각 1건 + AdminUsers 의 FORBIDDEN 별도 1건) — 비-admin userId 시 accessDenied 분기 + backend API 미호출 검증.
+- 회귀: TS 5 packages `tsc --noEmit` clean, build-monitor vitest **130/130 PASS** (TASK-101 baseline), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**.
 
 ## 3.5 Production semantic 운영 검증 (TASK-085)
 - 의도: TASK-081-B / TASK-082 의 dummy (size 0 source) 검증이 build 가 FAILED 로 끝나는 시나리오만 다뤘던 한계를 보완. busybox/scratch Dockerfile + 실제 `tar.gz` source archive 로 build 가 COMPLETED 까지 가는 운영 시나리오 자동 재현. `docs/operations/dogfood-e2e-2026-07-06.md` §2.2 의 `bab5995f-…-95d53684263d` (수동 dogfood) 의 자동 재현 동등물.
@@ -232,16 +233,16 @@
 - 제약: Postgres smoke는 통과했지만 Drizzle migration artifact 생성/운영 규칙은 아직 고정되지 않았다
 - 기타: 현재 다음 단계는 postgres 경로를 기본 개발 경로로 승격할지 결정하고, `Runner -> Host Server API only`, `Host Server -> PostgreSQL only` 경계 위에서 Runner 연동으로 넘어가는 것이다
 
-## 3.12 React 빌드 mount 운영 패턴 (TASK-093 + TASK-094)
-- 의도: TASK-075 의 단일 포트 reverse proxy 위에서 Svelte 빌드를 React 빌드로 swap 후 Svelte legacy mount 제거. Svelte → React frontend rewrite 7-PR 시리즈 6~7단계 (final). React 빌드(`apps/build-monitor/dist-react/`) 만 primary SPA — `/` + `/assets/*` + `/favicon.svg` + SPA fallback. Svelte 빌드는 Build Server 가 더 이상 mount 하지 않음 (TASK-094 에서 Svelte legacy mount + env + SPA fallback 분기 모두 폐기).
+## 3.12 React 빌드 mount 운영 패턴 (TASK-093 + TASK-094 + TASK-100 + TASK-101)
+- 의도: TASK-075 의 단일 포트 reverse proxy 위에서 Svelte 빌드를 React 빌드로 swap (TASK-093) + Svelte legacy mount 제거 (TASK-094) + App.svelte router 단순화 (TASK-100) + Svelte scaffold 일괄 정리 (TASK-101). frontend rewrite 7-PR 시리즈 + M4.5 8-PR 시리즈 후의 React 단일 SPA 운영 패턴. **React 빌드(`apps/build-monitor/dist-react/`) 만 primary SPA** — `/` + `/assets/*` + `/favicon.svg` + SPA fallback. **Svelte 빌드는 일괄 폐기** (TASK-101).
 - 핵심 변경:
-  - `apps/build-server/src/app/create-app.ts` `mountBuildMonitorDist` — React `@fastify/static` (decorateReply: true) 만 mount. SPA fallback: 그 외 unknown path → React index.html (`fs.createReadStream` raw stream). `BUILD_MONITOR_DIST_PATH` env + `mountSvelteIndexHtml` helper + `/svelte/*` SPA fallback 모두 삭제.
+  - `apps/build-server/src/app/create-app.ts` `mountBuildMonitorDist` — React `@fastify/static` (decorateReply: true) 만 mount. SPA fallback: 그 외 unknown path → React index.html (`fs.createReadStream` raw stream). `BUILD_MONITOR_DIST_PATH` (Svelte) env + `mountSvelteIndexHtml` helper + `/svelte/*` SPA fallback 모두 삭제 (TASK-094). React 빌드 mount 만 활성.
   - env 단일: `BUILD_MONITOR_REACT_DIST_PATH` (default `apps/build-monitor/dist-react`).
-  - 신규 진입점 `apps/build-monitor/src/routes/BuildDetailRedirect.svelte` — Svelte SPA 의 `/builds/:buildId` 진입 시 React SPA 의 `/builds/<id>` 로 즉시 redirect (`window.location.assign`). React BuildDetail 이 `useParams` 로 buildId 추출.
-  - 운영 중인 admin / build-request / api-console 페이지 (App.svelte / Header.svelte / BuildRow.svelte / StatusPill.svelte / AdminTabs.svelte / BuildRequest.svelte / ApiConsole.svelte / Admin{Admins,Builds,Runners,Users}.svelte 등) 는 Svelte 유지 — React 마이그레이션은 후속 시리즈에서 진행. `svelte` / `svelte-spa-router` package 유지.
-- 운영 명령 (Build Server 단일 port):
+  - `apps/build-monitor/src/` 디렉터리 일괄 폐기 (TASK-101) — App.svelte + components 8 + lib 7 + routes 16 + test 2 + main.ts. Svelte 측 App.svelte 의 routes 정의는 TASK-100 에서 `*` (NotFound) 1개로 단순화 후 TASK-101 에서 App.svelte 자체 일괄 폐기. Svelte 측 entrypoint (`main.ts`) + `tokens.css` + `theme.css` 도 일괄 폐기. React 측 `tokens.css` 가 단일 source-of-truth (TASK-096.5 디자인 토큰 단일화).
+  - React 측 `App.tsx` 가 모든 route 의 단일 진입점. react-router-dom v7 `<Routes>` + `<Route>` 매핑 (`/` → `/login` replace, `/login`, `/builds`, `/builds/:buildId`, `/build-request`, `/api-console`, `/admin/{builds,users,admins,runners}`, `*` → `/login` replace). 모든 route 가 React 측 `Header` 공유. TASK-088~101 까지 frontend rewrite + M4.5 8-PR 시리즈 + 디자인 토큰 단일화 + Svelte scaffold 정리.
+- 운영 명령 (Build Server 단일 port, React 단일 SPA):
   ```bash
-  # 1) React 빌드 생성 (Svelte 빌드는 운영 중 페이지용으로 유지하지만 Build Server 가 mount 하지 않음)
+  # 1) React 빌드 생성 (TASK-101: Svelte 빌드 폐기 — React 만 운영)
   (cd apps/build-monitor && ./node_modules/.bin/vite build --config vite.react.config.ts)
 
   # 2) Build Server 부팅 (React dist 만 검증)
@@ -252,14 +253,13 @@
   ```
   그 다음 한 port 에서:
   - `curl http://127.0.0.1:3000/` → React index.html (primary SPA)
-  - `curl http://127.0.0.1:3000/admin/login` → React index.html (SPA fallback, `/admin/*` deep link)
+  - `curl http://127.0.0.1:3000/admin/builds` → React index.html (SPA fallback, `/admin/*` deep link)
   - `curl http://127.0.0.1:3000/api/builds` → Build Server API (307 transparent redirect)
   - `curl http://127.0.0.1:3000/builds/<uuid>` → Build Server 의 `GET /builds/:buildId` route (UUID validation 통과 시 200 JSON; non-uuid 입력 시 500 zod validation)
 - 사전 결함 + 보강:
-  - `mountBuildMonitorDist` 가 Svelte 분기 없이 React 만 mount — `@fastify/static` decorateReply decorator 충돌 회피 단순화.
+  - `mountBuildMonitorDist` 가 React 만 mount — `@fastify/static` decorateReply decorator 충돌 회피 단순화.
   - `/builds/<id>` direct URL 입력 → Build Server 의 wildcard GET route 가 UUID validation 으로 거절 (500). 운영자는 React BuildDetail 진입은 `/api/builds/<id>` (Build Server 가 응답) 또는 `<Link>` 클릭 사용. 정직한 동작.
-  - `BuildDetailRedirect.svelte` 가 Svelte SPA 의 `/builds/<id>` deep link → React SPA 로 redirect — 동일 localStorage `userId` 가 양쪽 SPA 의 session 으로 공유 (cross-tab dispatch 정합).
-- 회귀 baseline: TS 5 packages `tsc --noEmit` clean, build-server node:test **131 → 142 PASS** (TASK-075 baseline 131 + 신규 회귀 가드 11), build-monitor vitest 178 → 173 PASS (PhaseTimeline.test.ts 5건 제거), Go 76/76 동일, svelte-check 0/1.
+- 회귀 baseline: TS 5 packages `tsc --noEmit` clean, build-server node:test **131 → 143 PASS** (TASK-075 baseline 131 + TASK-093 신규 12 + TASK-101 Svelte scaffold 정리 영향 0), build-monitor vitest **130/130 PASS** (TASK-101 Svelte 135 case 일괄 삭제), Go 7 packages 모두 PASS. svelte-check script 제거 (TASK-101 Svelte scaffold 정리).
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
