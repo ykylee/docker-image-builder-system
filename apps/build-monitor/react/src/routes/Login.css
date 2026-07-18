@@ -1,24 +1,21 @@
 /* TASK-089: Login 페이지 React 마이그레이션.
  *
- * Svelte routes/Login.svelte <style> 와 시각 정합 — 자체 디자인 토큰
- * (apps/build-monitor/src/lib/tokens.css) 를 그대로 import. Astryx 가
+ * Svelte routes/Login.svelte <style> 와 시각 정합 — React 측 디자인 토큰
+ * (apps/build-monitor/react/src/tokens.css) 를 그대로 import. Astryx 가
  * 별도 디자인 시스템이라 tokens.css 와 namespace 가 겹치지 않으며, 본
  * CSS 는 unlayered 이므로 Astryx layer cascade 위에 우선 적용된다
  * (Login 은 Astryx 컴포넌트를 직접 사용하지 않음 — 향후 TopNav/AppShell
  * 마이그레이션 시점 (TASK-088 이후) 에 Astryx CSS variable cascade 와
  * 통합 결정).
  *
- * @import "../../../src/lib/tokens.css" 경로:
- *   react/src/routes/Login.css → ../../../src/lib/tokens.css
+ * @import "../tokens.css" 경로:
+ *   react/src/routes/Login.css → ../tokens.css
  *     apps/build-monitor/react/src/routes/Login.css
- *     apps/build-monitor/react/src/routes/
  *     apps/build-monitor/react/src/
- *     apps/build-monitor/react/
- *     apps/build-monitor/
- *     apps/build-monitor/src/lib/tokens.css  ✓
+ *     apps/build-monitor/react/src/tokens.css  ✓
  */
 
-@import "../../../src/lib/tokens.css";
+@import "../tokens.css";
 
 .login-page {
   display: flex;
