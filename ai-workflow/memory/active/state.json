@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-18T00:00:00Z",
-  "purpose_digest": "TASK-066 follow-up batch 3 (source archive Postgres 운영 가이드 + PROJECT_PROFILE §3.2 default 개발 경로 정합) main 합류 회수 sync. 본 세션은 2026-07-08 ~ 2026-07-18 (10 일) 의 단일 작업 흐름에서 frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~098 + TASK-099 + TASK-100 + TASK-101) + 디자인 토큰 단일화 (TASK-096.5) + PROJECT_PROFILE React baseline batch 1 (PR #57) + batch 2 (PR #58) + TASK-066 follow-up batch 3 (PR #59) 까지 19 TASK 연속 봉인. 모든 Task 들이 main 합류. main HEAD `9c9bbe3` (PR #59 squash). TASK-066 follow-up batch 3 결정: 옵션 A (Postgres default 개발 경로 권장). Postgres backend 가 memory backend 와 동등한 운영 baseline 으로 사용 가능함을 정립. 운영 명령 (colima / docker 기반 부팅 + DATABASE_URL + Build Server 부팅 + e2e-source-archive-postgres.sh 회귀 검증) + 5 단계 운영 시나리오 + 4가지 권장 이유 (production 정합 / bytea round-trip 회귀 / FK CASCADE + migration / multi-runner 운영 검증). 회귀 baseline (변경 없음, docs only): TS 5 packages clean, vitest 130/130 PASS, vite build:react 정상 (gzip js 99.01KB / css 30.62KB), build-server 143/143 PASS. 운영 영향 0 (docs only). follow-up: 별도 사용자 결정 (PROJECT_PROFILE §3 명령의 run_local / run_local_postgres 명령 + memory vs Postgres baseline 회귀 baseline 갱신 / scripts/migrate.ts 의 standalone CLI 운영 workflow / postgres migration 0004 build_source 의 TOAST 전략).",
-  "purpose_digest_rev": 130,
+  "purpose_digest": "세션 종료 종합 정리 sync (rev 130→131). 본 세션은 2026-07-08 ~ 2026-07-18 (10 일) 의 단일 작업 흐름에서 frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~098 + TASK-099 + TASK-100 + TASK-101) + 디자인 토큰 단일화 (TASK-096.5) + PROJECT_PROFILE React baseline batch 1 (PR #57) + batch 2 (PR #58) + TASK-066 follow-up batch 3 (PR #59) 까지 **19 TASK 연속 봉인 완료**. 모든 Task 들이 main 합류. main HEAD `abb95fa` (workflow meta sync 회수). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 운영 영향 0 (모든 변경이 docs only 또는 cross-framework dead code 폐기). 결정: 옵션 A 일관 (단일 PR / src/ 일괄 삭제 / Svelte baseline → React baseline / Postgres default 개발 경로). follow-up: 별도 사용자 결정 (PROJECT_PROFILE §3 명령의 run_local / run_local_postgres 명령 + memory vs Postgres baseline 회귀 baseline 갱신 / scripts/migrate.ts 의 standalone CLI 운영 workflow / postgres migration 0004 build_source 의 TOAST 전략 / 운영 안정화 / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선). 본 세션 운영 가이드 6 종 신규: TASK-096.5 디자인 토큰 단일화 / TASK-099 BuildRequest + ApiConsole React / TASK-100 App.svelte router 단순화 / TASK-101 Svelte scaffold 일괄 정리 / TASK-101 follow-up batch 1+2 PROJECT_PROFILE React baseline / TASK-066 follow-up batch 3 source archive Postgres.",
+  "purpose_digest_rev": 131,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,9 +27,9 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "PR #59 (TASK-066 follow-up batch 3 source archive Postgres 운영 가이드 / `9c9bbe3`) main 합류. main HEAD `9c9bbe3` (PR #59 squash). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 운영 영향 0 (docs only). frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~098 + TASK-099 + TASK-100 + TASK-101) + 디자인 토큰 단일화 (TASK-096.5) + PROJECT_PROFILE React baseline batch 1 (PR #57) + batch 2 (PR #58) + TASK-066 follow-up batch 3 (PR #59) 까지 19 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-18).",
-    "current_axis": "frontend rewrite 7-PR 시리즈 + M4.5 8-PR 시리즈 + TASK-096.5 디자인 토큰 단일화 + PROJECT_PROFILE.md React baseline batch 1 + batch 2 + TASK-066 follow-up batch 3 까지 19 TASK 연속 봉인 완료. 모든 Task 들이 main 합류. 후속은 별도 사용자 결정.",
-    "current_focus": "PR #59 (TASK-066 follow-up batch 3) main 합류 완료. 후속 결정 대기.",
+    "current_baseline": "세션 종료 종합 정리 sync (rev 130→131). main HEAD `abb95fa` (workflow meta sync 회수). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 운영 영향 0 (모든 변경이 docs only 또는 cross-framework dead code 폐기). frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~098 + TASK-099 + TASK-100 + TASK-101) + 디자인 토큰 단일화 (TASK-096.5) + PROJECT_PROFILE React baseline batch 1 (PR #57) + batch 2 (PR #58) + TASK-066 follow-up batch 3 (PR #59) 까지 19 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-18). **세션 종료**.",
+    "current_axis": "frontend rewrite 7-PR 시리즈 + M4.5 8-PR 시리즈 + TASK-096.5 디자인 토큰 단일화 + PROJECT_PROFILE.md React baseline batch 1 + batch 2 + TASK-066 follow-up batch 3 까지 19 TASK 연속 봉인 완료. 모든 Task 들이 main 합류. 본 세션 종료.",
+    "current_focus": "세션 종료 종합 정리 sync 완료. 다음 세션 시작 시 main HEAD `abb95fa` + workflow meta (state rev 131) baseline 복원. 후속 결정 (PROJECT_PROFILE §3 명령의 run_local / run_local_postgres 명령 + memory vs Postgres baseline 회귀 baseline 갱신 / scripts/migrate.ts 의 standalone CLI 운영 workflow / postgres migration 0004 build_source 의 TOAST 전략 / 운영 안정화 / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선) 은 별도 사용자 결정.",
     "blocked_items": [],
     "recent_done_items": [
       "TASK-066 follow-up batch 3 (source archive Postgres 운영 가이드) — `9c9bbe3` PR #59 main 합류 (2026-07-18, 본 세션)",
@@ -99,10 +99,11 @@
       "세션 종합 정리 sync (rev 16 sync 봉인)",
       "PROJECT_PROFILE.md React baseline batch 1 (TASK-101 follow-up) (rev 17 sync 봉인, PR #57 main 합류)",
       "PROJECT_PROFILE.md React baseline batch 2 (TASK-101 follow-up) (rev 18 sync 봉인, PR #58 main 합류)",
-      "TASK-066 follow-up batch 3 (source archive Postgres 운영 가이드) (rev 19 sync 봉인, PR #59 main 합류)"
+      "TASK-066 follow-up batch 3 (source archive Postgres 운영 가이드) (rev 19 sync 봉인, PR #59 main 합류)",
+      "세션 종료 종합 정리 sync (rev 20 sync 봉인, 본 세션 종료)"
     ],
-    "index_rev": "53",
-    "latest_rev": "30"
+    "index_rev": "54",
+    "latest_rev": "31"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
