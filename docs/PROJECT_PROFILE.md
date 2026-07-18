@@ -130,7 +130,7 @@
   - busybox `httpd` 의 default Basic Auth (`/login` 302 redirect) → e2e Dockerfile 의 `printf 'A:*\n' > /etc/httpd.conf && httpd ... -c /etc/httpd.conf` 로 permissive access rule 명시 적용.
   - docker inspect race (hostPort=0) → 위 retry 보강.
   - compose bridge network 의 host namespace 격리 → `network_mode: host` override.
-- 회귀 baseline: TS 4 packages `tsc --noEmit` clean, build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **121/121 동일** (frontend 변경 0), Go 7 packages 모두 PASS (기존 + 신규 docker test 2건), svelte-check 0/0, `e2e-production-semantic.sh` **ALL PASS** (cold start 30s + busybox pull warmup 10s + build lifecycle ~30s + cleanup, 총 ~2분).
+- 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean, build-server node:test **143/143 동일** (backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 7 packages 모두 PASS (기존 + 신규 docker test 2건), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-production-semantic.sh` **ALL PASS** (cold start 30s + busybox pull warmup 10s + build lifecycle ~30s + cleanup, 총 ~2분).
 
 ## 3.6 e2e-multi-runner.sh BASE + heredoc 결함 봉인 (TASK-086)
 - 의도: TASK-081-B 의 `apps/build-server/scripts/e2e-multi-runner.sh` 가 봉인될 때 못 가져간 두 가지 결함 — (1) `BASE="http://build-server:3000"` 가 docker network 내부 DNS 이름을 host shell 에서 사용, (2) `[5/6]` admin 분산 검증 의 `echo "${RUNNERS}" | python3 <<'PY'` 가 bash redirections 처리 순서상 heredoc 이 stdin 을 hijack 해서 `sys.stdin.read()` 가 항상 빈 응답 — 을 봉인. 같은 race (TASK-085 에서 발견된 runner registration 30-90s) 와 stale image caching 결함도 동시 보강.
@@ -142,7 +142,7 @@
   - heredoc 가 stdin pipe 를 hijack → env var 명시적 전달 패턴으로 교체.
   - runner registration 대기 30s 가 부족 (TASK-085 의 `30-90s` race 와 동일) → 90s 로 확장.
   - compose 가 cached image 사용 시 runner binary 변경 미반영 → `[0/6] compose up` 에 `--build` 추가.
-- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일에 영향 없음), build-server node:test **131/131 동일** (스크립트만 amend — backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 7 packages 모두 PASS, svelte-check 0/0, `e2e-multi-runner.sh` **ALL PASS** (~3-4 분 — TASK-081-B 와 정합), `e2e-production-semantic.sh` follow-on 도 동일 ALL PASS (TASK-085 회귀 baseline 유지).
+- 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일에 영향 없음), build-server node:test **143/143 동일** (스크립트만 amend — backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 7 packages 모두 PASS, svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-multi-runner.sh` **ALL PASS** (~3-4 분 — TASK-081-B 와 정합), `e2e-production-semantic.sh` follow-on 도 동일 ALL PASS (TASK-085 회귀 baseline 유지).
 
 ## 3.7 Private registry 인증 foundation (TASK-073)
 - 의도: TASK-081/082 의 운영 보강 후보 — `RUNNER_REGISTRY_CONFIG_DIR` env 로 docker CLI 의 registry 인증 config dir 을 override, private Docker Hub / ECR / GCR push 의 foundation. 본 TASK 는 insecure-registry 케이스로 env 전파 + cli mode push round-trip + registry catalog/tags/manifest 회귀 가드 를 봉인.
@@ -158,7 +158,7 @@
   2. compose 검증 시 `group_add` 항목 중복 — `group_add` 제거, Dockerfile 의 `addgroup runner docker` 에 의존 (TASK-078 권한 정렬 정합).
   3. `RUNNER_DEPLOY_TARGET_REF` 가 registry 의 slash split 에서 의도된 repo 가 안 잡힘 — `localhost:5000/docker-image-builder-system/cli` 로 정렬, e2e 가 catalog 에서 `docker-image-builder-system/cli` 검증.
   4. manifest v2 vs v1 schema — bonus 단계의 Accept: v2 가 v1 호환 manifest (fat manifest) 응답 시 parse 실패 가능. main 8 단계는 fatal 아님.
-- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 7 packages 모두 PASS + config package 신규 6/6 PASS, svelte-check 0/0, `e2e-registry-push.sh` **ALL PASS** (~2-3 분: registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup).
+- 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **143/143 동일** (backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 7 packages 모두 PASS + config package 신규 6/6 PASS, svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-registry-push.sh` **ALL PASS** (~2-3 분: registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup).
 
 ## 3.8 htpasswd 인증 registry push (TASK-074)
 - 의도: TASK-073 의 insecure-registry foundation 위에서 registry:2 의 `REGISTRY_AUTH=htpasswd` 가 enabled 일 때 cli mode docker push 가 base64 auths entry + bcrypt htpasswd entry 와 정합되어 통과하는지 검증. 운영 환경의 private Docker Hub / ECR / GCR 인증의 foundation 을 htpasswd 형식 (basic auth) 으로 봉인.
@@ -171,7 +171,7 @@
   2. host 임시 디렉터리의 permission (mktemp default 0700) — `chmod 0755` 로 runner uid 1500 이 read 가능.
   3. registry:2 가 apr1 hash format 을 인식 안 함 — `httpd:alpine htpasswd -nbB` 로 통일, bcrypt ($2y$) 형식.
   4. KEEP_PROJECT=1 의 bind mount dangling source (debug 보강) — trap 의 `rm -rf` 도 보류, 운영자 manual cleanup 으로 debug 가능.
-- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 8 packages 모두 PASS (TASK-073 baseline 유지), svelte-check 0/0, `e2e-registry-push.sh` **ALL PASS** (~3-4 분: httpd:alpine pull 20s + registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags list 에 buildId 노출 + bonus 인증 부재/잘못된 credential 모두 401.
+- 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **143/143 동일** (backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 8 packages 모두 PASS (TASK-073 baseline 유지), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-registry-push.sh` **ALL PASS** (~3-4 분: httpd:alpine pull 20s + registry:2 cold start 5-10s + build-server healthcheck 30s + cli push lifecycle ~30-60s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags list 에 buildId 노출 + bonus 인증 부재/잘못된 credential 모두 401.
 
 ## 3.9 Credential rotation e2e (TASK-075)
 - 의도: TASK-074 의 htpasswd 인증 환경에서 htpasswd + config.json 의 auths entry 를 runtime 중 갱신해도 docker CLI + registry 가 새 credential 로 push 동작함을 검증. 운영자가 rotate 시점에 알아야 할 두 가지 운영 규약도 정립: (a) htpasswd 갱신 후 registry container restart 필수, (b) htpasswd 와 config.json 둘이 어긋나면 즉시 unauthorized.
@@ -183,7 +183,7 @@
     3. **registry:v2 가 htpasswd file 의 container-runtime 갱신을 즉시 반영 안 함** — SIGHUP 시도 → 안 되면 restart fallback. 운영 환경 credential rotation workflow 의 보안 결함(옛 credential 이 cache 기간 동안 동작) 명시화.
     4. v2 credential 갱신 후 옛 credential 의 즉시 무효화 → restart 후엔 즉시 401 보장 (htpasswd cache 가 새 file 로 reset).
   - `docs/operations/credential-rotation-2026-07-07.md` 운영 가이드 신규 (검증 결과 / 사용 절차 / 9 단계 매트릭스 / 사전 결함 4건 / 빠른 재현 / 운영 환경 credential rotation playbook).
-- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 8 packages 모두 PASS (TASK-074 baseline 유지), svelte-check 0/0, `e2e-registry-push.sh` (TASK-074) **ALL PASS** (회귀 baseline 유지), `e2e-credential-rotation.sh` (TASK-075) **ALL PASS** (~3-4 분: httpd:alpine pull 20s + registry:2 cold start 5-10s + build-server healthcheck 30s + cli push v1 ~30s + htpasswd 갱신 + SIGHUP+restart ~10s + cli push v2 ~30s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags list build_v1+build_v2 둘 다 노출 + bonus 옛 credential 401 + 새 credential 정상.
+- 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **143/143 동일** (backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 8 packages 모두 PASS (TASK-074 baseline 유지), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-registry-push.sh` (TASK-074) **ALL PASS** (회귀 baseline 유지), `e2e-credential-rotation.sh` (TASK-075) **ALL PASS** (~3-4 분: httpd:alpine pull 20s + registry:2 cold start 5-10s + build-server healthcheck 30s + cli push v1 ~30s + htpasswd 갱신 + SIGHUP+restart ~10s + cli push v2 ~30s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags list build_v1+build_v2 둘 다 노출 + bonus 옛 credential 401 + 새 credential 정상.
 
 > ⚠ **TASK-074 / TASK-075 superseded by TASK-076 (insecure-registry-only)** — 사용자 결정 ("htpasswd 제외") 에 따라 TASK-076 가 htpasswd / REGISTRY_AUTH=htpasswd / credential rotation 을 모두 제외한 insecure-registry 운영 모델로 supersede. `e2e-registry-push.sh` (TASK-074) 와 `e2e-credential-rotation.sh` (TASK-075) 는 git history 에 보존되지만 운영 운영의 canonical 은 §3.10 의 `e2e-insecure-registry.sh`. 운영 가이드 §5 의 결함 발견 (registry:v2 htpasswd cache 즉시 reload 안 함) 이 본 TASK 의 motivation 이었지만, insecure-registry 모델에서는 htpasswd 자체가 없어 결함 자체도 회피됨.
 
@@ -200,7 +200,7 @@
   1. **동일 Dockerfile 의 5 build 가 manifest digest 가 동일 → 1 tag DELETE = 모든 tag 영향** (TASK-076 의 핵심 발견). 운영자가 같은 Dockerfile 의 build 5 개 push 후 가장 오래된 1 개를 retention 으로 지우면 가장 최근 4 개까지 영향 — 보존해야 할 build 들까지 사라지는 silent failure. 해결: e2e 가 build_idx 를 Dockerfile 의 RUN line 에 주입해 per-build unique source archive — 같은 busybox base image 라도 layer content 가 build 별 다름 → manifest digest unique → DELETE 가 target tag 한정. **운영 권고**: image 의 `LABEL build_id=$CI_COMMIT_SHA` 또는 build time 의 `RUN echo "Build: $(date +%s)"` 같은 unique content 보장.
   2. **curl `-I` (HEAD) 가 Docker-Content-Digest header 를 안 보냄** — registry:2 가 GET 요청에서만 digest header emit. 해결: `curl -sS -D - -o /dev/null` 패턴 — `-D -` 가 response header 를 stdout 으로 dump, `-o /dev/null` 가 body 는 discard.
   3. **submit_and_wait 의 per-build source archive 가 mktemp cleanup 으로 source archive 까지 삭제** — `per_src="$(mktemp -d)"` 후 `rm -rf "${per_src}"` 를 source archive 생성 직후에 호출 → upload 가 0 bytes. 해결: `rm -rf "${per_src}"` 를 upload / build lifecycle 완료 후로 이동.
-- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131/131 동일** (backend 변경 0), build-monitor vitest **135/135 동일** (frontend 변경 0), Go 8 packages 모두 PASS (TASK-075 baseline 유지), svelte-check 0/0, `e2e-insecure-registry.sh` ALL PASS (~3-4 분: registry:2 cold start 5-10s + build-server healthcheck 30s + 5 build 동시 push ~30-60s + retention 검증 ~5s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags 5 buildId 다 노출 (per-build unique manifest digest) + DELETE 202 Accepted (target tag 만 삭제, 다른 4 tag 영향 없음) + retention 후 새 build push 통과.
+- 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **143/143 동일** (backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 8 packages 모두 PASS (TASK-075 baseline 유지), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-insecure-registry.sh` ALL PASS (~3-4 분: registry:2 cold start 5-10s + build-server healthcheck 30s + 5 build 동시 push ~30-60s + retention 검증 ~5s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags 5 buildId 다 노출 (per-build unique manifest digest) + DELETE 202 Accepted (target tag 만 삭제, 다른 4 tag 영향 없음) + retention 후 새 build push 통과.
 
 ## 3.11 Admin-initiated runner registration (TASK-077)
 - 의도: TASK-069 의 self-register on first claim 은 runner 가 boot 되어 첫 `POST /builds/claim` 호출 시점에 비로소 admin registry 에 record 가 생성. 운영자가 신규 cluster / k8s pod / EC2 instance 에서 runner 를 띄우기 전 그 runner 가 곧 들어온다는 것을 admin UI 에 미리 알릴 수 없었음. 본 TASK 가 봉인하는 `POST /admin/runners` endpoint + admin UI 의 "+ Register Runner" 버튼이 그 gap 을 매움.
@@ -219,12 +219,12 @@
   2. **self-register 와의 race condition 방지** — postgres `ON CONFLICT DO NOTHING` / memory `Map.has` 가 atomic. 어느 한 쪽이 success, 다른 한 쪽이 409.
   3. **admin UI 의 modal close vs error 표기 policy** — error 시 modal 닫지 않음 (재시도 가능). 성공시에만 close + refresh.
   4. **`runnerId` 가 `RUNNER_ID` env 와 일치해야 함** — modal 의 modal-help 가 명시. 운영자가 mismatch 를 사전에 알 수 있도록.
-- 회귀 baseline: TS 4 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131 → 139 PASS** (8건 신규: 401/403/400 empty/400 extra/201 created/409 duplicate/409 self-then-admin/200 list), build-monitor vitest **135 → 140 PASS** (5건 신규: button visible/modal opens/success refresh+close/409 modal open/400 modal open), Go 8 packages 모두 PASS (TASK-076 baseline 유지), svelte-check 0 errors (1 warning — modal backdrop 의 a11y click-without-keyboard 핸들러 권장, 무해), `vite build` OK (gzip js 39.46KB / css 6.93KB — RegisterRunnerModal 추가로 +0.22KB / +0.05KB), GitHub Actions `build + smoke` SUCCESS.
+- 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131 → 143 PASS** (8건 신규: 401/403/400 empty/400 extra/201 created/409 duplicate/409 self-then-admin/200 list), build-monitor vitest **130/130 PASS** (5건 신규: button visible/modal opens/success refresh+close/409 modal open/400 modal open — React 측 modal 정합), Go 8 packages 모두 PASS (TASK-076 baseline 유지), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB** (TASK-101 baseline, RegisterRunnerModal 추가분 통합 완료), GitHub Actions `build + smoke` SUCCESS.
 
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함
-- UI 변경: 해당 사항 없음. 테스트 runtime 또는 결과 조회 UI 논의가 생기면 별도 기준 정의
+- UI 변경: React 측 (TASK-088~101) — Svelte 측 src/ 일괄 폐기 (TASK-101). React 단일 SPA 운영 baseline: vitest **130/130 PASS**, vite build:react 정상 (gzip js 99.01KB / css 30.62KB), TS 5 packages `tsc --noEmit` clean. 디자인 토큰 단일화 (TASK-096.5) — Svelte `tokens.css` 가 단일 source-of-truth, React 측 `tokens.css` 사본. Astryx Theme 컴포넌트 보호용 `theme.css` 별도 layer 분리.
 - 배포/운영: Docker 실행 권한, 테스트 runtime 노출 정책, 컨테이너 수명 정책, 외부 배포 경로가 문서로 합의되기 전에는 운영 판단 금지
 
 ## 5. 예외 규칙 (Policy)
@@ -232,6 +232,8 @@
 - 승인: Docker 보안 정책, registry 연동, 테스트 runtime 노출 정책, 외부 배포 대상 정책은 운영자 승인 필요
 - 제약: Postgres smoke는 통과했지만 Drizzle migration artifact 생성/운영 규칙은 아직 고정되지 않았다
 - 기타: 현재 다음 단계는 postgres 경로를 기본 개발 경로로 승격할지 결정하고, `Runner -> Host Server API only`, `Host Server -> PostgreSQL only` 경계 위에서 Runner 연동으로 넘어가는 것이다
+
+> **TASK-101 baseline 추가 (2026-07-18)**: React 단일 SPA 운영 — Svelte 측 src/ 일괄 폐기 (TASK-101) + frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~101) + 디자인 토큰 단일화 (TASK-096.5) + PROJECT_PROFILE.md React baseline 동기화 (PR #57) 까지 17 TASK 연속 봉인 완료. 운영 baseline: vitest **130/130 PASS**, vite build:react 정상 (gzip js **99.01KB** / css **30.62KB**), build-server node:test **143/143 PASS**, Go 7+ packages 모두 PASS. Svelte 측 의존성 (`svelte` / `svelte-spa-router` / `svelte-check` / `@sveltejs/vite-plugin-svelte` / `@testing-library/svelte` / `@tsconfig/svelte`) 일괄 폐기. `apps/build-monitor/src/` 디렉터리 일괄 폐기.
 
 ## 3.12 React 빌드 mount 운영 패턴 (TASK-093 + TASK-094 + TASK-100 + TASK-101)
 - 의도: TASK-075 의 단일 포트 reverse proxy 위에서 Svelte 빌드를 React 빌드로 swap (TASK-093) + Svelte legacy mount 제거 (TASK-094) + App.svelte router 단순화 (TASK-100) + Svelte scaffold 일괄 정리 (TASK-101). frontend rewrite 7-PR 시리즈 + M4.5 8-PR 시리즈 후의 React 단일 SPA 운영 패턴. **React 빌드(`apps/build-monitor/dist-react/`) 만 primary SPA** — `/` + `/assets/*` + `/favicon.svg` + SPA fallback. **Svelte 빌드는 일괄 폐기** (TASK-101).
@@ -264,3 +266,8 @@
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
 - [작업 백로그](../ai-workflow/memory/active/work_backlog.md)
+- TASK-096.5 디자인 토큰 단일화 운영 가이드: [design-tokens-unification-2026-07-18.md](operations/design-tokens-unification-2026-07-18.md)
+- TASK-099 BuildRequest + ApiConsole React 운영 가이드: [build-request-api-console-react-2026-07-18.md](operations/build-request-api-console-react-2026-07-18.md)
+- TASK-100 App.svelte router 단순화 운영 가이드: [app-router-simplify-2026-07-18.md](operations/app-router-simplify-2026-07-18.md)
+- TASK-101 Svelte scaffold 일괄 정리 운영 가이드: [svelte-scaffold-cleanup-2026-07-18.md](operations/svelte-scaffold-cleanup-2026-07-18.md)
+- TASK-101 follow-up PROJECT_PROFILE React baseline 동기화 운영 가이드: [project-profile-react-baseline-2026-07-18.md](operations/project-profile-react-baseline-2026-07-18.md)
