@@ -1,27 +1,69 @@
-/* TASK-088 Astryx theme CSS imports.
+/* TASK-096.5 디자인 토큰 단일화: globals.css 는 tokens.css (단일 source-of-
+ * truth) 이후 import 되며, 본 파일은 토큰을 정의하지 않고 토큰 사용처의
+ * base style 만 담당합니다. 모든 토큰 사용처가 우리 Svelte tokens.css 와
+ * 정합 — fallback 없음. light/dark cascade 는 tokens.css 가 정의.
  *
- * Layer cascade (Astryx 가이드):
- *   reset.css      → @layer reset        (브라우저 default 리셋)
- *   astryx.css     → @layer astryx-base  (컴포넌트 default 스타일)
- *   theme-neutral  → @layer astryx-theme (토큰 override)
- *
- * 순서 뒤집히면 컴포넌트 default 가 theme 토큰을 덮어 디자인 시스템 무너짐.
- * neutral theme 은 muted minimal 스타터 — light + dark 모두 지원.
- * 운영 환경에 따라 theme-butter / theme-chocolate / theme-gothic / theme-matcha
- * / theme-stone / theme-y2k 로 교체 가능 (TASK-089 이후 결정).
+ * Astryx Theme 컴포넌트 (main.tsx 의 `<Theme theme={neutralTheme}>`) 의
+ * 자체 StyleX CSS-in-JS 토큰 ([data-astryx-theme="neutral"] scope) 은
+ * 별도 영역으로 유지되며, 본 globals.css 의 우리 토큰 사용처는 그것과
+ * 무관하게 Svelte baseline 을 따릅니다 (Theme 컴포넌트의 default 컴포넌트
+ * 스타일 보호용).
  */
 
-@import "@astryxdesign/core/reset.css";
-@import "@astryxdesign/core/astryx.css";
-@import "@astryxdesign/theme-neutral/theme.css";
+*, *::before, *::after {
+  box-sizing: border-box;
+}
 
-/* PoC 화면 최소 레이아웃 — Astryx VStack/HStack 컴포넌트로 후속 PR 에서 교체. */
+/* color-scheme: native form controls (input, select, scrollbar) 의
+   색을 우리 토큰과 맞춘다. dark 모드 에선 dark, light 모드 에선 light.
+   (TASK-046 QA) */
+:root { color-scheme: dark; }
+:root[data-theme="light"] { color-scheme: light; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg-canvas);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--size-md);
+  line-height: var(--line-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color var(--motion-duration-base) var(--motion-easing-standard), color var(--motion-duration-base) var(--motion-easing-standard);
+}
+
 #app-react {
   min-height: 100vh;
-  padding: var(--spacing-8, 32px);
-  font-family: var(--font-family-sans, system-ui, -apple-system, sans-serif);
-  color: var(--color-text-primary, inherit);
-  background: var(--color-background-body, transparent);
+  /* Astryx PoC 의 placeholder padding (var(--spacing-8, 32px)) 을 우리
+   * Svelte baseline 의 --space-xxl 로 통일 — 토큰 fallback 제거. */
+  padding: var(--space-xxl);
+}
+
+a {
+  color: var(--color-accent-primary);
+  text-decoration: none;
+}
+a:hover { color: var(--color-accent-primary-hover); text-decoration: underline; }
+
+/* a11y: 명확한 focus outline (DESIGN.md §6 Accessibility) */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+code, pre, .mono {
+  font-family: var(--font-mono);
 }
 
 /* TASK-091: PhaseTimeline 의 in-progress dot pulse animation. Svelte
@@ -33,4 +75,12 @@
 @keyframes phase-pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.25); }
+}
+
+/* reduced motion (DESIGN.md §6 Accessibility) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

@@ -14,6 +14,21 @@
 // 가 StrictMode 에서 mount/unmount/mount 두 번 fire 하지만 의도된
 // 동작 — replace navigate 가 idempotent.
 
+// TASK-096.5 디자인 토큰 단일화: CSS import 순서.
+//
+//   1) tokens.css    — 우리 Svelte baseline 디자인 토큰 단일 source-of-truth
+//                      (60+ 토큰 + light/dark cascade). 본 진입점이 가장 먼저
+//                      평가되어 후속 layer 들이 specificity 와 무관하게 본
+//                      토큰을 안정적으로 사용.
+//   2) theme.css     — Astryx Theme 컴포넌트의 default 컴포넌트 스타일
+//                      보호용. 3-layer @import (reset → astryx-base → theme).
+//                      Theme 자체의 StyleX CSS-in-JS cascade 와 정합.
+//                      본 layer 의 token 은 우리 React 컴포넌트가 사용하지
+//                      않으므로 Svelte baseline 영향 0.
+//   3) globals.css   — 토큰 사용처의 base style (html/body/a/button/etc).
+//                      fallback 없는 직접 토큰 사용.
+import "@/tokens.css";
+import "@/theme.css";
 import "@/globals.css";
 
 import { StrictMode } from "react";
