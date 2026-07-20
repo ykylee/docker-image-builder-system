@@ -127,11 +127,11 @@ docker compose \
 | postgres migration | 0001~0006 적용 정상 | 동일 (변경 0) |
 | 신규 e2e 스크립트 | (TASK-085 만) | **TASK-111 신규** |
 | 신규 compose override | (TASK-085 e2e 만) | **TASK-111 postgres 추가** |
-| 신규 운영 가이드 | (TASK-085 운영 가이드 14종) | **TASK-111 신규 15 종** |
+| 신규 운영 가이드 | (TASK-085 메모리 variant 신규 봉인, 14종) | **TASK-085 운영 가이드 신규 (15종) + TASK-111 신규 postgres 운영 가이드 (16종)** |
 
 ## follow-up
 
-- **TASK-085 production-semantic 운영 가이드 + 신규 e2e 의 cross-reference** — TASK-085 운영 가이드에 postgres variant link 추가 (후속 TASK 권장 — 운영자가 한 자릿에서 운영 가이드 인덱스 식별 가능하도록).
+- **TASK-085 ↔ TASK-111 운영 가이드 cross-reference** — `docs/operations/production-semantic-2026-07-07.md` (TASK-085 메모리 variant, 신규) ↔ 본 가이드. 운영자가 한 자릿에서 운영 가이드 인덱스 식별 가능하도록 **TASK-112 (본 TASK 의 후속 권장)** 가 봉인. SQL / schema / migration 변경 0 — docs only cross-reference.
 - **chunked multi-runner 회귀 가드** — TASK-106 / TASK-108 / TASK-109 / TASK-110 동시 사용 시 multi-runner 회귀 가드 후속.
 - **옵션 Z 외부 object storage** — TASK-104 trigger 후속 결정.
 - **신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK** — 별도 사용자 결정.
