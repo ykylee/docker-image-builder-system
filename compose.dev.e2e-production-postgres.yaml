@@ -1,0 +1,54 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — production-semantic e2e compose override (postgres)
+# =============================================================================
+#  TASK-111: TASK-085 의 production-semantic 검증의 postgres backend
+#  동등 보강. compose.dev.yaml 의 memory backend default 를 postgres 로
+#  전환하고, build-server 가 postgres service 에 의존하도록 강제. runner 는
+#  기존 production-semantic override 와 동일 (cli mode + host network +
+#  busybox Dockerfile verification).
+#
+#  사용:
+#    export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
+#    export ADMIN_IDS=admin
+#    docker compose \
+#      -f compose.dev.yaml \
+#      -f compose.dev.e2e-production.yaml \
+#      -f compose.dev.e2e-production-postgres.yaml \
+#      --profile postgres \
+#      --project-name dibs-prod-postgres-e2e-$$ \
+#      up -d
+#
+#    bash apps/build-server/scripts/e2e-production-semantic-postgres.sh
+#
+#    docker compose \
+#      -f compose.dev.yaml \
+#      -f compose.dev.e2e-production.yaml \
+#      -f compose.dev.e2e-production-postgres.yaml \
+#      --profile postgres \
+#      --project-name dibs-prod-postgres-e2e-$$ \
+#      down -v
+#
+#  핵심 env override:
+#    - BUILD_REPOSITORY_BACKEND: memory → postgres
+#    - DATABASE_URL: postgres service (compose 내부 DNS) 로 resolve
+#    - DB_AUTO_BOOTSTRAP: true — schema_migrations + 0001~N 자동 적용
+#    - depends_on 에 postgres healthy 조건 추가 (applyMigrations 이전에는
+#      build-server 가 health 통과 불가)
+#
+#  주의:
+#    - memory backend e2e (compose.dev.e2e-production.yaml) 와 비교해서 build-server
+#      의 backend 만 바뀐다. 같은 docker socket / busybox image / build lifecycle
+#      검증. 결과적으로 TASK-066 의 메모리 / postgres 양 backend 의 production
+#      semantic 운영 동등성 검증 가능.
+# =============================================================================
+
+services:
+  build-server:
+    environment:
+      BUILD_REPOSITORY_BACKEND: postgres
+      DATABASE_URL: postgres://dibs:dibs@postgres:5432/dibs
+      DB_AUTO_BOOTSTRAP: "true"
+    depends_on:
+      postgres:
+        condition: service_healthy
