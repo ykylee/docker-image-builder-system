@@ -223,13 +223,69 @@ export type StoreSourceChunkResult =
   | { kind: "not_found" }
   | { kind: "checksum_mismatch"; expected: string; actual: string }
   | { kind: "size_mismatch"; expected: number; actual: number }
-  | { kind: "idx_out_of_range"; idx: number; totalChunks: number };
+  | { kind: "idx_out_of_range"; idx: number; totalChunks: number }
+  | { kind: "content_range_invalid" }
+  | { kind: "content_range_mismatch"; declared: number; supplied: number };
 
 /** Wire format for `Content-Range` header parsing. */
 export interface ContentRangeParts {
   start: number;
   end: number;
   total: number;
+}
+
+// TASK-108: RFC 7233 Content-Range header parser. The format is
+// `bytes <start>-<end>/<total>` for single-range uploads, or
+// `bytes <start>-<end>/*` (no total — receiver must determine) for
+// trailer-append scenarios. We accept the full RFC 7233 grammar for
+// the single-range case and ignore `*` totals (treat as
+// `declaredTotalSizeBytes` from the build metadata).
+//
+// The returned shape is the same `ContentRangeParts` interface plus
+// a few invariants (start ≤ end, start ≥ 0, total ≥ 0 or undefined
+// for the `*` case).
+export type ContentRangeParse =
+  | { kind: "ok"; parts: ContentRangeParts; totalIsStar: boolean }
+  | { kind: "invalid_format" }
+  | { kind: "invalid_range"; reason: "start_after_end" | "negative_offset" | "non_numeric" };
+
+export const MAX_CONTENT_RANGE_TOTAL_BYTES = 1_073_741_824; // 1 GiB hard cap
+
+/**
+ * Parse a `Content-Range` header value per RFC 7233 §4.2. Accepts
+ * `bytes <start>-<end>/<total>` (single range) and
+ * `bytes <start>-<end>/*` (unknown total). Returns a typed
+ * `ContentRangeParse` so the route layer can distinguish a missing
+ * header (`null`) from an unparseable header (`invalid_format`).
+ */
+export function parseContentRange(header: string | null): ContentRangeParse | null {
+  if (header === null || header === "") {
+    return null;
+  }
+  const match = /^bytes\s+(\d+)-(\d+)\/(\d+|\*)$/.exec(header.trim());
+  if (!match) {
+    return { kind: "invalid_format" };
+  }
+  const start = Number(match[1]);
+  const end = Number(match[2]);
+  const totalRaw = match[3];
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
+    return { kind: "invalid_range", reason: "non_numeric" };
+  }
+  if (start < 0 || end < 0) {
+    return { kind: "invalid_range", reason: "negative_offset" };
+  }
+  if (start > end) {
+    return { kind: "invalid_range", reason: "start_after_end" };
+  }
+  if (totalRaw === "*") {
+    return { kind: "ok", parts: { start, end, total: 0 }, totalIsStar: true };
+  }
+  const total = Number(totalRaw);
+  if (total <= 0 || total > MAX_CONTENT_RANGE_TOTAL_BYTES) {
+    return { kind: "invalid_range", reason: "non_numeric" };
+  }
+  return { kind: "ok", parts: { start, end, total }, totalIsStar: false };
 }
 
 // TASK-066: read just the declared `SourceArchive` metadata for a
@@ -290,7 +346,21 @@ export interface BuildRepository {
     buildId: string,
     bytes: Uint8Array,
     perChunkChecksumSha256: string,
-    declaredTotalSizeBytes: number
+    declaredTotalSizeBytes: number,
+    /**
+     * TASK-108: optional RFC 7233 Content-Range parts. When supplied
+     * the repository treats the chunk as writing the bytes at
+     * `[parts.start, parts.end]` of the assembled archive (semantic
+     * A — RFC 7233 start-offset trusted). When omitted the
+     * repository falls back to the monotonically-increasing index
+     * derived from the existing chunks (semantic B, TASK-106
+     * default). The route layer implements the bipartite dispatch
+     * via `parseContentRange`: callers that send a `Content-Range`
+     * header land on the trusted path; callers that omit the header
+     * land on the legacy monotonic-sequence path. Both paths share
+     * the same `(build_id, idx)` uniqueness invariant.
+     */
+    contentRange?: ContentRangeParts
   ): Promise<StoreSourceChunkResult>;
   getSourceArchive(buildId: string): Promise<GetSourceArchiveResult>;
   getSourceArchiveMetadata(

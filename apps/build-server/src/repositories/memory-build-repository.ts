@@ -30,6 +30,7 @@ import type {
 import type {
   BuildRepository,
   ClaimNextBuildResult,
+  ContentRangeParts,
   CreateBuildResult,
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
@@ -816,7 +817,8 @@ export function createMemoryBuildRepository(): BuildRepository {
       buildId: string,
       bytes: Uint8Array,
       perChunkChecksumSha256: string,
-      declaredTotalSizeBytes: number
+      declaredTotalSizeBytes: number,
+      contentRange?: ContentRangeParts
     ): Promise<StoreSourceChunkResult> {
       const stored = builds.get(buildId);
       if (!stored) {
@@ -840,6 +842,19 @@ export function createMemoryBuildRepository(): BuildRepository {
           actual: actualSizeBytes
         };
       }
+      // TASK-108: RFC 7233 Content-Range total cross-check. When the
+      // caller supplies a Content-Range header the `total` field is
+      // the declared archive size per their own framing; if it
+      // disagrees with the build's `declaredTotalSizeBytes` we
+      // surface a 400 `content_range_mismatch` rather than silently
+      // trusting either side.
+      if (contentRange && contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
+        return {
+          kind: "content_range_mismatch",
+          declared: declaredTotalSizeBytes,
+          supplied: contentRange.total
+        };
+      }
       let envelope = sourceArchivesChunked.get(buildId);
       if (!envelope) {
         envelope = {
@@ -860,7 +875,39 @@ export function createMemoryBuildRepository(): BuildRepository {
       // total chunk count is derived from `totalSizeBytes` divided by
       // the maximal *expected* chunk size below; a chunk that would
       // extend past that count is rejected with `idx_out_of_range`.
-      const idx = envelope.chunks.size;
+      // TASK-108: 의미 C bipartite — semantic A (Content-Range
+      // trusted) vs semantic B (monotonic sequence). The two paths
+      // share `(build_id, idx)` uniqueness so a caller can mix
+      // semantic-B uploads (no header) and semantic-A uploads
+      // (with header) within the same archive, but semantic-A
+      // constraints apply if and only if a Content-Range was
+      // supplied for this call.
+      let idx: number;
+      if (contentRange) {
+        // Semantic A: derive idx from the chunk's start offset. With
+        // MAX_CHUNK_SIZE = 16 MiB, idx = start / MAX_CHUNK_SIZE so
+        // multiple callers can independently pick a non-contiguous
+        // range and write to a specific index.
+        const MAX_CHUNK_SIZE_FOR_DERIVATION = 16 * 1024 * 1024;
+        idx = Math.floor(contentRange.start / MAX_CHUNK_SIZE_FOR_DERIVATION);
+        // Content-Range's end must equal start + bytes.length - 1
+        // (RFC 7233 single-range inclusive). A mismatch means the
+        // bytes on the wire don't fill the declared range, which
+        // is a client bug — surface a 400.
+        const expectedEnd = contentRange.start + actualSizeBytes - 1;
+        if (contentRange.end !== expectedEnd) {
+          return { kind: "content_range_invalid" };
+        }
+        // Semantic A also accepts out-of-order uploads (since
+        // idx is derived from start) but rejects ranges that would
+        // extend past the declared total.
+        if (contentRange.start + actualSizeBytes > declaredTotalSizeBytes) {
+          return { kind: "size_mismatch", expected: declaredTotalSizeBytes, actual: contentRange.start + actualSizeBytes };
+        }
+      } else {
+        // Semantic B (TASK-106 default): monotonic sequence.
+        idx = envelope.chunks.size;
+      }
       // Conservative total-chunk cap: declare at most one chunk per
       // 1 KiB so a 1 GiB archive allows up to 1 M chunks; if a caller
       // uploads smaller chunks than this, the actual chunk count is

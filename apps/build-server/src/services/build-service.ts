@@ -18,6 +18,7 @@ import type {
 
 import type {
   BuildRepository,
+  ContentRangeParts,
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
@@ -339,17 +340,26 @@ export class BuildService {
   // The repository validates the per-chunk SHA-256, derives the
   // chunk index from cumulative chunk sizes, writes the row, and
   // reports whether the caller has just uploaded the final chunk.
+  //
+  // TASK-108: optional Content-Range header is forwarded as the
+  // fifth argument. The routes layer parses the header with
+  // `parseContentRange` before reaching this method; when the
+  // header is missing the routes layer omits the argument and the
+  // repository falls back to the monotonic-sequence semantic-B path
+  // (TASK-106 default).
   storeSourceChunk(
     buildId: string,
     bytes: Uint8Array,
     perChunkChecksumSha256: string,
-    declaredTotalSizeBytes: number
+    declaredTotalSizeBytes: number,
+    contentRange?: ContentRangeParts
   ): Promise<StoreSourceChunkResult> {
     return this.repository.storeSourceChunk(
       buildId,
       bytes,
       perChunkChecksumSha256,
-      declaredTotalSizeBytes
+      declaredTotalSizeBytes,
+      contentRange
     );
   }
 

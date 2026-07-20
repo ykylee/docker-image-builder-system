@@ -257,4 +257,91 @@ describe("MemoryBuildRepository: storeSourceChunk (TASK-106)", () => {
     const del = await repo.deleteSourceArchive(buildId);
     assert.equal(del.kind, "not_found");
   });
+
+  // -----------------------------------------------------------------------
+  // TASK-108: Content-Range (RFC 7233) 호환 의미 C bipartite 회귀 가드.
+  // 의미 A — Content-Range 헤더의 start offset 신뢰 path.
+  // 의미 B — 헤더 부재 시 monotonic sequence (TASK-106 default).
+  // -----------------------------------------------------------------------
+
+  it("TASK-108: Content-Range 헤더로 의미 A path — start offset 으로 idx derivation", async () => {
+    // 512 KiB archive 를 16 MiB MAX_CHUNK_SIZE 안에서 1 개 chunk 로
+    // 보내는 시나리오. start=0, end=sizeBytes-1, total=512*1024.
+    const totalSize = 512 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk = randomBytes(totalSize);
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      totalSize,
+      { start: 0, end: totalSize - 1, total: totalSize }
+    );
+    assert.equal(r.kind, "ok");
+    if (r.kind !== "ok") return;
+    assert.equal(r.idx, 0);
+    assert.equal(r.sizeBytes, totalSize);
+  });
+
+  it("TASK-108: 의미 A — start offset 이 16 MiB 이후면 idx 가 1 이상 (multi-chunk 분리)", async () => {
+    // 32 MiB archive 를 두 chunk (각 16 MiB) 로 보냄. start offset
+    // 첫 chunk 는 0, 둘째 chunk 는 16 MiB.
+    const totalSize = 32 * 1024 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk1 = randomBytes(16 * 1024 * 1024);
+    const chunk2 = randomBytes(16 * 1024 * 1024);
+    const r1 = await repo.storeSourceChunk(
+      buildId,
+      chunk1,
+      sha256Hex(chunk1),
+      totalSize,
+      { start: 0, end: 16 * 1024 * 1024 - 1, total: totalSize }
+    );
+    const r2 = await repo.storeSourceChunk(
+      buildId,
+      chunk2,
+      sha256Hex(chunk2),
+      totalSize,
+      { start: 16 * 1024 * 1024, end: totalSize - 1, total: totalSize }
+    );
+    assert.equal(r1.kind, "ok");
+    assert.equal(r2.kind, "ok");
+    if (r1.kind !== "ok" || r2.kind !== "ok") return;
+    assert.equal(r1.idx, 0);
+    assert.equal(r2.idx, 1);
+    assert.equal(r2.isFinalChunk, true);
+  });
+
+  it("TASK-108: 의미 A — Content-Range 의 end 가 start + length -1 과 다르면 content_range_invalid", async () => {
+    const totalSize = 16 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk = randomBytes(16 * 1024);
+    // end 가 start + length - 1 과 일치하지 않는 (의도적 mismatched)
+    // Content-Range 헤더를 보내면 repository 가 content_range_invalid
+    // 를 반환해야 한다 (RFC 7233 §4.4).
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      totalSize,
+      { start: 0, end: 16 * 1024 + 100, total: totalSize }
+    );
+    assert.equal(r.kind, "content_range_invalid");
+  });
+
+  it("TASK-108: 의미 C bipartite — 헤더 부재 시 의미 B fallback (monotonic)", async () => {
+    // Content-Range 를 전달하지 않으면 (5 번째 인자 생략) 의미 B
+    // path (TASK-106 default). 두 chunk monotonic 으로 idx 0, 1.
+    const totalSize = 32 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk1 = randomBytes(16 * 1024);
+    const chunk2 = randomBytes(16 * 1024);
+    const r1 = await repo.storeSourceChunk(buildId, chunk1, sha256Hex(chunk1), totalSize);
+    const r2 = await repo.storeSourceChunk(buildId, chunk2, sha256Hex(chunk2), totalSize);
+    assert.equal(r1.kind, "ok");
+    assert.equal(r2.kind, "ok");
+    if (r1.kind !== "ok" || r2.kind !== "ok") return;
+    assert.equal(r1.idx, 0);
+    assert.equal(r2.idx, 1);
+  });
 });

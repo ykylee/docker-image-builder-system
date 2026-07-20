@@ -21,6 +21,7 @@ import {
 } from "@docker-image-builder-system/shared-contract";
 
 import type { BuildService } from "../services/build-service.js";
+import { parseContentRange } from "../repositories/build-repository.js";
 
 // Note: Fastify v5 + zod v4 do not accept zod schemas in `routeOptions.schema`
 // directly; the runtime validator (ajv) requires JSON schema with
@@ -447,14 +448,52 @@ export async function registerBuildRoutes(
       typeof checksumHeader === "string" && checksumHeader.length > 0
         ? checksumHeader
         : metadataResult.sourceArchive.checksumSha256;
+    // TASK-108: 의미 C bipartite — parse the RFC 7233 `Content-Range`
+    // header (if present) and forward `contentRange` to the
+    // repository. When the header is missing (or unparseable / out
+    // of range) we deliberately fall back to the semantic-B
+    // monotonic-sequence path so existing callers (no
+    // `Content-Range`) keep working without change.
+    const rawContentRange = request.headers["content-range"];
+    const contentRangeHeader =
+      typeof rawContentRange === "string" ? rawContentRange : null;
+    const parsed = parseContentRange(contentRangeHeader);
+    if (parsed === null && contentRangeHeader !== null) {
+      // Header was supplied but unparseable — surface a 416
+      // Range Not Satisfiable (RFC 7233 §4.4).
+      return reply.status(416).send({
+        message: "Content-Range header is malformed.",
+        header: contentRangeHeader
+      });
+    }
+    const contentRange = parsed?.kind === "ok" ? parsed.parts : undefined;
+    if (parsed && parsed.kind === "invalid_range") {
+      return reply.status(416).send({
+        message: "Content-Range header is invalid.",
+        reason: parsed.reason
+      });
+    }
     const result = await buildService.storeSourceChunk(
       paramsResult.data.buildId,
       new Uint8Array(request.body),
       perChunkChecksumSha256,
-      metadataResult.sourceArchive.sizeBytes
+      metadataResult.sourceArchive.sizeBytes,
+      contentRange
     );
     if (result.kind === "not_found") {
       return reply.status(404).send({ message: "Build not found." });
+    }
+    if (result.kind === "content_range_invalid") {
+      return reply.status(400).send({
+        message: "Content-Range end does not match start + bytes.length - 1."
+      });
+    }
+    if (result.kind === "content_range_mismatch") {
+      return reply.status(400).send({
+        message: "Content-Range total does not match the build's declared sourceArchive.sizeBytes.",
+        declared: result.declared,
+        supplied: result.supplied
+      });
     }
     if (result.kind === "checksum_mismatch") {
       return reply.status(400).send({

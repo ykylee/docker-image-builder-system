@@ -51,6 +51,7 @@ import type {
 import type {
   BuildRepository,
   ClaimNextBuildResult,
+  ContentRangeParts,
   CreateBuildResult,
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
@@ -1221,7 +1222,8 @@ export class PostgresBuildRepository implements BuildRepository {
     buildId: string,
     bytes: Uint8Array,
     perChunkChecksumSha256: string,
-    declaredTotalSizeBytes: number
+    declaredTotalSizeBytes: number,
+    contentRange?: ContentRangeParts
   ): Promise<StoreSourceChunkResult> {
     const buildRow = await this.db
       .select({ id: buildRequestTable.id })
@@ -1249,21 +1251,47 @@ export class PostgresBuildRepository implements BuildRepository {
         actual: actualSizeBytes
       };
     }
-    // Derive the next chunk index from the current chunk count
-    // for this buildId. We assign indices in monotonically increasing
-    // sequence (0, 1, 2, ...) regardless of the bytes-per-chunk
-    // distribution — this keeps the (build_id, idx) uniqueness
-    // invariant simple and lets the caller size chunks freely. The
-    // total chunk count cap is `ceil(totalSizeBytes / 1024)` — a
-    // conservative upper bound (≤ one chunk per 1 KiB) that allows
-    // realistic archives while staying < 2^53 (JS safe-integer
-    // range). A chunk that would extend past that count is rejected
-    // with `idx_out_of_range`.
-    const priorCount = await this.db
-      .select({ id: buildSourceChunkTable.id })
-      .from(buildSourceChunkTable)
-      .where(eq(buildSourceChunkTable.buildId, buildId));
-    const idx = priorCount.length;
+    // TASK-108: Content-Range total cross-check (same as memory
+    // repository). When the caller supplies a Content-Range header
+    // the `total` is the declared archive size per their framing;
+    // a mismatch surfaces `content_range_mismatch` rather than
+    // silently trusting either side.
+    if (contentRange && contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
+      return {
+        kind: "content_range_mismatch",
+        declared: declaredTotalSizeBytes,
+        supplied: contentRange.total
+      };
+    }
+    // TASK-108: 의미 C bipartite — semantic A (Content-Range
+    // trusted) vs semantic B (monotonic sequence). Both paths share
+    // `(build_id, idx)` uniqueness so a caller can mix semantic-B
+    // (no header) and semantic-A (with header) uploads in the same
+    // archive.
+    let idx: number;
+    if (contentRange) {
+      // Semantic A: derive idx from the chunk's start offset. The
+      // derivation matches MAX_CHUNK_SIZE = 16 MiB so multiple
+      // callers can independently pick a non-contiguous range and
+      // write to a specific index.
+      const MAX_CHUNK_SIZE_FOR_DERIVATION = 16 * 1024 * 1024;
+      idx = Math.floor(contentRange.start / MAX_CHUNK_SIZE_FOR_DERIVATION);
+      // Content-Range's end must equal start + bytes.length - 1.
+      const expectedEnd = contentRange.start + actualSizeBytes - 1;
+      if (contentRange.end !== expectedEnd) {
+        return { kind: "content_range_invalid" };
+      }
+      if (contentRange.start + actualSizeBytes > declaredTotalSizeBytes) {
+        return { kind: "size_mismatch", expected: declaredTotalSizeBytes, actual: contentRange.start + actualSizeBytes };
+      }
+    } else {
+      // Semantic B (TASK-106 default): monotonic sequence.
+      const priorCount = await this.db
+        .select({ id: buildSourceChunkTable.id })
+        .from(buildSourceChunkTable)
+        .where(eq(buildSourceChunkTable.buildId, buildId));
+      idx = priorCount.length;
+    }
     const totalChunks = Math.ceil(declaredTotalSizeBytes / 1024);
     if (idx >= totalChunks) {
       return { kind: "idx_out_of_range", idx, totalChunks };
