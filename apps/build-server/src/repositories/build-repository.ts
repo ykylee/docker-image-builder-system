@@ -360,7 +360,17 @@ export interface BuildRepository {
      * land on the legacy monotonic-sequence path. Both paths share
      * the same `(build_id, idx)` uniqueness invariant.
      */
-    contentRange?: ContentRangeParts
+    contentRange?: ContentRangeParts,
+    /**
+     * TASK-110: STRICT_CONTENT_RANGE env flag mirror. When `true`
+     * the repository rejects callers that supply `Content-Range`
+     * with `*` total (RFC 7233 §4.2 unknown total) and forces them
+     * to supply a numeric total. The route layer reads the env
+     * flag at startup via the runtime settings and forwards it on
+     * every chunk upload. Defaults to `false` (lenient — TASK-109
+     * semantics preserved for existing callers).
+     */
+    strictContentRange?: boolean
   ): Promise<StoreSourceChunkResult>;
   getSourceArchive(buildId: string): Promise<GetSourceArchiveResult>;
   getSourceArchiveMetadata(

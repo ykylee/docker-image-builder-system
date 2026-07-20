@@ -34,6 +34,20 @@ import { BuildService } from "../services/build-service.js";
 // TASK-082 multi-runner postgres 운영 검증에서 봉인.
 const MIGRATIONS_DIR = join(process.cwd(), "apps/build-server/migrations");
 
+// TASK-110: STRICT_CONTENT_RANGE env flag parser. Recognised truthy
+// values are `"true"`, `"1"`, `"yes"` (case-insensitive); anything
+// else (including unset) maps to `false` so the default remains the
+// TASK-108/109 lenient behaviour. We do NOT honour `"true"` flag in
+// the route layer — it's a deployment-policy switch, not a
+// per-request parameter, so we read it once at startup and feed it
+// through the BuildService constructor.
+function parseStrictContentRangeFlag(env: NodeJS.ProcessEnv): boolean {
+  const raw = env.STRICT_CONTENT_RANGE;
+  if (typeof raw !== "string") return false;
+  const normalised = raw.trim().toLowerCase();
+  return normalised === "true" || normalised === "1" || normalised === "yes";
+}
+
 // TASK-075 단일 포트 reverse proxy. Build Server 가 build-monitor 의
 // vite build 산출물 (`apps/build-monitor/dist`) 을 정적 서빙 + SPA fallback 으로
 // 함께 노출 — Build Server 의 API routes 와 Build Monitor 의 SPA 가 단일 포트
@@ -107,7 +121,17 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     runtime.buildRepositoryBackend === "postgres"
       ? await createPostgresBuildRepository(app, runtime)
       : createMemoryBuildRepository();
-  const buildService = new BuildService(buildRepository);
+  // TASK-110: STRICT_CONTENT_RANGE env flag mirror. When set to
+  // "true"/"1"/"yes" the BuildService enforces numeric Content-Range
+  // totals on chunk uploads — callers that supply `*` (RFC 7233
+  // §4.2 unknown total) get a 400 `content_range_invalid`. Off by
+  // default so existing TASK-108/109 callers keep working. See
+  // `docs/operations/content-range-rfc-7233-strict-mode-2026-07-20.md`
+  // for the rollout playbook.
+  const strictContentRange = parseStrictContentRangeFlag(process.env);
+  const buildService = new BuildService(buildRepository, {
+    strictContentRange
+  });
 
   void registerHealthRoute(app);
   void registerBuildRoutes(app, buildService);

@@ -410,4 +410,84 @@ describe("MemoryBuildRepository: storeSourceChunk (TASK-106)", () => {
     assert.equal(r.declared, declaredTotal);
     assert.equal(r.supplied, wrongTotal);
   });
+
+  // -----------------------------------------------------------------------
+  // TASK-110: STRICT_CONTENT_RANGE env flag mirror. strictContentRange
+  // = true 의 경우 RFC 7233 §4.2 의 `*` total 케이스를 거절.
+  // -----------------------------------------------------------------------
+
+  it("TASK-110: strict 모드 ON + numeric total + declared 일치 → ok", async () => {
+    // strict 모드가 켜져 있어도 numeric total 이 declared 와 일치하면 정상.
+    const totalSize = 16 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk = randomBytes(16 * 1024);
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      totalSize,
+      { start: 0, end: totalSize - 1, total: totalSize },
+      true
+    );
+    assert.equal(r.kind, "ok");
+    if (r.kind !== "ok") return;
+    assert.equal(r.idx, 0);
+    assert.equal(r.isFinalChunk, true);
+  });
+
+  it("TASK-110: strict 모드 ON + '*' total → content_range_invalid", async () => {
+    // strict 모드 활성 시 RFC 7233 §4.2 의 `*` total 케이스를 거절.
+    // lenient 모드 (default) 와의 차이 — strict 가 켜진 운영 환경만
+    // 영향을 받음.
+    const totalSize = 16 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk = randomBytes(16 * 1024);
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      totalSize,
+      { start: 0, end: totalSize - 1, total: 0 },
+      true
+    );
+    assert.equal(r.kind, "content_range_invalid");
+  });
+
+  it("TASK-110: strict 모드 OFF + '*' total → ok (TASK-109 lenient default)", async () => {
+    // strict 모드 OFF (default) 의 동작이 TASK-109 와 같은지 확인.
+    // 환경 변수 flag 가 unset 이거나 non-truthy 면 strictContentRange
+    // 인자도 falsy 로 default — 기존 TASK-109 callers 가 그대로 동작.
+    const totalSize = 16 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk = randomBytes(16 * 1024);
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      totalSize,
+      { start: 0, end: totalSize - 1, total: 0 },
+      false
+    );
+    assert.equal(r.kind, "ok");
+    if (r.kind !== "ok") return;
+    assert.equal(r.isFinalChunk, true);
+  });
+
+  it("TASK-110: strict 모드 ON + numeric total + declared mismatch → content_range_mismatch", async () => {
+    // strict 모드 활성 시 numeric total mismatch 는 여전히
+    // content_range_mismatch 로 거절 (TASK-108 정합 유지).
+    const declaredTotal = 16 * 1024;
+    const { buildId, repo } = await setupBuild(declaredTotal);
+    const chunk = randomBytes(16 * 1024);
+    const wrongTotal = 32 * 1024;
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      declaredTotal,
+      { start: 0, end: chunk.length - 1, total: wrongTotal },
+      true
+    );
+    assert.equal(r.kind, "content_range_mismatch");
+  });
 });

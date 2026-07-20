@@ -51,7 +51,21 @@ export type GetTestDeploymentOutcome =
   | { kind: "not_found" };
 
 export class BuildService {
-  constructor(private readonly repository: BuildRepository) {}
+  // TASK-110: STRICT_CONTENT_RANGE env flag mirror. Default `false`
+  // (TASK-108 / TASK-109 lenient semantics preserved for existing
+  // callers). The route layer reads the env flag at startup via
+  // create-app.ts env loader and passes the boolean here. When the
+  // flag flips to `true`, `storeSourceChunk` rejects callers that
+  // supply `Content-Range` with `*` total — they must provide a
+  // numeric total to satisfy the cross-check. Operators toggle this
+  // via `STRICT_CONTENT_RANGE=true` when they're ready to enforce
+  // numeric totals as a deployment policy.
+  constructor(
+    private readonly repository: BuildRepository,
+    private readonly runtime: { strictContentRange: boolean } = {
+      strictContentRange: false
+    }
+  ) {}
 
   async createBuild(
     input: BuildRequest
@@ -359,7 +373,8 @@ export class BuildService {
       bytes,
       perChunkChecksumSha256,
       declaredTotalSizeBytes,
-      contentRange
+      contentRange,
+      this.runtime.strictContentRange
     );
   }
 

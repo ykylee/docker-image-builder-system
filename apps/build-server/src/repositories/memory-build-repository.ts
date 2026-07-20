@@ -818,7 +818,8 @@ export function createMemoryBuildRepository(): BuildRepository {
       bytes: Uint8Array,
       perChunkChecksumSha256: string,
       declaredTotalSizeBytes: number,
-      contentRange?: ContentRangeParts
+      contentRange?: ContentRangeParts,
+      strictContentRange: boolean = false
     ): Promise<StoreSourceChunkResult> {
       const stored = builds.get(buildId);
       if (!stored) {
@@ -860,7 +861,23 @@ export function createMemoryBuildRepository(): BuildRepository {
       // `docs/operations/content-range-rfc-7233-star-2026-07-20.md`
       // as the "strict" path; we adopt the lenient default to let
       // existing callers adopt RFC 7233 incrementally.
+      //
+      // TASK-110: STRICT_CONTENT_RANGE env flag mirror. When the
+      // route layer sets this flag (via create-app.ts env loader)
+      // the repository rejects callers that supply `Content-Range`
+      // with `*` total — they must provide a numeric total to
+      // satisfy the cross-check. This is the operationally enforced
+      // variant of the "strict" alternative noted above; operators
+      // flip it on once they're ready to require numeric totals.
       if (contentRange) {
+        if (strictContentRange && contentRange.total === 0) {
+          // TASK-110: STRICT_CONTENT_RANGE=true 인 경우 `*` total
+          // 거부. caller 가 numeric total 을 보내면 다음 분기에서
+          // 정상 cross-check.
+          return {
+            kind: "content_range_invalid"
+          };
+        }
         if (contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
           return {
             kind: "content_range_mismatch",
