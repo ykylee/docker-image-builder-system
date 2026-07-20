@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-20T08:00:00Z",
-  "purpose_digest": "TASK-110 (STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인) 봉인 sync (rev 139→140). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 + TASK-108 + TASK-109 + TASK-110 까지 **9 TASK 연속 봉인**. TASK-110 결정: 운영자가 deployment 시점에 env flag 한 개 (STRICT_CONTENT_RANGE) 로 RFC 7233 §4.2 `*` total 케이스 거절 (400 content_range_invalid) + numeric total 의무화. 신규 1 file + amend 7 file: 신규 — docs/operations/content-range-rfc-7233-strict-mode-2026-07-20.md (의도 / 결정 / 운영 rollout playbook 3 단계 / Wire format / Schema 변경 0 / Build service amend / Repository amend / Routes amend 0 / 신규 회귀 가드 4 case / 사전 결함 + 보강 2건 / 회귀 baseline / follow-up / 관련 문서). amend — create-app.ts (parseStrictContentRangeFlag helper + BuildService instantiation 시 { strictContentRange } 위임) + build-service.ts (BuildService constructor 의 두 번째 인자 { strictContentRange: boolean }) + build-repository.ts (storeSourceChunk 의 6 번째 parameter strictContentRange?: boolean) + memory-build-repository.ts (의미 C branch 4 종 dispatch) + postgres-build-repository.ts (memory 와 일대일 정합) + build-source-chunked.test.ts (+4 cases) + PROJECT_PROFILE.md (§3 source archive 라운드트립 TASK-110 항목 + 다음에 읽을 문서 reference). build-routes.ts amend 0 (BuildService runtime field 자동 전파). SQL / schema / migration / version 변경 0. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 0 변경), build-server 161 → 165 (+4 신규 strict cases, legacy/chunked/의미 C/`*` 0 변경), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 운영 영향 0 (default) — env unset / \"false\" 등 모든 callers TASK-109 동작 보존. strict 모드 활성은 deployment 정책 결정. 사전 결함 + 보강 2건 (운영 restart 없이 dynamic toggle 불가 / strict 모드 ON 시 기존 callers 의 breakdown 위험). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean / vite build:react 정상. 28 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up (남은 결정): 운영자 client 정렬 검증 staging checklist / chunked multi-runner 회귀 가드 / TASK-066 follow-up batch 4 의 e2e-production-semantic-postgres / 옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 모두 별도 사용자 결정.",
-  "purpose_digest_rev": 140,
+  "generated_at": "2026-07-20T09:00:00Z",
+  "purpose_digest": "TASK-111 (Production-semantic Postgres backend 동등 보강) 봉인 sync (rev 140→141). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 + TASK-108 + TASK-109 + TASK-110 + TASK-111 까지 **10 TASK 연속 봉인**. TASK-111 결정: TASK-085 의 production-semantic 운영 검증의 postgres backend 동등 보강 — busybox Dockerfile + 실제 tar.gz source archive 의 build 가 COMPLETED 까지 가는 운영 시나리오를 postgres backend 로 동일하게 검증. 신규 3 file + amend 1 file: 신규 — `compose.dev.e2e-production-postgres.yaml` (postgres profile + build-server 의 postgres backend 전환) + `apps/build-server/scripts/e2e-production-semantic-postgres.sh` (8 단계: postgres + busybox warm-up → compose up → build-server cold start + applyMigrations → psql direct verify → source archive 작성 + busybox Dockerfile → source archive upload + postgres bytea round-trip verify → build lifecycle 대기 → 10 phase + preview URL + deploy mode 검증 → terminal-phase bytea 재검증 + container cleanup + compose down. 약 2-3분) + `docs/operations/production-semantic-postgres-2026-07-20.md` (의도 / 결정 / 신규 회귀 가드 8 단계 / Wire format 변경 0 / Schema 변경 0 / 운영 rollout playbook 5 단계 / 사전 결함 + 보강 3건 / 회귀 baseline / follow-up / 관련 문서). amend — docs/PROJECT_PROFILE.md (§3.5 postgres backend follow-up 의 후속 TASK (TASK-066 follow-up batch 4 후보) 해제 + TASK-111 신규 봉인 완료 전환 + 본 TASK 신규 항목 + 다음에 읽을 문서 reference). SQL / schema / migration / version 변경 0. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 0 변경), build-server vitest 165/165 (변경 0), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 운영 영향 0 (memory variant callers) — TASK-085 의 memory variant 가 그대로 동등 운영; 신규 postgres variant 는 release staging 에서 운영자가 선택적으로 postgres 동등성 검증. 사전 결함 + 보강 3건 (3 layer compose 의 검증 부담 → 운영 가이드에 모두 명시 / postgres volume 자동 drop → staging 환경 verify / build 5 분 상한 미달 → 사전 warm-up 권장). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52, TASK-106 +11 + TASK-108 +4 + TASK-109 +3 + TASK-110 +4 신규) / TS 5 packages clean / vite build:react 정상. 29 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up (남은 결정): TASK-085 production-semantic 운영 가이드 postgres variant cross-reference / chunked multi-runner 회귀 가드 / 옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 모두 별도 사용자 결정.",
+  "purpose_digest_rev": 141,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-110 (STRICT_CONTENT_RANGE env flag 의 strict 모드) 봉인 (rev 139→140). main HEAD `1105a8e` (TASK-110 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52, TASK-106 +11 + TASK-108 +4 + TASK-109 +3 + TASK-110 +4 신규) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 28 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
-    "current_axis": "TASK-110 STRICT_CONTENT_RANGE env flag strict 모드 봉인 완료. 본 세션 9 TASK 연속 봉인. 28 TASK 봉인. 모든 TASK main 합류.",
-    "current_focus": "TASK-110 STRICT_CONTENT_RANGE env flag 봉인 sync 완료. 다음 세션 시작 시 main HEAD `1105a8e` + workflow meta (state rev 140) baseline 복원. 후속 결정 (운영자 client 정렬 staging checklist / chunked multi-runner 회귀 가드 / TASK-066 follow-up batch 4 / 옵션 Z / 신규 기능 / Nextcloud Tasks / 다른 TASK) 별도 사용자 결정.",
+    "current_baseline": "TASK-111 (Production-semantic Postgres backend 동등 보강) 봉인 (rev 140→141). main HEAD `3369d0a` (TASK-111 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 29 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
+    "current_axis": "TASK-111 Production-semantic Postgres backend 동등 보강 완료. 본 세션 10 TASK 연속 봉인. 29 TASK 봉인. 모든 TASK main 합류.",
+    "current_focus": "TASK-111 production-semantic-postgres 봉인 sync 완료. 다음 세션 시작 시 main HEAD `3369d0a` + workflow meta (state rev 141) baseline 복원. 후속 결정 (TASK-085 운영 가이드 postgres cross-reference / chunked multi-runner 회귀 가드 / 옵션 Z / 신규 기능 / Nextcloud Tasks / 다른 TASK) 별도 사용자 결정.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-111 Production-semantic Postgres backend 동등 보강 — `3369d0a` main 합류 (2026-07-20, 본 세션)",
       "TASK-110 STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인 — `1105a8e` main 합류 (2026-07-20, 본 세션)",
       "TASK-109 RFC 7233 `*` 케이스 dynamic boundary check 봉인 — `0663785` main 합류 (2026-07-20, 본 세션)",
       "TASK-108 RFC 7233 Content-Range chunked wire-format 의미 C bipartite 완전 봉인 — `4e5161e` main 합류 (2026-07-20, 본 세션)",
@@ -85,7 +86,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-20.md",
-    "task_count": 28,
+    "task_count": 29,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -118,10 +119,11 @@
       "TASK-107 RFC 7233 Content-Range chunked wire-format follow-up 권장 (docs only) (rev 26 sync 봉인, commit `7c25a06` main 합류)",
       "TASK-108 RFC 7233 Content-Range chunked wire-format 의미 C bipartite 완전 봉인 (rev 27 sync 봉인, commit `4e5161e` main 합류)",
       "TASK-109 RFC 7233 `*` 케이스 dynamic boundary check 봉인 (rev 28 sync 봉인, commit `0663785` main 합류)",
-      "TASK-110 STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인 (rev 29 sync 봉인, commit `1105a8e` main 합류)"
+      "TASK-110 STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인 (rev 29 sync 봉인, commit `1105a8e` main 합류)",
+      "TASK-111 Production-semantic Postgres backend 동등 보강 (rev 30 sync 봉인, commit `3369d0a` main 합류)"
     ],
-    "index_rev": "63",
-    "latest_rev": "40"
+    "index_rev": "64",
+    "latest_rev": "41"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
