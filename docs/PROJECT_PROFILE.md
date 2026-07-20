@@ -48,8 +48,18 @@
 
 ## 3. 기본 명령 (Commands)
 - 설치: `pnpm install` (`esbuild` 계열 승인 정책 때문에 환경에 따라 `ERR_PNPM_IGNORED_BUILDS`가 날 수 있으며, 이 경우 watch/dev dependency 승인 또는 direct `tsc` 검증으로 우회)
-- 로컬 실행 (memory backend, Build Server API 만 — 단일 포트 mount 미사용): `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && ./node_modules/.bin/tsc -p packages/db/tsconfig.json && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js`
-- Postgres 실행 (memory backend 와 동일하게 Build Server API 만): `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres DB_AUTO_BOOTSTRAP=true node apps/build-server/dist/apps/build-server/src/index.js`
+- 로컬 실행 — memory backend (단일 runner / 단일 build / 빠른 smoke / CI / 디버깅용 보조 경로. Build Server API 만 — 단일 포트 mount 미사용): `./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && ./node_modules/.bin/tsc -p packages/db/tsconfig.json && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js`
+- 로컬 실행 — Postgres backend (**Postgres backend 가 default 개발 경로** — 운영 환경(production deployment) 은 Postgres 만 사용하므로 dev ↔ production 환경 drift 최소화. bytea round-trip 회귀 / FK CASCADE + migration / multi-runner 운영 검증 모두 Postgres 환경에서만 가능. 단일 포트 mount / React SPA fallback 미사용 시 Build Server API 만 — Postgres container 가 127.0.0.1:15432 에 떠 있어야 함. 자세한 운영 권장은 §3.2 Postgres default 개발 경로 + `docs/operations/source-archive-postgres-2026-07-18.md` 참조):
+  ```bash
+  ./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json && \
+    ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json && \
+    ./node_modules/.bin/tsc -p packages/db/tsconfig.json && \
+    ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && \
+    DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder \
+    BUILD_REPOSITORY_BACKEND=postgres \
+    DB_AUTO_BOOTSTRAP=true \
+    node apps/build-server/dist/apps/build-server/src/index.js
+  ```
 - **단일 포트 reverse proxy (TASK-075)** — Build Server 가 build-monitor 의 React vite build 산출물 (`apps/build-monitor/dist-react/`) 을 정적 mount + SPA fallback 으로 함께 노출, `:3000` 한 포트로 backend + frontend 동시 접근:
   ```bash
   # 1) build-monitor 의 React vite build 산출물 생성 (workspace root 에서)
@@ -132,6 +142,7 @@
   - docker inspect race (hostPort=0) → 위 retry 보강.
   - compose bridge network 의 host namespace 격리 → `network_mode: host` override.
 - 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean, build-server node:test **143/143 동일** (backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 7 packages 모두 PASS (기존 + 신규 docker test 2건), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-production-semantic.sh` **ALL PASS** (cold start 30s + busybox pull warmup 10s + build lifecycle ~30s + cleanup, 총 ~2분).
+- **Postgres backend 회귀 (TASK-102 baseline 양축 동기화)**: `apps/build-server/scripts/e2e-source-archive-postgres.sh` 5 단계 (POST /builds → POST /source → bytea direct verify → GET /source → DELETE /source) 모두 PASS — TASK-066 봉인 시점에 memory backend 와 동등 baseline 검증 완료. postgres migration 0001 (`app_name`) / 0002 (`phase_history`) / 0003 (`build_test` / `deployment_attempt`) / 0004 (`build_source` bytea + FK CASCADE) / 0005 (`runner_registry`) 모두 적용 정상. TASK-082 `e2e-multi-runner-postgres.sh` ALL PASS (postgres backend multi-runner 3개 적재, 영속 검증 포함). `e2e-production-semantic.sh` 는 memory backend 전용 회귀 가드 — Postgres backend 동등 보강은 후속 TASK (TASK-066 follow-up batch 4 후보).
 
 ## 3.6 e2e-multi-runner.sh BASE + heredoc 결함 봉인 (TASK-086)
 - 의도: TASK-081-B 의 `apps/build-server/scripts/e2e-multi-runner.sh` 가 봉인될 때 못 가져간 두 가지 결함 — (1) `BASE="http://build-server:3000"` 가 docker network 내부 DNS 이름을 host shell 에서 사용, (2) `[5/6]` admin 분산 검증 의 `echo "${RUNNERS}" | python3 <<'PY'` 가 bash redirections 처리 순서상 heredoc 이 stdin 을 hijack 해서 `sys.stdin.read()` 가 항상 빈 응답 — 을 봉인. 같은 race (TASK-085 에서 발견된 runner registration 30-90s) 와 stale image caching 결함도 동시 보강.
@@ -144,6 +155,7 @@
   - runner registration 대기 30s 가 부족 (TASK-085 의 `30-90s` race 와 동일) → 90s 로 확장.
   - compose 가 cached image 사용 시 runner binary 변경 미반영 → `[0/6] compose up` 에 `--build` 추가.
 - 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일에 영향 없음), build-server node:test **143/143 동일** (스크립트만 amend — backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 7 packages 모두 PASS, svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-multi-runner.sh` **ALL PASS** (~3-4 분 — TASK-081-B 와 정합), `e2e-production-semantic.sh` follow-on 도 동일 ALL PASS (TASK-085 회귀 baseline 유지).
+- **Postgres backend 회귀 (TASK-102 baseline 양축 동기화)**: TASK-082 `e2e-multi-runner-postgres.sh` ALL PASS (8 단계 + 3 runner 적재 + 영속 검증, postgres 15432 port 기준) — §3.5 / §3.6 의 memory backend e2e 와 동등 baseline. postgres migration `0001~0005` 모두 적용 정상. 본 TASK 가 봉인한 shell heredoc / `BASE` env 결함 봉인은 memory + postgres 양 backend 의 30-90s race 와 stale image caching 모두 동시 해결.
 
 ## 3.7 Private registry 인증 foundation (TASK-073)
 - 의도: TASK-081/082 의 운영 보강 후보 — `RUNNER_REGISTRY_CONFIG_DIR` env 로 docker CLI 의 registry 인증 config dir 을 override, private Docker Hub / ECR / GCR push 의 foundation. 본 TASK 는 insecure-registry 케이스로 env 전파 + cli mode push round-trip + registry catalog/tags/manifest 회귀 가드 를 봉인.
@@ -202,6 +214,7 @@
   2. **curl `-I` (HEAD) 가 Docker-Content-Digest header 를 안 보냄** — registry:2 가 GET 요청에서만 digest header emit. 해결: `curl -sS -D - -o /dev/null` 패턴 — `-D -` 가 response header 를 stdout 으로 dump, `-o /dev/null` 가 body 는 discard.
   3. **submit_and_wait 의 per-build source archive 가 mktemp cleanup 으로 source archive 까지 삭제** — `per_src="$(mktemp -d)"` 후 `rm -rf "${per_src}"` 를 source archive 생성 직후에 호출 → upload 가 0 bytes. 해결: `rm -rf "${per_src}"` 를 upload / build lifecycle 완료 후로 이동.
 - 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **143/143 동일** (backend 변경 0), build-monitor vitest **130/130 동일** (frontend 변경 0 — React baseline), Go 8 packages 모두 PASS (TASK-075 baseline 유지), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**, `e2e-insecure-registry.sh` ALL PASS (~3-4 분: registry:2 cold start 5-10s + build-server healthcheck 30s + 5 build 동시 push ~30-60s + retention 검증 ~5s + cleanup). catalog `{"repositories":["docker-image-builder-system/cli"]}` + tags 5 buildId 다 노출 (per-build unique manifest digest) + DELETE 202 Accepted (target tag 만 삭제, 다른 4 tag 영향 없음) + retention 후 새 build push 통과.
+- **Postgres backend 회귀 (TASK-102 baseline 양축 동기화)**: `e2e-insecure-registry.sh` 는 memory backend 의 anonymous registry 운영 검증 회귀 가드 — insecure-registry 운영 모델은 memory / postgres 두 backend 와 직교하므로 별도 postgres 회귀 가드 추가 불필요. 단, registry 연동을 Postgres backend (예: staging) 에서 운영하면 postgres migration `0001~0005` 적용 + `applyMigrations` 자동 부팅 정상 동작은 §3.5 의 e2e-source-archive-postgres / TASK-082 의 e2e-multi-runner-postgres 에서 보편적 검증. 후속 TASK 권장: insecure-registry + Postgres backend 의 e2e 가드 신규 (registry push 데이터 보존 검증).
 
 ## 3.11 Admin-initiated runner registration (TASK-077)
 - 의도: TASK-069 의 self-register on first claim 은 runner 가 boot 되어 첫 `POST /builds/claim` 호출 시점에 비로소 admin registry 에 record 가 생성. 운영자가 신규 cluster / k8s pod / EC2 instance 에서 runner 를 띄우기 전 그 runner 가 곧 들어온다는 것을 admin UI 에 미리 알릴 수 없었음. 본 TASK 가 봉인하는 `POST /admin/runners` endpoint + admin UI 의 "+ Register Runner" 버튼이 그 gap 을 매움.
@@ -221,11 +234,12 @@
   3. **admin UI 의 modal close vs error 표기 policy** — error 시 modal 닫지 않음 (재시도 가능). 성공시에만 close + refresh.
   4. **`runnerId` 가 `RUNNER_ID` env 와 일치해야 함** — modal 의 modal-help 가 명시. 운영자가 mismatch 를 사전에 알 수 있도록.
 - 회귀 baseline (TASK-101 baseline 동기화): TS 5 packages `tsc --noEmit` clean (변경 파일 영향 없음), build-server node:test **131 → 143 PASS** (8건 신규: 401/403/400 empty/400 extra/201 created/409 duplicate/409 self-then-admin/200 list), build-monitor vitest **130/130 PASS** (5건 신규: button visible/modal opens/success refresh+close/409 modal open/400 modal open — React 측 modal 정합), Go 8 packages 모두 PASS (TASK-076 baseline 유지), svelte-check script 제거 (TASK-101 Svelte scaffold 일괄 정리), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB** (TASK-101 baseline, RegisterRunnerModal 추가분 통합 완료), GitHub Actions `build + smoke` SUCCESS.
+- **Postgres backend 회귀 (TASK-102 baseline 양축 동기화)**: `POST /admin/runners` 의 401/403/400 empty/400 extra/201 created/409 duplicate 응답은 memory backend 의 Map.has + postgres backend 의 `INSERT … ON CONFLICT DO NOTHING` 양쪽에서 동등 회귀 가드. §3.5 의 e2e-source-archive-postgres 의 `applyMigrations` 자동 부팅 + TASK-082 의 multi-runner 적재 + TASK-066 follow-up batch 3 의 Postgres default 개발 경로 권장 모두 정합. 운영자가 Postgres backend 의 admin UI 를 띄울 때 별도 회귀 가드 추가 불필요 — 모든 backend 공통 contract 가 동일하게 봉인.
 
 ## 4. 검증 포인트 (Validation)
 - 코드 변경: 현재 단계에서는 해당 사항 없음. 구현 전에는 도메인 경계와 책임 분리가 문서로 먼저 확정되어야 함
 - 문서 변경: README, `docs/sdlc/01-mvp-onboarding.md`, `docs/sdlc/02-concept-refinement.md`, `docs/sdlc/contracts/01-shared-build-contract-baseline.md`, handoff, backlog, state가 같은 현재 focus와 canonical 상태 모델을 가리켜야 함
-- UI 변경: React 측 (TASK-088~101) — Svelte 측 src/ 일괄 폐기 (TASK-101). React 단일 SPA 운영 baseline: vitest **130/130 PASS**, vite build:react 정상 (gzip js 99.01KB / css 30.62KB), TS 5 packages `tsc --noEmit` clean. 디자인 토큰 단일화 (TASK-096.5) — Svelte `tokens.css` 가 단일 source-of-truth, React 측 `tokens.css` 사본. Astryx Theme 컴포넌트 보호용 `theme.css` 별도 layer 분리.
+- UI 변경: React 측 (TASK-088~101) — Svelte 측 src/ 일괄 폐기 (TASK-101). React 단일 SPA 운영 baseline: vitest **130/130 PASS**, vite build:react 정상 (gzip js 99.01KB / css 30.62KB), TS 5 packages `tsc --noEmit` clean. 디자인 토큰 단일화 (TASK-096.5) — Svelte `tokens.css` 가 단일 source-of-truth, React 측 `tokens.css` 사본. Astryx Theme 컴포넌트 보호용 `theme.css` 별도 layer 분리. **Postgres backend 운영 baseline (TASK-102 양축 동기화)**: 동일 baseline 이 memory / postgres 두 backend 에서 정합 — vitest 130 / build-server 143 / e2e-source-archive-postgres ALL PASS / TASK-082 multi-runner-postgres ALL PASS / `applyMigrations` 자동 부팅 정상. frontend 변경 0 이므로 React 측 운영 baseline 영향 없음.
 - 배포/운영: Docker 실행 권한, 테스트 runtime 노출 정책, 컨테이너 수명 정책, 외부 배포 경로가 문서로 합의되기 전에는 운영 판단 금지
 
 ## 5. 예외 규칙 (Policy)
@@ -248,10 +262,21 @@
   # 1) React 빌드 생성 (TASK-101: Svelte 빌드 폐기 — React 만 운영)
   (cd apps/build-monitor && ./node_modules/.bin/vite build --config vite.react.config.ts)
 
-  # 2) Build Server 부팅 (React dist 만 검증)
+  # 2) Build Server 부팅 (React dist 검증 + 두 backend 옵션)
   ./node_modules/.bin/tsc -p packages/{shared-contract,shared-config,db}/tsconfig.json && \
-    ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json && \
-    BUILD_REPOSITORY_BACKEND=memory \
+    ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json
+
+  # 2-a) memory backend (단일 runner / 단일 build / 빠른 smoke — dev 보조 경로)
+  BUILD_REPOSITORY_BACKEND=memory \
+    node apps/build-server/dist/apps/build-server/src/index.js
+
+  # 2-b) Postgres backend (default 개발 경로 — 운영 환경은 Postgres 만 사용.
+  #     DATABASE_URL 의 postgres container 가 127.0.0.1:15432 에 떠 있어야 하고,
+  #     DB_AUTO_BOOTSTRAP=true 로 ensureDbSchema + applyMigrations 자동 부팅.
+  #     자세한 운영 권장은 §3.2 + docs/operations/source-archive-postgres-2026-07-18.md 참조)
+  DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder \
+    BUILD_REPOSITORY_BACKEND=postgres \
+    DB_AUTO_BOOTSTRAP=true \
     node apps/build-server/dist/apps/build-server/src/index.js
   ```
   그 다음 한 port 에서:
@@ -263,6 +288,7 @@
   - `mountBuildMonitorDist` 가 React 만 mount — `@fastify/static` decorateReply decorator 충돌 회피 단순화.
   - `/builds/<id>` direct URL 입력 → Build Server 의 wildcard GET route 가 UUID validation 으로 거절 (500). 운영자는 React BuildDetail 진입은 `/api/builds/<id>` (Build Server 가 응답) 또는 `<Link>` 클릭 사용. 정직한 동작.
 - 회귀 baseline: TS 5 packages `tsc --noEmit` clean, build-server node:test **131 → 143 PASS** (TASK-075 baseline 131 + TASK-093 신규 12 + TASK-101 Svelte scaffold 정리 영향 0), build-monitor vitest **130/130 PASS** (TASK-101 Svelte 135 case 일괄 삭제), Go 7 packages 모두 PASS. svelte-check script 제거 (TASK-101 Svelte scaffold 정리).
+- **Postgres backend 회귀 (TASK-102 baseline 양축 동기화)**: Build Server 의 `mountBuildMonitorDist` + SPA fallback + `/api/*` 307 redirect + JSON 404 + POST/PATCH/DELETE bypass 는 memory / postgres 두 backend 와 직교 — backend 선정과 무관하게 동일하게 통과. React 단일 SPA 운영 baseline 은 Postgres 환경 (Prod / Staging) 의 default 운영 패턴에서도 유지. 단일 port reverse proxy 의 `/health` + `/openapi.json` 응답은 backend 가 memory / postgres 어느 쪽이든 동일 — backend 차이로 frontend mount 동작에 영향 없음. 운영 검증은 §3.5 의 e2e-source-archive-postgres.sh + TASK-082 의 e2e-multi-runner-postgres.sh 모두 ALL PASS 로 확인.
 
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
@@ -274,3 +300,4 @@
 - TASK-101 follow-up PROJECT_PROFILE React baseline 동기화 운영 가이드: [project-profile-react-baseline-2026-07-18.md](operations/project-profile-react-baseline-2026-07-18.md)
 - TASK-101 follow-up batch 2 PROJECT_PROFILE React baseline full sync 운영 가이드: [project-profile-react-baseline-full-sync-2026-07-18.md](operations/project-profile-react-baseline-full-sync-2026-07-18.md)
 - TASK-066 follow-up batch 3 source archive Postgres 운영 가이드: [source-archive-postgres-2026-07-18.md](operations/source-archive-postgres-2026-07-18.md)
+- TASK-102 PROJECT_PROFILE §3 baseline 양축 동기화 운영 가이드: [project-profile-baseline-postgres-sync-2026-07-20.md](operations/project-profile-baseline-postgres-sync-2026-07-20.md)
