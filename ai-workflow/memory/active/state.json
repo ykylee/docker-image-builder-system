@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-20T00:00:00Z",
-  "purpose_digest": "TASK-102 (PROJECT_PROFILE §3 baseline 양축 동기화) docs only 봉인 sync (rev 131→132). 본 세션은 2026-07-20 신규 작업 흐름으로 TASK-102 (PROJECT_PROFILE.md 의 §3 명령 박스 run_local / run_local_postgres 의 default backend 정합 + §3.5 / §3.6 / §3.10 / §3.11 / §3.12 회귀 baseline 의 memory-only 표기를 Postgres 동등 baseline (TASK-066 + TASK-082) 양축 동기화 + §4 검증 포인트 Postgres 운영 baseline 추가 + 다음에 읽을 문서 reference 추가) 진행. branch 없음 — docs only 변경 (2 file, 123 insertions + 6 deletions) 으로 main `4ad57f2` 즉시 commit + push 후 workflow meta sync 단일 commit. 운영 가이드 신규 1 종: `docs/operations/project-profile-baseline-postgres-sync-2026-07-20.md` (의도 / 변경 / 사전 결함 + 보강 3건 / 회귀 baseline docs only / follow-up). 회귀 영향 0 — TS 5 packages clean, vitest 130/130 PASS, build-server 143/143 PASS, Go 7+ packages PASS, vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 결정: 옵션 A (docs only + 1 운영 가이드, 사양 변경 없음). follow-up: 결정 대기 항목 중 scripts/migrate.ts standalone CLI 운영 workflow / postgres migration 0004 build_source TOAST 전략 / 운영 안정화 / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선 모두 별도 사용자 결정 대기.",
-  "purpose_digest_rev": 132,
+  "generated_at": "2026-07-20T01:00:00Z",
+  "purpose_digest": "TASK-103 (scripts/migrate.ts standalone CLI 운영 workflow 정립 + 권고 스크립트 scripts/db-migrate.sh 신규) 봉인 sync (rev 132→133). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 (PROJECT_PROFILE §3 baseline 양축 동기화, docs only, main `4ad57f2`) + TASK-103 (scripts/db-migrate.sh 권고 스크립트 + PROJECT_PROFILE §3 명령 끝 migration 운영 권장 참조 + 운영 가이드 신규, main `7b74614`) 까지 2 TASK 연속 봉인. TASK-103 결정: 옵션 A (운영 가이드 + 권고 스크립트). 신규 2 file: `scripts/db-migrate.sh` (6 게이트 단일 entrypoint -- 모두 기존 standalone CLI 위임, SQL/schema 변경 0) + `docs/operations/migration-cli-workflow-2026-07-20.md` (의도 / 변경 / 자주 쓰는 5종 시나리오 / 기존 standalone CLI 와의 관계 / 사전 결함 + 보강 2건 / follow-up). PROJECT_PROFILE.md §3 끝 migration 운영 권장 참조 + 다음에 읽을 문서 reference 추가. 회귀 영향 0 — TS 5 packages clean, vitest 130/130 PASS, build-server 143/143 PASS, Go 7+ packages PASS, vite build:react 정상 (gzip js 99.01KB / css 30.62KB), postgres migration 0001~0005 적용 정상, e2e-source-archive-postgres / e2e-multi-runner-postgres ALL PASS 유지. scripts/db-migrate.sh: bash -n syntax OK / --help exit 0 OK / 게이트 부재 exit 2 OK / --dr-stop 안내만 출력 OK / DATABASE_URL 미설정 hint + exit 2 OK 검증. follow-up: 결정 대기 항목 중 postgres migration 0004 build_source TOAST 전략 (256 MiB body limit 충분) / 운영 안정화 (release workflow / CHANGELOG / 운영 배포 체크리스트) / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선 모두 별도 사용자 결정 대기. 본 세션 운영 가이드 2 종 신규: TASK-102 / TASK-103.",
+  "purpose_digest_rev": 133,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-102 (PROJECT_PROFILE §3 baseline 양축 동기화) docs only 봉인 (rev 131→132). main HEAD `4ad57f2` (TASK-102 docs only commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 운영 영향 0 (모든 변경이 docs only 또는 cross-framework dead code 폐기 또는 PROJECT_PROFILE baseline 양축 동기화 docs only). frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~098 + TASK-099 + TASK-100 + TASK-101) + 디자인 토큰 단일화 (TASK-096.5) + PROJECT_PROFILE React baseline batch 1 (PR #57) + batch 2 (PR #58) + TASK-066 follow-up batch 3 (PR #59) + TASK-102 docs only (commit `4ad57f2`) 까지 20 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
-    "current_axis": "TASK-102 PROJECT_PROFILE §3 baseline 양축 동기화 docs only 봉인 완료. frontend rewrite 7-PR 시리즈 + M4.5 8-PR 시리즈 + TASK-096.5 디자인 토큰 단일화 + PROJECT_PROFILE React baseline batch 1 + batch 2 + TASK-066 follow-up batch 3 까지 19 TASK 연속 봉인 + TASK-102 docs only = 총 20 TASK 봉인. 모든 TASK main 합류. 본 세션 후속 결정 대기.",
-    "current_focus": "TASK-102 docs only 봉인 sync 완료. 다음 세션 시작 시 main HEAD `4ad57f2` + workflow meta (state rev 132) baseline 복원. 후속 결정 (scripts/migrate.ts standalone CLI 운영 workflow / postgres migration 0004 build_source TOAST 전략 / 운영 안정화 / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선) 은 별도 사용자 결정.",
+    "current_baseline": "TASK-103 (scripts/migrate.ts standalone CLI 운영 workflow 정립 + 권고 스크립트 scripts/db-migrate.sh) 봉인 (rev 132→133). main HEAD `7b74614` (TASK-103 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123, Svelte 135 케이스 일괄 삭제) / build-server 113 → 143 (+30) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 운영 영향 0 (모든 변경이 docs only 또는 cross-framework dead code 폐기 또는 PROJECT_PROFILE baseline 양축 동기화 docs only 또는 scripts/db-migrate.sh standalone CLI 위임 wrapper). frontend rewrite 7-PR 시리즈 (TASK-088~094) + M4.5 8-PR 시리즈 (TASK-095~098 + TASK-099 + TASK-100 + TASK-101) + 디자인 토큰 단일화 (TASK-096.5) + PROJECT_PROFILE React baseline batch 1 (PR #57) + batch 2 (PR #58) + TASK-066 follow-up batch 3 (PR #59) + TASK-102 docs only (commit `4ad57f2`) + TASK-103 migration CLI 운영 workflow + 권고 스크립트 (commit `7b74614`) 까지 21 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
+    "current_axis": "TASK-103 migration CLI 운영 workflow + scripts/db-migrate.sh 권고 스크립트 봉인 완료. TASK-102 PROJECT_PROFILE §3 baseline 양축 동기화 + TASK-103 migration CLI 운영 workflow 까지 본 세션 2 TASK 연속 봉인. frontend rewrite 7-PR 시리즈 + M4.5 8-PR 시리즈 + TASK-096.5 디자인 토큰 단일화 + PROJECT_PROFILE React baseline batch 1 + batch 2 + TASK-066 follow-up batch 3 + TASK-102 + TASK-103 까지 21 TASK 봉인. 모든 TASK main 합류.",
+    "current_focus": "TASK-103 migration CLI 운영 workflow + 권고 스크립트 봉인 sync 완료. 다음 세션 시작 시 main HEAD `7b74614` + workflow meta (state rev 133) baseline 복원. 후속 결정 (postgres migration 0004 build_source TOAST 전략 / 운영 안정화 / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선) 은 별도 사용자 결정.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-103 migration CLI 운영 workflow + scripts/db-migrate.sh 권고 스크립트 — `7b74614` main 합류 (2026-07-20, 본 세션)",
       "TASK-102 PROJECT_PROFILE §3 baseline 양축 동기화 (docs only) — `4ad57f2` main 합류 (2026-07-20, 본 세션)",
       "TASK-066 follow-up batch 3 (source archive Postgres 운영 가이드) — `9c9bbe3` PR #59 main 합류 (2026-07-18, 본 세션)",
       "PROJECT_PROFILE.md React baseline batch 2 (TASK-101 follow-up) — `9aa0774` PR #58 main 합류 (2026-07-18, 본 세션)",
@@ -77,7 +78,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-20.md",
-    "task_count": 20,
+    "task_count": 21,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -102,10 +103,11 @@
       "PROJECT_PROFILE.md React baseline batch 2 (TASK-101 follow-up) (rev 18 sync 봉인, PR #58 main 합류)",
       "TASK-066 follow-up batch 3 (source archive Postgres 운영 가이드) (rev 19 sync 봉인, PR #59 main 합류)",
       "세션 종료 종합 정리 sync (rev 20 sync 봉인, 본 세션 종료)",
-      "TASK-102 PROJECT_PROFILE §3 baseline 양축 동기화 (docs only) (rev 21 sync 봉인, commit `4ad57f2` main 합류)"
+      "TASK-102 PROJECT_PROFILE §3 baseline 양축 동기화 (docs only) (rev 21 sync 봉인, commit `4ad57f2` main 합류)",
+      "TASK-103 migration CLI 운영 workflow + scripts/db-migrate.sh 권고 스크립트 (rev 22 sync 봉인, commit `7b74614` main 합류)"
     ],
-    "index_rev": "55",
-    "latest_rev": "32"
+    "index_rev": "56",
+    "latest_rev": "33"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
