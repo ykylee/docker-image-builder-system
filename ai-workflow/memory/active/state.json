@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-20T04:00:00Z",
-  "purpose_digest": "TASK-106 (build_source chunked split + multi-row schema) 봉인 sync (rev 135→136). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 까지 **5 TASK 연속 봉인**. TASK-106 결정: 옵션 Y (chunked split + multi-row schema 완전 봉인 — legacy endpoint 보존, 신규 POST /builds/:buildId/source/chunk 도입). 신규 6 file: migrations/0006_build_source_chunked.sql + packages/db/src/schema/build-source-chunk.ts + build-server/tests/build-source-chunked.test.ts (+11 cases) + e2e-source-archive-chunked.sh + e2e-source-archive-chunked-postgres.sh + docs/operations/source-archive-chunked-2026-07-20.md. amend 8 file: build-repository.ts (StoreSourceChunkResult + storeSourceChunk interface) + memory + postgres repository (chunked 우선 + cross-table cleanup) + build-service.ts (위임) + build-routes.ts (신규 endpoint) + packages/db bootstrap.ts + index.ts + docs/PROJECT_PROFILE.md §3 source archive 라운드트립 갱신. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 변경 0), build-server legacy 143/143 (변경 0) + chunked 11/11 신규 = 154/154, Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상, e2e-source-archive-chunked 6 단계 + e2e-source-archive-chunked-postgres 6 단계 + bytea direct verify 검증. 운영 영향 0 (legacy endpoint 보존 + 신규 endpoint 추가). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 / build-server 113 → 154 (+41) / TS 5 packages clean / vite build:react 정상. 24 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up: 옵션 Z 외부 object storage / RFC 7233 Content-Range 표준화 / TASK-066 follow-up batch 4 / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 모두 별도 사용자 결정 대기.",
-  "purpose_digest_rev": 136,
+  "generated_at": "2026-07-20T05:00:00Z",
+  "purpose_digest": "TASK-107 (RFC 7233 Content-Range chunked wire-format follow-up 권장) docs only 봉인 sync (rev 136→137). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 까지 **6 TASK 연속 봉인**. TASK-107 결정: PROJECT_PROFILE.md §3 source archive 라운드트립 부분 끝에 한 항목 추가 (의미 A/B/C 3 종 + 권장 의미 C) + 다음에 읽을 문서 끝에 후속 TASK 권장 reference 신규. docs only — SQL / schema / migration / version / git tag 변경 0. 신규 0 file / amend 1 file (docs/PROJECT_PROFILE.md 6 insertions). 회귀 영향 0 — TS 5 packages clean, vitest 130/130, build-server 154/154 (legacy 143 + chunked 11), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 결정 대기 항목 분석: TASK-106 follow-up 중 외부 object storage (Z) + RFC 7233 (B 본 TASK) + e2e-production-semantic-postgres (PROJECT_PROFILE §3.5 batch 4 후보) + chunked multi-runner 회귀 가드 후속 후보 4 종 식별 완료. follow-up (남은 결정): 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선 / TASK-107 의 의미 C 권장 후속 TASK 권장 / release notes 후속 TASK 권장 / 외부 object storage 후속 TASK 권장.",
+  "purpose_digest_rev": 137,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-106 (source archive chunked split + multi-row schema) 봉인 (rev 135→136). main HEAD `fadddcf` (TASK-106 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 154 (+41, TAS002-094 +14 / TAS002-096.5 +0 / TAS002-103 +0 / TAS002-106 +11 신규 chunked) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 24 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
-    "current_axis": "TASK-106 source archive chunked split + multi-row schema 봉인 완료. 본 세션 5 TASK 연속 봉인. frontend rewrite 7-PR + M4.5 8-PR + TASK-096.5 + PROJECT_PROFILE batch 1+2 + TASK-066 follow-up batch 3 + TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 까지 24 TASK 봉인. 모든 TASK main 합류.",
-    "current_focus": "TASK-106 source archive chunked split + multi-row schema 봉인 sync 완료. 다음 세션 시작 시 main HEAD `fadddcf` + workflow meta (state rev 136) baseline 복원. 후속 결정 (옵션 Z 외부 object storage / RFC 7233 Content-Range / TASK-066 follow-up batch 4 / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선) 별도 사용자 결정.",
+    "current_baseline": "TASK-107 (RFC 7233 Content-Range chunked wire-format follow-up 권장) docs only 봉인 (rev 136→137). main HEAD `7c25a06` (TASK-107 docs only commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 154 (+41, 변경 0 + 신규 +11) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 25 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
+    "current_axis": "TASK-107 RFC 7233 Content-Range follow-up 권장 봉인 완료. 본 세션 6 TASK 연속 봉인. frontend rewrite 7-PR + M4.5 8-PR + TASK-096.5 + PROJECT_PROFILE batch 1+2 + TASK-066 follow-up batch 3 + TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 까지 25 TASK 봉인. 모든 TASK main 합류.",
+    "current_focus": "TASK-107 RFC 7233 Content-Range follow-up 권장 봉인 sync 완료. 다음 세션 시작 시 main HEAD `7c25a06` + workflow meta (state rev 137) baseline 복원. 후속 결정 (신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 우선 / TASK-107 의미 C 후속 TASK / 외부 object storage 후속 TASK / release notes 후속 TASK / TASK-066 follow-up batch 4 e2e-production-semantic-postgres 후보) 별도 사용자 결정.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-107 RFC 7233 Content-Range chunked wire-format follow-up 권장 (docs only) — `7c25a06` main 합류 (2026-07-20, 본 세션)",
       "TASK-106 source archive chunked split + multi-row schema — `fadddcf` main 합류 (2026-07-20, 본 세션)",
       "TASK-105 운영 배포 체크리스트 운영 가이드 (docs only) — `4de639c` main 합류 (2026-07-20, 본 세션)",
       "TASK-104 build_source SLO + TOAST follow-up 운영 가이드 (docs only) — `d4fb554` main 합류 (2026-07-20, 본 세션)",
@@ -81,7 +82,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-20.md",
-    "task_count": 24,
+    "task_count": 25,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -110,10 +111,11 @@
       "TASK-103 migration CLI 운영 workflow + scripts/db-migrate.sh 권고 스크립트 (rev 22 sync 봉인, commit `7b74614` main 합류)",
       "TASK-104 build_source SLO + TOAST follow-up 운영 가이드 (docs only) (rev 23 sync 봉인, commit `d4fb554` main 합류)",
       "TASK-105 운영 배포 체크리스트 운영 가이드 (docs only) (rev 24 sync 봉인, commit `4de639c` main 합류)",
-      "TASK-106 source archive chunked split + multi-row schema (rev 25 sync 봉인, commit `fadddcf` main 합류)"
+      "TASK-106 source archive chunked split + multi-row schema (rev 25 sync 봉인, commit `fadddcf` main 합류)",
+      "TASK-107 RFC 7233 Content-Range chunked wire-format follow-up 권장 (docs only) (rev 26 sync 봉인, commit `7c25a06` main 합류)"
     ],
-    "index_rev": "59",
-    "latest_rev": "36"
+    "index_rev": "60",
+    "latest_rev": "37"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
