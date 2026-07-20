@@ -24,3 +24,13 @@ apps/build-monitor/.visual/
 # console-log 일회성 산출물 — workspace root 에만 떨어지며 같은 이름이
 # agent session 간 충돌나지 않도록 local-only.
 .playwright-cli/
+
+# TASK-122: Svelte → React 마이그레이션 (TASK-094/101) 후 apps/build-monitor/src/
+# 의 Vite/tsc emit 산출물 (.js + .map, Svelte 시절 testing-library/vitest 산출물) 과
+# 구 vite.config.js (Svelte 시절 vite config + sourcemap) 잔재 정리. React SPA 는
+# apps/build-monitor/react/src/ 가 source of truth 이며, 이 패턴들은 레거시
+# Svelte 시절 빌드 산출물. 의도된 TS 원본 추적이 필요해지면 .gitignore 에서
+# 제외 후 git add.
+apps/build-monitor/src/**
+apps/build-monitor/vite.config.js
+apps/build-monitor/vite.config.js.map

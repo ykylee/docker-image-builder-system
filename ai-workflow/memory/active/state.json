@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-20T12:00:00Z",
-  "purpose_digest": "TASK-121 v0.15.20 패치 (2026-07-21, rev 147→148). 5 신규 core 파일 (maturity_matrix / phase_13_followup / quality_dashboard_spec / stable_guarantee / v1_0_0_entry_evaluation) + 3 정합 (workflow_kit_roadmap / __init__ / dashboard_data) + housekeeping (VERSION / pyproject.toml). follow-up: TASK-114 결정 후보 6종 별도 사용자 결정 대기.",
-  "purpose_digest_rev": 148,
+  "generated_at": "2026-07-20T23:55:00Z",
+  "purpose_digest": "TASK-122 untracked 52종 잔재 정리 (.gitignore 보강). apps/build-monitor/src/** + apps/build-monitor/vite.config.js + .map 3 entry 신규. working tree clean 복원. follow-up: TASK-123 git tag + version bump (TASK-114 결정 후보 6종 중 1종 해소 진입).",
+  "purpose_digest_rev": 149,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-114 (본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스) docs only 봉인 (rev 143→144). main HEAD `d19038a` (TASK-114 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 32 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
-    "current_axis": "TASK-121 완료 (v0.15.20 패치: 5 신규 + 3 정합 + housekeeping). 다음 결정 대기: 옵션 Z / 신규 기능 / Nextcloud Tasks / CHANGELOG / CI migration validation / git tag + version bump (TASK-114 follow-up 후보 6종).",
-    "current_focus": "standard_ai_workflow v0.15.19-beta 배포 결과 검증 및 후속 stale drift 해소",
+    "current_baseline": "TASK-122 (untracked 52종 잔재 정리) 봉인 (rev 144→145). main HEAD `b2cbe5e` (이전 TASK-114 sync) 의 untracked 잔재 52종 (apps/build-monitor/src/ + vite.config.js + .map) 이 .gitignore 보강 (3 entry 신규) 으로 working tree 에서 사라짐 — git clean 불필요 (ignore 매칭 시 status 에서 자동 제외). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 33 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
+    "current_axis": "TASK-122 완료 (TASK-114 follow-up 6종 중 1종 = git tag + version bump 의 사전 working tree clean 보존). 다음 결정 대기: TASK-123 git tag + version bump 진입 / 옵션 Z / 신규 기능 / Nextcloud Tasks / CHANGELOG / CI migration validation.",
+    "current_focus": "TASK-123 git tag + version bump 진입 준비 (TASK-114 follow-up 6종 중 1종 사용자가 선택)",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-122 (untracked 52종 잔재 정리): .gitignore 보강 (apps/build-monitor/src/** + apps/build-monitor/vite.config.js + apps/build-monitor/vite.config.js.map 3 entry 신규). Svelte 시절 vite/tsx emit 산출물 (50 .js + 50 .map) + 구 vite.config.js 잔재 (2) 가 .gitignore 매칭으로 working tree 에서 자동 제외 — git clean 불필요. SQL / schema / migration / version / git tag 변경 0. 회귀 영향 0. workflow meta sync (state rev 144→145, handoff 114→115, work_backlog 108→109, backlog index 78→79 / latest 56→57) 같은 sync commit 안에 포함. TASK-114 follow-up 6종 중 1종 (git tag + version bump) 의 사전 working tree clean 보존.",
       "TASK-121 (v0.15.20 패치): standard_ai_workflow 원격 fetch + reset --hard origin/main (271f96b → 31f07f1). v0.15.20 pre-release final + Phase 12 close-out + Phase 13 follow-up 정의 반영. docker-image-builder-system 에 적용된 패치: (1) ai-workflow/core/ 신규 5파일 복사 (maturity_matrix.json 73063B / phase_13_followup.md 17384B / quality_dashboard_spec.md 18759B / stable_guarantee.md 15170B / v1_0_0_entry_evaluation.md 25597B). (2) 기존 3파일 v0.15.20 정합 (workflow_kit_roadmap.md / workflow_kit/__init__.py / workflow_kit/common/dashboard_data.py). (3) housekeeping (workflow_kit/pyproject.toml 마커 v0.15.20-beta / ai-workflow/VERSION v0.15.20-beta / v1_0_0_entry_evaluation.md v0.15.16-beta → v0.15.20-beta). 표준 source 의 5개 표준 문서 (README/PROJECT_PROFILE/INSTALLATION_AND_USAGE/RELEASE/CODE_INDEX) 는 표준 워크플로우 프로젝트 자체 housekeeping 이므로 docker 자체 프로젝트에는 적용하지 않음. 수백 개 추적 파일의 v0.15.19-beta 마커는 의도된 정책 (다음 release 시까지 유지) 따라 그대로 보존. no breaking change.",
       "TASK-120 (ai-workflow/{README,VERSION,session_handoff,work_backlog} 마커 정합): 4개 top-level 추적 파일의 v0.11.25-beta → v0.15.19-beta 마커 정합. ai-workflow/README.md 의 Export Sample → Docker Image Builder System, 최종 수정일 2026-07-08 → 2026-07-20, 상태 draft → stable. session_handoff.md 의 Status draft → stable, Updated 헤더 rev 113→114 (TASK-114 봉인) 로 교체. historical 백로그 파일 (2026-07-02 ~ 2026-07-20) 의 마커는 그대로 유지 — 각 시점의 표준 워크플로우 kit 마커가 historical 기록의 일부이므로 정합 대상이 아님.",
       "TASK-119 (.MiniMax/config.json PYTHONPATH 정합): .MiniMax/config.json + MiniMax_config.example.json 의 mcp_servers.standard-ai-workflow-readonly.env.PYTHONPATH 를 ./workflow-source → ./ai-workflow 로 정합. 표준 워크플로우 키트가 ./ai-workflow/workflow_kit/ 아래에 위치하므로 PYTHONPATH 가 이를 가리켜야 함. description 의 descriptors 참조도 workflow-source/schemas/... → ai-workflow/schemas/... 정합. JSON validity 양쪽 모두 OK.",
@@ -88,15 +89,15 @@
       "TASK-078 container self-dogfood (PR #28)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 88,
+    "handoff_rev": 89,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 83,
-    "latest_rev": 31,
+    "index_rev": 84,
+    "latest_rev": 32,
     "in_progress_items": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-20.md",
-    "task_count": 32,
+    "task_count": 33,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -133,10 +134,11 @@
       "TASK-111 Production-semantic Postgres backend 동등 보강 (rev 30 sync 봉인, commit `3369d0a` main 합류)",
       "TASK-112 양 variant 운영 가이드 cross-reference (rev 31 sync 봉인, commit `81110df` main 합류)",
       "TASK-113 chunked multi-runner cross-backend 회귀 가드 (rev 32 sync 봉인, commit `7e9f777` main 합류)",
-      "TASK-114 본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스 (rev 33 sync 봉인, commit `d19038a` main 합류)"
+      "TASK-114 본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스 (rev 33 sync 봉인, commit `d19038a` main 합류)",
+      "TASK-122 untracked 52종 잔재 정리 (rev 34 sync 봉인, .gitignore 보강 — commit 별도 sync commit)"
     ],
-    "index_rev": "67",
-    "latest_rev": "44"
+    "index_rev": "68",
+    "latest_rev": "45"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
