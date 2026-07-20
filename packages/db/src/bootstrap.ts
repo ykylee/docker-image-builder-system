@@ -117,6 +117,31 @@ const bootstrapStatements = [
     CREATE INDEX IF NOT EXISTS build_source_checksum_idx
     ON build_source (checksum_sha256)
   `,
+  // TASK-106: chunked split. See
+  // `apps/build-server/migrations/0006_build_source_chunked.sql` for the
+  // migration that mirrors this shape (idempotent); postgres backend's
+  // build-server wired migrations auto-run on boot. The legacy single-row
+  // `build_source` table from TASK-066 stays in place — uploads via the
+  // chunked endpoint `POST /builds/:buildId/source/chunk` write here.
+  `
+    CREATE TABLE IF NOT EXISTS build_source_chunk (
+      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      build_id UUID NOT NULL,
+      idx INTEGER NOT NULL,
+      bytes BYTEA NOT NULL,
+      size_bytes INTEGER NOT NULL,
+      checksum_sha256 TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `,
+  `
+    CREATE UNIQUE INDEX IF NOT EXISTS build_source_chunk_build_id_idx_unique
+    ON build_source_chunk (build_id, idx)
+  `,
+  `
+    CREATE INDEX IF NOT EXISTS build_source_chunk_build_id_idx
+    ON build_source_chunk (build_id)
+  `,
   // TASK-069: runner registry. Single TEXT PK (runner_id = canonical id
   // from RUNNER_ID env). counters + status + timestamps + optional
   // current_build_id + last_error. See 0005_runner_registry.sql for the

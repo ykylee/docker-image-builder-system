@@ -180,9 +180,57 @@ export type GetSourceArchiveResult =
 // (no such buildId) vs `ok` (build exists but no archive to
 // delete — same semantic, returned as `ok` because the desired
 // state is "no archive present").
+//
+// TASK-106: this also clears the chunked upload (all rows in
+// `build_source_chunk` for this buildId) so a re-upload via either
+// the legacy single-shot or the chunked endpoint starts from a
+// clean slate. The legacy `build_source` row (TASK-066) is also
+// removed so the two storage sides stay in sync.
 export type DeleteSourceArchiveResult =
   | { kind: "ok" }
   | { kind: "not_found" };
+
+// TASK-106: chunked upload. The Skill / tooling breaks a > bodyLimit
+// archive into N chunks and uploads each via `POST
+// /builds/:buildId/source/chunk` with a `Content-Range: bytes
+// <start>-<end>/<total>` header. The repository stores each chunk as
+// one row in `build_source_chunk` keyed by `(build_id, idx)` and
+// reassembles bytes in ascending idx order on `getSourceArchive`.
+//
+// `start` and `end` are inclusive byte offsets in the assembled
+// archive; `total` is the total size of the assembled archive (the
+// `BuildRequest.sourceArchive.sizeBytes` value recorded at `POST
+// /builds` time). `idx` is the 0-based chunk index derived from
+// `floor(start / CHUNK_SUGGESTED_SIZE)` — the caller may also pass
+// `idx` explicitly via the `X-Chunk-Idx` header.
+//
+// `expectedChecksumSha256` and `expectedSizeBytes` are the per-chunk
+// invariants: every chunk's recomputed SHA-256 must match the supplied
+// checksum, and the sum of every chunk's `sizeBytes` for the buildId
+// must equal the declared `totalSizeBytes`. The repository verifies
+// per-chunk checksum here; the whole-archive checksum verification
+// happens once the final chunk of the upload arrives (`idx == total_chunks - 1`)
+// via the aggregation path in `getSourceArchive`.
+export type StoreSourceChunkResult =
+  | {
+      kind: "ok";
+      checksumSha256: string;
+      sizeBytes: number;
+      idx: number;
+      /** True when this chunk completes the upload (next idx would be out of range). */
+      isFinalChunk: boolean;
+    }
+  | { kind: "not_found" }
+  | { kind: "checksum_mismatch"; expected: string; actual: string }
+  | { kind: "size_mismatch"; expected: number; actual: number }
+  | { kind: "idx_out_of_range"; idx: number; totalChunks: number };
+
+/** Wire format for `Content-Range` header parsing. */
+export interface ContentRangeParts {
+  start: number;
+  end: number;
+  total: number;
+}
 
 // TASK-066: read just the declared `SourceArchive` metadata for a
 // build. This is the metadata that was recorded at `POST /builds`
@@ -232,6 +280,18 @@ export interface BuildRepository {
     expectedChecksumSha256: string,
     expectedSizeBytes: number
   ): Promise<StoreSourceArchiveResult>;
+  // TASK-106: chunked upload. Same invariants as `storeSourceArchive`
+  // but writes one chunk at a time; the caller passes the chunk index
+  // explicitly via `Content-Range: bytes <start>-<end>/<total>` (the
+  // repository parses the header) or `X-Chunk-Idx` (callers that
+  // already computed the index). The declaration matches the actual
+  // values from `SourceUploadChunkRequest` in the routes layer.
+  storeSourceChunk(
+    buildId: string,
+    bytes: Uint8Array,
+    perChunkChecksumSha256: string,
+    declaredTotalSizeBytes: number
+  ): Promise<StoreSourceChunkResult>;
   getSourceArchive(buildId: string): Promise<GetSourceArchiveResult>;
   getSourceArchiveMetadata(
     buildId: string

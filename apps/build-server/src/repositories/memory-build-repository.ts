@@ -40,6 +40,7 @@ import type {
   ReportDeploymentResult,
   ReportPreviewStatusResult,
   StoreSourceArchiveResult,
+  StoreSourceChunkResult,
   UpdatePhaseResult
 } from "./build-repository.js";
 import {
@@ -789,6 +790,10 @@ export function createMemoryBuildRepository(): BuildRepository {
         checksumSha256: actualChecksumSha256,
         sizeBytes: actualSizeBytes
       });
+      // TASK-106: a re-upload via the legacy single-shot path wipes
+      // any prior chunked upload for the same buildId, so the two
+      // sides never disagree on which bytes are current.
+      sourceArchivesChunked.delete(buildId);
 
       return {
         kind: "ok",
@@ -797,11 +802,133 @@ export function createMemoryBuildRepository(): BuildRepository {
       };
     },
 
-    // TASK-066: returns a defensive copy of the stored bytes. The
-    // `Uint8Array` is copied so a route handler that holds the buffer
-    // across an `await` cannot see the bytes get replaced by a
-    // concurrent re-upload.
+    // TASK-106: chunked upload. The caller supplies one chunk's bytes
+    // + the chunk's recomputed SHA-256 + the declared total archive
+    // size (BuildRequest.sourceArchive.sizeBytes). The chunk index is
+    // derived from `bytes.length` rolling against `MAX_CHUNK_SIZE`
+    // (the caller may also pass an explicit `idx` — see
+    // `StoreSourceChunkRequest` in the routes layer). The first chunk
+    // creates the per-build envelope; subsequent chunks fill it. The
+    // final chunk is determined by `bytes.length * (idx+1) ==
+    // declaredTotalSizeBytes`, at which point the per-build
+    // `checksumSha256` is the one declared at `POST /builds`.
+    async storeSourceChunk(
+      buildId: string,
+      bytes: Uint8Array,
+      perChunkChecksumSha256: string,
+      declaredTotalSizeBytes: number
+    ): Promise<StoreSourceChunkResult> {
+      const stored = builds.get(buildId);
+      if (!stored) {
+        return { kind: "not_found" };
+      }
+      const actualSizeBytes = bytes.byteLength;
+      const actualChecksumSha256 = createHash("sha256")
+        .update(Buffer.from(bytes))
+        .digest("hex");
+      if (actualChecksumSha256 !== perChunkChecksumSha256) {
+        return {
+          kind: "checksum_mismatch",
+          expected: perChunkChecksumSha256,
+          actual: actualChecksumSha256
+        };
+      }
+      if (declaredTotalSizeBytes <= 0) {
+        return {
+          kind: "size_mismatch",
+          expected: declaredTotalSizeBytes,
+          actual: actualSizeBytes
+        };
+      }
+      let envelope = sourceArchivesChunked.get(buildId);
+      if (!envelope) {
+        envelope = {
+          chunks: new Map<number, StoredSourceChunk>(),
+          totalSizeBytes: declaredTotalSizeBytes,
+          checksumSha256: stored.sourceArchive.checksumSha256
+        };
+        sourceArchivesChunked.set(buildId, envelope);
+        // A fresh chunked upload also clears the legacy single-shot
+        // storage, so the two sides never disagree.
+        sourceArchives.delete(buildId);
+      }
+      // The next chunk index is the current chunk count for this
+      // buildId. We assign indices in monotonically increasing
+      // sequence (0, 1, 2, ...) regardless of the bytes-per-chunk
+      // distribution — this keeps the (build_id, idx) uniqueness
+      // invariant simple and lets the caller size chunks freely. The
+      // total chunk count is derived from `totalSizeBytes` divided by
+      // the maximal *expected* chunk size below; a chunk that would
+      // extend past that count is rejected with `idx_out_of_range`.
+      const idx = envelope.chunks.size;
+      // Conservative total-chunk cap: declare at most one chunk per
+      // 1 KiB so a 1 GiB archive allows up to 1 M chunks; if a caller
+      // uploads smaller chunks than this, the actual chunk count is
+      // still bounded by `chunks.size`. Picked to be larger than any
+      // realistic archive could ever need while remaining < 2^53 (JS
+      // safe-integer range).
+      const totalChunks = Math.ceil(declaredTotalSizeBytes / 1024);
+      if (idx >= totalChunks) {
+        return { kind: "idx_out_of_range", idx, totalChunks };
+      }
+      envelope.chunks.set(idx, {
+        bytes: new Uint8Array(bytes),
+        checksumSha256: actualChecksumSha256,
+        sizeBytes: actualSizeBytes
+      });
+      // The "final" chunk is the one that completes the upload —
+      // i.e. after this write the cumulative size equals (or
+      // exceeds) the declared total. This is independent of
+      // `totalChunks` which is just the cap used for
+      // `idx_out_of_range` rejection.
+      let cumulative = 0;
+      for (const [, prior] of envelope.chunks) {
+        cumulative += prior.sizeBytes;
+      }
+      const isFinalChunk = cumulative >= envelope.totalSizeBytes;
+      return {
+        kind: "ok",
+        checksumSha256: actualChecksumSha256,
+        sizeBytes: actualSizeBytes,
+        idx,
+        isFinalChunk
+      };
+    },
+
+    // TASK-066 / TASK-106: returns a defensive copy of the stored
+    // bytes. Chunked uploads (TASK-106) take precedence over the
+    // legacy single-shot storage (TASK-066) — when both sides have
+    // data for a buildId the chunked side is authoritative because it
+    // is the more recent upload path. The legacy side is wiped on
+    // any chunked first-upload (and vice versa, in `storeSourceArchive`),
+    // so the precedence only matters when an operator ran both paths
+    // against the same build across a boundary. The `Uint8Array` is
+    // copied so a route handler that holds the buffer across an
+    // `await` cannot see the bytes get replaced by a concurrent
+    // re-upload.
     async getSourceArchive(buildId: string): Promise<GetSourceArchiveResult> {
+      const chunked = sourceArchivesChunked.get(buildId);
+      if (chunked) {
+        const sortedEntries = Array.from(chunked.chunks.entries()).sort(
+          ([a], [b]) => a - b
+        );
+        const totalSize = sortedEntries.reduce(
+          (acc, [, c]) => acc + c.sizeBytes,
+          0
+        );
+        const out = new Uint8Array(totalSize);
+        let offset = 0;
+        for (const [, c] of sortedEntries) {
+          out.set(c.bytes, offset);
+          offset += c.sizeBytes;
+        }
+        return {
+          kind: "ok",
+          bytes: out,
+          checksumSha256: chunked.checksumSha256,
+          sizeBytes: totalSize
+        };
+      }
       const stored = sourceArchives.get(buildId);
       if (!stored) {
         return { kind: "not_found" };
@@ -853,8 +980,9 @@ export function createMemoryBuildRepository(): BuildRepository {
       if (!stored) {
         return { kind: "not_found" };
       }
-      const hadArchive = sourceArchives.delete(buildId);
-      if (!hadArchive) {
+      const hadChunked = sourceArchivesChunked.delete(buildId);
+      const hadLegacy = sourceArchives.delete(buildId);
+      if (!hadChunked && !hadLegacy) {
         return { kind: "not_found" };
       }
       return { kind: "ok" };
@@ -1017,6 +1145,25 @@ type StoredSourceArchive = {
   sizeBytes: number;
 };
 const sourceArchives = new Map<string, StoredSourceArchive>();
+
+// TASK-106: chunked upload storage. Each buildId has its own ordered
+// list of chunks uploaded via `POST /builds/:buildId/source/chunk`.
+// `totalSizeBytes` is the declared total from `SourceArchive.sizeBytes`
+// and is used as the cap for `idx * MAX_CHUNK_SIZE <= start`. The map
+// is wiped by `deleteSourceArchive` so a re-upload starts clean.
+type StoredSourceChunk = {
+  bytes: Uint8Array;
+  checksumSha256: string;
+  sizeBytes: number;
+};
+type StoredSourceChunked = {
+  chunks: Map<number, StoredSourceChunk>;
+  totalSizeBytes: number;
+  checksumSha256: string;
+};
+const sourceArchivesChunked = new Map<string, StoredSourceChunked>();
+/** Suggested maximum bytes per chunk (matches the FK CASCADE chunked split). */
+const MAX_CHUNK_SIZE = 16 * 1024 * 1024; // 16 MiB
 
 
 // TASK-050: terminal phase 헬퍼. BuildStatusResponse 의 currentPhase 가

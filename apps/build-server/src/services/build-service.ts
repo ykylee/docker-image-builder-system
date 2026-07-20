@@ -22,7 +22,8 @@ import type {
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
   PreviewStatusDetails,
-  StoreSourceArchiveResult
+  StoreSourceArchiveResult,
+  StoreSourceChunkResult
 } from "../repositories/build-repository.js";
 
 export type ReportPhaseOutcome =
@@ -330,6 +331,25 @@ export class BuildService {
       bytes,
       expectedChecksumSha256,
       expectedSizeBytes
+    );
+  }
+
+  // TASK-106: chunked upload (per-chunk). Routes layer's
+  // `POST /builds/:buildId/source/chunk` calls this once per chunk.
+  // The repository validates the per-chunk SHA-256, derives the
+  // chunk index from cumulative chunk sizes, writes the row, and
+  // reports whether the caller has just uploaded the final chunk.
+  storeSourceChunk(
+    buildId: string,
+    bytes: Uint8Array,
+    perChunkChecksumSha256: string,
+    declaredTotalSizeBytes: number
+  ): Promise<StoreSourceChunkResult> {
+    return this.repository.storeSourceChunk(
+      buildId,
+      bytes,
+      perChunkChecksumSha256,
+      declaredTotalSizeBytes
     );
   }
 

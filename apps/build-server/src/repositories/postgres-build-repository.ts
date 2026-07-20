@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 
 import {
+  buildSourceChunkTable,
   buildSourceTable,
   buildTestTable,
   and,
@@ -13,6 +14,13 @@ import {
   sql,
   type DatabaseClient
 } from "@docker-image-builder-system/db";
+
+// TASK-106: the chunked upload envelope uses the same
+// `MAX_CHUNK_SIZE` as the memory repository (16 MiB) so the chunked
+// upload index derivation stays consistent across both backends.
+// Operators may tune this constant; bumping it reduces the chunk
+// count per upload but widens the per-row `bytea` footprint.
+const MAX_CHUNK_SIZE = 16 * 1024 * 1024;
 import { eq, inArray } from "@docker-image-builder-system/db";
 
 import type {
@@ -53,6 +61,7 @@ import type {
   ReportDeploymentResult,
   ReportPreviewStatusResult,
   StoreSourceArchiveResult,
+  StoreSourceChunkResult,
   UpdatePhaseResult
 } from "./build-repository.js";
 import {
@@ -1073,6 +1082,12 @@ export class PostgresBuildRepository implements BuildRepository {
             updatedAt: new Date()
           }
         });
+      // TASK-106: a fresh legacy single-shot upload wipes any prior
+      // chunked upload for the same buildId so the two sides never
+      // disagree on which bytes are current.
+      await tx
+        .delete(buildSourceChunkTable)
+        .where(eq(buildSourceChunkTable.buildId, buildId));
 
       return {
         kind: "ok",
@@ -1082,14 +1097,24 @@ export class PostgresBuildRepository implements BuildRepository {
     });
   }
 
-  // TASK-066: read the stored archive bytes. Returns a fresh
-  // `Uint8Array` so the caller is not coupled to Drizzle's internal
-  // row representation. A build with no uploaded archive is reported
-  // as `not_found` (no `bytes` row) — distinct from the build itself
+  // TASK-066 / TASK-106: read the stored archive bytes. Chunked
+  // uploads (TASK-106) take precedence over the legacy single-shot
+  // storage (TASK-066) — the chunked side is authoritative because
+  // it is the more recent upload path. The legacy side is wiped on
+  // the first chunked write (and vice versa, in `storeSourceArchive`),
+  // so the precedence only matters when an operator ran both paths
+  // across a boundary. Returns a fresh `Uint8Array` so the caller
+  // is not coupled to Drizzle's internal row representation. A
+  // build with no uploaded archive is reported as `not_found` — no
+  // `bytes` row in either table — distinct from the build itself
   // being missing, which is reported as `not_found` from the build
   // existence check first so a 404 from the route layer is the same
   // for both.
   async getSourceArchive(buildId: string): Promise<GetSourceArchiveResult> {
+    const chunked = await this.getSourceArchiveFromChunks(buildId);
+    if (chunked.kind === "ok") {
+      return chunked;
+    }
     const [row] = await this.db
       .select({
         buildId: buildSourceTable.buildId,
@@ -1155,22 +1180,174 @@ export class PostgresBuildRepository implements BuildRepository {
   // archive was present") without a separate existence check —
   // but that ambiguity is fine: both states end with no bytes
   // present, which is what `DELETE` was trying to achieve.
+  //
+  // TASK-106: this also clears the chunked upload (all rows in
+  // `build_source_chunk` for this buildId) so the two storage
+  // sides stay in sync. Either side populated ⇒ `ok`; neither
+  // populated ⇒ `not_found`.
   async deleteSourceArchive(
     buildId: string
   ): Promise<DeleteSourceArchiveResult> {
-    const result = await this.db
-      .delete(buildSourceTable)
-      .where(eq(buildSourceTable.buildId, buildId))
-      .returning({ buildId: buildSourceTable.buildId });
-    if (result.length === 0) {
-      // Either the build does not exist, or it exists but never
-      // had an archive uploaded. Report `not_found` for symmetry
-      // with `storeSourceArchive` so the route can surface a
-      // 404 — the caller can re-check via `GET /builds/:id` if
-      // it needs to distinguish the two.
+    const [legacyResult, chunkedResult] = await Promise.all([
+      this.db
+        .delete(buildSourceTable)
+        .where(eq(buildSourceTable.buildId, buildId))
+        .returning({ buildId: buildSourceTable.buildId }),
+      this.db
+        .delete(buildSourceChunkTable)
+        .where(eq(buildSourceChunkTable.buildId, buildId))
+        .returning({ buildId: buildSourceChunkTable.buildId })
+    ]);
+    if (legacyResult.length === 0 && chunkedResult.length === 0) {
       return { kind: "not_found" };
     }
     return { kind: "ok" };
+  }
+
+  // TASK-106: chunked upload. Same per-chunk invariants as the
+  // memory repository — the chunk's SHA-256 is recomputed from the
+  // bytes, the declared `totalSizeBytes` is the
+  // `BuildRequest.sourceArchive.sizeBytes` recorded at `POST
+  // /builds`, and `idx` is the 0-based chunk index rolled from
+  // the chunked upload's prior chunks for this build. We write one
+  // row per chunk into `build_source_chunk` via an `INSERT ...
+  // ON CONFLICT (build_id, idx) DO UPDATE` so retries at the same
+  // index replace the chunk (last-write-wins). When the final
+  // chunk lands (`isFinalChunk`) the whole-archive SHA-256 is the
+  // one declared at `POST /builds` — we rely on
+  // `build_request.source_archive_checksum_sha256` and do not
+  // recompute it (the per-chunk checksums already cover integrity).
+  async storeSourceChunk(
+    buildId: string,
+    bytes: Uint8Array,
+    perChunkChecksumSha256: string,
+    declaredTotalSizeBytes: number
+  ): Promise<StoreSourceChunkResult> {
+    const buildRow = await this.db
+      .select({ id: buildRequestTable.id })
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+    if (buildRow.length === 0) {
+      return { kind: "not_found" };
+    }
+    const actualSizeBytes = bytes.byteLength;
+    const actualChecksumSha256 = createHash("sha256")
+      .update(Buffer.from(bytes))
+      .digest("hex");
+    if (actualChecksumSha256 !== perChunkChecksumSha256) {
+      return {
+        kind: "checksum_mismatch",
+        expected: perChunkChecksumSha256,
+        actual: actualChecksumSha256
+      };
+    }
+    if (declaredTotalSizeBytes <= 0) {
+      return {
+        kind: "size_mismatch",
+        expected: declaredTotalSizeBytes,
+        actual: actualSizeBytes
+      };
+    }
+    // Derive the next chunk index from the current chunk count
+    // for this buildId. We assign indices in monotonically increasing
+    // sequence (0, 1, 2, ...) regardless of the bytes-per-chunk
+    // distribution — this keeps the (build_id, idx) uniqueness
+    // invariant simple and lets the caller size chunks freely. The
+    // total chunk count cap is `ceil(totalSizeBytes / 1024)` — a
+    // conservative upper bound (≤ one chunk per 1 KiB) that allows
+    // realistic archives while staying < 2^53 (JS safe-integer
+    // range). A chunk that would extend past that count is rejected
+    // with `idx_out_of_range`.
+    const priorCount = await this.db
+      .select({ id: buildSourceChunkTable.id })
+      .from(buildSourceChunkTable)
+      .where(eq(buildSourceChunkTable.buildId, buildId));
+    const idx = priorCount.length;
+    const totalChunks = Math.ceil(declaredTotalSizeBytes / 1024);
+    if (idx >= totalChunks) {
+      return { kind: "idx_out_of_range", idx, totalChunks };
+    }
+    await this.db
+      .insert(buildSourceChunkTable)
+      .values({
+        buildId,
+        idx,
+        bytes: Buffer.from(bytes),
+        sizeBytes: actualSizeBytes,
+        checksumSha256: actualChecksumSha256
+      })
+      .onConflictDoUpdate({
+        target: [buildSourceChunkTable.buildId, buildSourceChunkTable.idx],
+        set: {
+          bytes: Buffer.from(bytes),
+          sizeBytes: actualSizeBytes,
+          checksumSha256: actualChecksumSha256
+        }
+      });
+    // First chunk wipes the legacy `build_source` row so the two
+    // sides never disagree on which is authoritative.
+    if (idx === 0) {
+      await this.db.delete(buildSourceTable).where(eq(buildSourceTable.buildId, buildId));
+    }
+    // The "final" chunk is the one that completes the upload —
+    // i.e. after this write the cumulative size equals the declared
+    // total. Recompute by summing chunk sizes for this build.
+    const cumulativeRows = await this.db
+      .select({ sizeBytes: buildSourceChunkTable.sizeBytes })
+      .from(buildSourceChunkTable)
+      .where(eq(buildSourceChunkTable.buildId, buildId));
+    const cumulative = cumulativeRows.reduce((acc, r) => acc + r.sizeBytes, 0);
+    const isFinalChunk = cumulative >= declaredTotalSizeBytes;
+    return {
+      kind: "ok",
+      checksumSha256: actualChecksumSha256,
+      sizeBytes: actualSizeBytes,
+      idx,
+      isFinalChunk
+    };
+  }
+
+  // TASK-106: chunked `getSourceArchive` path. Concatenates the
+  // rows in ascending `idx` order into a single `Uint8Array`. The
+  // per-chunk checksums have already been verified on upload; the
+  // declared whole-archive SHA-256 is taken from the build row.
+  async getSourceArchiveFromChunks(
+    buildId: string
+  ): Promise<GetSourceArchiveResult> {
+    const buildRow = await this.db
+      .select({ checksumSha256: buildRequestTable.sourceArchiveChecksumSha256 })
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+    if (buildRow.length === 0) {
+      return { kind: "not_found" };
+    }
+    const rows = await this.db
+      .select({ bytes: buildSourceChunkTable.bytes, sizeBytes: buildSourceChunkTable.sizeBytes })
+      .from(buildSourceChunkTable)
+      .where(eq(buildSourceChunkTable.buildId, buildId))
+      .orderBy(buildSourceChunkTable.idx);
+    if (rows.length === 0) {
+      return { kind: "not_found" };
+    }
+    const totalSize = rows.reduce((acc, r) => acc + r.sizeBytes, 0);
+    const out = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const row of rows) {
+      out.set(new Uint8Array(row.bytes), offset);
+      offset += row.sizeBytes;
+    }
+    const checksumSha256 = buildRow[0]?.checksumSha256;
+    if (!checksumSha256) {
+      return { kind: "not_found" };
+    }
+    return {
+      kind: "ok",
+      bytes: out,
+      checksumSha256,
+      sizeBytes: totalSize
+    };
   }
 
   // -------------------------------------------------------------------------

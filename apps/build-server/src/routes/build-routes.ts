@@ -407,6 +407,85 @@ export async function registerBuildRoutes(
     return reply.status(200).send(Buffer.from(result.bytes));
   });
 
+  // POST /builds/:buildId/source/chunk — chunked upload (TASK-106).
+  // The Skill / tooling splits the archive into N chunks (each
+  // ≤ 256 MiB Fastify bodyLimit) and posts them one at a time.
+  // Each chunk's recomputed SHA-256 must match the per-chunk
+  // `X-Source-Checksum-Sha256` header, and the sum of chunk
+  // `sizeBytes` must equal `BuildRequest.sourceArchive.sizeBytes`
+  // (recorded at `POST /builds` time). The chunk index is derived
+  // by the repository from the chunks already stored for the
+  // buildId — out-of-order uploads are accepted.
+  //
+  // Wire format: `Content-Range: bytes <start>-<end>/<total>` is
+  // accepted for HTTP-standard compatibility, but the canonical
+  // chunk index lives in the repository (cumulative offset). On
+  // success we reply 201 + the chunk's recomputed SHA-256 +
+  // `X-Chunk-Is-Final: true|false` so the caller knows when the
+  // upload is complete.
+  app.post("/builds/:buildId/source/chunk", async (request, reply) => {
+    const paramsResult = buildIdParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        message: "Invalid buildId parameter",
+        issues: paramsResult.error.issues
+      });
+    }
+    if (!Buffer.isBuffer(request.body)) {
+      return reply.status(415).send({
+        message: "Source chunk body must be application/octet-stream."
+      });
+    }
+    const metadataResult = await buildService.getSourceArchiveMetadata(
+      paramsResult.data.buildId
+    );
+    if (metadataResult.kind === "not_found") {
+      return reply.status(404).send({ message: "Build not found." });
+    }
+    const checksumHeader = request.headers["x-source-checksum-sha256"];
+    const perChunkChecksumSha256 =
+      typeof checksumHeader === "string" && checksumHeader.length > 0
+        ? checksumHeader
+        : metadataResult.sourceArchive.checksumSha256;
+    const result = await buildService.storeSourceChunk(
+      paramsResult.data.buildId,
+      new Uint8Array(request.body),
+      perChunkChecksumSha256,
+      metadataResult.sourceArchive.sizeBytes
+    );
+    if (result.kind === "not_found") {
+      return reply.status(404).send({ message: "Build not found." });
+    }
+    if (result.kind === "checksum_mismatch") {
+      return reply.status(400).send({
+        message: "Source chunk checksum mismatch.",
+        expected: result.expected,
+        actual: result.actual
+      });
+    }
+    if (result.kind === "size_mismatch") {
+      return reply.status(400).send({
+        message: "Source chunk size mismatch.",
+        expected: result.expected,
+        actual: result.actual
+      });
+    }
+    if (result.kind === "idx_out_of_range") {
+      return reply.status(409).send({
+        message: "Source chunk index out of range for declared total.",
+        idx: result.idx,
+        totalChunks: result.totalChunks
+      });
+    }
+    reply.header("X-Chunk-Is-Final", String(result.isFinalChunk));
+    return reply.status(201).send({
+      buildId: paramsResult.data.buildId,
+      idx: result.idx,
+      checksumSha256: result.checksumSha256,
+      sizeBytes: result.sizeBytes
+    });
+  });
+
   // DELETE /builds/:buildId/source — drop the stored source
   // archive bytes (TASK-066). The build row (and its declared
   // `sourceArchive` metadata) is preserved so the Skill can
