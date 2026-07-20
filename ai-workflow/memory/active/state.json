@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-20T07:00:00Z",
-  "purpose_digest": "TASK-109 (RFC 7233 §4.2 `*` 케이스 dynamic boundary check 봉인) 봉인 sync (rev 138→139). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 + TASK-108 + TASK-109 까지 **8 TASK 연속 봉인**. TASK-109 결정: lenient default (Content-Range.total 부재 시 numeric equality skip, 단 `end + 1 ≤ declaredTotalSizeBytes` dynamic 검증으로 silent accept 위험 봉인). 신규 1 file + amend 4 file: 신규 — docs/operations/content-range-rfc-7233-star-2026-07-20.md (RFC 7233 §4.2 `*` 케이스 lenient default 동적 boundary check + 회귀 가드 3 case + 사전 결함 + 보강 2건 + 회귀 baseline + follow-up). amend — memory-build-repository.ts (의미 C branch 3 종 분기: numeric total + mismatch / `*` total + boundary over / 그 외) + postgres-build-repository.ts (memory 와 일대일 정합) + build-source-chunked.test.ts (+3 cases: `*` 안 넘는 chunk / `*` boundary over / numeric total regression) + PROJECT_PROFILE.md (§3 source archive 라운드트립 TASK-109 항목 + 다음에 읽을 문서 reference). build-routes.ts amend 0 (기존 분기들이 신규 결과 흡수). SQL / schema / migration / version 변경 0. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 0 변경), build-server legacy 143/143 + chunked 11/11 (의미 B 0 변경) + 의미 C 4/4 (TASK-108 0 변경) + `*` 신규 3/3 = 161/161 (TASK-088 baseline 대비 +48), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 운영 영향: 의미 B callers (TASK-106) 의 wire-format 0 변경, 의미 A numeric callers (TASK-108) 의 cross-check 0 변경, `*` 케이스 callers 의 동작 boundary-check 정교화만 (silent accept → 명시 검증). 사전 결함 + 보강 2건 (`*` silent accept 위험 / strict alternative 잠재 정밀화). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 161 (+48) / TS 5 packages clean / vite build:react 정상. 27 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up (남은 결정): strict mode env flag (STRICT_CONTENT_RANGE=true) 후속 / chunked multi-runner 회귀 가드 / TASK-066 follow-up batch 4 의 e2e-production-semantic-postgres / 옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 모두 별도 사용자 결정.",
-  "purpose_digest_rev": 139,
+  "generated_at": "2026-07-20T08:00:00Z",
+  "purpose_digest": "TASK-110 (STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인) 봉인 sync (rev 139→140). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 + TASK-108 + TASK-109 + TASK-110 까지 **9 TASK 연속 봉인**. TASK-110 결정: 운영자가 deployment 시점에 env flag 한 개 (STRICT_CONTENT_RANGE) 로 RFC 7233 §4.2 `*` total 케이스 거절 (400 content_range_invalid) + numeric total 의무화. 신규 1 file + amend 7 file: 신규 — docs/operations/content-range-rfc-7233-strict-mode-2026-07-20.md (의도 / 결정 / 운영 rollout playbook 3 단계 / Wire format / Schema 변경 0 / Build service amend / Repository amend / Routes amend 0 / 신규 회귀 가드 4 case / 사전 결함 + 보강 2건 / 회귀 baseline / follow-up / 관련 문서). amend — create-app.ts (parseStrictContentRangeFlag helper + BuildService instantiation 시 { strictContentRange } 위임) + build-service.ts (BuildService constructor 의 두 번째 인자 { strictContentRange: boolean }) + build-repository.ts (storeSourceChunk 의 6 번째 parameter strictContentRange?: boolean) + memory-build-repository.ts (의미 C branch 4 종 dispatch) + postgres-build-repository.ts (memory 와 일대일 정합) + build-source-chunked.test.ts (+4 cases) + PROJECT_PROFILE.md (§3 source archive 라운드트립 TASK-110 항목 + 다음에 읽을 문서 reference). build-routes.ts amend 0 (BuildService runtime field 자동 전파). SQL / schema / migration / version 변경 0. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 0 변경), build-server 161 → 165 (+4 신규 strict cases, legacy/chunked/의미 C/`*` 0 변경), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 운영 영향 0 (default) — env unset / \"false\" 등 모든 callers TASK-109 동작 보존. strict 모드 활성은 deployment 정책 결정. 사전 결함 + 보강 2건 (운영 restart 없이 dynamic toggle 불가 / strict 모드 ON 시 기존 callers 의 breakdown 위험). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean / vite build:react 정상. 28 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up (남은 결정): 운영자 client 정렬 검증 staging checklist / chunked multi-runner 회귀 가드 / TASK-066 follow-up batch 4 의 e2e-production-semantic-postgres / 옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 모두 별도 사용자 결정.",
+  "purpose_digest_rev": 140,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-109 (RFC 7233 §4.2 `*` 케이스 dynamic boundary check) 봉인 (rev 138→139). main HEAD `0663785` (TASK-109 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 161 (+48, TASK-106 +11 + TASK-108 +4 + TASK-109 +3 신규) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 27 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
-    "current_axis": "TASK-109 RFC 7233 `*` 케이스 봉인 완료. 본 세션 8 TASK 연속 봉인. 27 TASK 봉인. 모든 TASK main 합류.",
-    "current_focus": "TASK-109 `*` 케이스 봉인 sync 완료. 다음 세션 시작 시 main HEAD `0663785` + workflow meta (state rev 139) baseline 복원. 후속 결정 (strict mode env flag / chunked multi-runner 회귀 가드 / TASK-066 follow-up batch 4 / 옵션 Z / 신규 기능 / Nextcloud Tasks / 다른 TASK) 별도 사용자 결정.",
+    "current_baseline": "TASK-110 (STRICT_CONTENT_RANGE env flag 의 strict 모드) 봉인 (rev 139→140). main HEAD `1105a8e` (TASK-110 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52, TASK-106 +11 + TASK-108 +4 + TASK-109 +3 + TASK-110 +4 신규) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 28 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
+    "current_axis": "TASK-110 STRICT_CONTENT_RANGE env flag strict 모드 봉인 완료. 본 세션 9 TASK 연속 봉인. 28 TASK 봉인. 모든 TASK main 합류.",
+    "current_focus": "TASK-110 STRICT_CONTENT_RANGE env flag 봉인 sync 완료. 다음 세션 시작 시 main HEAD `1105a8e` + workflow meta (state rev 140) baseline 복원. 후속 결정 (운영자 client 정렬 staging checklist / chunked multi-runner 회귀 가드 / TASK-066 follow-up batch 4 / 옵션 Z / 신규 기능 / Nextcloud Tasks / 다른 TASK) 별도 사용자 결정.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-110 STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인 — `1105a8e` main 합류 (2026-07-20, 본 세션)",
       "TASK-109 RFC 7233 `*` 케이스 dynamic boundary check 봉인 — `0663785` main 합류 (2026-07-20, 본 세션)",
       "TASK-108 RFC 7233 Content-Range chunked wire-format 의미 C bipartite 완전 봉인 — `4e5161e` main 합류 (2026-07-20, 본 세션)",
       "TASK-107 RFC 7233 Content-Range chunked wire-format follow-up 권장 (docs only) — `7c25a06` main 합류 (2026-07-20, 본 세션)",
@@ -84,7 +85,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-20.md",
-    "task_count": 27,
+    "task_count": 28,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -116,10 +117,11 @@
       "TASK-106 source archive chunked split + multi-row schema (rev 25 sync 봉인, commit `fadddcf` main 합류)",
       "TASK-107 RFC 7233 Content-Range chunked wire-format follow-up 권장 (docs only) (rev 26 sync 봉인, commit `7c25a06` main 합류)",
       "TASK-108 RFC 7233 Content-Range chunked wire-format 의미 C bipartite 완전 봉인 (rev 27 sync 봉인, commit `4e5161e` main 합류)",
-      "TASK-109 RFC 7233 `*` 케이스 dynamic boundary check 봉인 (rev 28 sync 봉인, commit `0663785` main 합류)"
+      "TASK-109 RFC 7233 `*` 케이스 dynamic boundary check 봉인 (rev 28 sync 봉인, commit `0663785` main 합류)",
+      "TASK-110 STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인 (rev 29 sync 봉인, commit `1105a8e` main 합류)"
     ],
-    "index_rev": "62",
-    "latest_rev": "39"
+    "index_rev": "63",
+    "latest_rev": "40"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
