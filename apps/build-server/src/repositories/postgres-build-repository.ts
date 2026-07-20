@@ -1256,12 +1256,63 @@ export class PostgresBuildRepository implements BuildRepository {
     // the `total` is the declared archive size per their framing;
     // a mismatch surfaces `content_range_mismatch` rather than
     // silently trusting either side.
-    if (contentRange && contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
-      return {
-        kind: "content_range_mismatch",
-        declared: declaredTotalSizeBytes,
-        supplied: contentRange.total
-      };
+    //
+    // TASK-109: when `total` is `*` (RFC 7233 §4.2 unknown total)
+    // the numeric equality check is inapplicable. We still enforce
+    // that the chunk's `[start, start + size)` range lies within
+    // `declaredTotalSizeBytes` because the build's declared
+    // metadata is the server-side source-of-truth. A stricter
+    // alternative — reject `*` outright and force the caller to
+    // supply a numeric total — is documented in
+    // `docs/operations/content-range-rfc-7233-star-2026-07-20.md`
+    // as the "strict" path; we adopt the lenient default to let
+    // existing callers adopt RFC 7233 incrementally.
+    if (contentRange) {
+      if (contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
+        return {
+          kind: "content_range_mismatch",
+          declared: declaredTotalSizeBytes,
+          supplied: contentRange.total
+        };
+      }
+      // `*` 케이스 — total 부재. chunk 의 end+1 이 declared 를
+      // 넘어가면 size_mismatch 로 거절.
+      if (contentRange.total === 0 && contentRange.end + 1 > declaredTotalSizeBytes) {
+        return {
+          kind: "size_mismatch",
+          expected: declaredTotalSizeBytes,
+          actual: contentRange.end + 1
+        };
+      }
+    }
+    // silently trusting either side.
+    //
+    // TASK-109: when `total` is `*` (RFC 7233 §4.2 unknown total)
+    // the numeric equality check is inapplicable. We still enforce
+    // that the chunk's `[start, start + size)` range lies within
+    // `declaredTotalSizeBytes` because the build's declared
+    // metadata is the server-side source-of-truth. The strictly-
+    // numeric alternative (reject `*` outright) is documented as
+    // the "strict" path in the TASK-109 follow-up operating guide;
+    // the lenient default lets existing callers adopt RFC 7233
+    // incrementally.
+    if (contentRange) {
+      if (contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
+        return {
+          kind: "content_range_mismatch",
+          declared: declaredTotalSizeBytes,
+          supplied: contentRange.total
+        };
+      }
+      // `*` 케이스 — total 부재. chunk 의 end+1 이 declared 를
+      // 넘어가면 size_mismatch 로 거절.
+      if (contentRange.total === 0 && contentRange.end + 1 > declaredTotalSizeBytes) {
+        return {
+          kind: "size_mismatch",
+          expected: declaredTotalSizeBytes,
+          actual: contentRange.end + 1
+        };
+      }
     }
     // TASK-108: 의미 C bipartite — semantic A (Content-Range
     // trusted) vs semantic B (monotonic sequence). Both paths share

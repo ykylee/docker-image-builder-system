@@ -848,12 +848,36 @@ export function createMemoryBuildRepository(): BuildRepository {
       // disagrees with the build's `declaredTotalSizeBytes` we
       // surface a 400 `content_range_mismatch` rather than silently
       // trusting either side.
-      if (contentRange && contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
-        return {
-          kind: "content_range_mismatch",
-          declared: declaredTotalSizeBytes,
-          supplied: contentRange.total
-        };
+      //
+      // TASK-109: when `total` is `*` (RFC 7233 §4.2 unknown total)
+      // the numeric equality check is inapplicable. We still
+      // enforce that the chunk's `[start, start + size)` range
+      // lies within `declaredTotalSizeBytes` because the build's
+      // declared metadata is the server-side source-of-truth (the
+      // caller is the devlier; build_request row is canonical).
+      // A stricter alternative — reject `*` outright and force the
+      // caller to supply a numeric total — is documented in
+      // `docs/operations/content-range-rfc-7233-star-2026-07-20.md`
+      // as the "strict" path; we adopt the lenient default to let
+      // existing callers adopt RFC 7233 incrementally.
+      if (contentRange) {
+        if (contentRange.total > 0 && contentRange.total !== declaredTotalSizeBytes) {
+          return {
+            kind: "content_range_mismatch",
+            declared: declaredTotalSizeBytes,
+            supplied: contentRange.total
+          };
+        }
+        // `*` 케이스 — total 부재 (ContentRangeParts.total=0 sentinel
+        // from the parser). chunk 의 end+1 이 declared 를 넘어가면
+        // size_mismatch 로 거절.
+        if (contentRange.total === 0 && contentRange.end + 1 > declaredTotalSizeBytes) {
+          return {
+            kind: "size_mismatch",
+            expected: declaredTotalSizeBytes,
+            actual: contentRange.end + 1
+          };
+        }
       }
       let envelope = sourceArchivesChunked.get(buildId);
       if (!envelope) {

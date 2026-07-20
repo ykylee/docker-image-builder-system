@@ -344,4 +344,70 @@ describe("MemoryBuildRepository: storeSourceChunk (TASK-106)", () => {
     assert.equal(r1.idx, 0);
     assert.equal(r2.idx, 1);
   });
+
+  // -----------------------------------------------------------------------
+  // TASK-109: '*' 케이스 (RFC 7233 §4.2 unknown total) 후속 봉인.
+  // Content-Range 가 `*` total 이면 numeric equality check 는 적용 안
+  // 되지만 end+1 ≤ declaredTotalSizeBytes 인지는 cross-check 한다.
+  // -----------------------------------------------------------------------
+
+  it("TASK-109: '*' total + declared 안 넘는 chunk → ok", async () => {
+    const totalSize = 16 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk = randomBytes(16 * 1024);
+    // `bytes 0-16383/*` — total unknown, chunk 의 end 가 declared 이내.
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      totalSize,
+      { start: 0, end: totalSize - 1, total: 0 }
+    );
+    assert.equal(r.kind, "ok");
+    if (r.kind !== "ok") return;
+    assert.equal(r.idx, 0);
+    assert.equal(r.isFinalChunk, true);
+  });
+
+  it("TASK-109: '*' total + chunk 의 end 가 declared 초과 → size_mismatch", async () => {
+    // total=16 KiB (declared), chunk 의 end 가 그 초과인 `*` 케이스.
+    // numeric equality check 는 inapplicable 이지만 dynamic boundary
+    // check (end+1 ≤ declaredTotalSizeBytes) 가 size_mismatch 를 발동.
+    const totalSize = 16 * 1024;
+    const { buildId, repo } = await setupBuild(totalSize);
+    const chunk = randomBytes(16 * 1024);
+    const beyondDeclared = totalSize + (10 * 1024);
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      totalSize,
+      { start: totalSize, end: beyondDeclared - 1, total: 0 }
+    );
+    assert.equal(r.kind, "size_mismatch");
+    if (r.kind !== "size_mismatch") return;
+    assert.equal(r.expected, totalSize);
+    assert.equal(r.actual, beyondDeclared);
+  });
+
+  it("TASK-109: numeric total + declared cross-check (TASK-108 정합 유지)", async () => {
+    // TASK-108 봉인 동작의 regression 가드 — numeric total 이 declared
+    // 와 다르면 content_range_mismatch 발동 (TASK-109 의 dynamic path
+    // 는 발동 안 함).
+    const declaredTotal = 16 * 1024;
+    const { buildId, repo } = await setupBuild(declaredTotal);
+    const chunk = randomBytes(16 * 1024);
+    const wrongTotal = 32 * 1024;
+    const r = await repo.storeSourceChunk(
+      buildId,
+      chunk,
+      sha256Hex(chunk),
+      declaredTotal,
+      { start: 0, end: chunk.length - 1, total: wrongTotal }
+    );
+    assert.equal(r.kind, "content_range_mismatch");
+    if (r.kind !== "content_range_mismatch") return;
+    assert.equal(r.declared, declaredTotal);
+    assert.equal(r.supplied, wrongTotal);
+  });
 });
