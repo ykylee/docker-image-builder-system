@@ -1,11 +1,11 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """workflow_kit.workflow_kit_cli - unified CLI dispatcher (consolidated v0.7.52,
 extended v0.7.53 with okf-export / okf-import, v0.7.54 with okf-validate /
 cache-migrate / release-doctor, v0.7.55 with okf-version-check / cache-decay /
 score-wiki-trend, v0.7.56 with okf-cleanup / cache-prune + score-wiki-trend
 in-process, v0.7.57 with cache-merge-multi / cache-import-csv / cache-export-json,
-v0.9.6 with refresh-purpose).
+v0.9.6 with refresh-purpose, v0.13.0-dev with dashboard, v0.13.1 with memory-index-telemetry).
 
 Replaces 6 per-feature CLI modules (cache_dashboard_cli, v_r13_layer2_cli,
 cache_analytics_trend_chart_cli, cache_dashboard_export_cli,
@@ -53,6 +53,9 @@ Commands:
                        [--purpose-path=PATH] [--json]
     cascade-delete     --deleted-paths=PATH [--deleted-paths=PATH] ...
                        --wiki-root=PATH [--project=SLUG] [--apply] [--json]
+    dashboard          [--format=json|markdown|html] [--output=PATH] [--publish]
+                       [--workspace-root=PATH] [--recent-limit=N] [--top-n=N]
+                       [--inline-guard=true|false]
 
 Exit codes: 0 = success (or no alerts), 1 = alerts triggered / operation result, 2 = usage error.
 
@@ -661,6 +664,85 @@ def cmd_release_doctor(argv: list[str]) -> int:
             v.get("ok") is False for v in results.values() if isinstance(v, dict)
         )
         return 1 if any_fail else 0
+    except Exception as e:
+        print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
+        return 2
+
+
+@register("dashboard")
+def cmd_dashboard(argv: list[str]) -> int:
+    """Quality Dashboard 5-panel snapshot (Phase 13 v0.13.0+, dispatcher subcommand 38).
+
+    Read-only diagnostic. 5 panels:
+      1. drift_prevention: maturity_matrix.json freshness + harness count + smoke count
+      2. maturity_distribution: skill / mcp / transport / harness / milestone stage 분포
+      3. memory_index_utilization: entries 갯수 + cue_anchor frequency + cumulative timeline
+      4. smoke_trend: 누적 smoke count + 최근 release 의 smoke fail 갯수
+      5. recent_releases: state.json.session.recent_done_items timeline
+
+    Args:
+        --format=json|markdown|html  출력 포맷 (default: json). v0.13.2+ html 추가.
+        --output=PATH            출력 파일 (생략 시 stdout)
+        --workspace-root=PATH    workspace root (생략 시 CWD 에서 REPO_ROOT 자동 탐색)
+        --recent-limit=N         smoke_trend panel 의 release note 갯수 (default: 5)
+        --top-n=N                recent_releases panel 의 timeline 갯수 (default: 10)
+        --publish                (v0.13.2+ html 전용) output 외 추가 로 docs/dashboard/index.html copy.
+                                  GitHub Pages workflow 와 정합.
+        --inline-guard=false     (v0.13.1+) drift guard inline 실행 skip. true (default) 면 inline 결과 emit.
+    """
+    fmt = _parse_flag(argv, "--format") or "json"
+    if fmt not in ("json", "markdown", "html"):
+        print(
+            f"ERROR: invalid --format '{fmt}' (expected: json|markdown|html)",
+            file=sys.stderr,
+        )
+        return 2
+    output = _parse_flag(argv, "--output")
+    workspace_root_s = _parse_flag(argv, "--workspace-root")
+    recent_limit_s = _parse_flag(argv, "--recent-limit") or "5"
+    top_n_s = _parse_flag(argv, "--top-n") or "10"
+    publish = _has_flag(argv, "--publish")
+    inline_guard_s = _parse_flag(argv, "--inline-guard") or "true"
+    inline_guard = inline_guard_s.lower() not in ("0", "false", "no", "off")
+    try:
+        recent_limit = int(recent_limit_s)
+        top_n = int(top_n_s)
+    except ValueError as e:
+        print(f"ERROR: --recent-limit / --top-n 정수 parse 실패: {e}", file=sys.stderr)
+        return 2
+
+    try:
+        from pathlib import Path as _P
+        from workflow_kit.common.dashboard_data import (
+            collect_dashboard_snapshot,
+            render_dashboard_markdown,
+            render_dashboard_html,
+        )
+        ws_root = _P(workspace_root_s) if workspace_root_s else None
+        snap = collect_dashboard_snapshot(ws_root, inline_guard=inline_guard)
+        if fmt == "json":
+            payload = json.dumps(snap, ensure_ascii=False, indent=2, sort_keys=True)
+        elif fmt == "markdown":
+            payload = render_dashboard_markdown(snap)
+        else:
+            payload = render_dashboard_html(snap)
+
+        if output:
+            out_path = _P(output)
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            out_path.write_text(payload, encoding="utf-8")
+        else:
+            print(payload, end="" if payload.endswith("\n") else "\n")
+
+        # --publish: docs/dashboard/index.html 로 추가 copy (html format 전용 권장).
+        if publish:
+            from pathlib import Path as _Pp
+            publish_path = _Pp("docs/dashboard/index.html")
+            publish_path.parent.mkdir(parents=True, exist_ok=True)
+            publish_path.write_text(payload, encoding="utf-8")
+            print(f"  [publish] {publish_path}", file=sys.stderr)
+
+        return 0
     except Exception as e:
         print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
         return 2
@@ -1718,6 +1800,183 @@ def cmd_release_status(argv: list[str]) -> int:
                     print(f"auto_bump.new_version: {ab_result.get('new_version')}")
                 else:
                     print(f"auto_bump.error: {ab_result.get('error')}")
+        return 0
+    except Exception as e:
+        print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
+        return 2
+
+
+@register("memory-index-query")
+def cmd_memory_index_query(argv: list[str]) -> int:
+    """Phase 3: ADR-005 memory_index retrieval 3-tuple 의 dispatcher subcommand.
+
+    ARGS:
+      --workspace-root <path>  (필수) memory_index/ entries/ 가 있는 workspace.
+      --query-tokens <csv>     (필수) 매칭 token 들. comma-separated.
+      --top-k <int>            default 10
+      --max-depth <int>        default 2 (linked expansion depth)
+      --use-bm25-fallback      bool flag (없으면 False = opt-out)
+      --json                   stdout JSON, 없으면 human-readable text
+
+    session-start / doc-sync / backlog-update 가 본 subcommand 호출 시
+    retrieval layer 자동 활용 (Phase 3 default-on 의 정공법).
+    """
+    import json as _json
+    from pathlib import Path as _P
+
+    workspace_root = _parse_flag(argv, "--workspace-root")
+    query_tokens_raw = _parse_flag(argv, "--query-tokens")
+    top_k_str = _parse_flag(argv, "--top-k") or "10"
+    max_depth_str = _parse_flag(argv, "--max-depth") or "2"
+    use_bm25 = _has_flag(argv, "--use-bm25-fallback")
+    use_json = _has_flag(argv, "--json")
+
+    if not workspace_root or not query_tokens_raw:
+        print(
+            "ERROR: --workspace-root 와 --query-tokens 둘 다 필수입니다.",
+            file=sys.stderr,
+        )
+        return 2
+    try:
+        top_k = int(top_k_str)
+        max_depth = int(max_depth_str)
+    except ValueError as e:
+        print(f"ERROR: --top-k / --max-depth 정수 parse 실패: {e}", file=sys.stderr)
+        return 2
+
+    query_tokens = [t.strip() for t in query_tokens_raw.split(",") if t.strip()]
+    if not query_tokens:
+        print("ERROR: --query-tokens 가 비어있음.", file=sys.stderr)
+        return 2
+
+    try:
+        from workflow_kit.common.schemas.memory_index import (
+            MemoryIndexQueryOutput,
+            MemoryIndexTelemetryEvent,
+        )
+        from workflow_kit.common.state.memory_index import (
+            append_telemetry_event,
+            query_memory_index_for_dispatcher,
+        )
+        result: MemoryIndexQueryOutput = query_memory_index_for_dispatcher(
+            _P(workspace_root),
+            query_tokens,
+            top_k=top_k,
+            max_depth=max_depth,
+            use_bm25_fallback=use_bm25,
+        )
+        # v0.13.1+ Phase 13 AC2: telemetry sidecar emit (dispatcher source)
+        from datetime import datetime as _dt, timezone as _tz
+        append_telemetry_event(
+            _P(workspace_root),
+            MemoryIndexTelemetryEvent(
+                timestamp=_dt.now(_tz.utc),
+                source="dispatcher",
+                workspace_root=str(_P(workspace_root)),
+                query_tokens_count=len(query_tokens),
+                selected_count=result.selected_count,
+                cue_hits=result.cue_hits,
+                bm25_hits=result.bm25_hits,
+                expansion_hits=result.expansion_hits,
+                top_k=top_k,
+                max_depth=max_depth,
+                use_bm25_fallback=use_bm25,
+            ),
+        )
+        if use_json:
+            payload = result.model_dump(mode="json")
+            print(_json.dumps(payload, ensure_ascii=False, indent=2))
+        else:
+            print(f"status: {result.status.value}")
+            print(f"selected_count: {result.selected_count}")
+            print(f"cue_hits: {result.cue_hits}")
+            print(f"bm25_hits: {result.bm25_hits}")
+            print(f"expansion_hits: {result.expansion_hits}")
+            print(f"expansion_depth_used: {result.expansion_depth_used}")
+            print(f"selected_ids: {','.join(result.selected_ids) or '<empty>'}")
+        return 0
+    except Exception as e:
+        # v0.13.1+ Phase 13 AC2: 예외 path 도 telemetry emit (negative example)
+        try:
+            from workflow_kit.common.schemas.memory_index import MemoryIndexTelemetryEvent as _MTE
+            from workflow_kit.common.state.memory_index import append_telemetry_event as _ate
+            from datetime import datetime as _dt2, timezone as _tz2
+            _ate(
+                _P(workspace_root),
+                _MTE(
+                    timestamp=_dt2.now(_tz2.utc),
+                    source="dispatcher",
+                    workspace_root=str(_P(workspace_root)),
+                    query_tokens_count=len(query_tokens),
+                    error=True,
+                ),
+            )
+        except Exception:
+            pass
+        print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
+        return 2
+
+
+@register("memory-index-telemetry")
+def cmd_memory_index_telemetry(argv: list[str]) -> int:
+    """v0.13.1+ Phase 13 AC2: memory_index telemetry sidecar 의 read-only inspect.
+
+    ARGS:
+      --workspace-root <path>  (필수) memory_index/ 가 있는 workspace.
+      --json                   stdout JSON, 없으면 human-readable text.
+      --show-events            (--json 과 배타적) telemetry events raw list (newline-separated JSON).
+
+    Subcommand 36 (read-only, §6.3 MUST-NOT-delegate 정합).
+    호출 빈도 측정 (3 skill + dispatcher 의 opt-in retrieval 활용도) 의 SSOT.
+    """
+    import json as _json
+    from pathlib import Path as _P
+
+    workspace_root = _parse_flag(argv, "--workspace-root")
+    use_json = _has_flag(argv, "--json")
+    show_events = _has_flag(argv, "--show-events")
+
+    if not workspace_root:
+        print(
+            "ERROR: --workspace-root 는 필수입니다.",
+            file=sys.stderr,
+        )
+        return 2
+    if use_json and show_events:
+        print(
+            "ERROR: --json 와 --show-events 는 배타적입니다.",
+            file=sys.stderr,
+        )
+        return 2
+
+    try:
+        from workflow_kit.common.state.memory_index import (
+            read_telemetry_events,
+            summarize_telemetry,
+        )
+        ws = _P(workspace_root)
+        if show_events:
+            events = read_telemetry_events(ws)
+            for ev in events:
+                print(_json.dumps(ev.model_dump(mode="json"), ensure_ascii=False))
+            return 0
+        summary = summarize_telemetry(ws)
+        if use_json:
+            print(_json.dumps(summary.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        else:
+            print(f"total_calls: {summary.total_calls}")
+            print(f"total_hits: {summary.total_hits}")
+            print(f"hit_rate: {summary.hit_rate:.4f}")
+            print(f"by_source:")
+            if summary.by_source:
+                for source, bucket in sorted(summary.by_source.items()):
+                    print(f"  {source}: calls={bucket['calls']} hits={bucket['hits']}")
+            else:
+                print("  (none)")
+            print(f"first_event_at: {summary.first_event_at or '<empty>'}")
+            print(f"last_event_at: {summary.last_event_at or '<empty>'}")
+            print(f"events_parsed: {summary.events_parsed}")
+            print(f"events_skipped: {summary.events_skipped}")
         return 0
     except Exception as e:
         print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)

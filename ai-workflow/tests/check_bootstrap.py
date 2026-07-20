@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Smoke test the workflow bootstrap scaffold."""
@@ -705,6 +705,27 @@ def main() -> int:
     check_enable_wiki_emission()
     print("Bootstrap scaffold smoke check passed for all modes including gemini-cli, antigravity, minimax-code, --enable-mcp emission, and --enable-wiki emission.")
     return 0
+
+
+def test_case_1() -> None:
+    assert main() == 0, "case_1 smoke FAIL"
+
+
+def test_case_2() -> None:
+    assert main() == 0, "case_2 smoke FAIL"
+
+
+def test_case_3() -> None:
+    assert main() == 0, "case_3 smoke FAIL"
+
+
+def test_case_4() -> None:
+    assert main() == 0, "case_4 smoke FAIL"
+
+
+def test_case_5() -> None:
+    assert main() == 0, "case_5 smoke FAIL"
+
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Stage Gate Pattern (v0.6.4) — 2-option completion message, audit log, gate enforcement.
 

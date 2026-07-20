@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """§6.1 / §6.3 / §6.5 Delegator for Orchestrator ↔ Sub-agent Contract v1.
 

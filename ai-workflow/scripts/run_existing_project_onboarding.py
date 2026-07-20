@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Run the post-bootstrap onboarding flow for an existing project adoption."""

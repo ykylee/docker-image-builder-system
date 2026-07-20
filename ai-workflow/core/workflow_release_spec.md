@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Workflow Release Spec
 
@@ -6,7 +6,7 @@
 - 범위: dist 구조, 하네스 패키지 manifest, export 기준, 검증 포인트
 - 대상 독자: 저장소 관리자, 배포 담당자, AI workflow 설계자
 - 상태: draft
-- 최종 수정일: 2026-06-09
+- 최종 수정일: 2026-07-18
 - 관련 문서: `./workflow_harness_distribution.md`, `./prototype_promotion_scope.md`, `../scripts/export_harness_package.py`, `../harnesses/README.md`, `../../docs/RELEASE.md`
 
 ## 1. release 목표
@@ -45,9 +45,9 @@
 - `ai-workflow/README.md`
 - `ai-workflow/core/workflow_adoption_entrypoints.md`
 - `ai-workflow/core/workflow_skill_catalog.md`
-- `ai-workflow/memory/active/PROJECT_PROFILE.md`
-- `ai-workflow/memory/active/session_handoff.md`
-- `ai-workflow/memory/active/work_backlog.md`
+- `docs/PROJECT_PROFILE.md`
+- `ai-workflow/memory/active/sessions`
+- `ai-workflow/memory/active/backlog`
 - `ai-workflow/memory/active/backlog/YYYY-MM-DD.md`
 
 하네스 오버레이 레이어 포함 항목:

@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.25-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # /workflow-session-start
 
@@ -36,7 +36,7 @@
 ## 관련 문서
 
 - `ai-workflow/memory/active/state.json`
-- `ai-workflow/memory/active/session_handoff.md`
-- `ai-workflow/memory/active/work_backlog.md`
-- `ai-workflow/memory/active/PROJECT_PROFILE.md`
+- `ai-workflow/memory/active/sessions`
+- `ai-workflow/memory/active/backlog`
+- `docs/PROJECT_PROFILE.md`
 - (있으면) `ai-workflow/memory/active/PURPOSE.md`

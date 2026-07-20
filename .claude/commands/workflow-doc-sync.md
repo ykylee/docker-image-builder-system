@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.25-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # /workflow-doc-sync
 

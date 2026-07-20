@@ -1,0 +1,40 @@
+{
+  "id": "MEM-2026-07-20-001",
+  "schema_version": 1,
+  "source_paths": [
+    "docs/operations/single-port-react-2026-07-08.md",
+    "docs/operations/admin-entry-react-2026-07-08.md",
+    "docs/operations/admin-pages-react-2026-07-08.md",
+    "docs/operations/svelte-cleanup-2026-07-08.md",
+    "ai-workflow/memory/active/backlog/2026-07-09.md"
+  ],
+  "primary_abstraction": "Frontend rewrite Svelte → React 7-PR series TASK-088~094",
+  "cue_anchors": [
+    "frontend",
+    "rewrite",
+    "svelte",
+    "react",
+    "TASK-088",
+    "TASK-094",
+    "7-PR",
+    "spa-router"
+  ],
+  "value_digest": "frontend rewrite 7-PR 시리즈 (Svelte SPA → React SPA). vitest 7 baseline 시작점.",
+  "owners": [
+    "ykylee"
+  ],
+  "scope": [
+    "docker-image-builder-system",
+    "frontend",
+    "react",
+    "spa"
+  ],
+  "merge_state": "active",
+  "mentioned_in": [
+    "docs/RELEASE_NOTES-2026-07-20.md",
+    "ai-workflow/memory/active/session_handoff.md",
+    "ai-workflow/memory/active/work_backlog.md"
+  ],
+  "created_at": "2026-07-20T15:00:00Z",
+  "updated_at": "2026-07-20T15:00:00Z"
+}

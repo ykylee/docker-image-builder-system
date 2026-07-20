@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # open_git_client 파일럿 적용 기록 예시
 
@@ -53,9 +53,9 @@
 - 생성/복사한 문서:
 - `ai-workflow/README.md`
 - `ai-workflow/memory/active/README.md`
-- `ai-workflow/memory/active/PROJECT_PROFILE.md`
-- `ai-workflow/memory/active/session_handoff.md`
-- `ai-workflow/memory/active/work_backlog.md`
+- `docs/PROJECT_PROFILE.md`
+- `ai-workflow/memory/active/sessions`
+- `ai-workflow/memory/active/backlog`
 - `ai-workflow/memory/active/backlog/2026-04-22.md`
 - `ai-workflow/memory/active/repository_assessment.md`
 - 적용한 하네스 오버레이:
@@ -87,11 +87,11 @@
 ## 5. 적용 후 상태
 
 - 최종 project profile 경로:
-- `ai-workflow/memory/active/PROJECT_PROFILE.md`
+- `docs/PROJECT_PROFILE.md`
 - 최종 session handoff 경로:
-- `ai-workflow/memory/active/session_handoff.md`
+- `ai-workflow/memory/active/sessions`
 - 최종 work backlog 경로:
-- `ai-workflow/memory/active/work_backlog.md`
+- `ai-workflow/memory/active/backlog`
 - 최신 backlog 경로:
 - `ai-workflow/memory/active/backlog/2026-04-22.md`
 - 실제 첫 세션에서 사용한 runner 또는 skill:

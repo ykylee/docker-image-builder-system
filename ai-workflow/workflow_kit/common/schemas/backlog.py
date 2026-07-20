@@ -1,8 +1,10 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Pydantic models for backlog-related skills."""
 
 from __future__ import annotations
+
+from typing import Any
 
 from pydantic import BaseModel, Field
 from workflow_kit.common.schemas.base import BaseOutput, Status
@@ -99,6 +101,11 @@ class BacklogUpdateOutput(BaseOutput):
     purpose_cot_trace: BacklogUpdatePurposeCoTTrace | None = None
     graph_insights: GraphInsightsOutput | None = None
     scope_creep_warnings: list[str] = Field(default_factory=list)
+    # v0.11.22+ Phase 3d: ADR-005 memory_index retrieval hints (optional, opt-in).
+    memory_index_query_output: dict[str, Any] | None = Field(
+        default=None,
+        description="Phase 3: query_memory_index_for_dispatcher 결과 dict. 부재 시 None (zero-risk).",
+    )
 
 
 class CreateBacklogEntryOutput(BaseOutput):

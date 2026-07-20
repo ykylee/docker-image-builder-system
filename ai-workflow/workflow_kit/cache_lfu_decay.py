@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """workflow_kit.cache_lfu_decay - LFUConfig + _save_cache direct integration (v0.7.47+).
 

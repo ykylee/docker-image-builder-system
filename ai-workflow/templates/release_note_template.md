@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # [Release Name: e.g. v0.4.0: Enhanced Packaging]
 

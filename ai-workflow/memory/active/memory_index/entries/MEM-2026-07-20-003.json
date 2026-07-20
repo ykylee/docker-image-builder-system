@@ -1,0 +1,41 @@
+{
+  "id": "MEM-2026-07-20-003",
+  "schema_version": 1,
+  "source_paths": [
+    "docs/operations/source-archive-chunked-2026-07-20.md",
+    "docs/operations/content-range-rfc-7233-2026-07-20.md",
+    "docs/operations/content-range-rfc-7233-star-2026-07-20.md",
+    "docs/operations/content-range-rfc-7233-strict-mode-2026-07-20.md",
+    "apps/build-server/src/migrations/0006_build_source_chunk.sql",
+    "apps/build-server/src/services/build-source-chunk.ts"
+  ],
+  "primary_abstraction": "Source archive chunked split + RFC 7233 Content-Range TASK-106~110",
+  "cue_anchors": [
+    "source-archive",
+    "chunked-split",
+    "build_source_chunk",
+    "RFC-7233",
+    "Content-Range",
+    "TASK-106",
+    "TASK-110",
+    "STRICT_CONTENT_RANGE"
+  ],
+  "value_digest": "source archive chunked split + multi-row schema + RFC 7233 의미 C bipartite + STRICT flag. build-server 113→165 (+52).",
+  "owners": [
+    "ykylee"
+  ],
+  "scope": [
+    "docker-image-builder-system",
+    "source-archive",
+    "rfc-7233",
+    "chunked",
+    "build-server"
+  ],
+  "merge_state": "active",
+  "mentioned_in": [
+    "docs/RELEASE_NOTES-2026-07-20.md",
+    "docs/operations/multi-runner-chunked-postgres-2026-07-20.md"
+  ],
+  "created_at": "2026-07-20T15:00:00Z",
+  "updated_at": "2026-07-20T15:00:00Z"
+}

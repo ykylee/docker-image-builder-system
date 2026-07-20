@@ -1,12 +1,12 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Global Snippets
 
 - 문서 목적: 하네스 전역 설정에 넣어도 비교적 안전한 표준 workflow snippet 예시를 모아둔다.
-- 범위: Codex, OpenCode 전역 주입 샘플, 사용 시 주의점, 프로젝트 로컬 레이어와의 관계
+- 범위: Codex, OpenCode, Grok Build 전역 주입 샘플, 사용 시 주의점, 프로젝트 로컬 레이어와의 관계
 - 대상 독자: 저장소 관리자, 하네스 통합 담당자, 운영 담당자
 - 상태: draft
-- 최종 수정일: 2026-04-19
+- 최종 수정일: 2026-07-20
 - 관련 문서: `../core/workflow_global_injection_policy.md`, `../core/workflow_configuration_layers.md`
 
 ## 목적
@@ -21,6 +21,8 @@
 - [codex/config.toml.snippet](./codex/config.toml.snippet)
 - [opencode/README.md](./opencode/README.md)
 - [opencode/opencode.global.jsonc](./opencode/opencode.global.jsonc)
+- [grok-build/README.md](./grok-build/README.md)
+- [grok-build/config.toml.snippet](./grok-build/config.toml.snippet)
 
 ## 사용 원칙
 

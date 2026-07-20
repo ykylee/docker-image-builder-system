@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Harness Template
 
@@ -6,7 +6,7 @@
 - 범위: 문서 추가 위치, bootstrap 확장 포인트, 테스트 포인트
 - 대상 독자: 저장소 관리자, AI workflow 설계자, 하네스 통합 담당자
 - 상태: draft
-- 최종 수정일: 2026-06-09
+- 최종 수정일: 2026-07-20
 - 관련 문서: `../../core/workflow_harness_distribution.md`, `../../scripts/bootstrap_workflow_kit.py`, `../README.md`
 
 ## 1. 새 하네스 추가 최소 단계

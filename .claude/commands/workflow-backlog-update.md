@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.25-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # /workflow-backlog-update
 
@@ -10,7 +10,7 @@
 
 ## 절차
 
-1. `ai-workflow/memory/active/work_backlog.md` 의 인덱스 anchor 확인
+1. `ai-workflow/memory/active/backlog` 의 인덱스 anchor 확인
 2. 오늘 날짜의 `backlog/YYYY-MM-DD.md` 파일:
    - 없으면 신규 작성
    - 있으면 기존 항목에 append
@@ -26,7 +26,7 @@ scope_creep_warnings = `[]` (graceful skip). 본문 reference 불가, advisory �
 
 ## 다음에 읽을 문서
 
-- `ai-workflow/memory/active/work_backlog.md`
+- `ai-workflow/memory/active/backlog`
 - (있으면) `ai-workflow/memory/active/PURPOSE.md`
 - 영향 받을 document 들
 

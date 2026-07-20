@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Read-Only MCP Transport Promotion Spec
 
@@ -6,7 +6,7 @@
 - 범위: descriptor 단일 출처, JSON-RPC fixture 기준선, SDK 승격 시 유지/변경 필드, 검증 경로
 - 대상 독자: MCP server 구현자, 하네스 적용 담당자, AI workflow 설계자
 - 상태: draft
-- 최종 수정일: 2026-06-09
+- 최종 수정일: 2026-07-18
 - 관련 문서: `./prototype_promotion_scope.md`, `../mcp_servers/read_only_bundle.md`, `../schemas/README.md`, `../workflow_kit/README.md`
 
 ## 1. 목적
@@ -16,9 +16,9 @@
 - registry: `workflow_kit/server/read_only_registry.py`
 - direct-call entrypoint: `workflow_kit/server/read_only_entrypoint.py`
 - JSON-RPC draft bridge: `workflow_kit/server/read_only_jsonrpc.py` (**stable default**, v0.5.7+)
-- optional official SDK candidate: `workflow_kit/server/read_only_mcp_sdk.py` (**experimental**, known `Connection closed` regression)
+- optional official SDK candidate: `workflow_kit/server/read_only_mcp_sdk.py` (**stable as of v0.11.25**, regression fixed)
 
-> **Transport status (v0.5.10-beta)**: `jsonrpc-bridge` 는 안정 기본값이며 `tools/list` / `tools/call` round-trip 정상 동작. `stdio-sdk` 는 실험적이며 MCP 1.27.0 `CallToolResult` API 불일치로 `Connection closed` 회귀가 있다. 상세: [./mcp_installation_by_harness.md](./mcp_installation_by_harness.md)
+> **Transport status (v0.11.25)**: `jsonrpc-bridge` is the stable default with `tools/list` / `tools/call` round-trip working. `stdio-sdk` is **officially stable as of v0.11.25** — mcp 1.27.0 `CallToolResult(_meta=..., structuredContent=...)` API validated. spec §6's 7 verification commands all PASS. Detail: [`./mcp_installation_by_harness.md`](./mcp_installation_by_harness.md) §7.2 (regression marked fixed)
 
 이 문서는 정식 MCP SDK transport 를 붙일 때 draft bridge 전체를 그대로 “완성품”으로 오해하지 않도록, 유지해야 할 계약과 교체 가능한 envelope 를 분리한다.
 

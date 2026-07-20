@@ -1215,7 +1215,7 @@
         "graph_insights": {
           "anyOf": [
             {
-              "description": "v0.11.2 chapter 13 R-A follow-up cycle 4 deferred 통합: graph insights output.\n\nbacklog-update skill 의 context load 시 purpose_graph.run_graph_insights 호출 결과.\n- SessionStartPurposeCoTTrace 와 동일 schema (shared pattern)\n- coverage_pct + health_score + tier 정량화",
+              "description": "v0.11.2 chapter 13 R-A follow-up cycle 4 deferred \ud1b5\ud569: graph insights output.\n\nbacklog-update skill \uc758 context load \uc2dc purpose_graph.run_graph_insights \ud638\ucd9c \uacb0\uacfc.\n- SessionStartPurposeCoTTrace \uc640 \ub3d9\uc77c schema (shared pattern)\n- coverage_pct + health_score + tier \uc815\ub7c9\ud654",
               "properties": {
                 "coverage_pct": {
                   "default": 0.0,
@@ -1314,6 +1314,20 @@
           "default": null,
           "title": "Index Update Note"
         },
+        "memory_index_query_output": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phase 3: query_memory_index_for_dispatcher \uacb0\uacfc dict. \ubd80\uc7ac \uc2dc None (zero-risk).",
+          "title": "Memory Index Query Output"
+        },
         "operation_type": {
           "description": "Classified operation type (create_entry, update_entry, ...)",
           "title": "Operation Type",
@@ -1322,7 +1336,7 @@
         "purpose_context": {
           "anyOf": [
             {
-              "description": "v0.9.5 chapter 9 R-A follow-up part 2: skill context load integration.\n\nbacklog-update skill 이 PURPOSE.md + state.json.purpose_digest 를 자동 read 한 결과.",
+              "description": "v0.9.5 chapter 9 R-A follow-up part 2: skill context load integration.\n\nbacklog-update skill \uc774 PURPOSE.md + state.json.purpose_digest \ub97c \uc790\ub3d9 read \ud55c \uacb0\uacfc.",
               "properties": {
                 "body_excerpt": {
                   "anyOf": [
@@ -1416,7 +1430,7 @@
         "purpose_cot_trace": {
           "anyOf": [
             {
-              "description": "v0.11.0 chapter 11 R-A follow-up cycle 3: two-step CoT ingest trace.\n\nbacklog-update skill 의 context load 시 purpose_ingest.run_two_step_cot_ingest 호출 결과.",
+              "description": "v0.11.0 chapter 11 R-A follow-up cycle 3: two-step CoT ingest trace.\n\nbacklog-update skill \uc758 context load \uc2dc purpose_ingest.run_two_step_cot_ingest \ud638\ucd9c \uacb0\uacfc.",
               "properties": {
                 "cross_ref_matched": {
                   "items": {
@@ -2293,10 +2307,24 @@
           "title": "Impacted Documents",
           "type": "array"
         },
+        "memory_index_query_output": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phase 3: query_memory_index_for_dispatcher \uacb0\uacfc dict. \ubd80\uc7ac \uc2dc None (zero-risk).",
+          "title": "Memory Index Query Output"
+        },
         "purpose_context": {
           "anyOf": [
             {
-              "description": "v0.9.5 chapter 9 R-A follow-up part 2: skill context load integration.\n\ndoc-sync skill 이 PURPOSE.md + state.json.purpose_digest 를 자동 read 한 결과.",
+              "description": "v0.9.5 chapter 9 R-A follow-up part 2: skill context load integration.\n\ndoc-sync skill \uc774 PURPOSE.md + state.json.purpose_digest \ub97c \uc790\ub3d9 read \ud55c \uacb0\uacfc.",
               "properties": {
                 "body_excerpt": {
                   "anyOf": [
@@ -3032,7 +3060,7 @@
       "type": "object"
     },
     "project_status_assessment": {
-      "description": "Output contract for the project-status-assessment skill.\n\nReplaces the legacy ``build_runner_success_result`` dict emission (v0.11.20\nstable 정합 — 다른 stable skill 들과 동일하게 BaseOutput + nested dataclass).",
+      "description": "Output contract for the project-status-assessment skill.\n\nReplaces the legacy ``build_runner_success_result`` dict emission (v0.11.20\nstable \uc815\ud569 \u2014 \ub2e4\ub978 stable skill \ub4e4\uacfc \ub3d9\uc77c\ud558\uac8c BaseOutput + nested dataclass).",
       "properties": {
         "assessment": {
           "description": "Structured assessment data from analyze_repo_structure.",
@@ -3250,7 +3278,7 @@
       "type": "object"
     },
     "robust_patcher": {
-      "description": "Output contract for the robust-patcher skill.\n\nReplaces the legacy dict emission (v0.11.21 stable 정합 — 다른 stable skill\n들과 동일하게 BaseOutput + nested dataclass).",
+      "description": "Output contract for the robust-patcher skill.\n\nReplaces the legacy dict emission (v0.11.21 stable \uc815\ud569 \u2014 \ub2e4\ub978 stable skill\n\ub4e4\uacfc \ub3d9\uc77c\ud558\uac8c BaseOutput + nested dataclass).",
       "properties": {
         "applied_blocks": {
           "description": "Per-block detail (matched/fuzzy/preview).",
@@ -3399,7 +3427,7 @@
         "graph_insights": {
           "anyOf": [
             {
-              "description": "v0.11.2 chapter 13 R-A follow-up cycle 4 deferred 통합: graph insights output.\n\nsession-start / backlog-update skill 의 context load 시\npurpose_graph.run_graph_insights 호출 결과 (cycle 4 의 2차 통합).\n- coverage_pct: 0.0-100.0 (Goals ↔ deliverables 매칭률)\n- health_score: 0-100 종합 점수\n- health_tier: excellent / good / fair / poor\n- scope_creep_warnings: scope_excluded 매칭 ❌ + Goals 매핑 0 deliverable",
+              "description": "v0.11.2 chapter 13 R-A follow-up cycle 4 deferred \ud1b5\ud569: graph insights output.\n\nsession-start / backlog-update skill \uc758 context load \uc2dc\npurpose_graph.run_graph_insights \ud638\ucd9c \uacb0\uacfc (cycle 4 \uc758 2\ucc28 \ud1b5\ud569).\n- coverage_pct: 0.0-100.0 (Goals \u2194 deliverables \ub9e4\uce6d\ub960)\n- health_score: 0-100 \uc885\ud569 \uc810\uc218\n- health_tier: excellent / good / fair / poor\n- scope_creep_warnings: scope_excluded \ub9e4\uce6d \u274c + Goals \ub9e4\ud551 0 deliverable",
               "properties": {
                 "coverage_pct": {
                   "default": 0.0,
@@ -3493,6 +3521,20 @@
           "default": null,
           "title": "Latest Backlog Path"
         },
+        "memory_index_query_output": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Phase 3: `query_memory_index_for_dispatcher` \uacb0\uacfc dict. \ubd80\uc7ac \uc2dc None (zero-risk).",
+          "title": "Memory Index Query Output"
+        },
         "next_documents": {
           "items": {
             "type": "string"
@@ -3503,7 +3545,7 @@
         "purpose_context": {
           "anyOf": [
             {
-              "description": "v0.9.5 chapter 9 R-A follow-up part 2: skill context load integration.\n\nsession-start skill 이 PURPOSE.md + state.json.purpose_digest 를 자동 read 한 결과.",
+              "description": "v0.9.5 chapter 9 R-A follow-up part 2: skill context load integration.\n\nsession-start skill \uc774 PURPOSE.md + state.json.purpose_digest \ub97c \uc790\ub3d9 read \ud55c \uacb0\uacfc.",
               "properties": {
                 "body_excerpt": {
                   "anyOf": [
@@ -3597,7 +3639,7 @@
         "purpose_cot_trace": {
           "anyOf": [
             {
-              "description": "v0.11.0 chapter 11 R-A follow-up cycle 3: two-step CoT ingest trace.\n\nsession-start skill 의 context load 시 purpose_ingest.run_two_step_cot_ingest 호출 결과.\n- step1: raw 본문 ≤800 char excerpt\n- step2: structured 4-element 요약\n- cross_ref: PURPOSE.md `[[mention]]` ↔ wiki concepts 매칭",
+              "description": "v0.11.0 chapter 11 R-A follow-up cycle 3: two-step CoT ingest trace.\n\nsession-start skill \uc758 context load \uc2dc purpose_ingest.run_two_step_cot_ingest \ud638\ucd9c \uacb0\uacfc.\n- step1: raw \ubcf8\ubb38 \u2264800 char excerpt\n- step2: structured 4-element \uc694\uc57d\n- cross_ref: PURPOSE.md `[[mention]]` \u2194 wiki concepts \ub9e4\uce6d",
               "properties": {
                 "cross_ref_matched": {
                   "items": {

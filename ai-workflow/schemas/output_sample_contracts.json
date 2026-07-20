@@ -397,7 +397,63 @@
         "kind": "list"
       }
     },
+    "project_status_assessment": {
+      "error": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "error_code": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "source_context": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "object"
+      },
+      "status": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "tool_version": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "warnings": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "list"
+      }
+    },
     "read_only_entrypoint": {
+      "error": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "error_code": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "source_context": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "object"
+      },
+      "status": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "tool_version": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "warnings": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "list"
+      }
+    },
+    "robust_patcher": {
       "error": {
         "allow_null": false,
         "kind": "string"
@@ -693,7 +749,17 @@
       "error_code",
       "source_context"
     ],
+    "project_status_assessment": [
+      "error",
+      "error_code",
+      "source_context"
+    ],
     "read_only_entrypoint": [
+      "error",
+      "error_code",
+      "source_context"
+    ],
+    "robust_patcher": [
       "error",
       "error_code",
       "source_context"
@@ -766,6 +832,11 @@
       "index_update_note": {
         "allow_null": true,
         "kind": "string"
+      },
+      "memory_index_query_output": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "object"
       },
       "operation_type": {
         "allow_null": false,
@@ -1131,6 +1202,11 @@
         "item_kind": "string",
         "kind": "list"
       },
+      "memory_index_query_output": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "object"
+      },
       "purpose_context": {
         "allow_null": true,
         "kind": "DocSyncPurposeContext"
@@ -1363,6 +1439,53 @@
         "kind": "list"
       }
     },
+    "project_status_assessment": {
+      "assessment": {
+        "allow_null": false,
+        "kind": "AssessmentData"
+      },
+      "orchestration_plan": {
+        "allow_null": false,
+        "kind": "OrchestrationPlan"
+      },
+      "recommended_actions": {
+        "allow_null": false,
+        "item_kind": "RecommendedAction",
+        "kind": "list"
+      },
+      "report_preview": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "list"
+      },
+      "runner_inputs": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "object"
+      },
+      "source_context": {
+        "allow_null": false,
+        "kind": "ProjectStatusAssessmentSourceContext"
+      },
+      "status": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "tool_version": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "warnings": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "list"
+      },
+      "written_paths": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "list"
+      }
+    },
     "read_only_entrypoint": {
       "error": {
         "allow_null": false,
@@ -1380,6 +1503,46 @@
       "status": {
         "allow_null": false,
         "kind": "string"
+      },
+      "tool_version": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "warnings": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "list"
+      }
+    },
+    "robust_patcher": {
+      "applied_blocks": {
+        "allow_null": false,
+        "item_kind": "AppliedPatchBlock",
+        "kind": "list"
+      },
+      "dry_run": {
+        "allow_null": false,
+        "kind": "boolean"
+      },
+      "file_path": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "message": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "source_context": {
+        "allow_null": false,
+        "kind": "RobustPatcherSourceContext"
+      },
+      "status": {
+        "allow_null": false,
+        "kind": "string"
+      },
+      "syntax_validated": {
+        "allow_null": false,
+        "kind": "boolean"
       },
       "tool_version": {
         "allow_null": false,
@@ -1414,6 +1577,11 @@
       "latest_backlog_path": {
         "allow_null": true,
         "kind": "string"
+      },
+      "memory_index_query_output": {
+        "allow_null": false,
+        "item_kind": "string",
+        "kind": "object"
       },
       "next_documents": {
         "allow_null": false,
@@ -1758,7 +1926,9 @@
       "source_context",
       "state_conflicts"
     ],
+    "project_status_assessment": [],
     "read_only_entrypoint": [],
+    "robust_patcher": [],
     "session_start": [
       "recommended_next_action",
       "source_documents",

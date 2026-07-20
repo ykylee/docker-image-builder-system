@@ -1,19 +1,19 @@
 {
   "schema_version": "1",
   "generated_at": "2026-07-20T12:00:00Z",
-  "purpose_digest": "TASK-114 (본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스 봉인) docs only sync (rev 143→144). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 + TASK-108 + TASK-109 + TASK-110 + TASK-111 + TASK-112 + TASK-113 + TASK-114 까지 **13 TASK 연속 봉인**. TASK-114 결정: 본 세션 12 TASK 종합 리뷰 + 운영자 release staging 운영 가이드 + 결정 항목 인덱스 + follow-up 후보 인덱스 봉인. 신규 1 file: `docs/RELEASE_NOTES-2026-07-20.md` (§1 본 세션 의도 / §2 12 TASK 성과 표 + 운영 가이드 인덱스 + main commit + 누적 회귀 baseline / §3 결정 항목 인덱스 (이미 본 세션에서 모두 해소) / §4 신규 파일 인벤토리 / §5 운영 가이드 32 종 인덱스 / §6 운영자 release staging 운영 가이드 (5 phase 검증) / §7 회귀 baseline 종합 / §8 follow-up 후보 인덱스 / §9 운영 영향 요약 / §10 다음 세션 가이드). SQL / schema / migration / version / git tag 변경 0 — 운영자 종합 release staging 인덱스 신규만. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 0 변경), build-server vitest 165/165 (변경 0), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 운영 영향: 운영자가 본 세션의 12 TASK 를 release staging 에서 종합 검증 가능 (5 phase 운영 가이드). 신규 결정 항목 0. 사전 결함 + 보강 1건 (운영자 release staging 검증 순서 일관성 — 운영 가이드 인덱스의 운영 rollout playbook). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean / vite build:react 정상. 32 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up (남은 결정): 옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / release notes 후속 (옵션 B/C 본 세션 TASK-105 운영 후 자연스러운 후속) / CI migration validation / git tag version bump / 운영자 client 정렬 staging checklist 후속 모두 별도 사용자 결정.",
-  "purpose_digest_rev": 144,
+  "purpose_digest": "TASK-121 v0.15.20 패치 (2026-07-21, rev 147→148). 5 신규 core 파일 (maturity_matrix / phase_13_followup / quality_dashboard_spec / stable_guarantee / v1_0_0_entry_evaluation) + 3 정합 (workflow_kit_roadmap / __init__ / dashboard_data) + housekeeping (VERSION / pyproject.toml). follow-up: TASK-114 결정 후보 6종 별도 사용자 결정 대기.",
+  "purpose_digest_rev": 148,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
     "work_backlog_index_path": "ai-workflow/memory/active/work_backlog.md",
-    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-18.md",
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-20.md",
     "repository_assessment_path": "ai-workflow/memory/active/repository_assessment.md"
   },
   "project": {
     "project_name": "Docker Image Builder System",
     "document_home": "README.md",
-    "operations_path": null,
+    "operations_path": "ai-workflow/memory/active/",
     "backlog_path": "ai-workflow/memory/active/backlog/",
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
     "environment_path": "ai-workflow/memory/active/repository_assessment.md"
@@ -28,10 +28,17 @@
   },
   "session": {
     "current_baseline": "TASK-114 (본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스) docs only 봉인 (rev 143→144). main HEAD `d19038a` (TASK-114 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 32 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
-    "current_axis": "TASK-114 본 세션 종합 RELEASE_NOTES 봉인 완료. 본 세션 13 TASK 연속 봉인. 32 TASK 봉인. 모든 TASK main 합류.",
-    "current_focus": "TASK-114 본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스 봉인 sync 완료. 다음 세션 시작 시 main HEAD `d19038a` + workflow meta (state rev 144) baseline 복원. 후속 결정 (옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / release notes 후속 / CI migration validation / git tag version bump / 운영자 client 정렬 staging checklist 후속) 별도 사용자 결정.",
+    "current_axis": "TASK-121 완료 (v0.15.20 패치: 5 신규 + 3 정합 + housekeeping). 다음 결정 대기: 옵션 Z / 신규 기능 / Nextcloud Tasks / CHANGELOG / CI migration validation / git tag + version bump (TASK-114 follow-up 후보 6종).",
+    "current_focus": "standard_ai_workflow v0.15.19-beta 배포 결과 검증 및 후속 stale drift 해소",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-121 (v0.15.20 패치): standard_ai_workflow 원격 fetch + reset --hard origin/main (271f96b → 31f07f1). v0.15.20 pre-release final + Phase 12 close-out + Phase 13 follow-up 정의 반영. docker-image-builder-system 에 적용된 패치: (1) ai-workflow/core/ 신규 5파일 복사 (maturity_matrix.json 73063B / phase_13_followup.md 17384B / quality_dashboard_spec.md 18759B / stable_guarantee.md 15170B / v1_0_0_entry_evaluation.md 25597B). (2) 기존 3파일 v0.15.20 정합 (workflow_kit_roadmap.md / workflow_kit/__init__.py / workflow_kit/common/dashboard_data.py). (3) housekeeping (workflow_kit/pyproject.toml 마커 v0.15.20-beta / ai-workflow/VERSION v0.15.20-beta / v1_0_0_entry_evaluation.md v0.15.16-beta → v0.15.20-beta). 표준 source 의 5개 표준 문서 (README/PROJECT_PROFILE/INSTALLATION_AND_USAGE/RELEASE/CODE_INDEX) 는 표준 워크플로우 프로젝트 자체 housekeeping 이므로 docker 자체 프로젝트에는 적용하지 않음. 수백 개 추적 파일의 v0.15.19-beta 마커는 의도된 정책 (다음 release 시까지 유지) 따라 그대로 보존. no breaking change.",
+      "TASK-120 (ai-workflow/{README,VERSION,session_handoff,work_backlog} 마커 정합): 4개 top-level 추적 파일의 v0.11.25-beta → v0.15.19-beta 마커 정합. ai-workflow/README.md 의 Export Sample → Docker Image Builder System, 최종 수정일 2026-07-08 → 2026-07-20, 상태 draft → stable. session_handoff.md 의 Status draft → stable, Updated 헤더 rev 113→114 (TASK-114 봉인) 로 교체. historical 백로그 파일 (2026-07-02 ~ 2026-07-20) 의 마커는 그대로 유지 — 각 시점의 표준 워크플로우 kit 마커가 historical 기록의 일부이므로 정합 대상이 아님.",
+      "TASK-119 (.MiniMax/config.json PYTHONPATH 정합): .MiniMax/config.json + MiniMax_config.example.json 의 mcp_servers.standard-ai-workflow-readonly.env.PYTHONPATH 를 ./workflow-source → ./ai-workflow 로 정합. 표준 워크플로우 키트가 ./ai-workflow/workflow_kit/ 아래에 위치하므로 PYTHONPATH 가 이를 가리켜야 함. description 의 descriptors 참조도 workflow-source/schemas/... → ai-workflow/schemas/... 정합. JSON validity 양쪽 모두 OK.",
+      "TASK-118 (MiniMax.md 정합): MiniMax.md v0.11.21-beta → v0.15.19-beta 마커 정합. 최종 수정일 2026-07-02 → 2026-07-20. 상태 draft → stable. §프로젝트 실행 기본값 박스 TODO 5종 → state.json commands SSOT 와 정합 (install / run_local / run_local_postgres / quick_tests / isolated_tests / runtime_checks). §MiniMax Code 전용 메모 에 TASK-119 follow-up (PYTHONPATH ./workflow-source 정합) 안내 추가.",
+      "TASK-117 (memory_index 표준 키트 opt-in 도입): 디렉토리 ai-workflow/memory/active/memory_index/ 신규 생성 (entries/ + telemetry/.gitkeep + README.md). seed entry 7개 (MEM-2026-07-20-001~007) — frontend rewrite 7-PR / M4.5 8-PR / source archive chunked+RFC 7233 / postgres multi-runner / PROJECT_PROFILE baseline / migrate.ts CLI / TASK-114 종합 RELEASE_NOTES. 표준 helper save_memory_entry (atomic write + Pydantic validate) 사용. validate_memory_index 0 issues (중복 id / 중복 primary_abstraction / source_paths 중복 없음). state.json memory_entries_count 7. retrieval wiring opt-in (session-start / doc-sync / backlog-update 의 --memory-index-dir + --memory-query-tokens 동시 지정 시 활성, 미지정 시 silent skip). no version bump.",
+      "TASK-116 (state.json stale drift 해소): state.json 의 next_documents 가 TASK-098-era (admin-pages-react-2026-07-08.md + AdminBuilds.tsx 등) stale 참조를 가리키고 있던 결함 해소. TASK-114 의 종합 RELEASE_NOTES (docs/RELEASE_NOTES-2026-07-20.md) + session_handoff + work_backlog + backlog/2026-07-20 + repository_assessment + project_status_assessment 으로 교체. source_of_truth.latest_backlog_path 2026-07-18 → 2026-07-20 정합. source_of_truth.repository_assessment_path (None → 실 경로) / work_backlog_index_path (None → 실 경로) / project.operations_path (None → ai-workflow/memory/active/) 정합. follow-up 의 stale reference 0. no version bump.",
+      "TASK-115 (reconcile session): standard_ai_workflow v0.15.19-beta 4-harness 배포 (grok-build / opencode / codex / claude-code 신규 overlay, .codewhale / .MiniMax 보존). 기존 ai-workflow/ 패키지는 v0.15.19-beta 내용 정합 (538 file ignored, 0 created). state.json reconcile: TASK-114 32봉인 이력 복구, recent_done 47 보존, task_count 32 복원, purpose_digest_rev=144 유지. latest_backlog_path 2026-07-20 정합. next step: state stale drift 해소 (next_documents TASK-098-era 참조 정합), memory_index 미존재 → opt-in 도입 후보, MiniMax.md v0.11.21-beta 정합 (선택). backup=/tmp/docker_state_backup_20260720_235129.json. no version bump.",
       "TASK-114 본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스 — `d19038a` main 합류 (2026-07-20, 본 세션)",
       "TASK-113 chunked multi-runner cross-backend 회귀 가드 — `7e9f777` main 합류 (2026-07-20, 본 세션)",
       "TASK-112 양 variant 운영 가이드 cross-reference — `81110df` main 합류 (2026-07-20, 본 세션)",
@@ -133,18 +140,290 @@
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
-    "docs/operations/admin-pages-react-2026-07-08.md",
+    "docs/RELEASE_NOTES-2026-07-20.md",
     "ai-workflow/memory/active/session_handoff.md",
     "ai-workflow/memory/active/work_backlog.md",
-    "ai-workflow/memory/active/backlog/2026-07-08.md",
-    "apps/build-monitor/react/src/routes/AdminBuilds.tsx",
-    "apps/build-monitor/react/src/routes/AdminUsers.tsx",
-    "apps/build-monitor/react/src/routes/AdminAdmins.tsx",
-    "apps/build-monitor/react/src/routes/AdminRunners.tsx",
-    "apps/build-monitor/react/src/components/RegisterRunnerModal.tsx"
+    "ai-workflow/memory/active/backlog/2026-07-20.md",
+    "ai-workflow/memory/active/repository_assessment.md",
+    "ai-workflow/memory/active/project_status_assessment.md"
   ],
   "repository_assessment": {
     "path": "ai-workflow/memory/active/repository_assessment.md",
     "present": true
-  }
+  },
+  "memory_entries": [
+    {
+      "id": "MEM-2026-07-20-001",
+      "schema_version": 1,
+      "source_paths": [
+        "docs/operations/single-port-react-2026-07-08.md",
+        "docs/operations/admin-entry-react-2026-07-08.md",
+        "docs/operations/admin-pages-react-2026-07-08.md",
+        "docs/operations/svelte-cleanup-2026-07-08.md",
+        "ai-workflow/memory/active/backlog/2026-07-09.md"
+      ],
+      "primary_abstraction": "Frontend rewrite Svelte → React 7-PR series TASK-088~094",
+      "cue_anchors": [
+        "frontend",
+        "rewrite",
+        "svelte",
+        "react",
+        "TASK-088",
+        "TASK-094",
+        "7-PR",
+        "spa-router"
+      ],
+      "value_digest": "frontend rewrite 7-PR 시리즈 (Svelte SPA → React SPA). vitest 7 baseline 시작점.",
+      "owners": [
+        "ykylee"
+      ],
+      "scope": [
+        "docker-image-builder-system",
+        "frontend",
+        "react",
+        "spa"
+      ],
+      "merge_state": "active",
+      "mentioned_in": [
+        "docs/RELEASE_NOTES-2026-07-20.md",
+        "ai-workflow/memory/active/session_handoff.md",
+        "ai-workflow/memory/active/work_backlog.md"
+      ],
+      "created_at": "2026-07-20T15:00:00Z",
+      "updated_at": "2026-07-20T15:00:00Z"
+    },
+    {
+      "id": "MEM-2026-07-20-002",
+      "schema_version": 1,
+      "source_paths": [
+        "docs/operations/admin-pages-react-2026-07-08.md",
+        "docs/operations/build-request-api-console-react-2026-07-18.md",
+        "docs/operations/app-router-simplify-2026-07-18.md",
+        "docs/operations/svelte-scaffold-cleanup-2026-07-18.md",
+        "docs/operations/design-tokens-unification-2026-07-18.md"
+      ],
+      "primary_abstraction": "M4.5 8-PR Group A-G + design tokens unification TASK-095~101",
+      "cue_anchors": [
+        "M4.5",
+        "Group-A",
+        "Group-B",
+        "Group-C",
+        "Group-D",
+        "Group-E",
+        "Group-F",
+        "Group-G",
+        "design-tokens",
+        "TASK-095",
+        "TASK-101"
+      ],
+      "value_digest": "M4.5 8-PR 시리즈 + TASK-096.5 디자인 토큰 단일화 (Svelte inline style 1:1 React CSS). vitest +123 케이스.",
+      "owners": [
+        "ykylee"
+      ],
+      "scope": [
+        "docker-image-builder-system",
+        "frontend",
+        "react",
+        "design-tokens"
+      ],
+      "merge_state": "active",
+      "mentioned_in": [
+        "docs/RELEASE_NOTES-2026-07-20.md",
+        "ai-workflow/memory/active/session_handoff.md"
+      ],
+      "created_at": "2026-07-20T15:00:00Z",
+      "updated_at": "2026-07-20T15:00:00Z"
+    },
+    {
+      "id": "MEM-2026-07-20-003",
+      "schema_version": 1,
+      "source_paths": [
+        "docs/operations/source-archive-chunked-2026-07-20.md",
+        "docs/operations/content-range-rfc-7233-2026-07-20.md",
+        "docs/operations/content-range-rfc-7233-star-2026-07-20.md",
+        "docs/operations/content-range-rfc-7233-strict-mode-2026-07-20.md",
+        "apps/build-server/src/migrations/0006_build_source_chunk.sql",
+        "apps/build-server/src/services/build-source-chunk.ts"
+      ],
+      "primary_abstraction": "Source archive chunked split + RFC 7233 Content-Range TASK-106~110",
+      "cue_anchors": [
+        "source-archive",
+        "chunked-split",
+        "build_source_chunk",
+        "RFC-7233",
+        "Content-Range",
+        "TASK-106",
+        "TASK-110",
+        "STRICT_CONTENT_RANGE"
+      ],
+      "value_digest": "source archive chunked split + multi-row schema + RFC 7233 의미 C bipartite + STRICT flag. build-server 113→165 (+52).",
+      "owners": [
+        "ykylee"
+      ],
+      "scope": [
+        "docker-image-builder-system",
+        "source-archive",
+        "rfc-7233",
+        "chunked",
+        "build-server"
+      ],
+      "merge_state": "active",
+      "mentioned_in": [
+        "docs/RELEASE_NOTES-2026-07-20.md",
+        "docs/operations/multi-runner-chunked-postgres-2026-07-20.md"
+      ],
+      "created_at": "2026-07-20T15:00:00Z",
+      "updated_at": "2026-07-20T15:00:00Z"
+    },
+    {
+      "id": "MEM-2026-07-20-004",
+      "schema_version": 1,
+      "source_paths": [
+        "docs/operations/multi-runner-claim-postgres-2026-07-06.md",
+        "docs/operations/multi-runner-chunked-postgres-2026-07-20.md",
+        "compose.dev.runner-multi-postgres.yaml",
+        "compose.dev.multi-runner-chunked-postgres.yaml",
+        "apps/build-server/scripts/e2e-multi-runner-postgres.sh"
+      ],
+      "primary_abstraction": "Postgres multi-runner 운영 검증 TASK-082 + cross-backend TASK-113",
+      "cue_anchors": [
+        "postgres",
+        "multi-runner",
+        "TASK-082",
+        "TASK-113",
+        "compose.dev.runner-multi-postgres",
+        "buildsClaimed",
+        "cross-backend"
+      ],
+      "value_digest": "postgres backend multi-runner 운영 검증 (3 runner ACTIVE + 5 builds + 영속 검증) + cross-backend 회귀 가드.",
+      "owners": [
+        "ykylee"
+      ],
+      "scope": [
+        "docker-image-builder-system",
+        "postgres",
+        "multi-runner",
+        "e2e",
+        "compose"
+      ],
+      "merge_state": "active",
+      "mentioned_in": [
+        "docs/RELEASE_NOTES-2026-07-20.md",
+        "docs/operations/production-semantic-postgres-2026-07-20.md"
+      ],
+      "created_at": "2026-07-20T15:00:00Z",
+      "updated_at": "2026-07-20T15:00:00Z"
+    },
+    {
+      "id": "MEM-2026-07-20-005",
+      "schema_version": 1,
+      "source_paths": [
+        "docs/PROJECT_PROFILE.md",
+        "docs/operations/project-profile-baseline-postgres-sync-2026-07-20.md",
+        "docs/operations/project-profile-react-baseline-full-sync-2026-07-18.md"
+      ],
+      "primary_abstraction": "PROJECT_PROFILE §3 baseline 양축 동기화 (memory/postgres 동등) TASK-102",
+      "cue_anchors": [
+        "PROJECT_PROFILE",
+        "baseline",
+        "양축-동기화",
+        "memory",
+        "postgres",
+        "TASK-102",
+        "default-backend"
+      ],
+      "value_digest": "PROJECT_PROFILE §3 명령 박스 run_local/run_local_postgres default backend 정합 + 회귀 baseline 양축 동기화 (memory-only → Postgres 동등). docs only.",
+      "owners": [
+        "ykylee"
+      ],
+      "scope": [
+        "docker-image-builder-system",
+        "PROJECT_PROFILE",
+        "docs-only",
+        "memory-postgres-baseline"
+      ],
+      "merge_state": "active",
+      "mentioned_in": [
+        "docs/RELEASE_NOTES-2026-07-20.md",
+        "ai-workflow/memory/active/work_backlog.md"
+      ],
+      "created_at": "2026-07-20T15:00:00Z",
+      "updated_at": "2026-07-20T15:00:00Z"
+    },
+    {
+      "id": "MEM-2026-07-20-006",
+      "schema_version": 1,
+      "source_paths": [
+        "scripts/db-migrate.sh",
+        "apps/build-server/src/migrations/",
+        "docs/operations/migration-cli-workflow-2026-07-20.md",
+        "docs/PROJECT_PROFILE.md"
+      ],
+      "primary_abstraction": "scripts/migrate.ts standalone CLI + 권고 scripts/db-migrate.sh TASK-103",
+      "cue_anchors": [
+        "migrate.ts",
+        "db-migrate.sh",
+        "standalone-CLI",
+        "6-gate",
+        "TASK-103",
+        "migration-workflow"
+      ],
+      "value_digest": "scripts/migrate.ts standalone CLI 운영 workflow 정립 + scripts/db-migrate.sh 6 게이트 wrapper (--plan / --status / --apply-all / --apply-up-to / --bootstrap / --dr-stop).",
+      "owners": [
+        "ykylee"
+      ],
+      "scope": [
+        "docker-image-builder-system",
+        "migration",
+        "CLI",
+        "scripts",
+        "postgres"
+      ],
+      "merge_state": "active",
+      "mentioned_in": [
+        "docs/RELEASE_NOTES-2026-07-20.md",
+        "docs/operations/release-checklist-2026-07-20.md"
+      ],
+      "created_at": "2026-07-20T15:00:00Z",
+      "updated_at": "2026-07-20T15:00:00Z"
+    },
+    {
+      "id": "MEM-2026-07-20-007",
+      "schema_version": 1,
+      "source_paths": [
+        "docs/RELEASE_NOTES-2026-07-20.md",
+        "ai-workflow/memory/active/session_handoff.md",
+        "ai-workflow/memory/active/work_backlog.md",
+        "ai-workflow/memory/active/backlog/2026-07-20.md"
+      ],
+      "primary_abstraction": "TASK-114 본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스화",
+      "cue_anchors": [
+        "TASK-114",
+        "RELEASE_NOTES",
+        "운영-가이드-인덱스",
+        "종합-리뷰",
+        "follow-up-후보"
+      ],
+      "value_digest": "본 세션 (2026-07-20) 12 TASK (TASK-102~113) 종합 RELEASE_NOTES + 운영 가이드 인덱스 + follow-up 후보 (옵션 Z / 신규 기능 / Nextcloud Tasks / CHANGELOG / CI migration validation / git tag).",
+      "owners": [
+        "ykylee"
+      ],
+      "scope": [
+        "docker-image-builder-system",
+        "release-notes",
+        "operations-guide",
+        "follow-up",
+        "TASK-114"
+      ],
+      "merge_state": "active",
+      "mentioned_in": [
+        "ai-workflow/memory/active/state.json",
+        "ai-workflow/memory/active/session_handoff.md"
+      ],
+      "created_at": "2026-07-20T15:00:00Z",
+      "updated_at": "2026-07-20T15:00:00Z"
+    }
+  ],
+  "memory_entries_count": 7,
+  "schema_version_memory_entries": "1"
 }

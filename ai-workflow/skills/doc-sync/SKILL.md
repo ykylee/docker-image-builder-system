@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Doc-Sync Skill
 
@@ -52,15 +52,15 @@
 - 실행 예시 (추천 확인):
 ```bash
 python3 skills/doc-sync/scripts/run_doc_sync.py \
-  --project-profile-path ai-workflow/memory/active/PROJECT_PROFILE.md \
-  --session-handoff-path ai-workflow/memory/active/session_handoff.md \
+  --project-profile-path docs/PROJECT_PROFILE.md \
+  --session-handoff-path ai-workflow/memory/active/sessions \
   --changed-file app/main.py
 ```
 - 실행 예시 (자동 반영):
 ```bash
 python3 skills/doc-sync/scripts/run_doc_sync.py \
-  --project-profile-path ai-workflow/memory/active/PROJECT_PROFILE.md \
-  --session-handoff-path ai-workflow/memory/active/session_handoff.md \
+  --project-profile-path docs/PROJECT_PROFILE.md \
+  --session-handoff-path ai-workflow/memory/active/sessions \
   --changed-file app/main.py \
   --apply
 ```
@@ -72,7 +72,42 @@ python3 skills/doc-sync/scripts/run_doc_sync.py \
 - 추천된 후속 조치(`follow_up_actions`)를 `session_handoff.md` 운영 메모에 추가
 - 프로젝트별 문서 구조는 project profile 을 기준으로 해석함
 
+## 9. v0.11.22+ Phase 3c — memory_index retrieval wiring (opt-in)
+
+doc-sync 가 ADR-005 memory_index 의 retrieval 3-tuple (cue exact → BM25 fallback →
+linked expansion) 결과를 *선택적* 으로 받아 output 의 `memory_index_query_output` field
+에 emit 한다. 디스크 변경 ❌ (read-only retrieval). session-start 와 동일 패턴.
+
+### 사용법
+
+```bash
+python3 skills/doc-sync/scripts/run_doc_sync.py \
+  --project-profile-path <PROJECT_PROFILE.md> \
+  --changed-file <path1> --changed-file <path2> \
+  --memory-index-dir <ws>/ai-workflow/memory/active/memory_index \
+  --memory-query-tokens "adr,memora,retrieval"
+```
+
+`--memory-index-dir` 와 `--memory-query-tokens` *둘 다* 지정해야 retrieval 활성. 둘 중
+하나만 지정 시 advisory emit + `memory_index_query_output=None`. 둘 다 부재 시 zero-risk
+skip (default).
+
+### Output 추가 field
+
+`DocSyncOutput.memory_index_query_output` (optional, `dict[str, Any] | None`):
+
+- `selected_ids` / `cue_hits` / `bm25_hits` / `expansion_hits` / `expansion_depth_used`
+- `source_context`
+
+부재 시 `None` (backward compat).
+
+### 후속
+
+- `backlog-update` skill 의 wiring (Phase 3d, 별도 release).
+- ADR-006 retrospective 자리 (Phase 3d 완료 후).
+
 ## 다음에 읽을 문서
 
 - skills 허브: [../README.md](../README.md)
+- ADR-005 memory_index: [../../../docs/architecture/ADR-005-memora-inspired-memory-index.md](../../../docs/architecture/ADR-005-memora-inspired-memory-index.md)
 - 상세 스펙: [../../core/doc_sync_skill_spec.md](../../core/doc_sync_skill_spec.md)

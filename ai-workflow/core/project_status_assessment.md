@@ -1,97 +1,129 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Project Status Assessment (Standard AI Workflow)
 
 - 문서 목적: `standard_ai_workflow` 저장소의 현재 작업 상태, 설계 성숙도, 공백 영역, 다음 우선순위를 공식 진단 문서 형태로 정리한다.
 - 범위: 저장소 구조, 문서 완성도, 구현 공백, 적용 가능성, 다음 단계 권고안
 - 대상 독자: 저장소 관리자, AI workflow 설계자, 도입 검토자, 프로젝트 온보딩 담당자
-- 상태: v0.5.10-beta 기준
-- 최종 수정일: 2026-06-09
-- 관련 문서: `../README.md`, `./global_workflow_standard.md`, `./workflow_skill_catalog.md`, `./workflow_mcp_candidate_catalog.md`, `./workflow_agent_topology.md`, `./workflow_kit_roadmap.md`, `./prototype_promotion_scope.md`
+- 상태: v0.11.22-beta 기준
+- 최종 수정일: 2026-07-18
+- 관련 문서: `../README.md`, `./global_workflow_standard.md`, `./workflow_skill_catalog.md`, `./workflow_mcp_candidate_catalog.md`, `./workflow_agent_topology.md`, `./workflow_kit_roadmap.md`, `./prototype_promotion_scope.md`, `./maturity_matrix.json`
 
 ## 1. 총평
 
-이 저장소는 `v0.5.10-beta` 기준으로 단순한 문서 표준을 넘어, **실행 가능한 통합 Workflow Kit**로 완전히 진화했다. 핵심 11종 스킬의 Beta 승급과 더불어, contract v1 enforcement (output_validator + delegator), multi-component fan-out (choose_roles), 지능형 운영 보조 도구(`workflow-linter`, `project-status-assessment`), MCP transport dual-mode (jsonrpc-bridge 안정 + stdio-sdk 실험적) 를 갖추어 타 프로젝트에 즉시 배포 및 실운영이 가능한 수준의 기술적 완성도를 확보했다.
+이 저장소는 `v0.11.22-beta` 기준으로 **Phase 1–11 모두 완료, Phase 12 (운영 지능화 + deprecation 안정화) in_progress** 상태다. 핵심 11종 skill 중 9종이 stable 채널로 승격 완료되었고 (v0.11.19 ~ v0.11.21, 3 batch), **FULL mypy strict** 도달 (v0.11.18, 109 file clean, 0 errors), **ADR-005 Memora-inspired Memory Index** 의 Phase 1~3d 8 release 가 v0.11.22 사이클에서 모두 완료됐다. **CodeWhale 하네스** 가 10번째 하네스로 추가됐다 (v0.10.4, 2026-07-03).
 
-현재 기준으로는 하네스별 배포 패키지(`dist/`)와 도입 가이드(`docs/INSTALLATION_AND_USAGE.md`)까지 갖춰져 있으며, **Phase 11: 실전 파일럿 검증** 단계를 진행 중이다. Phase 1–10 은 모두 완료 상태이며, 현재 Phase 11 이 `in_progress` 다. 정식 phase 상태는 `workflow-source/core/maturity_matrix.json` 을 단일 진실 공급원(SSOT)으로 참조한다.
+정식 phase / skill / harness 상태는 **`workflow-source/core/maturity_matrix.json`** 을 SSOT 로 참조한다. 본 문서는 그 SSOT 의 *해설 + 진단* 본문이다.
 
-## 2. 현재 단계 판단
+## 2. 현재 단계 판단 (Phase 12 in_progress)
 
-현재 저장소는 11단계 중 **Phase 11 진행 중** 상태다 (Phase 1–10 완료). 정식 phase 상태는 `workflow-source/core/maturity_matrix.json` 을 SSOT 로 참조한다.
+### 2.1 Phase 진행 상황 SSOT 정합 (v0.11.22-beta 기준)
 
-1. Phase 1 (Concept) — 완료
-2. Phase 2 (Template) — 완료
-3. Phase 3 (Prototype) — 완료
-4. Phase 4 (Beta/Pilot) — 완료
-5. Phase 5 (Intelligence) — 완료
-6. Phase 6 (Precision & Optimization) — 완료
-7. Phase 7 (Intelligent Task Modes) — 완료
-8. Phase 8 (Pilot Deployment & Integration) — 완료
-9. Phase 9 (System Maturity & Multi-Agent Evolution) — 완료
-10. Phase 10 (Document & Link Hygiene) — 완료
-11. Phase 11 (Real-world Pilot Validation) — 진행 중
+| 단계 | 이름 | 상태 | 비고 |
+| --- | --- | --- | --- |
+| Phase 1 | Concept | done |  |
+| Phase 2 | Template | done |  |
+| Phase 3 | Prototype | done |  |
+| Phase 4 | Beta/Pilot | done |  |
+| Phase 5 | Intelligence | done |  |
+| Phase 6 | Precision & Optimization | done |  |
+| Phase 7 | Intelligent Task Modes | done |  |
+| Phase 8 | Pilot Deployment & Integration | done |  |
+| Phase 9 | System Maturity & Multi-Agent Evolution | done |  |
+| Phase 10 | Document & Link Hygiene | done |  |
+| Phase 11 | Real-world Pilot Validation | **done** (v0.9.0, 2026-06-18) | DevHub 실전 파일럿 + contract v1 + stable API frozen + read-only MCP transport + deprecation 1st cycle |
+| Phase 12 | Operational Intelligence + Deprecation Stabilization | **in_progress** (2026-06-18 ~) | mypy FULL strict, 9 skill stable, ADR-005 Memory Index, CodeWhale harness |
 
-v0.5.10-beta (2026-06-08) 기준 판단 근거:
+Phase 11 닫힘은 v0.9.0 (release note `Beta-v0.9.0.md` 에서 명시). 본 진단서는 Phase 12 in_progress 기준 작성. 12단계 외에 별도의 13단계는 정의돼 있지 않으며, 후속 milestone 인 v1.0.0 은 Phase 12 의 SemVer stable guarantee 진입 시점.
 
-- **핵심 스킬 11종 Beta**: 모든 핵심 스킬이 `--apply` 또는 `--scaffold` 기능을 포함하여 실질적인 쓰기 파이프라인 완성. v0.5.7+ 5종 추가 (`code-index-update`, `project-status-assessment`, `automated-repro-scaffold`, `robust-patcher`, `git-conflict-resolver`).
-- **Contract v1 Enforcement**: `output_validator` + `delegator.choose_role` / `delegator.choose_roles` 로 sub-agent 응답 자동 검증 및 MUST NOT delegate 7 패턴 거부.
-- **Multi-component Fan-out**: `choose_roles` 로 병렬 sub-agent 위임, `validate_fanin_output` 으로 cross-ref 통합 검증.
-- **MCP Transport Dual-mode**: `jsonrpc-bridge` (안정, 기본) + `stdio-sdk` (실험적, `Connection closed` 회귀 있음).
-- **Interactive Harness Picker**: `--harness` 미지정 시 TTY 자동 picker (v0.5.8).
-- **배포 체계 구축**: 하네스별 맞춤형 배포 패키지 생성, 의존성 자동 관리(`bootstrap_lib`), 6개 하네스 오버레이.
-- **검증 자동화**: 52종 smoke test + GitHub Actions CI.
+### 2.2 v0.11.22-beta (2026-07-03) 기준 판단 근거
 
-## 3. 잘 정리된 영역 (v0.5.10-beta 성과)
+- **Skill 11종 → 9 stable**: v0.11.19 (1st batch, 4 skill: session-start / doc-sync / validation-plan / code-index-update) → v0.11.20 (2nd batch, 4 skill: backlog-update / merge-doc-reconcile / workflow-linter / project-status-assessment) → v0.11.21 (3rd batch, 1 skill: robust-patcher). 남은 2종: automated-repro-scaffold (beta, scaffold 만) + git-conflict-resolver (alpha). task-modes 도 stable (independent track).
+- **MCP 12종**: stable 8 (`latest_backlog`, `check_doc_metadata`, `check_doc_links`, `create_backlog_entry`, `suggest_impacted_docs`, `create_session_handoff_draft`, `create_environment_record_stub`, `check_quickstart_stale_links`) + beta 4 (`git_history_summarizer`, `workflow_log_rotator`, `smart_context_reader`, `apply_robust_patch`).
+- **FULL mypy strict 도달** (v0.11.18, commit `4253eed` 12 file residual 격상, 107 file clean). 누적: v0.11.21 기준 109 file clean. 0 errors. pyproject `dev` extra mypy pin `==2.1.0`. CI mypy-strict workflow passing.
+- **ADR-005 Memory Index Phase 1~3d 완료** (v0.11.22, 8 release). `ai-workflow/memory/active/memory_index/` 메타데이터 레이어 + `--merge` opt-in canonical merge + BM25 stdlib 2단계 fallback + dispatcher entry (`memory-index-query` skill beta) + 3 skill opt-in wiring (session-start / doc-sync / backlog-update).
+- **ADR-006**: Memory Index retrospective 자리 박기 (`34fb07f`). 회고 본문은 v0.11.23+ 또는 실 사용 30일 후 작성.
+- **CodeWhale 하네스** (v0.10.4, commit `cf0060d`, 2026-07-03) — 10번째 하네스. `HARNESS_SPECS` 레지스트리 등록 + 단일 `SKILL.md` overlay (Constitution 이 verification/parallelism/context 담당, 본 overlay 는 session start + Korean output + backlog mgmt 만 추가).
+- **Stable API frozen** (v0.8.0, 2-year SemVer guarantee: v0.8.0 → v2.0.0). Deprecation 1st cycle 적용 (v0.9.0, `phishing_federation_v4.fetch_federated_phishing_urls_v4`). Deprecation 2nd cycle 후속 candidate 식별 (v0.9.3 완료 + 후속).
+- **release pipeline 자동화** (v0.7.9+): `tools/release_pipeline.py` 8 subcommand (validate / version-bump / note-draft / changelog-gen / release / gen-schema / verify / rollback / dist) + `--apply` flag. CI mypy-strict workflow + Layer 2 release-time gate cross-verify (v0.11.13+).
 
-### 3.1 쓰기 파이프라인과 스캐폴딩
-`validation-plan`의 `--scaffold` 기능과 각 스킬의 `--apply` 기능은 에이전트가 단순히 '제안'하는 수준을 넘어, 프로젝트 문서와 테스트 코드를 직접 '관리'할 수 있는 능력을 부여한다. `robust-patcher` (v0.5.7+) 는 로컬 LLM 친화적 Search-Replace + 퍼지 매칭 기반의 견고한 파일 수정을 제공한다.
+## 3. 잘 정리된 영역 (v0.11.22-beta 성과)
 
-### 3.2 Contract v1 기반 다중 에이전트 위임
-orchestrator ↔ sub-agent 간 contract v1 enforcement (`output_validator` + `delegator`) 로 sub-agent 응답의 자동 검증과 MUST NOT delegate 7 패턴 거부가 적용된다. `choose_roles` (v0.5.7) 로 multi-component fan-out 이 가능하며, `validate_fanin_output` 으로 cross-ref 통합 검증을 수행한다.
+### 3.1 Skill 안정화 3 batch (9 → 11 → stable 9)
+`skill_beta_criteria.md` §3.1 6 정합 조건 (CLI argparse / Pydantic schema / error_code 4종 / 단일 명령 / 예시 실행 섹션 / smoke test PASS) 모두 충족 시 `beta → stable` 승격. v0.11.19 ~ v0.11.21 의 3 batch 로 9종 stable. 누적: `stable=9 / beta=2 / prototype=4` (skill task 모드 / memory-index-query / ...).
 
-### 3.3 지능형 정합성 관리
-`workflow-linter`는 `maturity_matrix.json`과 `state.json`, `handoff`, `backlog` 간의 논리적 불일치를 탐지하여 컨텍스트 누적 시 발생할 수 있는 환각(Hallucination) 요소를 사전에 차단한다.
+### 3.2 Memora-inspired Memory Index (ADR-005)
+본 ADR 은 v0.11.22 에 end-to-end milestone 도달:
+- **Phase 1** (prototype): `workflow_kit/common/state/memory_index.py` helper + schema + smoke.
+- **Phase 1.5** (state.json hook): `state.json` 생성 시 optional `memory_entries[]` 추가.
+- **Phase 2** (--merge opt-in): canonical merge + provenance 합집합.
+- **Phase 2b** (BM25 fallback): stdlib only 2단계 fallback (embedding 없이 fallback 가능).
+- **Phase 3** (dispatcher entry): `memory-index-query` skill beta.
+- **Phase 3b1 / 3c / 3d** (3 skill opt-in wiring): `session-start` / `doc-sync` / `backlog-update` 에 retrieval hint 통합.
+- **ADR-006**: retrospective 자리 박기 (회고 본문은 후속 release 또는 30일 후).
 
-### 3.4 표준화된 출력 계약
-모든 스킬과 MCP가 contract v1 output envelope (`status`, `error`, `error_code`, `warnings`, `source_context`, `tool_version`) 을 포함한 구조화된 JSON 출력을 제공하여 하네스나 오케스트레이터가 결과를 기계적으로 처리하기 용이해졌다.
+본질적 가치: 본문/검색 분리로 retrieval 비용 ↓, canonical anchor 기반 cross-doc reconcile 가 가능해짐.
 
-### 3.5 범용적인 도입 도구
-`bootstrap_lib`가 Python 및 Node.js 의존성을 자동 관리하고, interactive `--harness` picker (v0.5.8) 로 TTY 환경에서 자동 하네스 선택을 지원하며, 기존 프로젝트와 신규 프로젝트를 구분하여 최적의 초기 세트를 생성해준다.
+### 3.3 mypy FULL strict + Layer 1/Layer 2 defense
+- v0.8.1 ~ v0.8.15: 19 file strict clean.
+- v0.11.0 cycle 3 (+ purpose_ingest.py) → v0.11.18 FULL strict 도달 (107 file clean).
+- v0.11.21: 109 file strict clean.
+- **Layer 1**: CI `mypy-strict.yml` workflow (push to main + PR + workflow_dispatch).
+- **Layer 2**: `release_pipeline validate` 의 mypy source 5번째 (REPO_ROOT.parent cwd + 절대경로). v0.11.13 `cross-verify` 로 verdict 결정.
+- v0.11.12 의 `--skip-mypy` flag 는 escape hatch 로 유지.
 
-## 4. 현재 공백과 한계 (Next Phase 과제)
+### 3.4 CodeWhale 하네스 (10번째)
+v0.10.4 (commit `cf0060d`, 2026-07-03) 추가. 6 file 변경 (+370 line). 단일 SKILL.md overlay (Constitution handles verification/parallelism/context). `HARNESS_SPECS` + `register_harness_builder` 한 줄 등록. 본 추가가 다른 하네스의 spec/overlay 파일을 건드리지 않는 것이 보장됨 (`isolated registration path`).
 
-### 4.1 지능형 자동 교정 (Auto-fix)
-현재 `workflow-linter`는 불일치를 탐지하지만, 이를 자동으로 수정하고 반영하는 루틴은 아직 초기 단계다. 에이전트가 탐지 결과를 컨펌 한 번으로 바로잡는 지능화가 필요하다.
+## 4. 현재 공백과 한계 (Phase 12 잔여 + v1.0.0 milestone 전)
 
-### 4.2 양방향 MCP 정식 승격
-현재의 MCP 서버는 주로 읽기 및 초안 생성 위주다. 프로젝트 파일을 직접 수정하거나 Git 명령을 수행하는 '쓰기 성격'의 도구들을 위한 보안 경계 및 정식 서버 구조 확립이 필요하다.
+### 4.1 README.md / CHANGELOG.md auto-gen automation 신뢰 회복
+2026-06-14 이후 `tools/release_pipeline.py changelog-gen` 이 한 번도 실행되지 않아 CHANGELOG.md 가 0.7.9 에서 멈춰 있다. v0.7.10 ~ v0.11.22 까지 91 release cycle 의 본문이 누락. v0.11.22 사이클에서 1회 복구 + 후속 release 부터는 `release_pipeline release --apply` 시 자동 실행으로 정책 lockdown 필요.
 
-### 4.3 운영 지표 및 마일스톤 관리
-작업 이력을 기반으로 `state.json`의 베이스라인을 자동 갱신하거나, 특정 주기(예: TASK 10개 단위)로 마일스톤 요약을 자동 생성하는 지능형 운영 로직이 아직 보강되어야 한다.
+### 4.2 Git conflict resolver (alpha → beta)
+git-conflict-resolver 가 v0.5.10 부터 alpha 단계에서 멈춰 있다. stable 진입 시 smoke test + error_code 정리 + spec layer 동기화 작업이 후속으로 남아 있음.
 
-## 5. 이 저장소의 현재 가치 (v0.5.10-beta 기준)
+### 4.3 MCP stdio-sdk 정식 승격 잔여
+`stdio-sdk` 의 `Connection closed` 회귀가 v0.8.10~v0.8.11 부터 관측됐고, jsonrpc-bridge 가 안정 기본으로 유지 중. read-only input schema 의 Pydantic v2 강타입 계약 전면 적용은 후속. (v0.11.22 의 ADR-005 Memory Index 는 별도 layer 이므로 직접 영향 ❌)
 
-- **즉시 배포 가능한 키트**: `dist/` 패키지를 통해 어떤 프로젝트든 5분 내에 표준 워크플로우 도입 가능.
-- **에이전트 친화적 구조**: contract v1 enforced delegation, MCP dual transport, interactive picker 로 어떤 하네스에서도 최적의 워크플로우 구성 가능.
-- **검증된 안정성**: 52종 smoke test 및 CI 를 통해 도구의 신뢰성 확보.
+### 4.4 v1.0.0 milestone 진입 평가
+Phase 12 의 SemVer stable guarantee 2-year 진입 (v0.8.0 → v2.0.0) 을 위한 **v1.0.0** milestone 평가 시점. 진입 후보:
+- 11/11 skill stable (현재 9/11, 후속 2종 stable 시).
+- consumer 1+ months 안정 운영 데이터 (ADR-006 회고 본문 작성 트리거).
+- deprecation 1st/2nd cycle 운영 검증 완료.
+- long-running CI mypy-strict + release pipeline 자동화 안정화.
 
-## 6. 우선순위 권고 (Phase 11~12)
+## 5. 이 저장소의 현재 가치 (v0.11.22-beta 기준)
 
-### 우선순위 1: Phase 11 실전 파일럿 검증 완료
-Phase 11 pilot 시나리오 A/B/C 실행 완료 상태에서 파일럿 결과 보고서 작성 및 종료 판단.
+- **즉시 배포 가능한 키트**: 91 release cycle 누적, 9 stable skill + 8 stable MCP + 10 harness + FULL mypy strict. 다운스트림이 `pip install -e ".[mcp-sdk,dev]"` 한 줄로 editable link 가능.
+- **에이전트 친화적 retrieval layer**: ADR-005 Memory Index 가 본문/검색 분리로 context load 비용을 줄이고 cross-doc reconcile 을 강화.
+- **타입 안전성**: 109 file mypy strict clean + Layer 1/Layer 2 mypy defense + release pipeline 자동화.
+- **하네스 호환성**: 10개 하네스 (Codex, OpenCode, Gemini CLI, Antigravity, MiniMax Code, CodeWhale, Claude Code, Aider, Goose, pi-dev). 신규 하네스 추가는 `HARNESS_SPECS` + `register_harness_builder` 한 줄.
+- **검증된 안정성**: 누적 smoke test 200+ (`workflow-source/tests/check_*.py`) + CI mypy-strict + consumer feedback GH Pages.
 
-### 우선순위 2: MCP stdio-sdk 안정화
-`check_read_only_mcp_sdk_stdio.py` 의 `Connection closed` 회귀 해결 및 정식 SDK transport 승격.
+## 6. 우선순위 권고 (Phase 12 잔여 + ADR-006 후속)
 
-### 우선순위 3: 실제 적용 확대
-실제 외부 저장소에 v0.5.10-beta 패키지를 적용하고, 그 과정에서 발생하는 사소한 오동작이나 가이드의 모호함을 수정하여 안정성을 높인다.
+### 우선순위 1: CHANGELOG.md + README.md sync 자동화 lockdown
+`tools/release_pipeline.py release --apply` 에 `changelog-gen --apply` 자동 pre-step 으로 추가. 본 시점에서 수동 1회 backfill (Unreleased 본문 = v0.7.10 ~ v0.11.22 누적 changelog auto-gen 결과).
 
-## 7. 권장 완료 기준 (Phase 12 진입 기준)
+### 우선순위 2: ADR-006 회고 본문 작성
+v0.11.22 의 Memory Index 8 release 누적 후 `≥ 14일` 또는 `≥ 30일` 누적 사용 데이터 후 작성. merge rule / 3-tuple retrieval / skill wiring latency 의 실측 metric 기반.
 
-- Phase 11 pilot 모든 성공 기준 충족.
-- MCP stdio-sdk `Connection closed` 회귀 해결 및 정식 승격.
-- 2개 이상의 실제 프로젝트에서 1개월 이상의 안정적인 운영 기록 확보.
+### 우선순위 3: 2 남은 skill stable 승격
+automated-repro-scaffold (beta) + git-conflict-resolver (alpha) 의 stable 진입 블로커 해소. **9/11 → 11/11 stable** 시 자연스러운 v1.0.0 milestone 진입 후보.
+
+### 우선순위 4: MCP stdio-sdk 정식 승격 + read-only input schema 강타입화
+현황 회귀 (`Connection closed`) fix 후 정식 SDK transport 승격. read-only input schema 의 Pydantic v2 강타입 계약 전면 적용.
+
+## 7. 권장 완료 기준 (v1.0.0 milestone 진입)
+
+- 11/11 skill stable.
+- CHANGELOG.md auto-gen 안정적 운영 (3 release 연속 auto-gen 결과 만족).
+- 1+ months 운영 데이터 (ADR-006 회고 본문 작성 완료).
+- MCP stdio-sdk 정식 승격.
+- deprecation policy contract test (`workflow_kit.__all__` 의 모든 symbol 의 deprecation 상태 verify).
+- Long-running CI mypy-strict + release pipeline 자동화 안정성 1+ months 검증.
 
 ## 8. 결론
 
-Standard AI Workflow는 `v0.5.10-beta`를 통해 contract v1 enforcement, multi-component fan-out, 11종 스킬, MCP dual transport, interactive harness picker 등 기술적 기반을 완비했다. 현재 Phase 11 실전 파일럿 검증을 진행 중이며, MCP stdio-sdk 안정화와 실제 프로젝트 적용 확대를 통해 Phase 12 (패키지 승격) 진입을 목표로 한다.
+Standard AI Workflow 는 `v0.11.22-beta` 에서 Phase 1–11 모두 완료 + Phase 12 in_progress 상태로, 다음 마일스톤인 v1.0.0 (SemVer stable guarantee 2-year 진입) 을 향해 진화하고 있다. **FULL mypy strict (109 file clean)**, **9/11 skill stable**, **ADR-005 Memory Index Phase 1~3d 완결**, **CodeWhale 10번째 하네스 추가**, **release pipeline 자동화** 가 v0.11.x 사이클의 핵심 성과다. 다음 우선순위는 (1) CHANGELOG 자동화 lockdown, (2) ADR-006 회고 본문, (3) 2 남은 skill stable 승격, (4) MCP stdio-sdk 정식 승격 + read-only input schema 강타입화다.

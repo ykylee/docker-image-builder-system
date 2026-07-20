@@ -1,0 +1,39 @@
+{
+  "id": "MEM-2026-07-20-004",
+  "schema_version": 1,
+  "source_paths": [
+    "docs/operations/multi-runner-claim-postgres-2026-07-06.md",
+    "docs/operations/multi-runner-chunked-postgres-2026-07-20.md",
+    "compose.dev.runner-multi-postgres.yaml",
+    "compose.dev.multi-runner-chunked-postgres.yaml",
+    "apps/build-server/scripts/e2e-multi-runner-postgres.sh"
+  ],
+  "primary_abstraction": "Postgres multi-runner 운영 검증 TASK-082 + cross-backend TASK-113",
+  "cue_anchors": [
+    "postgres",
+    "multi-runner",
+    "TASK-082",
+    "TASK-113",
+    "compose.dev.runner-multi-postgres",
+    "buildsClaimed",
+    "cross-backend"
+  ],
+  "value_digest": "postgres backend multi-runner 운영 검증 (3 runner ACTIVE + 5 builds + 영속 검증) + cross-backend 회귀 가드.",
+  "owners": [
+    "ykylee"
+  ],
+  "scope": [
+    "docker-image-builder-system",
+    "postgres",
+    "multi-runner",
+    "e2e",
+    "compose"
+  ],
+  "merge_state": "active",
+  "mentioned_in": [
+    "docs/RELEASE_NOTES-2026-07-20.md",
+    "docs/operations/production-semantic-postgres-2026-07-20.md"
+  ],
+  "created_at": "2026-07-20T15:00:00Z",
+  "updated_at": "2026-07-20T15:00:00Z"
+}

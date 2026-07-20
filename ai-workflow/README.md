@@ -1,12 +1,12 @@
-<!-- standard-ai-workflow-kit: v0.11.25-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Standard AI Workflow Kit
 
-- 문서 목적: `Export Sample` 저장소에 표준 AI 워크플로우 기본 문서 세트를 도입할 수 있도록 bootstrap 결과를 안내한다.
+- 문서 목적: `Docker Image Builder System` 저장소에 표준 AI 워크플로우 기본 문서 세트를 도입한 bootstrap 결과를 안내한다.
 - 범위: 공통 코어 문서 위치, 프로젝트 상태 문서 세트, 도입 모드별 후속 작업
 - 대상 독자: 개발자, 운영자, AI agent, 프로젝트 온보딩 담당자
-- 상태: draft
-- 최종 수정일: 2026-07-08
+- 상태: stable (TASK-120 정합)
+- 최종 수정일: 2026-07-20
 - 관련 문서: `docs/PROJECT_PROFILE.md`, `ai-workflow/memory/active/state.json`, `ai-workflow/memory/active/session_handoff.md`, `ai-workflow/memory/active/work_backlog.md`
 
 ## 1. 도입 모드

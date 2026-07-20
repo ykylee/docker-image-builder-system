@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Question File Format (v0.6.4) — parser, validator, ambiguity/contradiction detection.
 

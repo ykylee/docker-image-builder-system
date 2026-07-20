@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Export harness-specific workflow packages into a dist directory."""
@@ -22,7 +22,14 @@ from workflow_kit import __version__ as WORKFLOW_KIT_VERSION
 from workflow_kit.common.doc_transformer import DocTransformer
 
 
-SUPPORTED_HARNESSES = ("codex", "opencode", "gemini-cli", "pi-dev", "antigravity")
+SUPPORTED_HARNESSES = (
+    "codex",
+    "opencode",
+    "gemini-cli",
+    "pi-dev",
+    "antigravity",
+    "claude-code",
+)
 MINIMAL_CORE_DOCS = (
     "global_workflow_standard.md",
     "workflow_adoption_entrypoints.md",
@@ -147,6 +154,8 @@ def harness_specific_sources(harness: str) -> list[Path]:
         return sources
     if harness == "antigravity":
         return sources
+    if harness == "claude-code":
+        return sources
     raise ValueError(f"Unsupported harness: {harness}")
 
 
@@ -206,6 +215,13 @@ def bootstrap_export_sources(harness: str, temp_repo: Path) -> list[Path]:
                 temp_repo / "ANTIGRAVITY.md",
             ]
         )
+    elif harness == "claude-code":
+        sources.extend(
+            [
+                temp_repo / "CLAUDE.md",
+                temp_repo / ".claude",
+            ]
+        )
     return sources
 
 
@@ -226,9 +242,9 @@ def recommended_entrypoints_for(harness: str) -> list[str]:
     common = [
         "bundle/ai-workflow/README.md",
         "bundle/ai-workflow/memory/active/state.json",
-        "bundle/ai-workflow/memory/active/session_handoff.md",
-        "bundle/ai-workflow/memory/active/work_backlog.md",
-        "bundle/ai-workflow/memory/active/PROJECT_PROFILE.md",
+        "bundle/ai-workflow/memory/active/sessions",
+        "bundle/ai-workflow/memory/active/backlog",
+        "bundle/docs/PROJECT_PROFILE.md",
         "bundle/ai-workflow/core/workflow_adoption_entrypoints.md",
         "bundle/ai-workflow/core/workflow_skill_catalog.md",
     ]
@@ -247,6 +263,13 @@ def recommended_entrypoints_for(harness: str) -> list[str]:
         return ["bundle/AGENTS.md"] + common
     if harness == "antigravity":
         return ["bundle/ANTIGRAVITY.md"] + common
+    if harness == "claude-code":
+        return [
+            "bundle/CLAUDE.md",
+            "bundle/.claude/commands/workflow-session-start.md",
+            "bundle/.claude/commands/workflow-backlog-update.md",
+            "bundle/.claude/commands/workflow-doc-sync.md",
+        ] + common
     raise ValueError(f"Unsupported harness: {harness}")
 
 
@@ -292,6 +315,16 @@ def package_apply_steps_for(harness: str) -> list[str]:
             "Antigravity 는 루트의 `ANTIGRAVITY.md` 를 시스템 지침에 우선 반영하며, Artifacts 와 Browser sub-agent 를 적극 활용합니다.",
             "첫 세션에서는 `state.json`, `session_handoff.md`, `work_backlog.md`, 오늘 날짜 backlog 를 실제 저장소 상태로 갱신한다.",
         ]
+    if harness == "claude-code":
+        return [
+            "압축을 풀고 가능하면 `ai-workflow/scripts/apply_workflow_upgrade.py` 를 사용하여 `bundle/` 내용을 반영한다. 이 스크립트는 버전 비교와 .gitignore 셋업을 자동으로 수행한다.",
+            "수동 적용 시 `bundle/CLAUDE.md` 와 `bundle/.claude/commands/`, `bundle/ai-workflow/` 디렉터리를 대상 저장소 루트에 복사한다.",
+            "`CLAUDE.md` 가 `ai-workflow/memory/active/state.json`, `session_handoff.md`, `work_backlog.md`, `PROJECT_PROFILE.md` 를 먼저 읽도록 유지한다.",
+            "Claude Code 는 `CLAUDE.md` 를 *root 진입점* 으로 자동 read 하므로 (v0.10.2 정정), 본 파일이 누락되면 진입점이 깨진다.",
+            "기존 `AGENTS.md` 가 있으면 `CLAUDE.md` 첫 줄에 `@AGENTS.md` import 또는 symlink 으로 통합한다 (Claude Code 는 `AGENTS.md` 를 직접 read 하지 않음).",
+            "`.claude/commands/workflow-*.md` 3종은 user invocation 방식의 *additive 도구* 다. 자동 실행되지 않으므로 필요 시 사용자가 `/workflow-session-start`, `/workflow-backlog-update`, `/workflow-doc-sync` 로 호출한다.",
+            "첫 세션에서는 `state.json`, `session_handoff.md`, `work_backlog.md`, 오늘 날짜 backlog 를 실제 저장소 상태로 갱신한다.",
+        ]
     raise ValueError(f"Unsupported harness: {harness}")
 
 
@@ -307,6 +340,7 @@ def render_package_contents(
     version: str,
     include_source_docs: bool,
     include_global_snippets: bool,
+    bundle_root: Path,
 ) -> str:
     harness_runtime_files = {
         "codex": [
@@ -332,9 +366,24 @@ def render_package_contents(
         "antigravity": [
             "- `bundle/ANTIGRAVITY.md`",
         ],
+        "claude-code": [
+            "- `bundle/CLAUDE.md`",
+            "- `bundle/.claude/commands/workflow-session-start.md`",
+            "- `bundle/.claude/commands/workflow-backlog-update.md`",
+            "- `bundle/.claude/commands/workflow-doc-sync.md`",
+        ],
     }[harness]
     source_docs_state = "포함됨" if include_source_docs else "기본 제외"
     global_snippets_state = "포함됨" if include_global_snippets else "기본 제외"
+    backlog_dir = bundle_root / "ai-workflow" / "memory" / "active" / "backlog"
+    if backlog_dir.is_dir():
+        backlog_entries = sorted(
+            f"- `bundle/ai-workflow/memory/active/backlog/{path.name}`"
+            for path in backlog_dir.iterdir()
+            if path.is_file() and path.suffix == ".md"
+        )
+    else:
+        backlog_entries = []
     return f"""# Package Contents
 
 - 문서 목적: `{package_name}` 배포 패키지에 무엇이 들어 있는지와 어떤 파일부터 읽어야 하는지 빠르게 안내한다.
@@ -363,11 +412,11 @@ def render_package_contents(
 - `bundle/ai-workflow/core/global_workflow_standard.md`
 - `bundle/ai-workflow/core/workflow_adoption_entrypoints.md`
 - `bundle/ai-workflow/core/workflow_skill_catalog.md`
-- `bundle/ai-workflow/memory/active/PROJECT_PROFILE.md`
+- `bundle/docs/PROJECT_PROFILE.md`
 - `bundle/ai-workflow/memory/active/state.json`
-- `bundle/ai-workflow/memory/active/session_handoff.md`
-- `bundle/ai-workflow/memory/active/work_backlog.md`
-- `bundle/ai-workflow/memory/active/backlog/2026-04-23.md`
+- `bundle/ai-workflow/memory/active/sessions`
+- `bundle/ai-workflow/memory/active/backlog`
+{chr(10).join(backlog_entries)}
 
 ## 4. 하네스 runtime overlay 파일
 
@@ -428,14 +477,19 @@ def render_apply_guide(
             "- `bundle/ANTIGRAVITY.md -> <repo>/ANTIGRAVITY.md`",
             "- `bundle/ai-workflow -> <repo>/ai-workflow`",
         ],
+        "claude-code": [
+            "- `bundle/CLAUDE.md -> <repo>/CLAUDE.md`",
+            "- `bundle/.claude/commands -> <repo>/.claude/commands`",
+            "- `bundle/ai-workflow -> <repo>/ai-workflow`",
+        ],
     }[harness]
     first_session_reads = {
         "codex": [
             "- `AGENTS.md`",
             "- `ai-workflow/memory/active/state.json`",
-            "- `ai-workflow/memory/active/session_handoff.md`",
-            "- `ai-workflow/memory/active/work_backlog.md`",
-            "- `ai-workflow/memory/active/PROJECT_PROFILE.md`",
+            "- `ai-workflow/memory/active/sessions`",
+            "- `ai-workflow/memory/active/backlog`",
+            "- `docs/PROJECT_PROFILE.md`",
         ],
         "opencode": [
             "- `AGENTS.md`",
@@ -443,30 +497,37 @@ def render_apply_guide(
             "- `.opencode/skills/standard-ai-workflow/SKILL.md`",
             "- `.opencode/agents/workflow-orchestrator.md`",
             "- `ai-workflow/memory/active/state.json`",
-            "- `ai-workflow/memory/active/session_handoff.md`",
-            "- `ai-workflow/memory/active/work_backlog.md`",
-            "- `ai-workflow/memory/active/PROJECT_PROFILE.md`",
+            "- `ai-workflow/memory/active/sessions`",
+            "- `ai-workflow/memory/active/backlog`",
+            "- `docs/PROJECT_PROFILE.md`",
         ],
         "gemini-cli": [
             "- `GEMINI.md`",
             "- `ai-workflow/memory/active/state.json`",
-            "- `ai-workflow/memory/active/session_handoff.md`",
-            "- `ai-workflow/memory/active/work_backlog.md`",
-            "- `ai-workflow/memory/active/PROJECT_PROFILE.md`",
+            "- `ai-workflow/memory/active/sessions`",
+            "- `ai-workflow/memory/active/backlog`",
+            "- `docs/PROJECT_PROFILE.md`",
         ],
         "pi-dev": [
             "- `AGENTS.md`",
             "- `ai-workflow/memory/active/state.json`",
-            "- `ai-workflow/memory/active/session_handoff.md`",
-            "- `ai-workflow/memory/active/work_backlog.md`",
-            "- `ai-workflow/memory/active/PROJECT_PROFILE.md`",
+            "- `ai-workflow/memory/active/sessions`",
+            "- `ai-workflow/memory/active/backlog`",
+            "- `docs/PROJECT_PROFILE.md`",
         ],
         "antigravity": [
             "- `ANTIGRAVITY.md`",
             "- `ai-workflow/memory/active/state.json`",
-            "- `ai-workflow/memory/active/session_handoff.md`",
-            "- `ai-workflow/memory/active/work_backlog.md`",
-            "- `ai-workflow/memory/active/PROJECT_PROFILE.md`",
+            "- `ai-workflow/memory/active/sessions`",
+            "- `ai-workflow/memory/active/backlog`",
+            "- `docs/PROJECT_PROFILE.md`",
+        ],
+        "claude-code": [
+            "- `CLAUDE.md`",
+            "- `ai-workflow/memory/active/state.json`",
+            "- `ai-workflow/memory/active/sessions`",
+            "- `ai-workflow/memory/active/backlog`",
+            "- `docs/PROJECT_PROFILE.md`",
         ],
     }[harness]
     return f"""# Apply Guide
@@ -506,9 +567,9 @@ def render_apply_guide(
 ## 5. 적용 후 바로 수정할 항목
 
 - `ai-workflow/memory/active/state.json` 의 current_focus 와 next_documents
-- `ai-workflow/memory/active/PROJECT_PROFILE.md` 의 실행/테스트/검증 명령
-- `ai-workflow/memory/active/session_handoff.md` 의 현재 기준선
-- `ai-workflow/memory/active/work_backlog.md` 와 최신 날짜 backlog 의 실제 작업 상태
+- `docs/PROJECT_PROFILE.md` 의 실행/테스트/검증 명령
+- `ai-workflow/memory/active/sessions` 의 현재 기준선
+- `ai-workflow/memory/active/backlog` 와 최신 날짜 backlog 의 실제 작업 상태
 
 ## 6. 주의 사항
 
@@ -521,6 +582,7 @@ def render_apply_guide(
 def write_package_docs(
     *,
     package_root: Path,
+    bundle_root: Path,
     harness: str,
     package_name: str,
     version: str,
@@ -537,6 +599,7 @@ def write_package_docs(
             version=version,
             include_source_docs=include_source_docs,
             include_global_snippets=include_global_snippets,
+            bundle_root=bundle_root,
         ),
     )
     write_text(
@@ -581,7 +644,7 @@ def export_harness(
                 included_files.append(rel(destination, package_root))
         profile_source = temp_repo / "docs" / "PROJECT_PROFILE.md"
         if profile_source.exists():
-            profile_destination = bundle_root / "ai-workflow" / "memory" / "active" / "PROJECT_PROFILE.md"
+            profile_destination = bundle_root / "docs" / "PROJECT_PROFILE.md"
             copy_file(profile_source, profile_destination)
             included_files.append(rel(profile_destination, package_root))
 
@@ -610,6 +673,7 @@ def export_harness(
     included_files.extend(
         write_package_docs(
             package_root=package_root,
+            bundle_root=bundle_root,
             harness=harness,
             package_name=package_name,
             version=version,
@@ -624,8 +688,6 @@ def export_harness(
         "release_focus": "workflow_skill_onboarding",
         "optimization_profile": "agent_runtime_minimal",
         "exported_at": datetime.now(timezone.utc).isoformat(),
-        "source_root": str(REPO_ROOT),
-        "bundle_root": str(bundle_root),
         "included_files": sorted(included_files),
         "global_snippet_files": sorted(snippet_files),
         "recommended_entrypoints": recommended_entrypoints_for(harness),
@@ -657,10 +719,6 @@ def export_harness(
         "harness": harness,
         "package_name": package_name,
         "package_version": version,
-        "package_root": str(package_root),
-        "bundle_root": str(bundle_root),
-        "manifest_path": str(manifest_path),
-        "archive_path": archive_path,
         "included_files_count": len(included_files),
     }
 

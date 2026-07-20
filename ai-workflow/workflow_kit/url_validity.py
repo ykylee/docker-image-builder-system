@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """workflow_kit.url_validity — URL validity check (V-R10, v0.7.35 PoC + v0.7.36 v2 cache).
 

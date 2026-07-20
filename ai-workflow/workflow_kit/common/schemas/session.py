@@ -1,8 +1,10 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Pydantic models for session-start skill."""
 
 from __future__ import annotations
+
+from typing import Any
 
 from pydantic import BaseModel, Field
 from workflow_kit.common.schemas.base import BaseOutput, Status
@@ -91,6 +93,11 @@ class SessionStartOutput(BaseOutput):
     # v0.10.2: self-bootstrap mode (PURPOSE.md / state.json / handoff / backlog 모두 부재 시)
     self_bootstrap_suggested: bool = False
     self_bootstrap_init_commands: list[str] = Field(default_factory=list)
+    # v0.11.22+ Phase 3b: ADR-005 memory_index retrieval hints (optional, opt-in)
+    memory_index_query_output: dict[str, Any] | None = Field(
+        default=None,
+        description="Phase 3: `query_memory_index_for_dispatcher` 결과 dict. 부재 시 None (zero-risk).",
+    )
 
     @property
     def primary_summary(self) -> str:

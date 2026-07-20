@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Scaffold a new harness stub inside the standard AI workflow repository."""
@@ -126,9 +126,9 @@ def render_overlay_spec(display_name: str, slug: str, args: argparse.Namespace) 
 
 ## 3. 공통 workflow 연결 규칙
 
-- 항상 `ai-workflow/memory/active/session_handoff.md` 를 우선 읽게 연결한다.
-- 항상 `ai-workflow/memory/active/work_backlog.md` 를 참조하게 연결한다.
-- 항상 `ai-workflow/memory/active/PROJECT_PROFILE.md` 를 참조하게 연결한다.
+- 항상 `ai-workflow/memory/active/sessions` 를 우선 읽게 연결한다.
+- 항상 `ai-workflow/memory/active/backlog` 를 참조하게 연결한다.
+- 항상 `docs/PROJECT_PROFILE.md` 를 참조하게 연결한다.
 - 필요하면 `ai-workflow/memory/active/repository_assessment.md` 를 adoption 단계 보조 문서로 사용한다.
 - read-only MCP draft descriptor 는 `bundle/source-docs/schemas/read_only_transport_descriptors.json` 위치를 기준으로 검토한다.
 

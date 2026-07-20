@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """workflow_kit.cli.doctor — v0.7.4 CLI wrapper for 7 baseline compliance evaluation.
 

@@ -1,12 +1,12 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Harnesses
 
 - 문서 목적: 표준 AI 워크플로우를 하네스별 배포 패키지로 맞출 때 참고할 타겟별 안내 문서를 모은다.
-- 범위: Codex, OpenCode, MiniMax Code, Gemini CLI, Antigravity 타겟별 파일 구성과 bootstrap 연결 방식, 공통 `AGENTS.md` 진입점, 추후 하네스 확장 포인트
+- 범위: Codex, OpenCode, MiniMax Code, Gemini CLI, Antigravity, Grok Build, Claude Code, Aider, Goose, Pi Coding Agent, CodeWhale 타겟별 파일 구성과 bootstrap 연결 방식, 공통 `AGENTS.md` 진입점, 추후 하네스 확장 포인트
 - 대상 독자: 저장소 관리자, AI workflow 설계자, 하네스 통합 담당자
 - 상태: draft
-- 최종 수정일: 2026-06-09
+- 최종 수정일: 2026-07-20
 - 관련 문서: `../core/workflow_harness_distribution.md`, `../scripts/bootstrap_workflow_kit.py`, `../scripts/bootstrap_lib/harnesses/__init__.py`
 
 ## 현재 지원 타겟
@@ -21,6 +21,18 @@
 - [gemini-cli/apply_guide.md](./gemini-cli/apply_guide.md)
 - [antigravity/README.md](./antigravity/README.md)
 - [antigravity/apply_guide.md](./antigravity/apply_guide.md)
+- [claude-code/README.md](./claude-code/README.md)
+- [claude-code/apply_guide.md](./claude-code/apply_guide.md)
+- [aider/README.md](./aider/README.md)
+- [aider/apply_guide.md](./aider/apply_guide.md)
+- [goose/README.md](./goose/README.md)
+- [goose/apply_guide.md](./goose/apply_guide.md)
+- [grok-build/README.md](./grok-build/README.md)
+- [grok-build/apply_guide.md](./grok-build/apply_guide.md)
+- [pi-dev/AGENTS.md](./pi-dev/AGENTS.md)
+- [pi-dev/apply_guide.md](./pi-dev/apply_guide.md)
+- [codewhale/README.md](./codewhale/README.md)
+- [codewhale/apply_guide.md](./codewhale/apply_guide.md)
 
 ## 추후 확장용 템플릿
 
@@ -41,9 +53,9 @@
 - `bundle/ai-workflow/README.md`
 - `bundle/ai-workflow/core/workflow_adoption_entrypoints.md`
 - `bundle/ai-workflow/core/workflow_skill_catalog.md`
-- `bundle/ai-workflow/memory/active/PROJECT_PROFILE.md`
-- `bundle/ai-workflow/memory/active/session_handoff.md`
-- `bundle/ai-workflow/memory/active/work_backlog.md`
+- `bundle/docs/PROJECT_PROFILE.md`
+- `bundle/ai-workflow/memory/active/sessions`
+- `bundle/ai-workflow/memory/active/backlog`
 - `bundle/ai-workflow/wiki/index.md` (Wiki 진입점, R4 anchor 기반)
 
 ## bootstrap 예시

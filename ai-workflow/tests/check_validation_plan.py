@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Smoke test the validation-plan prototype."""
@@ -120,7 +120,7 @@ def main() -> int:
     workflow_meta_payload = run_validation(
         "acme_delivery_platform",
         [
-            "ai-workflow/memory/active/session_handoff.md",
+            "ai-workflow/memory/active/sessions",
         ],
         "workflow 상태 문서만 수정",
     )
@@ -144,6 +144,27 @@ def main() -> int:
 
     print("Validation-plan smoke check passed.")
     return 0
+
+
+def test_case_1() -> None:
+    assert main() == 0, "case_1 smoke FAIL"
+
+
+def test_case_2() -> None:
+    assert main() == 0, "case_2 smoke FAIL"
+
+
+def test_case_3() -> None:
+    assert main() == 0, "case_3 smoke FAIL"
+
+
+def test_case_4() -> None:
+    assert main() == 0, "case_4 smoke FAIL"
+
+
+def test_case_5() -> None:
+    assert main() == 0, "case_5 smoke FAIL"
+
 
 
 if __name__ == "__main__":

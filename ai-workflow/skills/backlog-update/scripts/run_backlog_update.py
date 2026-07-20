@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Prototype runner for the backlog-update skill."""
@@ -148,7 +148,103 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--work-backlog-index-path")
     parser.add_argument("--session-handoff-path")
     parser.add_argument("--apply", action="store_true")
+    # v0.11.22+ Phase 3d: ADR-005 memory_index retrieval 3-tuple opt-in wiring (session-start / doc-sync 동일 패턴).
+    parser.add_argument("--memory-index-dir",
+                        help="memory_index 절대 path. 부재 시 skip.")
+    parser.add_argument("--memory-query-tokens",
+                        help="comma-separated query tokens. 부재 시 skip.")
     return parser.parse_args()
+
+
+def _build_memory_index_query_output(
+    args: argparse.Namespace,
+    workspace_root: Path,
+    warnings: list[str],
+) -> dict[str, Any] | None:
+    """v0.11.22+ Phase 3d: optional ADR-005 memory_index retrieval 3-tuple 호출 (session-start / doc-sync 동일 패턴).
+
+    - 둘 다 미지정 → None (zero-risk skip).
+    - 한쪽만 지정 → advisory emit + None.
+    - 둘 다 지정 → helper 호출, `MemoryIndexQueryOutput` dict 변환 후 emit.
+    - v0.13.1+ Phase 13 AC2: retrieval 성공/실패 후 telemetry sidecar 에 1 event append.
+    """
+    if not args.memory_index_dir and not args.memory_query_tokens:
+        return None
+    if not args.memory_index_dir or not args.memory_query_tokens:
+        warnings.append(
+            "memory_index wiring: --memory-index-dir 와 --memory-query-tokens 둘 다 지정해야 retrieval 활성."
+        )
+        return None
+    memory_index_dir = Path(args.memory_index_dir)
+    query_tokens = [t.strip() for t in args.memory_query_tokens.split(",") if t.strip()]
+    if not query_tokens:
+        warnings.append(
+            "memory_index wiring: --memory-query-tokens 가 비어있음. retrieval skip."
+        )
+        return None
+
+    from datetime import datetime as _dt, timezone as _tz
+    from workflow_kit.common.state.memory_index import (
+        MemoryIndexTelemetryEvent,
+        append_telemetry_event,
+        query_memory_index_for_dispatcher,
+    )
+    target = workspace_root
+    try:
+        memory_index_dir.relative_to(workspace_root)
+    except ValueError:
+        warnings.append(
+            "memory_index wiring: --memory-index-dir 가 workspace_root 외부. "
+            "본 release (Phase 3d) 정공법은 ws subdir 만 지원."
+        )
+        # Phase 13 AC2: 외부 dir 도 telemetry emit (negative example).
+        append_telemetry_event(
+            workspace_root,
+            MemoryIndexTelemetryEvent(
+                timestamp=_dt.now(_tz.utc),
+                source="backlog-update",
+                workspace_root=str(workspace_root),
+                query_tokens_count=len(query_tokens),
+                error=True,
+            ),
+        )
+        return None
+    try:
+        result = query_memory_index_for_dispatcher(target, query_tokens)
+        # Phase 13 AC2: telemetry emit (success path).
+        append_telemetry_event(
+            workspace_root,
+            MemoryIndexTelemetryEvent(
+                timestamp=_dt.now(_tz.utc),
+                source="backlog-update",
+                workspace_root=str(workspace_root),
+                query_tokens_count=len(query_tokens),
+                selected_count=result.selected_count,
+                cue_hits=result.cue_hits,
+                bm25_hits=result.bm25_hits,
+                expansion_hits=result.expansion_hits,
+                top_k=10,
+                max_depth=2,
+                use_bm25_fallback=False,
+            ),
+        )
+        return result.model_dump(mode="json")
+    except Exception as e:
+        warnings.append(
+            f"memory_index wiring: retrieval 실패 ({type(e).__name__}: {e}). backlog-update 본체는 계속 진행."
+        )
+        # Phase 13 AC2: 예외 path 도 telemetry emit (negative example).
+        append_telemetry_event(
+            workspace_root,
+            MemoryIndexTelemetryEvent(
+                timestamp=_dt.now(_tz.utc),
+                source="backlog-update",
+                workspace_root=str(workspace_root),
+                query_tokens_count=len(query_tokens),
+                error=True,
+            ),
+        )
+        return None
 
 
 def main() -> int:
@@ -158,6 +254,8 @@ def main() -> int:
         "task_name": args.task_name,
         "task_brief": args.task_brief,
         "daily_backlog_path": args.daily_backlog_path,
+        "memory_index_dir": args.memory_index_dir,
+        "memory_query_tokens": args.memory_query_tokens,
         "target_date": args.target_date,
         "task_id": args.task_id,
         "mode": args.mode,
@@ -489,6 +587,9 @@ def main() -> int:
             purpose_cot_trace=purpose_cot_trace,
             graph_insights=graph_insights,
             scope_creep_warnings=scope_creep_warnings,
+            memory_index_query_output=_build_memory_index_query_output(
+                args, workspace_root, warnings,
+            ),
         )
         result = output_model.model_dump()
     except Exception as exc:

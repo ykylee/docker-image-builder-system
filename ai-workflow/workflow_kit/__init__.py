@@ -1,5 +1,3 @@
-# standard-ai-workflow-kit: v0.11.21-beta
-
 """Reusable library modules for the standard AI workflow kit.
 
 Public API surface (v0.8.0+ stable API frozen):
@@ -40,6 +38,10 @@ Cumulative mypy strict clean file count (v0.8.0 spec §5.3 단계적 격상 정�
     - v0.11.16 누적: 36 file strict clean (유지)
       v0.11.14 36 + v0.11.16 28단계 (release_status.py --auto-bump 확장, 신규 file 0)
       = 36 file (기존 release_status.py 의 in-place 확장)
+    - v0.13.1 누적: 36 file strict clean (Phase 13 AC2 telemetry 후속, in-place 확장)
+      신규 file 0 (state/memory_index.py 의 telemetry helpers 는 기존 file 내 in-scope)
+      단, telemetry schemas (MemoryIndexTelemetryEvent/Summary) 는 schemas layer 로
+      격상 (workflow_kit/common/schemas/memory_index.py in-place 확장).
 """
 from __future__ import annotations
 
@@ -111,7 +113,7 @@ def _read_pyproject_version() -> str:
     Fallback chain (per spec v0.8.0 section 4.3):
         1. ``pyproject.toml`` (SSOT) - works in source tree.
         2. ``importlib.metadata`` - works for installed distribution.
-        3. Literal ``"v0.8.0-beta"`` - loud fallback when both fail.
+        3. Literal ``"v0.14.0-beta"`` - loud fallback when both fail.
     """
     # 1. pyproject.toml (SSOT)
     pyproject: Path = Path(__file__).parent.parent / "pyproject.toml"
@@ -138,7 +140,7 @@ def _read_pyproject_version() -> str:
         pass
 
     # 3. Loud fallback (spec section 4.3)
-    return "v0.11.21-beta-beta"
+    return "v0.15.20-beta"
 
 
 __version__: str = _read_pyproject_version()

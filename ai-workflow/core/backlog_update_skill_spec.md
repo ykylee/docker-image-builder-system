@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Backlog-Update Skill Spec
 
@@ -6,7 +6,7 @@
 - 범위: 목표, 입력 계약, 출력 계약, 신규 작업 생성 규칙, 상태 갱신 규칙, 실패 규칙, 쓰기 권한 제한, 수동 대체 절차
 - 대상 독자: AI agent 설계자, skill 구현자, 운영자, 프로젝트 온보딩 담당자
 - 상태: draft
-- 최종 수정일: 2026-04-18
+- 최종 수정일: 2026-07-18
 - 관련 문서: `./workflow_skill_catalog.md`, `./global_workflow_standard.md`, `./workflow_agent_topology.md`, `../templates/daily_backlog_template.md`, `../templates/work_backlog_template.md`, `./llm_wiki_concept_purpose_spec.md` (v0.9.5 part 2)
 
 ## 1. 목적
@@ -119,7 +119,7 @@
 | `next_stage` | `None` (workflow end) | 다음 stage 이름. workflow 끝이면 `None` |
 | `approval_actor` | `user` mandatory | auto-approval 차단 (state 문서 갱신) |
 | `approval_timestamp` | ISO 8601 | user explicit approval 시각 |
-| `artifacts` | [`ai-workflow/memory/active/backlog/<target_date>.md`, `ai-workflow/memory/active/work_backlog.md`] | 본 stage 의 검토 대상 artifact path |
+| `artifacts` | [`ai-workflow/memory/active/backlog/<target_date>.md`, `ai-workflow/memory/active/backlog`] | 본 stage 의 검토 대상 artifact path |
 | `requested_changes` | (empty or list) | user 가 요청한 변경 사항 |
 | `notes` | 1-3 line | AI summary |
 

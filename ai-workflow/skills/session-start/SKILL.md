@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Session-Start Skill
 
@@ -68,7 +68,44 @@ python3 skills/session-start/scripts/run_session_start.py \
 - handoff, backlog index, project profile 을 읽어 구조화된 현재 상태 요약을 출력할 수 있음
 - 경고 기반의 보수적 요약만 제공하며 문서 수정은 수행하지 않음
 
+## 9. v0.11.22+ Phase 3b — memory_index retrieval wiring (opt-in)
+
+session-start 가 ADR-005 memory_index 의 retrieval 3-tuple (cue exact → BM25 fallback →
+linked expansion) 결과를 *선택적* 으로 받아 output 의 `memory_index_query_output` field
+에 emit 한다. 디스크 변경 ❌ (read-only retrieval).
+
+### 사용법
+
+```bash
+python3 skills/session-start/scripts/run_session_start.py \
+  --session-handoff-path <handoff.md> \
+  --work-backlog-index-path <work_backlog.md> \
+  --project-profile-path <PROJECT_PROFILE.md> \
+  --memory-index-dir <workspace>/ai-workflow/memory/active/memory_index \
+  --memory-query-tokens "adr,memora,retrieval"
+```
+
+`--memory-index-dir` 와 `--memory-query-tokens` *둘 다* 지정해야 retrieval 활성.
+둘 중 하나만 지정 시 advisory emit + `memory_index_query_output=None`. 둘 다 부재 시
+zero-risk skip (default).
+
+### Output 추가 field
+
+`SessionStartOutput.memory_index_query_output` (optional, `dict[str, Any] | None`):
+
+- `selected_ids` — retrieval 결과 entry id list
+- `cue_hits` / `bm25_hits` / `expansion_hits` / `expansion_depth_used`
+- `source_context` — 호출 정보 (workspace_root / memory_index_dir)
+
+본 field 는 기존 caller 깨지지 않게 *optional* — 부재 시 `None` (backward compat).
+
+### 후속
+
+- doc-sync / backlog-update 같은 다른 skill 의 wiring (Phase 3c/3d, 별도 release).
+- ADR-006 retrospective 자리 (Phase 3c/d 완료 후).
+
 ## 다음에 읽을 문서
 
 - skills 허브: [../README.md](../README.md)
 - 상세 스펙: [../../core/session_start_skill_spec.md](../../core/session_start_skill_spec.md)
+- ADR-005 memory_index: [../../../docs/architecture/ADR-005-memora-inspired-memory-index.md](../../../docs/architecture/ADR-005-memora-inspired-memory-index.md)

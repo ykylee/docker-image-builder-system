@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Safely apply a workflow harness bundle into a target repository."""
@@ -25,8 +25,8 @@ MANAGED_RELATIVE_PATHS = [
 PRESERVE_RELATIVE_PATHS = [
     Path("ai-workflow/memory"),
     Path("ai-workflow/WORKFLOW_INDEX.md"),
-    Path("ai-workflow/memory/active/PROJECT_PROFILE.md"),
-    Path("ai-workflow/memory/active/session_handoff.md"),
+    Path("docs/PROJECT_PROFILE.md"),
+    Path("ai-workflow/memory/active/sessions"),
     Path("ai-workflow/memory/active/state.json"),
 ]
 

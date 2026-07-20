@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Workflow MCP Candidate Catalog
 
@@ -6,7 +6,7 @@
 - 범위: 탐색, 검사, 초안 생성, 영향도 추천 등 반복 작업에 적합한 MCP 후보
 - 대상 독자: AI agent 설계자, 개발자, 운영자
 - 상태: Beta v2 통합 완료 (v0.5.10-beta 기준 refresh)
-- 최종 수정일: 2026-06-09
+- 최종 수정일: 2026-07-18
 - 관련 문서: `workflow_skill_catalog.md`, `workflow_agent_topology.md`
 
 ## 1. 우선순위 1 (Beta v2 통합 완료)

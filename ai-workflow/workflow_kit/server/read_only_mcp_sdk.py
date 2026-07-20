@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Optional official MCP Python SDK stdio server candidate for the read-only bundle."""
@@ -50,6 +50,13 @@ def _import_sdk_modules() -> OfficialSdkModules:
 
 
 def sdk_runtime_status() -> dict[str, object]:
+    """stdio-sdk server 의 runtime status + descriptor 정합 검증.
+
+    v0.11.25 cycle 의 fix: sdk_available=True 일 때 transport_ready=True advertise
+    (이전 experimental 박힘 상태 → stable 전환). mcp 1.27.0 의 CallToolResult(_meta=...,
+    structuredContent=...) API 정합 (가설 A 의 *historical* 원인 — 구 SDK 의 kwarg 미지원 —
+    해소 확인).
+    """
     missing_modules: list[str] = []
     resolved_modules: dict[str, str] = {}
     for module_name in SDK_IMPORT_TARGETS:
@@ -62,13 +69,17 @@ def sdk_runtime_status() -> dict[str, object]:
         resolved_modules[module_name] = module_path or "<namespace>"
 
     descriptors = build_transport_tool_descriptors()
+    sdk_available = not missing_modules
     return {
         "status": "ok",
         "server_name": READ_ONLY_SERVER_NAME,
         "tool_version": TOOL_VERSION,
-        "transport_ready": False,
-        "sdk_candidate_phase": "official_sdk_optional_candidate",
-        "sdk_available": not missing_modules,
+        "transport_ready": sdk_available,
+        "sdk_candidate_phase": (
+            "official_sdk_stable" if sdk_available
+            else "official_sdk_optional_candidate"
+        ),
+        "sdk_available": sdk_available,
         "sdk_import_targets": list(SDK_IMPORT_TARGETS),
         "missing_modules": missing_modules,
         "resolved_modules": resolved_modules,

@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """workflow-source 의 [tool.workflow-doctor] pyproject.toml metadata loader (v0.7.6+).
 

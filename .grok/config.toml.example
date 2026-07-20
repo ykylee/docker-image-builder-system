@@ -1,0 +1,104 @@
+# Grok Build config (v0.15.16+, standard-ai-workflow overlay)
+#
+# 사용: 본 파일을 `.grok/config.toml` 로 cp 후 절대 경로 보정.
+#
+#   cp .grok/config.toml.example .grok/config.toml
+#   $EDITOR .grok/config.toml
+#
+# Grok Build 는 cwd > repo > user 순으로 .grok/config.toml 을 자동 load.
+# Claude (`.claude.json`) / Cursor (`.cursor/mcp.json`) / `.mcp.json` 도
+# 자동 import (config.toml > claude > cursor > mcp 우선순위).
+
+# ---------------------------------------------------------------------------
+# 모델 (Grok Build default)
+# ---------------------------------------------------------------------------
+[models]
+default = "grok-build"
+web_search = "grok-4.20-multi-agent"
+
+# subagent 는 더 가벼운 모델로 분리 (예: explore / plan)
+# [subagents]
+# enabled = true
+#
+# [subagents.toggle]
+# explore = true
+# plan = true
+#
+# [subagents.models]
+# explore = "grok-4.20-multi-agent"
+# plan = "grok-4.20-multi-agent"
+
+# ---------------------------------------------------------------------------
+# 표준 AI 워크플로우 MCP (read-only)
+# ---------------------------------------------------------------------------
+[mcp_servers.standardAiWorkflowReadOnly]
+command = "python3"
+args = ["-m", "workflow_kit.server.read_only_jsonrpc", "--stdio-lines"]
+PYTHONPATH = "/ABSOLUTE/PATH/TO/standard_ai_workflow/workflow-source"
+STANDARD_AI_WORKFLOW_ROOT = "/ABSOLUTE/PATH/TO/<project_root>"
+
+[mcp_servers.standardAiWorkflowReadOnly.tool_descriptions]
+workflow_kit.read_only = "Read-only MCP tools (latest_backlog, check_doc_metadata, ...) for the Standard AI Workflow kit."
+
+# stdio-sdk variant (실험적):
+# [mcp_servers.standardAiWorkflowReadOnly]
+# command = "python3"
+# args = ["-m", "workflow_kit.server.read_only_mcp_sdk", "--stdio-sdk"]
+# PYTHONPATH = "/ABSOLUTE/PATH/TO/standard_ai_workflow/workflow-source"
+# STANDARD_AI_WORKFLOW_ROOT = "/ABSOLUTE/PATH/TO/<project_root>"
+
+# ---------------------------------------------------------------------------
+# Skills (project-local + user)
+# ---------------------------------------------------------------------------
+[skills]
+paths = [".grok/skills"]
+# ignore = []
+# disabled = []
+
+# ---------------------------------------------------------------------------
+# Memory (opt-in)
+# ---------------------------------------------------------------------------
+# [memory]
+# enabled = false                       # enable memory
+#
+# [memory.session]
+# save_on_end = true                    # write metadata summary on session end
+#
+# [memory.watcher]
+# enabled = true                        # watch memory files for external edits
+#
+# [memory.search]
+# max_results = 6
+# min_score = 0.35
+#
+# [memory.initial_injection]
+# enabled = true
+# min_score = 0.0
+
+# ---------------------------------------------------------------------------
+# Permissions (default: ask; team 표준은 always_allow_all_sessions)
+# ---------------------------------------------------------------------------
+# [permission]
+# default_action = "ask"
+
+# ---------------------------------------------------------------------------
+# 호환성 자동 import (선택)
+# ---------------------------------------------------------------------------
+# 기존 workflow MCP 가 Claude / Cursor / MCP 표준 소스에 있으면 자동 import.
+# 동일 alias 의 [mcp_servers] 가 여러 소스에 있으면 config.toml 이 우선.
+[compat.claude]
+mcps = true
+
+[compat.cursor]
+mcps = true
+
+[compat.codex]
+sessions = true
+
+# ---------------------------------------------------------------------------
+# Notifications (선택)
+# ---------------------------------------------------------------------------
+# [ui.notifications]
+# method = "auto"
+# condition = "unfocused"
+# events = ["turn_complete", "approval_required"]

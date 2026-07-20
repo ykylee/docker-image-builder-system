@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 from workflow_kit.common.schemas.base import BaseOutput, Status, ErrorOutput
 from workflow_kit.common.schemas.backlog import (
@@ -36,6 +36,10 @@ from workflow_kit.common.schemas.patcher import (
     AppliedPatchBlock,
     RobustPatcherSourceContext,
 )
+from workflow_kit.common.schemas.automated_repro_scaffold import (
+    AutomatedReproScaffoldOutput,
+    AutomatedReproScaffoldSourceContext,
+)
 from workflow_kit.common.schemas.read_only import (
     LatestBacklogOutput,
     CheckDocMetadataOutput,
@@ -45,6 +49,18 @@ from workflow_kit.common.schemas.read_only import (
     CreateSessionHandoffDraftOutput,
     CreateEnvironmentRecordStubOutput,
     SmartContextReaderOutput,
+)
+from workflow_kit.common.schemas.memory_index import (
+    MemoryEntry,
+    MemoryIndexOutput,
+    MemoryIndexQuery,
+    MemoryIndexQueryOutput,
+    MemoryIndexQueryResult,
+    MemoryIndexValidationIssue,
+    MemoryIndexValidationOutput,
+    MemoryMergeRequest,
+    MemoryMergeResult,
+    MergeState,
 )
 
 __all__ = [
@@ -82,6 +98,18 @@ __all__ = [
     "RobustPatcherOutput",
     "AppliedPatchBlock",
     "RobustPatcherSourceContext",
+    "AutomatedReproScaffoldOutput",
+    "AutomatedReproScaffoldSourceContext",
+    "MemoryEntry",
+    "MemoryIndexOutput",
+    "MemoryIndexQuery",
+    "MemoryIndexQueryOutput",
+    "MemoryIndexQueryResult",
+    "MemoryIndexValidationIssue",
+    "MemoryIndexValidationOutput",
+    "MemoryMergeRequest",
+    "MemoryMergeResult",
+    "MergeState",
     "LatestBacklogOutput",
     "CheckDocMetadataOutput",
     "CheckDocLinksOutput",

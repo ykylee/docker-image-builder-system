@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Code Index Update Skill Spec
 
@@ -6,7 +6,7 @@
 - 범위: 입력, 출력, 추천 규칙, 색인 문서 범위 정의, 보수적 경고 규칙, 프로토타입 범위
 - 대상 독자: AI agent 설계자, skill 구현자, 개발자, 운영자
 - 상태: draft
-- 최종 수정일: 2026-04-19
+- 최종 수정일: 2026-07-18
 - 관련 문서: `./workflow_skill_catalog.md`, `./doc_sync_skill_spec.md`, `../skills/code-index-update/SKILL.md`
 
 ## 1. 목적
@@ -74,7 +74,7 @@
 | `next_stage` | `None` (workflow end) | 다음 stage 이름. workflow 끝이면 `None` |
 | `approval_actor` | `user` mandatory | auto-approval 차단 (state 문서 갱신) |
 | `approval_timestamp` | ISO 8601 | user explicit approval 시각 |
-| `artifacts` | [`README.md`, `ai-workflow/memory/active/session_handoff.md`] | 본 stage 의 검토 대상 artifact path |
+| `artifacts` | [`README.md`, `ai-workflow/memory/active/sessions`] | 본 stage 의 검토 대상 artifact path |
 | `requested_changes` | (empty or list) | user 가 요청한 변경 사항 |
 | `notes` | 1-3 line | AI summary |
 

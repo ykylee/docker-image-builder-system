@@ -1,0 +1,42 @@
+{
+  "id": "MEM-2026-07-20-002",
+  "schema_version": 1,
+  "source_paths": [
+    "docs/operations/admin-pages-react-2026-07-08.md",
+    "docs/operations/build-request-api-console-react-2026-07-18.md",
+    "docs/operations/app-router-simplify-2026-07-18.md",
+    "docs/operations/svelte-scaffold-cleanup-2026-07-18.md",
+    "docs/operations/design-tokens-unification-2026-07-18.md"
+  ],
+  "primary_abstraction": "M4.5 8-PR Group A-G + design tokens unification TASK-095~101",
+  "cue_anchors": [
+    "M4.5",
+    "Group-A",
+    "Group-B",
+    "Group-C",
+    "Group-D",
+    "Group-E",
+    "Group-F",
+    "Group-G",
+    "design-tokens",
+    "TASK-095",
+    "TASK-101"
+  ],
+  "value_digest": "M4.5 8-PR 시리즈 + TASK-096.5 디자인 토큰 단일화 (Svelte inline style 1:1 React CSS). vitest +123 케이스.",
+  "owners": [
+    "ykylee"
+  ],
+  "scope": [
+    "docker-image-builder-system",
+    "frontend",
+    "react",
+    "design-tokens"
+  ],
+  "merge_state": "active",
+  "mentioned_in": [
+    "docs/RELEASE_NOTES-2026-07-20.md",
+    "ai-workflow/memory/active/session_handoff.md"
+  ],
+  "created_at": "2026-07-20T15:00:00Z",
+  "updated_at": "2026-07-20T15:00:00Z"
+}

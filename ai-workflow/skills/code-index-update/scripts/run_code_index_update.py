@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 #!/usr/bin/env python3
 """Prototype runner for the code-index-update skill."""
@@ -343,7 +343,7 @@ def main() -> int:
             build_stage_completion(
                 stage_name="code-index-update",
                 stage_status="ok" if result.get("status") in ("ok", "success") else "warning" if result.get("status") == "warning" else "error",
-                artifacts=["ai-workflow/memory/active/session_handoff.md"],
+                artifacts=["ai-workflow/memory/active/sessions"],
                 next_stage=None,
                 notes=[result.get("summary", "")[:200]] if result.get("summary") else [],
             ),

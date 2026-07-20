@@ -1,0 +1,37 @@
+{
+  "id": "MEM-2026-07-20-006",
+  "schema_version": 1,
+  "source_paths": [
+    "scripts/db-migrate.sh",
+    "apps/build-server/src/migrations/",
+    "docs/operations/migration-cli-workflow-2026-07-20.md",
+    "docs/PROJECT_PROFILE.md"
+  ],
+  "primary_abstraction": "scripts/migrate.ts standalone CLI + 권고 scripts/db-migrate.sh TASK-103",
+  "cue_anchors": [
+    "migrate.ts",
+    "db-migrate.sh",
+    "standalone-CLI",
+    "6-gate",
+    "TASK-103",
+    "migration-workflow"
+  ],
+  "value_digest": "scripts/migrate.ts standalone CLI 운영 workflow 정립 + scripts/db-migrate.sh 6 게이트 wrapper (--plan / --status / --apply-all / --apply-up-to / --bootstrap / --dr-stop).",
+  "owners": [
+    "ykylee"
+  ],
+  "scope": [
+    "docker-image-builder-system",
+    "migration",
+    "CLI",
+    "scripts",
+    "postgres"
+  ],
+  "merge_state": "active",
+  "mentioned_in": [
+    "docs/RELEASE_NOTES-2026-07-20.md",
+    "docs/operations/release-checklist-2026-07-20.md"
+  ],
+  "created_at": "2026-07-20T15:00:00Z",
+  "updated_at": "2026-07-20T15:00:00Z"
+}

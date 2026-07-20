@@ -1,0 +1,36 @@
+{
+  "id": "MEM-2026-07-20-007",
+  "schema_version": 1,
+  "source_paths": [
+    "docs/RELEASE_NOTES-2026-07-20.md",
+    "ai-workflow/memory/active/session_handoff.md",
+    "ai-workflow/memory/active/work_backlog.md",
+    "ai-workflow/memory/active/backlog/2026-07-20.md"
+  ],
+  "primary_abstraction": "TASK-114 본 세션 종합 RELEASE_NOTES + 운영 가이드 인덱스화",
+  "cue_anchors": [
+    "TASK-114",
+    "RELEASE_NOTES",
+    "운영-가이드-인덱스",
+    "종합-리뷰",
+    "follow-up-후보"
+  ],
+  "value_digest": "본 세션 (2026-07-20) 12 TASK (TASK-102~113) 종합 RELEASE_NOTES + 운영 가이드 인덱스 + follow-up 후보 (옵션 Z / 신규 기능 / Nextcloud Tasks / CHANGELOG / CI migration validation / git tag).",
+  "owners": [
+    "ykylee"
+  ],
+  "scope": [
+    "docker-image-builder-system",
+    "release-notes",
+    "operations-guide",
+    "follow-up",
+    "TASK-114"
+  ],
+  "merge_state": "active",
+  "mentioned_in": [
+    "ai-workflow/memory/active/state.json",
+    "ai-workflow/memory/active/session_handoff.md"
+  ],
+  "created_at": "2026-07-20T15:00:00Z",
+  "updated_at": "2026-07-20T15:00:00Z"
+}

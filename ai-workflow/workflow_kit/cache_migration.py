@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """workflow_kit.cache_migration - v0.7.41 single file -> 3 per-strategy files (v0.7.44+).
 

@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Registry for the first read-only MCP server bundle."""
 
@@ -313,7 +313,7 @@ READ_ONLY_TOOL_SPECS: tuple[ReadOnlyToolSpec, ...] = (
             ),
         ),
         payload_example={
-            "handoff_path": "ai-workflow/memory/active/session_handoff.md",
+            "handoff_path": "ai-workflow/memory/active/sessions",
             "max_done_items": "5",
         },
     ),

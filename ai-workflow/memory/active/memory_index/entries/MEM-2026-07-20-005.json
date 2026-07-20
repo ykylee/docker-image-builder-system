@@ -1,0 +1,36 @@
+{
+  "id": "MEM-2026-07-20-005",
+  "schema_version": 1,
+  "source_paths": [
+    "docs/PROJECT_PROFILE.md",
+    "docs/operations/project-profile-baseline-postgres-sync-2026-07-20.md",
+    "docs/operations/project-profile-react-baseline-full-sync-2026-07-18.md"
+  ],
+  "primary_abstraction": "PROJECT_PROFILE §3 baseline 양축 동기화 (memory/postgres 동등) TASK-102",
+  "cue_anchors": [
+    "PROJECT_PROFILE",
+    "baseline",
+    "양축-동기화",
+    "memory",
+    "postgres",
+    "TASK-102",
+    "default-backend"
+  ],
+  "value_digest": "PROJECT_PROFILE §3 명령 박스 run_local/run_local_postgres default backend 정합 + 회귀 baseline 양축 동기화 (memory-only → Postgres 동등). docs only.",
+  "owners": [
+    "ykylee"
+  ],
+  "scope": [
+    "docker-image-builder-system",
+    "PROJECT_PROFILE",
+    "docs-only",
+    "memory-postgres-baseline"
+  ],
+  "merge_state": "active",
+  "mentioned_in": [
+    "docs/RELEASE_NOTES-2026-07-20.md",
+    "ai-workflow/memory/active/work_backlog.md"
+  ],
+  "created_at": "2026-07-20T15:00:00Z",
+  "updated_at": "2026-07-20T15:00:00Z"
+}

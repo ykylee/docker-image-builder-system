@@ -29,10 +29,10 @@
       "command": "python3",
       "args": ["-m", "workflow_kit.server.read_only_jsonrpc", "--stdio-lines"],
       "env": {
-        "PYTHONPATH": "./workflow-source"
+        "PYTHONPATH": "./ai-workflow"
       },
       "transport_ready": false,
-      "description": "Read-only MCP draft fixture for the standard workflow kit. See workflow-source/schemas/read_only_transport_descriptors.json."
+      "description": "Read-only MCP draft fixture for the standard workflow kit. v0.15.19-beta: workflow kit lives under ./ai-workflow/ (not ./workflow-source/) — see TASK-119 reconcile. descriptors: ai-workflow/schemas/read_only_transport_descriptors.json."
     }
   },
   "workflow": {

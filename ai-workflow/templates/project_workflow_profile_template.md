@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Project Workflow Profile
 
@@ -18,7 +18,7 @@
 - 문서 위키 홈: <README.md>
 - 운영 문서 홈: <docs/operations/>
 - 백로그 위치: <ai-workflow/memory/backlog/>
-- 세션 인계 문서: <ai-workflow/memory/active/session_handoff.md>
+- 세션 인계 문서: <ai-workflow/memory/active/sessions>
 - 환경 기록 위치: <ai-workflow/memory/active/repository_assessment.md>
 
 ## 3. 기본 명령 (Commands)
@@ -41,5 +41,5 @@
 - 기타: <프로젝트 특유의 컨벤션>
 
 ## 다음에 읽을 문서
-- [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
-- [작업 백로그](../ai-workflow/memory/active/work_backlog.md)
+- [세션 인계 문서](../ai-workflow/memory/active/sessions)
+- [작업 백로그](../ai-workflow/memory/active/backlog)

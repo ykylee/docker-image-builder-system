@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """workflow_kit.common.auth — v0.7.3 SEC-AUTH-01~06 runtime evaluator.
 

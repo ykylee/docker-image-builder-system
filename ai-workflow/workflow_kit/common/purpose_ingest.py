@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Two-step CoT ingest helper for PURPOSE.md (v0.11.0 R-A follow-up cycle 3).
 

@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Purpose context load helper for skill integration (v0.9.5 chapter 9 R-A part 2).
 

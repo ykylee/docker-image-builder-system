@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.21-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # Prototype Promotion Scope
 
@@ -6,7 +6,7 @@
 - 범위: 승격 판단 기준, 우선 승격 후보, 보류 후보, package/server 분리 원칙, 단계별 권장 순서
 - 대상 독자: 저장소 관리자, AI workflow 설계자, 구현자, 배포 담당자
 - 상태: draft (snapshot of Phase 8 promotion criteria. Current promotion status: see `maturity_matrix.json`)
-- 최종 수정일: 2026-06-09
+- 최종 수정일: 2026-07-18
 - 관련 문서: `./workflow_kit_roadmap.md`, `./workflow_release_spec.md`, `./workflow_mcp_candidate_catalog.md`, `./read_only_mcp_transport_promotion.md`, `../skills/README.md`, `../mcp_servers/README.md`, `../workflow_kit/README.md`
 
 ## 1. 목적

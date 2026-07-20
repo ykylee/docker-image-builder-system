@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Extension Baseline Compliance Evaluator (v0.7.1+ / v0.7.3+).
 
@@ -305,19 +305,22 @@ def _eval_testing_baseline(project_root: Path, *, state: dict[str, Any] | None =
     tests_dir = project_root / "workflow-source" / "tests"
 
     # TST-WF-01: Smoke Test Coverage Required (≥ 5 test case)
+    # v0.15.16+ patch: historical `def case_*` 패턴도 인정. 196 file 중 77 file (39%) 가
+    # pre-existing 인프라로 `def test_` 0~4개 → patch 후에도 min < 5 residual (운영 기록 v0.11.22 와 정합).
     smoke_test_files = list(tests_dir.glob("check_*.py")) if tests_dir.exists() else []
     test_count_per_file = {}
     for tf in smoke_test_files:
         content = tf.read_text(encoding="utf-8", errors="ignore")
-        # "def test_" 개수
-        n = len(re.findall(r"^def test_", content, re.MULTILINE))
-        test_count_per_file[tf.name] = n
+        # "def test_" + "def case_" 모두 카운트 (historical compatibility)
+        n_test = len(re.findall(r"^def test_", content, re.MULTILINE))
+        n_case = len(re.findall(r"^def case_", content, re.MULTILINE))
+        test_count_per_file[tf.name] = n_test + n_case
     min_tests = min(test_count_per_file.values()) if test_count_per_file else 0
     results.append(RuleResult(
         rule_id="TST-WF-01",
         title="Smoke Test Coverage Required",
         status="compliant" if min_tests >= 5 else "non_compliant",
-        notes=f"min test count: {min_tests} (need ≥ 5) across {len(smoke_test_files)} files",
+        notes=f"min test count (test_ + case_): {min_tests} (need ≥ 5) across {len(smoke_test_files)} files",
     ))
 
     # TST-WF-02: Round-Trip Properties for State Serialization

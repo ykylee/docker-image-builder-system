@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.11.25-beta -->
+<!-- standard-ai-workflow-kit: v0.15.19-beta -->
 
 # AGENTS.md
 
@@ -6,8 +6,8 @@
 - 범위: 세션 복원, workflow state docs 참조 순서, 사용자 보고 언어, 기본 실행/검증 명령
 - 대상 독자: Codex, 저장소 관리자, workflow 설계자
 - 상태: draft
-- 최종 수정일: 2026-07-08
-- 관련 문서: `ai-workflow/memory/active/state.json`, `ai-workflow/memory/active/session_handoff.md`, `ai-workflow/memory/active/work_backlog.md`, `ai-workflow/memory/active/PROJECT_PROFILE.md`
+- 최종 수정일: 2026-07-20
+- 관련 문서: `ai-workflow/memory/active/state.json`, `ai-workflow/memory/active/sessions`, `ai-workflow/memory/active/backlog`, `docs/PROJECT_PROFILE.md`
 
 ## 목적
 
@@ -16,9 +16,9 @@
 ## 항상 먼저 읽을 문서
 
 - `ai-workflow/memory/active/state.json`
-- `ai-workflow/memory/active/session_handoff.md`
-- `ai-workflow/memory/active/work_backlog.md`
-- `ai-workflow/memory/active/PROJECT_PROFILE.md`
+- `ai-workflow/memory/active/sessions`
+- `ai-workflow/memory/active/backlog`
+- `docs/PROJECT_PROFILE.md`
 - `ai-workflow/wiki/index.md` — R4 anchor 기반, AI agent query 시 먼저 로드
 
 `ai-workflow/` 는 세션 복원과 workflow 상태 관리용 메타 레이어다. 프로젝트 코드나 프로젝트 문서를 탐색할 때는 이 경로를 기본 탐색 범위에 넣지 말고, workflow 문서 자체를 갱신하거나 현재 세션 상태를 복원할 때만 예외적으로 참조한다.
@@ -40,11 +40,11 @@
 
 ## 프로젝트 실행 기본값
 
-- 설치: `TODO: 설치 명령 입력`
+- 설치: `npm install`
 - 로컬 실행: `TODO: 로컬 실행 명령 입력`
 - 빠른 테스트: `TODO: 빠른 테스트 명령 입력`
 - 격리 테스트: `TODO: 격리 테스트 명령 입력`
-- 실행 확인: `TODO: 실행 확인 명령 입력`
+- 실행 확인: `node --version`
 
 ## 문서 작업 기준
 
@@ -60,4 +60,4 @@
 - 가능한 경우 메인 에이전트는 조정과 통합에 집중하고, bounded scope 의 읽기/쓰기/검증 작업은 worker 성격의 서브 에이전트로 분리하는 패턴을 권장한다.
 - worker 에게는 책임 파일과 종료 조건을 명확히 넘기고, 메인 에이전트에는 핵심 사실과 결과만 다시 모은다.
 - `main`/`small` 모델을 함께 운영한다면, 메인 에이전트는 난도 높은 판단과 통합에, worker 는 bounded scope 탐색/초안/검증에 우선 배치하는 편이 효율적이다.
-- 신규 프로젝트 기준 초안이다. 프로젝트 고유의 실행 명령과 문서 구조가 정확한지 확인해야 한다.
+- 기존 코드베이스 분석 결과를 반영한 초안이다. 추정 명령과 문서 경로는 실제 저장소 기준으로 수정할 수 있다.

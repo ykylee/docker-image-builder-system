@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.11.21-beta
+# standard-ai-workflow-kit: v0.15.19-beta
 
 """Filesystem path helpers shared across workflow kit prototypes."""
 
@@ -58,6 +58,34 @@ def workflow_memory_dir(project_profile_path: Path) -> Path:
     if profile_dir.name == "docs":
         return (profile_dir.parent / "ai-workflow" / "memory").resolve()
     return profile_dir
+
+
+def workflow_backlog_dir(project_profile_path: Path) -> Path:
+    """Return the daily-backlog directory (v0.14.0+ append-only layout).
+
+    본 directory 는 memory_dir / 'backlog' 으로, YYYY-MM-DD.md daily index 들을 포함.
+    MEMORY_GOVERNANCE.md §2 의 "Daily Backlog Index" 템플릿 정공법.
+    """
+    return workflow_memory_dir(project_profile_path) / "backlog"
+
+
+def workflow_tasks_dir(project_profile_path: Path) -> Path:
+    """Return the per-task directory (v0.14.0+ append-only layout).
+
+    본 directory 는 memory_dir / 'backlog' / 'tasks' 으로, TASK-<date>-<NNN>.md
+    per-task SSOT 들을 포함.
+    """
+    return workflow_backlog_dir(project_profile_path) / "tasks"
+
+
+def workflow_sessions_dir(project_profile_path: Path) -> Path:
+    """Return the per-session directory (v0.14.0+ append-only layout).
+
+    본 directory 는 memory_dir / 'sessions' 으로, session-analysis / audit-follow-up
+    같은 per-session 파일들을 포함. 기존 legacy `session_handoff.md` (단일 파일,
+    overwrite race) 의 후속.
+    """
+    return workflow_memory_dir(project_profile_path) / "sessions"
 
 
 def project_workspace_root(project_profile_path: Path) -> Path:
