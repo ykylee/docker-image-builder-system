@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-20T09:00:00Z",
-  "purpose_digest": "TASK-111 (Production-semantic Postgres backend 동등 보강) 봉인 sync (rev 140→141). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 + TASK-108 + TASK-109 + TASK-110 + TASK-111 까지 **10 TASK 연속 봉인**. TASK-111 결정: TASK-085 의 production-semantic 운영 검증의 postgres backend 동등 보강 — busybox Dockerfile + 실제 tar.gz source archive 의 build 가 COMPLETED 까지 가는 운영 시나리오를 postgres backend 로 동일하게 검증. 신규 3 file + amend 1 file: 신규 — `compose.dev.e2e-production-postgres.yaml` (postgres profile + build-server 의 postgres backend 전환) + `apps/build-server/scripts/e2e-production-semantic-postgres.sh` (8 단계: postgres + busybox warm-up → compose up → build-server cold start + applyMigrations → psql direct verify → source archive 작성 + busybox Dockerfile → source archive upload + postgres bytea round-trip verify → build lifecycle 대기 → 10 phase + preview URL + deploy mode 검증 → terminal-phase bytea 재검증 + container cleanup + compose down. 약 2-3분) + `docs/operations/production-semantic-postgres-2026-07-20.md` (의도 / 결정 / 신규 회귀 가드 8 단계 / Wire format 변경 0 / Schema 변경 0 / 운영 rollout playbook 5 단계 / 사전 결함 + 보강 3건 / 회귀 baseline / follow-up / 관련 문서). amend — docs/PROJECT_PROFILE.md (§3.5 postgres backend follow-up 의 후속 TASK (TASK-066 follow-up batch 4 후보) 해제 + TASK-111 신규 봉인 완료 전환 + 본 TASK 신규 항목 + 다음에 읽을 문서 reference). SQL / schema / migration / version 변경 0. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 0 변경), build-server vitest 165/165 (변경 0), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 운영 영향 0 (memory variant callers) — TASK-085 의 memory variant 가 그대로 동등 운영; 신규 postgres variant 는 release staging 에서 운영자가 선택적으로 postgres 동등성 검증. 사전 결함 + 보강 3건 (3 layer compose 의 검증 부담 → 운영 가이드에 모두 명시 / postgres volume 자동 drop → staging 환경 verify / build 5 분 상한 미달 → 사전 warm-up 권장). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52, TASK-106 +11 + TASK-108 +4 + TASK-109 +3 + TASK-110 +4 신규) / TS 5 packages clean / vite build:react 정상. 29 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up (남은 결정): TASK-085 production-semantic 운영 가이드 postgres variant cross-reference / chunked multi-runner 회귀 가드 / 옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 모두 별도 사용자 결정.",
-  "purpose_digest_rev": 141,
+  "generated_at": "2026-07-20T10:00:00Z",
+  "purpose_digest": "TASK-112 (양 variant 운영 가이드 cross-reference 봉인) docs only sync (rev 141→142). 본 세션은 2026-07-20 의 단일 작업 흐름에서 TASK-102 + TASK-103 + TASK-104 + TASK-105 + TASK-106 + TASK-107 + TASK-108 + TASK-109 + TASK-110 + TASK-111 + TASK-112 까지 **11 TASK 연속 봉인**. TASK-112 결정: TASK-085 follow-up 권장 — 운영자가 메모리 / postgres 양 variant 를 운영 가이드 인덱스에서 한 자릿에 식별 가능하도록 cross-reference 봉인. 신규 1 file + amend 2 file: 신규 — `docs/operations/production-semantic-2026-07-07.md` (TASK-085 memory variant 운영 가이드, §1 의도 / 결정 / §2 신규 회귀 가드 7 단계 / §3 Wire format 변경 없음 / §4 Schema 변경 없음 / §5 운영 rollout playbook 5 단계 / §6 사전 결함 + 보강 3건 / §7 회귀 baseline / §8 follow-up / §9 관련 문서). amend — `docs/operations/production-semantic-postgres-2026-07-20.md` (postgres variant 가이드 § 회귀 baseline 의 \"신규 운영 가이드\" row + follow-up 의 TASK-085 ↔ TASK-111 cross-reference 권장 반영) + `docs/PROJECT_PROFILE.md` (§3.5 의 TASK-085 e2e-production-semantic.sh 회귀 baseline 줄 끝에 TASK-085 운영 가이드 reference + 다음에 읽을 문서에 TASK-085 운영 가이드 reference 추가). SQL / schema / migration / version 변경 0 — 운영 가이드 본체 + cross-reference 만. 회귀 영향: TS 5 packages clean, vitest 130/130 (frontend 0 변경), build-server vitest 165/165 (변경 0), Go 7+ PASS, vite build:react 동일, postgres migration 0001~0006 적용 정상. 운영 영향 0 — 신규 운영 가이드 + cross-reference 만; release staging 의 검증 / e2e 스크립트 동작 0 변경. 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean / vite build:react 정상. 30 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20). follow-up (남은 결정): chunked multi-runner 회귀 가드 / 옵션 Z 외부 object storage / 신규 기능 추가 / Nextcloud Tasks 통합 / 다른 TASK 모두 별도 사용자 결정.",
+  "purpose_digest_rev": 142,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-111 (Production-semantic Postgres backend 동등 보강) 봉인 (rev 140→141). main HEAD `3369d0a` (TASK-111 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 29 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
-    "current_axis": "TASK-111 Production-semantic Postgres backend 동등 보강 완료. 본 세션 10 TASK 연속 봉인. 29 TASK 봉인. 모든 TASK main 합류.",
-    "current_focus": "TASK-111 production-semantic-postgres 봉인 sync 완료. 다음 세션 시작 시 main HEAD `3369d0a` + workflow meta (state rev 141) baseline 복원. 후속 결정 (TASK-085 운영 가이드 postgres cross-reference / chunked multi-runner 회귀 가드 / 옵션 Z / 신규 기능 / Nextcloud Tasks / 다른 TASK) 별도 사용자 결정.",
+    "current_baseline": "TASK-112 (양 variant 운영 가이드 cross-reference) docs only 봉인 (rev 141→142). main HEAD `81110df` (TASK-112 commit). 누적 회귀 baseline (TASK-088 baseline 대비): vitest 7 → 130 (+123) / build-server 113 → 165 (+52) / TS 5 packages clean. vite build:react 정상 (gzip js 99.01KB / css 30.62KB). 30 TASK 연속 봉인 완료 (2026-07-08 ~ 2026-07-20).",
+    "current_axis": "TASK-112 양 variant 운영 가이드 cross-reference 봉인 완료. 본 세션 11 TASK 연속 봉인. 30 TASK 봉인. 모든 TASK main 합류.",
+    "current_focus": "TASK-112 양 variant 운영 가이드 cross-reference 봉인 sync 완료. 다음 세션 시작 시 main HEAD `81110df` + workflow meta (state rev 142) baseline 복원. 후속 결정 (chunked multi-runner 회귀 가드 / 옵션 Z / 신규 기능 / Nextcloud Tasks / 다른 TASK) 별도 사용자 결정.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-112 양 variant 운영 가이드 cross-reference — `81110df` main 합류 (2026-07-20, 본 세션)",
       "TASK-111 Production-semantic Postgres backend 동등 보강 — `3369d0a` main 합류 (2026-07-20, 본 세션)",
       "TASK-110 STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인 — `1105a8e` main 합류 (2026-07-20, 본 세션)",
       "TASK-109 RFC 7233 `*` 케이스 dynamic boundary check 봉인 — `0663785` main 합류 (2026-07-20, 본 세션)",
@@ -86,7 +87,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-20.md",
-    "task_count": 29,
+    "task_count": 30,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -120,10 +121,11 @@
       "TASK-108 RFC 7233 Content-Range chunked wire-format 의미 C bipartite 완전 봉인 (rev 27 sync 봉인, commit `4e5161e` main 합류)",
       "TASK-109 RFC 7233 `*` 케이스 dynamic boundary check 봉인 (rev 28 sync 봉인, commit `0663785` main 합류)",
       "TASK-110 STRICT_CONTENT_RANGE env flag 의 운영적 strict 모드 봉인 (rev 29 sync 봉인, commit `1105a8e` main 합류)",
-      "TASK-111 Production-semantic Postgres backend 동등 보강 (rev 30 sync 봉인, commit `3369d0a` main 합류)"
+      "TASK-111 Production-semantic Postgres backend 동등 보강 (rev 30 sync 봉인, commit `3369d0a` main 합류)",
+      "TASK-112 양 variant 운영 가이드 cross-reference (rev 31 sync 봉인, commit `81110df` main 합류)"
     ],
-    "index_rev": "64",
-    "latest_rev": "41"
+    "index_rev": "65",
+    "latest_rev": "42"
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
