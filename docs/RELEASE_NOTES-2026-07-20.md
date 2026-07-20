@@ -186,7 +186,8 @@ bash apps/build-server/scripts/e2e-single-port.sh
 
 ## 10. 다음 세션 가이드
 
-- **다음 세션 시작 시 baseline**: main HEAD `55486f0` (TASK-113 + workflow meta sync, workflow rev 143), 본 RELEASE_NOTES + 32 운영 가이드 + 165 build-server 회귀 가드
-- **후속 결정 해소 시**: workflow meta sync 새 TASK 가 본 RELEASE_NOTES 의 §5 + §8 에 append
+- **다음 세션 시작 시 baseline**: main HEAD `53adb75` (TASK-122 sync, **v0.1.0 tagged**), 본 RELEASE_NOTES + [`CHANGELOG.md`](../../CHANGELOG.md) + 32 운영 가이드 + 165 build-server 회귀 가드
+- **v0.1.0 tag anchor**: [`v0.1.0`](../../CHANGELOG.md) (annotated, 2026-07-20) — 본 세션 13 TASK (TASK-102~114) + TASK-122 working tree clean 보존 누적. 운영자 release staging 의 단일 anchor.
+- **후속 결정 해소 시**: workflow meta sync 새 TASK 가 본 RELEASE_NOTES 의 §5 + §8 + CHANGELOG §2 + §5 에 append
 - **본 세션 종합 검토 후속**: 옵션 Z 외부 object storage 결정 (본 §8 의 후보 1) — TASK-114 의 본 RELEASE_NOTES 에 append 되는 §11 의 향후 결정 항목
 - **장기 follow-up**: 본 세션의 12 TASK 가 운영 환경 release staging 통과 후 신규 기능 추가 / Nextcloud Tasks 통합 결정 진입

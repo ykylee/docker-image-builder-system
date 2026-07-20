@@ -43,3 +43,4 @@
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/sessions)
 - [작업 백로그](../ai-workflow/memory/active/backlog)
+- [CHANGELOG.md](../../CHANGELOG.md) (TASK-123 v0.1.0 release staging anchor)
