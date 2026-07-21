@@ -2,7 +2,7 @@
   "schema_version": "1",
   "generated_at": "2026-07-21T09:00:00Z",
   "purpose_digest": "TASK-131 문서 무결성 가드 (bulk sync 재발 방지) — TASK-124 사고의 구조적 재발 방지, 본 세션 내내 이월되던 유일 항목 해소. kit sync 도구는 ai-workflow/scripts 배포본이라 고쳐도 덮어써지므로 가드를 저장소 자신이 보유 (scripts/check-doc-integrity.sh). 검출 신호는 실제 사고에서 역산: 급격한 축소(86.2%) + placeholder 회귀(2→16). 두 번째 신호가 결정적 — 줄 수가 그대로여도 템플릿 덮어쓰기를 잡는다. 검증: 실제 사고 차단 + 전체 히스토리 166 커밋 쌍 스캔 오탐 0 + pre-commit hook 실제 차단 확인. 가드가 즉시 미발견 사고 2호 발견 (9c069a9 가 AGENTS.md 실행 명령을 TODO 로 덮어쓴 채 12일 방치) → 복구. 운영 가이드 신규. 다음: CI 통합 (--range origin/main..HEAD) 이 가장 값어치 큼.",
-  "purpose_digest_rev": 158,
+  "purpose_digest_rev": 159,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,8 +28,8 @@
   },
   "session": {
     "current_baseline": "TASK-131 (문서 무결성 가드) 봉인 (rev 153→154). 본 세션 8 TASK 봉인 (124~131). 누적 회귀 baseline: frontend vitest 133 / build-server 172 / TS 5 packages clean / go 8/8 package PASS / db-migrate.sh 6 게이트 실행 검증 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 (히스토리 166 쌍 오탐 0).",
-    "current_axis": "TASK-131 완료 — 본 세션 8 TASK 봉인 (124 bulk sync 회귀 복구 / 125 환경 셋업 + baseline 실측 / 126 tar 절대경로 가드 / 127 POST /builds 400 계약 / 128 db-migrate.sh 실행 경로 / 129 parseApiError envelope 회귀 / 130 shared-contract 에러 스키마 / 131 문서 무결성 가드). TASK-125 발견 결함 3건 + TASK-124 이월 항목 모두 해소. 다음 결정 대기: 문서 무결성 가드 CI 통합 (가장 값어치 큼) / kit sync 절차에 --range 편입 / PhaseTimeline 9 phase 수동 복제 drift / 진단-필드 응답 40여 곳 helper 흡수 / 기존 결정 대기 5종.",
-    "current_focus": "문서 무결성 가드 CI 통합 (--range origin/main..HEAD 로 hook 미설치·--no-verify 우회 구멍 차단) — 사용자 결정",
+    "current_axis": "본 세션 종료 (8 TASK 봉인, TASK-124~131). 사용자 결정: CI 통합 보류, 다음 세션은 구동 확인부터. 미push 8 커밋 존재 (push 여부 사용자 결정 대기).",
+    "current_focus": "다음 세션: 구동 확인 — TS 빌드 → vite build:react → 단일 포트 build-server 기동 (Postgres backend) → SPA / admin deep link / /api 307 / TASK-127 400 계약의 UI field-level 에러 렌더 실제 화면 확인. Docker 미채택이라 e2e 11종 + 실제 이미지 빌드는 여전히 검증 불가.",
     "blocked_items": [],
     "recent_done_items": [
       "TASK-131 (문서 무결성 가드, Code + Doc): TASK-124 사고의 구조적 재발 방지 — 본 세션 내내 이월되던 유일 항목 해소. 설계 판단: workflow kit sync 도구는 ai-workflow/scripts 아래 배포본이라 거기를 고쳐도 다음 kit 업데이트에 덮어써지므로 가드는 저장소 자신이 들고 있어야 함 → scripts/check-doc-integrity.sh 신규, kit 경로는 검사 대상 제외 (sync 로 갈리는 것이 정상). 검출 신호는 실제 사고 시그니처에서 역산: (1) 급격한 축소 327→45줄 = 86.2%, (2) placeholder 회귀 TODO/<...> 2→16. 두 번째가 결정적 — 줄 수가 그대로여도 내용이 템플릿 빈칸으로 바뀌면 잡힘. 4 모드 (staged / --range / --install-hook / --help) + 임계값 env 3종 + 우회 스위치. 보호 대상 8종. 검증: bash -n OK / 실제 사고 재현 차단 / 세션 전체 + TASK-124 복구 커밋 통과 / 전체 히스토리 166 커밋 쌍 스캔 → 차단 2건 오탐 0 / 우회 스위치 정상 / staged 정상·차단 / pre-commit hook 실제 커밋 차단 확인. 가드가 즉시 미발견 사고 2호 발견: 9c069a9 (2026-07-09 harness overlay) 가 AGENTS.md 실행 기본값 6줄을 TODO placeholder 로 덮어쓰고 PROJECT_PROFILE 참조를 존재하지 않는 경로로 바꾸고 상태를 stable→draft 역행, 줄 수 63→63 이라 placeholder 신호로만 검출, 12일간 방치 → 실측 명령으로 복구. 운영 가이드 신규 (8 섹션, 한계 포함). 한계: hook 의존 (CI --range 로 보완 필요) / 줄 수+placeholder 대리 지표 / 임계값 재측정 필요. follow-up: CI 통합 / kit sync 절차 편입 / PhaseTimeline drift.",
@@ -159,14 +159,12 @@
     "latest_rev": "46"
   },
   "next_documents": [
-    "docs/PROJECT_PROFILE.md",
-    "docs/RELEASE_NOTES-2026-07-20.md",
     "ai-workflow/memory/active/session_handoff.md",
-    "ai-workflow/memory/active/work_backlog.md",
     "ai-workflow/memory/active/backlog/2026-07-21.md",
-    "ai-workflow/memory/active/backlog/2026-07-20.md",
-    "ai-workflow/memory/active/repository_assessment.md",
-    "ai-workflow/memory/active/project_status_assessment.md"
+    "docs/PROJECT_PROFILE.md",
+    "docs/operations/doc-integrity-guard-2026-07-21.md",
+    "CLAUDE.md",
+    "ai-workflow/memory/active/work_backlog.md"
   ],
   "repository_assessment": {
     "path": "ai-workflow/memory/active/repository_assessment.md",
