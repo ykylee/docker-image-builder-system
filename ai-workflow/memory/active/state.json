@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-22T09:00:00Z",
+  "generated_at": "2026-07-22T09:30:00Z",
   "purpose_digest": "Astryx 도입 프로젝트 진행 중 (사용자 결정: 제대로 도입). 3단계 계획 — 1단계 토큰 네임스페이스 --dib-*(TASK-134) / 사전 정지작업 0.1.4→0.1.7(TASK-135) / 2단계 기반 구축(TASK-136) 봉인 완료. 3단계 컴포넌트 점진 이관이 남았다. 사용자 결정 3건: 시각 정체성은 **브랜드 색만 이식**(나머지는 Astryx neutral 위임 — 이식이 적을수록 pre-1.0 churn 에 덜 흔들리고 컴포넌트 조합 안 접근성을 우리가 계속 책임지지 않아도 됨) / **점진 이관**(매 단계 회귀 통과 유지) / 레이아웃 셸은 **AppShell 로 교체**(3단계). TASK-136 은 <Theme> + astryx.css 재도입 + defineTheme(--color-accent 1종만) + themeStore(Zustand) 신규. 테마 상태를 ThemeToggle 지역 state 에서 끌어올린 이유는 <Theme mode> 가 App 보다 위에서 같은 값을 봐야 하기 때문이고, 부수적으로 '토글 버튼이 없는 페이지에서 테마 미적용' 여지도 해소됐다. mode='system' 을 쓰지 않고 store 값을 명시 전달 — Astryx 내부가 light-dark() 를 쓰므로 어긋나면 페이지는 다크인데 컴포넌트만 light 로 렌더된다. 재도입 안전 근거 4가지 실측: 토큰 충돌 0종 / astryx.css 에 전역 element·:root·html·body 규칙 0건 (순수 스코프 클래스) / @layer 계층에서 unlayered 인 우리 손 CSS 가 항상 이김 / 우리 CSS 에 light-dark() 부재 + color-scheme 명시 선언. reset.css 는 전역 리셋이라 이관 중 손 CSS 를 흔들 수 있어 의도적 미도입. **가장 의미 있는 검증**: <Theme> 가 P0 때와 똑같이 문서 루트에 속성을 붙였는데도(wrapperIsRoot true) 하이재킹 0 — '이름이 겹치지 않으면 하이재킹은 성립하지 않는다'가 실증됐다. 회귀: TSC clean / vitest 216→229 / B층 다크·라이트 × 3라우트 하이재킹0·위반0 / 스크린샷 양 테마 정상. 번들 고정비용 gzip CSS +21.9KB · JS +7.5KB (컴포넌트 0개 사용 상태) — 3단계에서 손 CSS 2,000여 줄이 줄며 상쇄, 추이를 매 단계 기록할 것. 다음: 3-1 Dialog←RegisterRunnerModal / 3-2 Field+FormLayout←BuildRequest / 3-3 CodeBlock←LogStream / 3-4 Table←BuildsList(StatusPill→Badge 논점 선결) / 3-5 AppShell+TopNav←레이아웃 셸.",
-  "purpose_digest_rev": 176,
+  "purpose_digest_rev": 177,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,7 +28,7 @@
   },
   "session": {
     "current_baseline": "TASK-142 (Astryx 3-4b Admin 테이블 이관 + BuildRow 제거) 봉인 (rev 165→166). 누적 회귀 baseline: frontend vitest 266 / build-server 178 / TS 5 packages clean / go 8/8 / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 / 양 테마 WCAG AA 대비 전수 통과 / Astryx 토큰 충돌 0종 / 초기 로드 JS gzip 94.66 / 손 CSS 2,135줄.",
-    "current_axis": "Astryx 3단계 이관 — 3-1(Dialog)/3-2(BuildRequest 폼)/3-3(LogStream→CodeBlock)/3-4(BuildsList→Table+배지 정책)/3-4b(Admin 테이블 + BuildRow 제거) 봉인. 중간에 라우트 지연 로드(TASK-139) 정지작업. 남은 큰 이관은 3-5 AppShell+TopNav ← 레이아웃 셸. 작업 브랜치 feat/task-142-admin-table (병합 상태는 git 참조).",
+    "current_axis": "Astryx 3단계 이관 — 3-1(Dialog)/3-2(BuildRequest 폼)/3-3(LogStream→CodeBlock)/3-4(BuildsList→Table+배지 정책)/3-4b(Admin 테이블 + BuildRow 제거) 봉인. 중간에 라우트 지연 로드(TASK-139) 정지작업. TASK-140~142 는 main 에 병합 완료(HEAD 8773fbc), 작업 브랜치 전부 삭제 — 로컬 브랜치는 main 단독. 남은 큰 이관은 3-5 AppShell+TopNav ← 레이아웃 셸. 원격 반영 여부는 `git log origin/main..main` 을 볼 것.",
     "current_focus": "다음: **3-5 AppShell+TopNav ← 레이아웃 셸** — TASK-132 가 손으로 만든 셸(--dib-layout-max/--dib-header-h/<main class=app-main>)을 Astryx AppShell+TopNav 로 대체. AppShell 은 responsive mobile nav + skip-to-content 를 자동 처리한다. 단 TASK-132 가 실측해 맞춘 정렬(272/272, 헤더-본문 기준선 일치)을 Astryx 기준으로 **재검증** 필요. 이것이 3단계의 마지막 큰 이관이다. 이월: **admin 라우트 테스트 4종 복원**(TASK-142 에서 유령 헤더 결함을 놓친 직접 원인) + PROJECT_PROFILE §3.4 정정 / 라우트 CSS 전역 유출 감사(Login.css 에서 두 번 나옴) / B층 가드가 오버레이를 검사하지 못함 / PhaseTimeline.tsx 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.",
     "blocked_items": [],
     "recent_done_items": [
