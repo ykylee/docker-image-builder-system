@@ -1,7 +1,11 @@
 // TASK-095: ThemeToggle (React).
 //
-// Svelte src/components/ThemeToggle.svelte 와 1:1 정합. light/dark 토글
-// + localStorage 영속화 + system preference fallback.
+// Svelte src/components/ThemeToggle.svelte 와 1:1 정합. light/dark 토글.
+//
+// TASK-136: 테마 상태 / localStorage 영속화 / system preference fallback /
+// DOM 반영은 전부 `lib/stores/themeStore.ts` 로 이관됐다. 본 컴포넌트는
+// 이제 표시와 클릭만 담당한다 — Astryx `<Theme mode>` 가 App 보다 위에서
+// 같은 상태를 봐야 하기 때문 (main.tsx 의 ThemedApp).
 //
 // a11y: aria-label "Toggle theme" + role="button" (button element).
 //
@@ -9,70 +13,19 @@
 // --dib-color-text-primary / --dib-radius-pill / --dib-motion-duration-fast /
 // --dib-motion-easing-standard. globals.css cascade 와 정합.
 
-import { useEffect, useState, type ReactElement } from "react";
+import { type ReactElement } from "react";
 
-const STORAGE_KEY = "theme";
-
-function readInitialTheme(): boolean {
-  if (typeof window === "undefined") {
-    return false;
-  }
-  const stored = window.localStorage.getItem(STORAGE_KEY);
-  if (stored === "light") {
-    return true;
-  }
-  if (stored === "dark") {
-    return false;
-  }
-  // system preference fallback — prefers-color-scheme: light 일 때 light.
-  // jsdom 에는 matchMedia 가 없어 try/catch 로 fallback.
-  try {
-    return window.matchMedia("(prefers-color-scheme: light)").matches;
-  } catch {
-    return false;
-  }
-}
-
-function applyTheme(light: boolean): void {
-  if (typeof document === "undefined") {
-    return;
-  }
-  if (light) {
-    document.documentElement.setAttribute("data-theme", "light");
-    document.documentElement.style.colorScheme = "light";
-    window.localStorage.setItem(STORAGE_KEY, "light");
-  } else {
-    document.documentElement.removeAttribute("data-theme");
-    document.documentElement.style.colorScheme = "dark";
-    window.localStorage.setItem(STORAGE_KEY, "dark");
-  }
-}
+import { useThemeStore } from "@/lib/stores/themeStore";
 
 export function ThemeToggle(): ReactElement {
-  // 첫 마운트 시점의 theme 결정은 useEffect 안에서 (DOM 접근 필요).
-  // useState 의 initial value 는 SSR-safe 한 default (dark) 로 두고,
-  // mount 후 readInitialTheme() 로 동기화. 단, 첫 paint 시점에는
-  // light 가 결정될 가능성도 있어 SSR / hydration 시점 mismatch 가 발생할
-  // 수 있다 — 본 React SPA 는 client-side only 라 hydration 단계 없으므로
-  // 안전.
-  const [isLight, setIsLight] = useState(false);
-
-  useEffect(() => {
-    const initial = readInitialTheme();
-    setIsLight(initial);
-    applyTheme(initial);
-    // 첫 마운트 시 isLight 가 false 인 경우 setAttribute 가 호출되지
-    // 않을 가능성 — 명시 보강.
-    if (!initial) {
-      document.documentElement.style.colorScheme = "dark";
-    }
-  }, []);
-
-  function toggle(): void {
-    const next = !isLight;
-    setIsLight(next);
-    applyTheme(next);
-  }
+  // TASK-136: 테마 상태와 DOM 반영은 themeStore 로 이관됐다. Astryx
+  // `<Theme mode>` 가 App 보다 위(main.tsx)에서 같은 값을 봐야 하므로
+  // 컴포넌트 지역 상태로는 둘 수 없다. 초기화(init)도 store 를 쓰는
+  // main.tsx 의 ThemedApp 이 담당한다 — 토글 버튼이 없는 페이지에서도
+  // 테마가 적용되어야 하기 때문.
+  const mode = useThemeStore((s) => s.mode);
+  const toggle = useThemeStore((s) => s.toggle);
+  const isLight = mode === "light";
 
   const buttonStyle = {
     display: "inline-flex",

@@ -6,6 +6,40 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-21 (rev 129→130: **TASK-136 Astryx 도입 2단계 — 기반 구축 봉인**).
+
+  **⚠️ 미병합 브랜치 2개 누적**: `chore/task-135-astryx-0-1-7` → `feat/task-136-astryx-foundation`. main 은 `origin/main` 보다 3 커밋 앞선 채 미push.
+
+  **사용자 결정 3건**: 시각 정체성 = **브랜드 색만 이식**(나머지는 Astryx neutral 위임) / **점진 이관**(매 단계 회귀 통과 유지) / 레이아웃 셸 = **AppShell 로 교체**(3단계에서).
+
+  **재도입 전에 실측한 안전 근거 4가지** — TASK-132 가 제거했던 것을 다시 넣는 것이므로 P0 재발 불가 근거를 먼저 확인했다:
+  1. **토큰 충돌 0종** — TASK-134 개명으로 우리 67종 vs Astryx 172종이 안 겹친다. 이름이 안 겹치면 하이재킹이 성립하지 않는다.
+  2. **`astryx.css` 에 전역 element 셀렉터 0건 + `:root`/`html`/`body` 규칙 0건** — 순수 스코프 클래스(StyleX atomic)라 우리 마크업에 샐 수 없다.
+  3. **@layer 계층** `reset → astryx-base → astryx-theme` 이고 **unlayered 인 우리 손 CSS 가 항상 이긴다** — 점진 이관 중 기존 화면이 밀리지 않는다.
+  4. **`light-dark()` 경로 부재** — 우리 CSS 는 이 함수를 안 쓰고 `color-scheme` 을 `:root` 에 명시 선언한다. P0 의 기전이 성립할 수 없다.
+
+  `reset.css` 는 **의도적으로 도입하지 않았다** — 전역 리셋이라 이관 중인 손 CSS 2,000여 줄을 흔들 수 있다. 손 CSS 가 사라진 뒤 재검토.
+
+  **구현**: `theme.ts` 신규(`defineTheme`, **이식 토큰 1종** `--color-accent`) / `themeStore.ts` 신규(Zustand — 테마 상태를 ThemeToggle 지역 state 에서 끌어올렸다. `<Theme mode>` 가 App 보다 **위**에서 같은 값을 봐야 하기 때문이고, 부수적으로 **"토글 버튼이 없는 페이지에서 테마 미적용" 여지**도 해소됐다) / `main.tsx` 에 `ThemedApp` 도입 — **`mode="system"` 을 쓰지 않고** store 값을 명시 전달한다 (Astryx 내부가 `light-dark()` 를 쓰므로 어긋나면 페이지는 다크인데 Astryx 컴포넌트만 light 로 렌더된다) / `theme.test.ts` 신규(브랜드 색이 `theme.ts` 와 `tokens.css` 양쪽에서 일치 — 어긋나면 **같은 화면에 두 가지 인디고**).
+
+  **테스트 조정 2건 (동작 이전에 따른 정당한 갱신)**: (a) store 싱글턴 누수로 테스트 사이 상태가 새어 `beforeEach` 초기화 추가 (이 가드 없이 2건이 깨졌다). (b) "저장값 복원" 검증을 ThemeToggle 마운트 → `themeStore.init()` 으로 이동 — **의도는 그대로 두고 위치만 실제 구현에 맞췄다.** `themeStore.test.ts` 신규 11건.
+
+  **검증**: TSC clean / vitest **216 → 229** / **B층 실브라우저 다크·라이트 × 3 라우트 — 하이재킹 0 · 대비 위반 0**(수용 기준) / 배선 확인 `data-astryx-theme="dib"` · **wrapperIsRoot: true** · `--color-accent` = `light-dark(#4f46e5, #7e81f3)` / 스크린샷 양 테마 정상.
+
+  **가장 의미 있는 확인**: `<Theme>` 가 **P0 때와 똑같이 문서 루트에 속성을 붙였는데도**(`wrapperIsRoot: true`) 하이재킹이 0 이다. "이름이 겹치지 않으면 하이재킹은 성립하지 않는다" 가 실측으로 증명됐다 — TASK-134 결정의 직접 검증.
+
+  **번들 고정비용**: css 41.59 → **163.62KB** (gzip 5.44 → **27.38**) / js 297.03 → **318.62KB** (gzip 90.69 → **98.21**). **아직 Astryx 컴포넌트를 하나도 안 쓴 상태**의 비용이다 (`astryx.css` 는 단일 파일이라 전량). 3단계에서 손 CSS 2,000여 줄이 줄며 상쇄된다 — **상쇄 추이를 매 단계 기록할 것.**
+
+  **다음 세션 = 3단계 컴포넌트 점진 이관. 제안 순서**:
+  | 순서 | 대상 | Astryx | 비고 |
+  |---|---|---|---|
+  | 3-1 | RegisterRunnerModal | `Dialog` | 가장 독립적, 위험 낮음. 미정의 토큰 사고가 있던 파일이라 정리 효과도 큼 |
+  | 3-2 | BuildRequest | `Field`+`FormLayout`+`TextInput` | 폼 접근성 이득 최대 |
+  | 3-3 | LogStream | `CodeBlock` | 구문 강조 + 복사 버튼을 공짜로 |
+  | 3-4 | BuildsList | `Table` | 가장 큼. **StatusPill → Badge 논점 선결** (Astryx Badge 문서가 "모든 행에 같은 배지를 반복하지 말라"를 명시) |
+  | 3-5 | 레이아웃 셸 | `AppShell`+`TopNav` | TASK-132 수작업 대체. 정렬 실측 재검증 필요 |
+
+  이월: B층 CI 통합 / `PhaseTimeline.tsx` 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 165→166, handoff 129→130, work_backlog TASK-136 등록, backlog 2026-07-21 rev 13) 같은 commit 안에 포함.
 - Updated: 2026-07-21 (rev 128→129: **TASK-135 Astryx 0.1.4 → 0.1.7 업데이트 봉인** — 2단계 사전 정지작업).
 
   **브랜치 `chore/task-135-astryx-0-1-7` — main 미병합.** (TASK-133/134 는 병합 완료, main 이 `origin/main` 보다 3 커밋 앞선 채 미push.)
