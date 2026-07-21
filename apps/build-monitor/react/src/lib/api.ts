@@ -374,23 +374,40 @@ export function parseApiError(err: unknown): ParsedApiError {
     return { summary: raw, fieldErrors: [] };
   }
   const jsonText = raw.slice(jsonStart, jsonEnd + 1);
-  let envelope: { message?: string } | null = null;
+  type ZodIssueLike = { path?: string[]; message?: string };
+  let envelope: { message?: string; issues?: ZodIssueLike[] } | null = null;
   try {
-    envelope = JSON.parse(jsonText) as { message?: string };
+    envelope = JSON.parse(jsonText) as {
+      message?: string;
+      issues?: ZodIssueLike[];
+    };
   } catch {
     return { summary: raw, fieldErrors: [] };
   }
-  // zod issue 추출 시도. message 가 JSON array 형태면 field-level error.
-  if (!envelope.message || envelope.message[0] !== "[") {
-    return { summary: envelope.message ?? raw, fieldErrors: [] };
+
+  // TASK-129: zod issue 는 두 가지 envelope 으로 도착할 수 있다.
+  //
+  //   (a) 현행 계약 — `{ message, issues: [...] }`
+  //       build-server 의 route handler 가 `safeParse` 실패 시 내보내는
+  //       형태 (TASK-127 이 세 handler 를 이 계약으로 정렬).
+  //   (b) 레거시 — `{ statusCode, error, message: "[...zod...]" }`
+  //       handler 가 bare `.parse` 를 써서 ZodError 가 Fastify 기본
+  //       error handler 까지 새어 나갔을 때의 500 응답. TASK-127 이전의
+  //       `POST /builds` 가 이랬다.
+  //
+  // (a) 를 먼저 본다. (b) 는 아직 이 형태로 응답하는 경로가 남아 있을
+  // 가능성 + 서버/프론트 배포 시차를 위해 계속 처리한다.
+  let issues: ZodIssueLike[] | null = null;
+  if (Array.isArray(envelope.issues)) {
+    issues = envelope.issues;
+  } else if (envelope.message && envelope.message[0] === "[") {
+    try {
+      issues = JSON.parse(envelope.message) as ZodIssueLike[];
+    } catch {
+      return { summary: envelope.message, fieldErrors: [] };
+    }
   }
-  let issues: Array<{ path?: string[]; message?: string }>;
-  try {
-    issues = JSON.parse(envelope.message) as Array<{
-      path?: string[];
-      message?: string;
-    }>;
-  } catch {
+  if (!issues) {
     return { summary: envelope.message ?? raw, fieldErrors: [] };
   }
   const fieldErrors = issues.map((issue) => ({

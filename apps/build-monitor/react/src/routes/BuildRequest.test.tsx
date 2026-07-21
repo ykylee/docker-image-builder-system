@@ -336,3 +336,53 @@ describe("BuildRequest (React) — TASK-099", () => {
     expect(parseApiError(new Error("network")).summary).toBe("network");
   });
 });
+
+// TASK-129: parseApiError 가 build-server 의 *실제* 에러 envelope 두 형태를
+// 모두 field-level error 로 풀어내는지 고정한다.
+//
+// 배경: TASK-127 이 build-server 의 POST /builds 를 500(ZodError 누수) →
+// 400 { message, issues } 로 정렬했는데, 그 시점 parseApiError 는 "message 가
+// JSON 배열 문자열일 때" 만 issue 를 추출했다. 그래서 서버는 고쳐졌는데
+// 프론트의 필드별 에러 표시가 조용히 사라지는 회귀가 생겼다. 기존 테스트는
+// 서버 응답을 mock 하고 있었기 때문에 이 계약 변화를 잡지 못했다.
+//
+// 아래 두 케이스는 mock 이 아니라 *양쪽 envelope 문자열* 을 직접 넣어
+// 계약을 고정한다.
+describe("parseApiError envelope 계약 (TASK-129)", () => {
+  const issues = [
+    { path: ["requestedBy"], message: "Invalid input: expected string" },
+    { path: ["sourceArchive"], message: "Invalid input: expected object" }
+  ];
+
+  it("현행 계약 400 { message, issues } 에서 field error 를 추출한다", () => {
+    const envelope = JSON.stringify({
+      message: "Invalid build request payload",
+      issues
+    });
+    const parsed = parseApiError(new Error(`POST /builds failed: 400 ${envelope}`));
+    expect(parsed.fieldErrors).toHaveLength(2);
+    expect(parsed.fieldErrors.map((fe) => fe.path)).toEqual([
+      "requestedBy",
+      "sourceArchive"
+    ]);
+    expect(parsed.summary).toMatch(/2 field\(s\) failed/);
+  });
+
+  it("레거시 500 { message: '[...zod...]' } 도 계속 처리한다", () => {
+    const envelope = JSON.stringify({
+      statusCode: 500,
+      error: "Internal Server Error",
+      message: JSON.stringify(issues)
+    });
+    const parsed = parseApiError(new Error(`POST /builds failed: 500 ${envelope}`));
+    expect(parsed.fieldErrors).toHaveLength(2);
+    expect(parsed.summary).toMatch(/2 field\(s\) failed/);
+  });
+
+  it("issue 가 없는 일반 에러는 summary 만 채운다", () => {
+    const envelope = JSON.stringify({ message: "Build not found." });
+    const parsed = parseApiError(new Error(`GET /builds/x failed: 404 ${envelope}`));
+    expect(parsed.fieldErrors).toHaveLength(0);
+    expect(parsed.summary).toBe("Build not found.");
+  });
+});

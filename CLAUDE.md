@@ -80,7 +80,7 @@
 - **quick test**: 각 tsconfig 에 `tsc --noEmit` (shared-contract / shared-config / db /
   build-server) + `apps/build-monitor` 의 `tsc --noEmit -p tsconfig.react.json`
 - **isolated test**:
-  - frontend: `apps/build-monitor` 에서 `vitest run` → **130 PASS**
+  - frontend: `apps/build-monitor` 에서 `vitest run` → **133 PASS**
   - build-server: `apps/build-server` 에서 `node --import tsx --test tests/*.test.ts` → **172 PASS**
   - runner: `apps/runner` 에서 `go test ./...` → **8/8 package PASS**
 - **smoke check**: 서버 기동 후 `GET /health` → `{"status":"ok"}`, `POST /builds`
