@@ -85,10 +85,16 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
     // 했으므로 React SPA 진입은 `/api/builds/<id>` GET (Build Server 가 응답)
     // 또는 Build Server 의 route 가 매치되지 않는 다른 path 로 제한.
     // 직접 URL `/builds/abc-123` 입력 시 Build Server 가 UUID validation
-    // 으로 500 응답 — 운영자가 React SPA 측 진입은 `/builds/<uuid>` 가 아닌
+    // 으로 400 응답 — 운영자가 React SPA 측 진입은 `/builds/<uuid>` 가 아닌
     // `/api/builds/<uuid>` 로 fetch (lib/api.ts 의 getBuild 함수).
+    //
+    // TASK-127: 본 단언은 원래 500 이었다. 그것은 의도된 명세가 아니라
+    // 당시 handler 가 `safeParse` 대신 bare `parse` 를 써서 ZodError 가
+    // Fastify 기본 error handler 까지 새어 나가던 결함을 그대로 받아적은
+    // 것이다. 잘못된 buildId 는 client error 이므로 400 이 맞다. 본
+    // 테스트의 본래 목적 (SPA 라우팅 우선순위 검증) 은 그대로 유지된다.
     const res = await fetch(`${baseUrl}/builds/abc-123`);
-    assert.equal(res.status, 500);
+    assert.equal(res.status, 400);
   });
 
   it("falls back to React index.html for /api/builds/<id> (Build Server route)", async () => {

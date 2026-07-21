@@ -52,8 +52,14 @@ export async function registerBuildRoutes(
   });
 
   app.post("/builds", async (request, reply) => {
-    const payload = buildRequestSchema.parse(request.body);
-    const result = await buildService.createBuild(payload);
+    const payloadResult = buildRequestSchema.safeParse(request.body ?? {});
+    if (!payloadResult.success) {
+      return reply.status(400).send({
+        message: "Invalid build request payload",
+        issues: payloadResult.error.issues
+      });
+    }
+    const result = await buildService.createBuild(payloadResult.data);
 
     if ("duplicate" in result && result.duplicate) {
       const body = buildDuplicateResponseSchema.parse(result);
@@ -65,8 +71,14 @@ export async function registerBuildRoutes(
   });
 
   app.get("/builds/:buildId", async (request, reply) => {
-    const params = buildIdParamsSchema.parse(request.params);
-    const result = await buildService.getBuild(params.buildId);
+    const paramsResult = buildIdParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        message: "Invalid buildId parameter",
+        issues: paramsResult.error.issues
+      });
+    }
+    const result = await buildService.getBuild(paramsResult.data.buildId);
 
     if (!result) {
       return reply.status(404).send({
@@ -79,8 +91,14 @@ export async function registerBuildRoutes(
   });
 
   app.get("/builds/:buildId/logs", async (request, reply) => {
-    const params = buildIdParamsSchema.parse(request.params);
-    const result = await buildService.getBuildLogs(params.buildId);
+    const paramsResult = buildIdParamsSchema.safeParse(request.params);
+    if (!paramsResult.success) {
+      return reply.status(400).send({
+        message: "Invalid buildId parameter",
+        issues: paramsResult.error.issues
+      });
+    }
+    const result = await buildService.getBuildLogs(paramsResult.data.buildId);
 
     if (!result) {
       return reply.status(404).send({

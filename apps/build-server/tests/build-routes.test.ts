@@ -779,3 +779,103 @@ describe("DELETE /builds/:buildId/source (TASK-066)", () => {
     await app.close();
   });
 });
+
+// TASK-127: these three handlers used bare `schema.parse(...)` instead of
+// the `safeParse` + 400 contract every other handler in this file follows
+// (the convention is stated at the top of `build-routes.ts`). A schema
+// violation therefore threw a ZodError that escaped to Fastify's default
+// error handler and surfaced as a 500 — a server-fault status for what is
+// squarely a client error. There were no route-level tests for these three
+// endpoints at all, which is why it went unnoticed. These guards pin the
+// status codes so the contract cannot silently regress again.
+describe("POST /builds (TASK-127 request validation)", () => {
+  it("returns 202 for a well-formed payload", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: { ...baseBody, appName: "task-127-ok" }
+    });
+    assert.equal(res.statusCode, 202);
+    assert.equal(res.json().accepted, true);
+    await app.close();
+  });
+
+  it("returns 400 (not 500) when required fields are missing", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: { appName: "task-127-partial" }
+    });
+    assert.equal(res.statusCode, 400);
+    const body = res.json();
+    assert.equal(body.message, "Invalid build request payload");
+    // The zod issues are surfaced so the caller can see which fields
+    // failed rather than getting an opaque server error.
+    assert.ok(Array.isArray(body.issues));
+    const paths = body.issues.map((issue: { path: string[] }) => issue.path[0]);
+    assert.ok(paths.includes("requestedBy"));
+    assert.ok(paths.includes("sourceArchive"));
+    assert.ok(paths.includes("entrypointPath"));
+    await app.close();
+  });
+
+  it("returns 400 (not 500) for an empty body", async () => {
+    const app = await buildApp();
+    const res = await app.inject({ method: "POST", url: "/builds", payload: {} });
+    assert.equal(res.statusCode, 400);
+    await app.close();
+  });
+
+  it("returns 400 (not 500) when a field has the wrong type", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: { ...baseBody, appName: 12345 }
+    });
+    assert.equal(res.statusCode, 400);
+    await app.close();
+  });
+});
+
+describe("GET /builds/:buildId (TASK-127 param validation)", () => {
+  it("returns 400 (not 500) for a non-UUID buildId", async () => {
+    const app = await buildApp();
+    const res = await app.inject({ method: "GET", url: "/builds/not-a-uuid" });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.json().message, "Invalid buildId parameter");
+    await app.close();
+  });
+
+  it("still returns 404 for a well-formed but unknown buildId", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/builds/00000000-0000-0000-0000-000000000000"
+    });
+    assert.equal(res.statusCode, 404);
+    await app.close();
+  });
+});
+
+describe("GET /builds/:buildId/logs (TASK-127 param validation)", () => {
+  it("returns 400 (not 500) for a non-UUID buildId", async () => {
+    const app = await buildApp();
+    const res = await app.inject({ method: "GET", url: "/builds/not-a-uuid/logs" });
+    assert.equal(res.statusCode, 400);
+    assert.equal(res.json().message, "Invalid buildId parameter");
+    await app.close();
+  });
+
+  it("still returns 404 for a well-formed but unknown buildId", async () => {
+    const app = await buildApp();
+    const res = await app.inject({
+      method: "GET",
+      url: "/builds/00000000-0000-0000-0000-000000000000/logs"
+    });
+    assert.equal(res.statusCode, 404);
+    await app.close();
+  });
+});
