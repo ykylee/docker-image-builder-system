@@ -12,16 +12,16 @@
 //   - NOT_IN_ALLOW_LIST: backend 가 allow-list 를 알려줬지만 caller 가
 //     거기 없음.
 //
-// 디자인 토큰: --color-accent-danger / --color-text-muted /
-// --color-bg-surface / --color-bg-canvas / --color-border-subtle /
-// --color-border-strong / --color-text-primary /
-// --color-bg-surface-elevated / --color-accent-primary /
-// --color-accent-primary-hover / --shadow-modal / --shadow-glow /
-// --radius-lg / --radius-md / --radius-sm / --space-xs / --space-sm /
-// --space-md / --space-lg / --space-xl / --space-xxl /
-// --size-xs / --size-sm / --size-md / --size-xxl /
-// --motion-duration-fast / --motion-duration-slow /
-// --motion-easing-standard.
+// 디자인 토큰: --dib-color-accent-danger / --dib-color-text-muted /
+// --dib-color-bg-surface / --dib-color-bg-canvas / --dib-color-border-subtle /
+// --dib-color-border-strong / --dib-color-text-primary /
+// --dib-color-bg-surface-elevated / --dib-color-accent-primary /
+// --dib-color-accent-primary-hover / --dib-shadow-modal / --dib-shadow-glow /
+// --dib-radius-lg / --dib-radius-md / --dib-radius-sm / --dib-space-xs / --dib-space-sm /
+// --dib-space-md / --dib-space-lg / --dib-space-xl / --dib-space-xxl /
+// --dib-size-xs / --dib-size-sm / --dib-size-md / --dib-size-xxl /
+// --dib-motion-duration-fast / --dib-motion-duration-slow /
+// --dib-motion-easing-standard.
 //
 // AdminGuard test mock 호환성 — ensureAdminAccess 가 반환하는 reason
 // union ("NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST") 그대로 type import.
@@ -72,8 +72,8 @@ export function AdminAccessDenied({
   const pageStyle: CSSProperties = {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--space-xxl)",
-    animation: "fadeIn var(--motion-duration-slow) var(--motion-easing-standard)"
+    gap: "var(--dib-space-xxl)",
+    animation: "fadeIn var(--dib-motion-duration-slow) var(--dib-motion-easing-standard)"
   };
 
   return (

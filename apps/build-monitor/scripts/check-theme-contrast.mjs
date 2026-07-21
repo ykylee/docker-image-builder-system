@@ -52,13 +52,13 @@ const DEFAULT_ROUTES = ["/login", "/builds", "/build-request"];
 
 /** 우리 디자인 토큰 — 하이재킹 여부를 확인할 대상. */
 const WATCHED_TOKENS = [
-  "--color-text-primary",
-  "--color-text-secondary",
-  "--color-text-muted",
-  "--color-bg-canvas",
-  "--color-bg-surface",
-  "--color-accent-primary",
-  "--color-on-accent"
+  "--dib-color-text-primary",
+  "--dib-color-text-secondary",
+  "--dib-color-text-muted",
+  "--dib-color-bg-canvas",
+  "--dib-color-bg-surface",
+  "--dib-color-accent-primary",
+  "--dib-color-on-accent"
 ];
 
 const AA_TEXT = 4.5;

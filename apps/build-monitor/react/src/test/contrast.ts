@@ -42,7 +42,7 @@ function parseBlock(css: string, selector: string): Record<string, string> {
  *
  * light 는 `:root` 를 상속한 뒤 `:root[data-theme="light"]` 로 덮는 실제
  * cascade 를 그대로 재현한다 — light 블록이 재정의하지 않는 토큰(예:
- * --color-text-primary 이외의 spacing/radius)은 dark 값이 그대로 쓰이므로,
+ * --dib-color-text-primary 이외의 spacing/radius)은 dark 값이 그대로 쓰이므로,
  * 단순히 light 블록만 보면 실제와 다른 값을 검사하게 된다.
  */
 export function readThemes(): { dark: TokenMap; light: TokenMap } {

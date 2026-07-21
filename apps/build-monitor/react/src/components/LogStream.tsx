@@ -1,8 +1,8 @@
 // TASK-091: LogStream (React).
 //
 // Svelte src/components/LogStream.svelte 와 1:1 정합. wrap 토글 +
-// auto-scroll 토글 후속. 디자인 토큰 — --code-bg / --code-border /
-// --code-fg / --code-muted / --code-phase / --code-inset-shadow.
+// auto-scroll 토글 후속. 디자인 토큰 — --dib-code-bg / --dib-code-border /
+// --dib-code-fg / --dib-code-muted / --dib-code-phase / --dib-code-inset-shadow.
 //
 // at 슬라이스 (`e.createdAt.slice(11, 19)`) 는 ISO 8601 의 HH:MM:SS
 // 부분 — 운영자가 log stream 을 빠르게 스캔.
@@ -14,13 +14,13 @@ import type { BuildLogEntry } from "@/lib/api";
 
 function LogEntrySpan({ entry }: { entry: BuildLogEntry }): ReactElement {
   const atStyle: CSSProperties = {
-    color: "var(--code-muted)",
-    fontFamily: "var(--font-mono)"
+    color: "var(--dib-code-muted)",
+    fontFamily: "var(--dib-font-mono)"
   };
   const phaseStyle: CSSProperties = {
-    color: "var(--code-phase)",
-    fontWeight: "var(--weight-semibold)",
-    fontFamily: "var(--font-mono)"
+    color: "var(--dib-code-phase)",
+    fontWeight: "var(--dib-weight-semibold)",
+    fontFamily: "var(--dib-font-mono)"
   };
   return (
     <span data-testid="log-entry">
@@ -42,36 +42,36 @@ export function LogStream({
   const wrapStyle: CSSProperties = {
     display: "flex",
     flexDirection: "column",
-    gap: "var(--space-md)"
+    gap: "var(--dib-space-md)"
   };
 
   const toolbarStyle: CSSProperties = {
     display: "flex",
-    gap: "var(--space-md)",
-    color: "var(--code-muted)",
-    fontSize: "var(--size-sm)",
+    gap: "var(--dib-space-md)",
+    color: "var(--dib-code-muted)",
+    fontSize: "var(--dib-size-sm)",
     alignItems: "center",
-    padding: "var(--space-xs) var(--space-md)",
-    border: "1px solid var(--color-border-subtle)",
-    borderRadius: "var(--radius-sm)",
-    background: "var(--color-bg-canvas)",
+    padding: "var(--dib-space-xs) var(--dib-space-md)",
+    border: "1px solid var(--dib-color-border-subtle)",
+    borderRadius: "var(--dib-radius-sm)",
+    background: "var(--dib-color-bg-canvas)",
     width: "fit-content"
   };
 
   const preBaseStyle: CSSProperties = {
-    background: "var(--code-bg)",
-    border: "1px solid var(--color-border-subtle)",
-    borderRadius: "var(--radius-md)",
-    padding: "var(--space-lg)",
-    fontFamily: "var(--font-mono)",
-    fontSize: "var(--size-sm)",
-    lineHeight: "var(--line-relaxed)",
-    color: "var(--code-fg)",
+    background: "var(--dib-code-bg)",
+    border: "1px solid var(--dib-color-border-subtle)",
+    borderRadius: "var(--dib-radius-md)",
+    padding: "var(--dib-space-lg)",
+    fontFamily: "var(--dib-font-mono)",
+    fontSize: "var(--dib-size-sm)",
+    lineHeight: "var(--dib-line-relaxed)",
+    color: "var(--dib-code-fg)",
     margin: 0,
     maxHeight: "480px",
     overflow: "auto",
     whiteSpace: "pre",
-    boxShadow: "var(--code-inset-shadow)"
+    boxShadow: "var(--dib-code-inset-shadow)"
   };
 
   const preWrapStyle: CSSProperties = {
@@ -83,7 +83,7 @@ export function LogStream({
   return (
     <div data-testid="log-stream" style={wrapStyle}>
       <div style={toolbarStyle}>
-        <label style={{ display: "flex", gap: "var(--space-sm)" }}>
+        <label style={{ display: "flex", gap: "var(--dib-space-sm)" }}>
           <input
             type="checkbox"
             data-testid="log-stream-wrap"

@@ -22,35 +22,35 @@ afterEach(() => {
 describe("StatusPill (TASK-096)", () => {
   it.each([
     // Canonical lifecycle (TASK-052)
-    ["RECEIVED", "var(--color-text-secondary)"],
-    ["QUEUED", "var(--color-text-secondary)"],
-    ["PREPARING_SOURCE", "var(--color-accent-warning)"],
-    ["BUILDING", "var(--color-accent-warning)"],
-    ["BUILD_SUCCESS", "var(--color-accent-success)"],
-    ["TEST_SUCCESS", "var(--color-accent-success)"],
-    ["DEPLOY_SUCCESS", "var(--color-accent-success)"],
-    ["COMPLETED", "var(--color-accent-success)"],
-    ["TESTING", "var(--color-accent-info)"],
-    ["DEPLOYING", "var(--color-accent-info)"],
-    ["FAILED", "var(--color-accent-danger)"],
-    ["CANCELLED", "var(--color-text-secondary)"],
+    ["RECEIVED", "var(--dib-color-text-secondary)"],
+    ["QUEUED", "var(--dib-color-text-secondary)"],
+    ["PREPARING_SOURCE", "var(--dib-color-accent-warning)"],
+    ["BUILDING", "var(--dib-color-accent-warning)"],
+    ["BUILD_SUCCESS", "var(--dib-color-accent-success)"],
+    ["TEST_SUCCESS", "var(--dib-color-accent-success)"],
+    ["DEPLOY_SUCCESS", "var(--dib-color-accent-success)"],
+    ["COMPLETED", "var(--dib-color-accent-success)"],
+    ["TESTING", "var(--dib-color-accent-info)"],
+    ["DEPLOYING", "var(--dib-color-accent-info)"],
+    ["FAILED", "var(--dib-color-accent-danger)"],
+    ["CANCELLED", "var(--dib-color-text-secondary)"],
     // Legacy preview-era (migration shim)
-    ["CLAIMED", "var(--color-accent-info)"],
-    ["TEST_READY", "var(--color-accent-info)"],
-    ["PROVISIONING", "var(--color-accent-info)"],
-    ["PREVIEW_QUEUED", "var(--color-accent-info)"],
-    ["PREVIEW_READY", "var(--color-accent-info)"],
+    ["CLAIMED", "var(--dib-color-accent-info)"],
+    ["TEST_READY", "var(--dib-color-accent-info)"],
+    ["PROVISIONING", "var(--dib-color-accent-info)"],
+    ["PREVIEW_QUEUED", "var(--dib-color-accent-info)"],
+    ["PREVIEW_READY", "var(--dib-color-accent-info)"],
     // EXPIRED: TASK-046 — secondary for contrast on light mode
-    ["EXPIRED", "var(--color-text-secondary)"],
+    ["EXPIRED", "var(--dib-color-text-secondary)"],
     // RunnerStatus (TASK-072)
-    ["ACTIVE", "var(--color-accent-success)"],
-    ["DISABLED", "var(--color-accent-danger)"]
+    ["ACTIVE", "var(--dib-color-accent-success)"],
+    ["DISABLED", "var(--dib-color-accent-danger)"]
   ])("status %s maps to %s", (status, expectedColor) => {
     render(<StatusPill status={status} />);
     const pill = screen.getByRole("status");
     // TASK-072: aria-label "Build status:" → "Status:" general.
     expect(pill).toHaveAttribute("aria-label", `Status: ${status}`);
-    expect((pill as HTMLElement).style.getPropertyValue("--pill-color")).toBe(
+    expect((pill as HTMLElement).style.getPropertyValue("--dib-pill-color")).toBe(
       expectedColor
     );
   });
@@ -59,8 +59,8 @@ describe("StatusPill (TASK-096)", () => {
     render(<StatusPill status="" />);
     const pill = screen.getByRole("status");
     expect(pill).toHaveAttribute("aria-label", "Status: UNKNOWN");
-    expect((pill as HTMLElement).style.getPropertyValue("--pill-color")).toBe(
-      "var(--color-text-secondary)"
+    expect((pill as HTMLElement).style.getPropertyValue("--dib-pill-color")).toBe(
+      "var(--dib-color-text-secondary)"
     );
   });
 
@@ -68,8 +68,8 @@ describe("StatusPill (TASK-096)", () => {
     render(<StatusPill status="BUILDING" lifecycleStatus="ACTIVE" />);
     const pill = screen.getByRole("status");
     expect(pill).toHaveAttribute("aria-label", "Status: ACTIVE");
-    expect((pill as HTMLElement).style.getPropertyValue("--pill-color")).toBe(
-      "var(--color-accent-success)"
+    expect((pill as HTMLElement).style.getPropertyValue("--dib-pill-color")).toBe(
+      "var(--dib-color-accent-success)"
     );
   });
 
@@ -79,8 +79,8 @@ describe("StatusPill (TASK-096)", () => {
     render(<StatusPill status="COMPLETED" />);
     const pill = screen.getByRole("status");
     expect(pill.style.padding).toContain("4px");
-    expect(pill.style.padding).toContain("var(--space-md)");
-    expect(pill.style.fontSize).toBe("var(--size-xs)");
+    expect(pill.style.padding).toContain("var(--dib-space-md)");
+    expect(pill.style.fontSize).toBe("var(--dib-size-xs)");
     expect(pill.style.background).toContain("15%");
     expect(pill.style.border).toContain("30%");
     expect(pill.style.boxShadow).toContain("8px");

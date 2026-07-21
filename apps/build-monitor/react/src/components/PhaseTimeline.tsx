@@ -12,9 +12,9 @@
 //
 // a11y: <ol role="list"> + 각 step role="listitem" + 상태별 aria-label.
 //
-// 디자인 토큰: --color-accent-success / --color-accent-primary /
-// --color-accent-danger / --color-text-muted / --color-bg-canvas /
-// --color-border-subtle — globals.css cascade 와 정합.
+// 디자인 토큰: --dib-color-accent-success / --dib-color-accent-primary /
+// --dib-color-accent-danger / --dib-color-text-muted / --dib-color-bg-canvas /
+// --dib-color-border-subtle — globals.css cascade 와 정합.
 
 import type { CSSProperties, ReactElement } from "react";
 
@@ -91,7 +91,7 @@ export function PhaseTimeline({
     padding: 0,
     display: "flex",
     flexDirection: "column",
-    gap: "var(--space-md)",
+    gap: "var(--dib-space-md)",
     position: "relative"
   };
 
@@ -137,7 +137,7 @@ function PhaseStep({
     display: "grid",
     gridTemplateColumns: "12px 1fr",
     alignItems: "start",
-    gap: "var(--space-lg)",
+    gap: "var(--dib-space-lg)",
     position: "relative",
     zIndex: 1
   };
@@ -145,30 +145,30 @@ function PhaseStep({
   const dotBase: CSSProperties = {
     width: "11px",
     height: "11px",
-    borderRadius: "var(--radius-pill)",
-    background: "var(--color-bg-canvas)",
-    boxShadow: "0 0 0 2px var(--color-border-subtle)",
+    borderRadius: "var(--dib-radius-pill)",
+    background: "var(--dib-color-bg-canvas)",
+    boxShadow: "0 0 0 2px var(--dib-color-border-subtle)",
     marginTop: "6px",
-    border: "2px solid var(--color-bg-surface)"
+    border: "2px solid var(--dib-color-bg-surface)"
   };
 
   const dotCompleted: CSSProperties = {
     ...dotBase,
     background:
       phase === "FAILED"
-        ? "var(--color-accent-danger)"
-        : "var(--color-accent-success)",
+        ? "var(--dib-color-accent-danger)"
+        : "var(--dib-color-accent-success)",
     boxShadow:
       phase === "FAILED"
-        ? "0 0 8px color-mix(in srgb, var(--color-accent-danger) 35%, transparent)"
-        : "0 0 8px color-mix(in srgb, var(--color-accent-success) 35%, transparent)"
+        ? "0 0 8px color-mix(in srgb, var(--dib-color-accent-danger) 35%, transparent)"
+        : "0 0 8px color-mix(in srgb, var(--dib-color-accent-success) 35%, transparent)"
   };
 
   const dotCurrent: CSSProperties = {
     ...dotBase,
-    background: "var(--color-accent-primary)",
+    background: "var(--dib-color-accent-primary)",
     boxShadow:
-      "0 0 12px color-mix(in srgb, var(--color-accent-primary) 45%, transparent)",
+      "0 0 12px color-mix(in srgb, var(--dib-color-accent-primary) 45%, transparent)",
     animation: "phase-pulse 1.6s ease-in-out infinite"
   };
 
@@ -179,36 +179,36 @@ function PhaseStep({
   };
 
   const phaseLabelStyle: CSSProperties = {
-    fontSize: "var(--size-sm)",
-    fontWeight: "var(--weight-semibold)",
+    fontSize: "var(--dib-size-sm)",
+    fontWeight: "var(--dib-weight-semibold)",
     color:
       status === "pending"
-        ? "var(--color-text-muted)"
-        : "var(--color-text-primary)",
-    fontFamily: "var(--font-mono)"
+        ? "var(--dib-color-text-muted)"
+        : "var(--dib-color-text-primary)",
+    fontFamily: "var(--dib-font-mono)"
   };
 
   const metaStyle: CSSProperties = {
-    fontSize: "var(--size-xs)"
+    fontSize: "var(--dib-size-xs)"
   };
 
   let tsStyle: CSSProperties = {
-    color: "var(--color-text-secondary)",
-    fontFamily: "var(--font-mono)"
+    color: "var(--dib-color-text-secondary)",
+    fontFamily: "var(--dib-font-mono)"
   };
   if (status === "pending") {
-    tsStyle = { ...tsStyle, color: "var(--color-text-muted)" };
+    tsStyle = { ...tsStyle, color: "var(--dib-color-text-muted)" };
   } else if (status === "current") {
     tsStyle = {
       ...tsStyle,
-      color: "var(--color-accent-primary)",
-      fontWeight: "var(--weight-medium)"
+      color: "var(--dib-color-accent-primary)",
+      fontWeight: "var(--dib-weight-medium)"
     };
   } else if (status === "completed") {
     if (phase === "FAILED") {
-      tsStyle = { ...tsStyle, color: "var(--color-accent-danger)" };
+      tsStyle = { ...tsStyle, color: "var(--dib-color-accent-danger)" };
     } else {
-      tsStyle = { ...tsStyle, color: "var(--color-accent-success)" };
+      tsStyle = { ...tsStyle, color: "var(--dib-color-accent-success)" };
     }
   }
 

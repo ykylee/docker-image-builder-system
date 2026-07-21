@@ -9,32 +9,32 @@
 
 .admin-tabs {
   display: inline-flex;
-  gap: var(--space-xs);
-  padding: var(--space-xs);
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-card);
+  gap: var(--dib-space-xs);
+  padding: var(--dib-space-xs);
+  background: var(--dib-color-bg-surface);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-pill);
+  box-shadow: var(--dib-shadow-card);
 }
 
 .admin-tab {
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-pill);
-  color: var(--color-text-secondary);
-  font-size: var(--size-sm);
-  font-weight: var(--weight-medium);
+  padding: var(--dib-space-sm) var(--dib-space-lg);
+  border-radius: var(--dib-radius-pill);
+  color: var(--dib-color-text-secondary);
+  font-size: var(--dib-size-sm);
+  font-weight: var(--dib-weight-medium);
   text-decoration: none;
-  transition: color var(--motion-duration-fast) var(--motion-easing-standard),
-              background var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: color var(--dib-motion-duration-fast) var(--dib-motion-easing-standard),
+              background var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
 
 .admin-tab:hover {
-  color: var(--color-text-primary);
+  color: var(--dib-color-text-primary);
   text-decoration: none;
 }
 
 .admin-tab.active {
-  background: var(--color-accent-primary);
-  color: var(--color-on-accent);
-  box-shadow: var(--shadow-glow);
+  background: var(--dib-color-accent-primary);
+  color: var(--dib-color-on-accent);
+  box-shadow: var(--dib-shadow-glow);
 }

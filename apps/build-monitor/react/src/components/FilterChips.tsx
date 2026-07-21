@@ -3,12 +3,12 @@
 // Svelte src/components/FilterChips.svelte 와 1:1 정합. canonical toggle
 // chip group for status filters.
 //
-// 디자인 토큰: --color-bg-surface / --color-text-secondary /
-// --color-text-primary / --color-accent-primary / --shadow-glow /
-// --shadow-card / --radius-pill / --space-sm / --space-lg /
-// --motion-duration-fast / --motion-easing-standard.
+// 디자인 토큰: --dib-color-bg-surface / --dib-color-text-secondary /
+// --dib-color-text-primary / --dib-color-accent-primary / --dib-shadow-glow /
+// --dib-shadow-card / --dib-radius-pill / --dib-space-sm / --dib-space-lg /
+// --dib-motion-duration-fast / --dib-motion-easing-standard.
 //
-// raw rgba glow 대신 디자인 토큰 `--shadow-glow` 사용 (TASK-083 정합) —
+// raw rgba glow 대신 디자인 토큰 `--dib-shadow-glow` 사용 (TASK-083 정합) —
 // dark / light 모드 자동 follow.
 
 import type { CSSProperties, ReactElement } from "react";
@@ -26,12 +26,12 @@ export function FilterChips<T extends string>({
 }): ReactElement {
   const groupStyle: CSSProperties = {
     display: "inline-flex",
-    gap: "var(--space-sm)",
-    background: "var(--color-bg-surface)",
-    padding: "var(--space-xs)",
-    borderRadius: "var(--radius-pill)",
-    border: "1px solid var(--color-border-subtle)",
-    boxShadow: "var(--shadow-card)"
+    gap: "var(--dib-space-sm)",
+    background: "var(--dib-color-bg-surface)",
+    padding: "var(--dib-space-xs)",
+    borderRadius: "var(--dib-radius-pill)",
+    border: "1px solid var(--dib-color-border-subtle)",
+    boxShadow: "var(--dib-shadow-card)"
   };
 
   return (
@@ -44,23 +44,23 @@ export function FilterChips<T extends string>({
       {options.map((option) => {
         const isActive = selected === option;
         const baseStyle: CSSProperties = {
-          padding: "var(--space-sm) var(--space-lg)",
-          borderRadius: "var(--radius-pill)",
+          padding: "var(--dib-space-sm) var(--dib-space-lg)",
+          borderRadius: "var(--dib-radius-pill)",
           background: "transparent",
           color: isActive
             ? "white"
-            : "var(--color-text-secondary)",
-          fontSize: "var(--size-sm)",
-          fontWeight: "var(--weight-medium)",
+            : "var(--dib-color-text-secondary)",
+          fontSize: "var(--dib-size-sm)",
+          fontWeight: "var(--dib-weight-medium)",
           border: "1px solid transparent",
           cursor: "pointer",
           transition:
-            "color var(--motion-duration-fast) var(--motion-easing-standard), background var(--motion-duration-fast) var(--motion-easing-standard)"
+            "color var(--dib-motion-duration-fast) var(--dib-motion-easing-standard), background var(--dib-motion-duration-fast) var(--dib-motion-easing-standard)"
         };
         const activeStyle: CSSProperties = {
           ...baseStyle,
-          background: "var(--color-accent-primary)",
-          boxShadow: "var(--shadow-glow)"
+          background: "var(--dib-color-accent-primary)",
+          boxShadow: "var(--dib-shadow-glow)"
         };
         return (
           <button

@@ -7,27 +7,27 @@
 .hdr {
   position: sticky;
   top: 0;
-  z-index: var(--z-header);
-  background: var(--glass-bg);
+  z-index: var(--dib-z-header);
+  background: var(--dib-glass-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 1px solid var(--dib-glass-border);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: background-color var(--motion-duration-base) var(--motion-easing-standard);
+  transition: background-color var(--dib-motion-duration-base) var(--dib-motion-easing-standard);
 }
 
 /* max-width / padding 은 본문 셸(.app-main)과 반드시 같은 토큰을 써야 한다 —
  * 다르면 브랜드와 본문의 좌측 기준선이 어긋난다 (2026-07-21 UI 검수: 이전
- * padding 이 --space-xl 이고 본문은 루트 --space-xxl 이라 1920 에서 232px
+ * padding 이 --dib-space-xl 이고 본문은 루트 --dib-space-xxl 이라 1920 에서 232px
  * 어긋나 있었다). */
 .hdr-inner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-lg);
-  padding: 0 var(--layout-gutter);
-  min-height: var(--header-h);
-  max-width: var(--layout-max);
+  gap: var(--dib-space-lg);
+  padding: 0 var(--dib-layout-gutter);
+  min-height: var(--dib-header-h);
+  max-width: var(--dib-layout-max);
   margin: 0 auto;
 }
 
@@ -36,12 +36,12 @@
 @media (max-width: 768px) {
   .hdr-inner {
     flex-wrap: wrap;
-    padding-top: var(--space-sm);
-    padding-bottom: var(--space-sm);
+    padding-top: var(--dib-space-sm);
+    padding-bottom: var(--dib-space-sm);
   }
 
   .hdr-nav {
-    gap: var(--space-md);
+    gap: var(--dib-space-md);
     flex-wrap: wrap;
     justify-content: flex-end;
   }
@@ -50,10 +50,10 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-sm);
-  color: var(--color-text-primary);
-  font-weight: var(--weight-semibold);
-  font-size: var(--size-lg);
+  gap: var(--dib-space-sm);
+  color: var(--dib-color-text-primary);
+  font-weight: var(--dib-weight-semibold);
+  font-size: var(--dib-size-lg);
   letter-spacing: -0.01em;
   text-decoration: none;
 }
@@ -68,75 +68,75 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-info));
-  box-shadow: var(--shadow-glow);
+  border-radius: var(--dib-radius-md);
+  background: linear-gradient(135deg, var(--dib-color-accent-primary), var(--dib-color-accent-info));
+  box-shadow: var(--dib-shadow-glow);
 }
 
 .logo {
-  color: var(--color-on-accent);
-  font-size: var(--size-lg);
+  color: var(--dib-color-on-accent);
+  font-size: var(--dib-size-lg);
   line-height: 1;
 }
 
 .hdr-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
+  gap: var(--dib-space-lg);
 }
 
 .hdr-link {
-  color: var(--color-text-secondary);
-  font-weight: var(--weight-medium);
-  font-size: var(--size-sm);
+  color: var(--dib-color-text-secondary);
+  font-weight: var(--dib-weight-medium);
+  font-size: var(--dib-size-sm);
   text-decoration: none;
-  transition: color var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: color var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
 
 .hdr-link:hover {
-  color: var(--color-text-primary);
+  color: var(--dib-color-text-primary);
   text-decoration: none;
 }
 
 .user-id {
-  color: var(--color-text-primary);
-  font-size: var(--size-sm);
-  font-weight: var(--weight-semibold);
-  background: var(--color-bg-surface-elevated);
-  padding: var(--space-xs) var(--space-md);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border-subtle);
+  color: var(--dib-color-text-primary);
+  font-size: var(--dib-size-sm);
+  font-weight: var(--dib-weight-semibold);
+  background: var(--dib-color-bg-surface-elevated);
+  padding: var(--dib-space-xs) var(--dib-space-md);
+  border-radius: var(--dib-radius-pill);
+  border: 1px solid var(--dib-color-border-subtle);
 }
 
 .admin-id {
-  color: var(--color-text-primary);
-  font-size: var(--size-sm);
-  font-weight: var(--weight-semibold);
+  color: var(--dib-color-text-primary);
+  font-size: var(--dib-size-sm);
+  font-weight: var(--dib-weight-semibold);
 }
 
 .logout-btn {
-  color: var(--color-accent-danger);
-  font-size: var(--size-sm);
-  font-weight: var(--weight-medium);
+  color: var(--dib-color-accent-danger);
+  font-size: var(--dib-size-sm);
+  font-weight: var(--dib-weight-medium);
   cursor: pointer;
   background: transparent;
   border: none;
   padding: 0;
-  transition: color var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: color var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
 
 .logout-btn:hover {
-  color: var(--color-accent-danger);
+  color: var(--dib-color-accent-danger);
   text-decoration: underline;
 }
 
 .divider {
   width: 1px;
   height: 24px;
-  background: var(--color-border-subtle);
-  margin: 0 var(--space-xs);
+  background: var(--dib-color-border-subtle);
+  margin: 0 var(--dib-space-xs);
 }
 
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--dib-font-mono);
 }

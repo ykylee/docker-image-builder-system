@@ -44,7 +44,7 @@ function walk(dir: string): string[] {
  * 선언된 커스텀 프로퍼티 전체.
  *
  * tokens.css 의 전역 토큰뿐 아니라, 컴포넌트가 지역적으로 선언해서 쓰는
- * 프로퍼티(예: StatusPill 의 `--pill-color`)도 정당한 정의다. 후자를 빼면
+ * 프로퍼티(예: StatusPill 의 `--dib-pill-color`)도 정당한 정의다. 후자를 빼면
  * 오탐이 난다.
  */
 function collectDeclared(files: readonly string[]): Set<string> {

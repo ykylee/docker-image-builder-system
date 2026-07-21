@@ -26,7 +26,7 @@
 // Astryx (theme.css + <Theme> 래퍼) 제거 — 2026-07-21 UI 검수.
 //
 // 제거 이유: theme-neutral 이 우리와 **이름이 같은** 토큰
-// (--color-text-primary / --color-text-secondary / --color-text-disabled) 을
+// (--dib-color-text-primary / --dib-color-text-secondary / --dib-color-text-disabled) 을
 // `[data-astryx-theme="neutral"]` 로 재정의하고, <Theme> 가 그 속성을 문서
 // 루트에 붙여 하위 전체에 상속시켰다. 그 결과 tokens.css 의 값이 컴포넌트
 // 위치에서 Astryx 값으로 덮였고, 동시에 하위 color-scheme 이 `light dark` 가
@@ -37,7 +37,7 @@
 // 제거해도 안전한 근거: Astryx 컴포넌트는 본 진입점 외 어디에서도 import
 // 되지 않았다 (사용처 0건). 보호할 default 컴포넌트 스타일이 없고, reset 은
 // globals.css 가 자체 보유 (box-sizing / margin / color-scheme).
-// 부수 효과: 본문 폰트가 Astryx 의 Figtree → 우리 --font-sans 로 복귀.
+// 부수 효과: 본문 폰트가 Astryx 의 Figtree → 우리 --dib-font-sans 로 복귀.
 import "@/tokens.css";
 import "@/globals.css";
 

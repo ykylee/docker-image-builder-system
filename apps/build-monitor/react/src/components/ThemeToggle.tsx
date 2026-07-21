@@ -5,9 +5,9 @@
 //
 // a11y: aria-label "Toggle theme" + role="button" (button element).
 //
-// 디자인 토큰: --color-text-secondary / --color-bg-surface-elevated /
-// --color-text-primary / --radius-pill / --motion-duration-fast /
-// --motion-easing-standard. globals.css cascade 와 정합.
+// 디자인 토큰: --dib-color-text-secondary / --dib-color-bg-surface-elevated /
+// --dib-color-text-primary / --dib-radius-pill / --dib-motion-duration-fast /
+// --dib-motion-easing-standard. globals.css cascade 와 정합.
 
 import { useEffect, useState, type ReactElement } from "react";
 
@@ -80,13 +80,13 @@ export function ThemeToggle(): ReactElement {
     justifyContent: "center",
     width: "36px",
     height: "36px",
-    borderRadius: "var(--radius-pill)",
-    color: "var(--color-text-secondary)",
+    borderRadius: "var(--dib-radius-pill)",
+    color: "var(--dib-color-text-secondary)",
     background: "transparent",
     border: "1px solid transparent",
     cursor: "pointer",
     transition:
-      "all var(--motion-duration-fast) var(--motion-easing-standard)"
+      "all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard)"
   };
 
   return (
@@ -97,13 +97,13 @@ export function ThemeToggle(): ReactElement {
       style={buttonStyle}
       onClick={toggle}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = "var(--color-bg-surface-elevated)";
-        e.currentTarget.style.color = "var(--color-text-primary)";
+        e.currentTarget.style.background = "var(--dib-color-bg-surface-elevated)";
+        e.currentTarget.style.color = "var(--dib-color-text-primary)";
         e.currentTarget.style.transform = "scale(1.05)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = "transparent";
-        e.currentTarget.style.color = "var(--color-text-secondary)";
+        e.currentTarget.style.color = "var(--dib-color-text-secondary)";
         e.currentTarget.style.transform = "scale(1)";
       }}
     >

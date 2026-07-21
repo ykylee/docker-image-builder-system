@@ -35,26 +35,26 @@ export function BuildRow({
 
   const rowStyle: CSSProperties = {
     transition:
-      "background-color var(--motion-duration-fast) var(--motion-easing-standard)"
+      "background-color var(--dib-motion-duration-fast) var(--dib-motion-easing-standard)"
   };
   const cellStyle: CSSProperties = {
-    padding: "var(--space-md) var(--space-lg)",
+    padding: "var(--dib-space-md) var(--dib-space-lg)",
     height: "48px",
     verticalAlign: "middle",
-    borderBottom: "1px solid var(--color-border-subtle)"
+    borderBottom: "1px solid var(--dib-color-border-subtle)"
   };
   const idStyle: CSSProperties = {
-    fontSize: "var(--size-sm)",
-    color: "var(--color-accent-primary)",
-    fontWeight: "var(--weight-medium)",
+    fontSize: "var(--dib-size-sm)",
+    color: "var(--dib-color-accent-primary)",
+    fontWeight: "var(--dib-weight-medium)",
     textDecoration: "none",
-    fontFamily: "var(--font-mono)"
+    fontFamily: "var(--dib-font-mono)"
   };
   const metaStyle: CSSProperties = {
-    color: "var(--color-text-secondary)",
-    fontSize: "var(--size-sm)",
-    fontWeight: "var(--weight-medium)",
-    fontFamily: "var(--font-mono)",
+    color: "var(--dib-color-text-secondary)",
+    fontSize: "var(--dib-size-sm)",
+    fontWeight: "var(--dib-weight-medium)",
+    fontFamily: "var(--dib-font-mono)",
     // 길이가 긴 appName (e.g. feature/test-environment-deployment) 도
     // row 한 줄 유지 + ellipsis 로 시각 정리. hover/active 시
     // title attr 이 tooltip 으로 노출되어 운영자가 full name 확인.
@@ -64,21 +64,21 @@ export function BuildRow({
     whiteSpace: "nowrap"
   };
   const timeStyle: CSSProperties = {
-    color: "var(--color-text-muted)",
-    fontSize: "var(--size-sm)",
+    color: "var(--dib-color-text-muted)",
+    fontSize: "var(--dib-size-sm)",
     textAlign: "right",
     fontVariantNumeric: "tabular-nums"
   };
   const ownerStyle: CSSProperties = {
-    color: "var(--color-text-primary)",
-    fontSize: "var(--size-sm)",
-    fontWeight: "var(--weight-semibold)",
-    background: "var(--color-bg-surface-elevated)",
-    padding: "var(--space-xs) var(--space-md)",
-    borderRadius: "var(--radius-pill)",
-    border: "1px solid var(--color-border-strong)",
+    color: "var(--dib-color-text-primary)",
+    fontSize: "var(--dib-size-sm)",
+    fontWeight: "var(--dib-weight-semibold)",
+    background: "var(--dib-color-bg-surface-elevated)",
+    padding: "var(--dib-space-xs) var(--dib-space-md)",
+    borderRadius: "var(--dib-radius-pill)",
+    border: "1px solid var(--dib-color-border-strong)",
     width: "max-content",
-    fontFamily: "var(--font-mono)"
+    fontFamily: "var(--dib-font-mono)"
   };
 
   return (

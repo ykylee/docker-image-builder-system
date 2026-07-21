@@ -23,9 +23,9 @@ import "./BuildDetail.css";
 
 // loading / not-found placeholder 스타일.
 const placeholderStyle: CSSProperties = {
-  padding: "var(--space-xxl, 32px)",
-  fontFamily: "var(--font-sans)",
-  color: "var(--color-text-primary)"
+  padding: "var(--dib-space-xxl, 32px)",
+  fontFamily: "var(--dib-font-sans)",
+  color: "var(--dib-color-text-primary)"
 };
 
 // datalist key 생성 helper — label 의 padding/breaks 없이 한 줄 노출.

@@ -97,8 +97,8 @@ describe("FilterChips (TASK-095)", () => {
       />
     );
     const active = screen.getByTestId("filter-chip-BUILDING");
-    expect(active.style.background).toContain("var(--color-accent-primary)");
-    expect(active.style.boxShadow).toContain("var(--shadow-glow)");
+    expect(active.style.background).toContain("var(--dib-color-accent-primary)");
+    expect(active.style.boxShadow).toContain("var(--dib-shadow-glow)");
   });
 
   it("inactive chip renders without primary background", () => {

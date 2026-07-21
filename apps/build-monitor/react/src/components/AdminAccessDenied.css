@@ -7,8 +7,8 @@
 .admin-denied-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxl);
-  animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+  gap: var(--dib-space-xxl);
+  animation: fadeIn var(--dib-motion-duration-slow) var(--dib-motion-easing-standard);
 }
 
 @keyframes fadeIn {
@@ -19,90 +19,90 @@
 .admin-denied-head {
   display: flex;
   align-items: center;
-  gap: var(--space-lg);
+  gap: var(--dib-space-lg);
   flex-wrap: wrap;
 }
 
 .admin-denied-head h1 {
   margin: 0;
-  font-size: var(--size-xxl);
-  font-weight: var(--weight-semibold);
+  font-size: var(--dib-size-xxl);
+  font-weight: var(--dib-weight-semibold);
   letter-spacing: -0.02em;
-  color: var(--color-accent-danger);
+  color: var(--dib-color-accent-danger);
 }
 
 .admin-denied-muted {
-  color: var(--color-text-muted);
+  color: var(--dib-color-text-muted);
   margin: 4px 0 0;
-  font-size: var(--size-sm);
+  font-size: var(--dib-size-sm);
 }
 
 .admin-denied-card {
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal);
-  padding: var(--space-xxl);
+  background: var(--dib-color-bg-surface);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-lg);
+  box-shadow: var(--dib-shadow-modal);
+  padding: var(--dib-space-xxl);
   display: flex;
   flex-direction: column;
-  gap: var(--space-xl);
+  gap: var(--dib-space-xl);
   max-width: 640px;
 }
 
 .admin-denied-card-body {
   margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--size-md);
+  color: var(--dib-color-text-secondary);
+  font-size: var(--dib-size-md);
   line-height: 1.6;
 }
 
 .admin-denied-card-body code {
-  background: var(--color-bg-canvas);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 0 var(--space-xs);
+  background: var(--dib-color-bg-canvas);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-sm);
+  padding: 0 var(--dib-space-xs);
   font-size: 0.95em;
 }
 
 .admin-denied-actions {
   display: flex;
-  gap: var(--space-md);
+  gap: var(--dib-space-md);
   flex-wrap: wrap;
 }
 
 .admin-denied-btn-primary,
 .admin-denied-btn-secondary {
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-md);
-  font-size: var(--size-sm);
-  font-weight: var(--weight-semibold);
+  padding: var(--dib-space-sm) var(--dib-space-lg);
+  border-radius: var(--dib-radius-md);
+  font-size: var(--dib-size-sm);
+  font-weight: var(--dib-weight-semibold);
   cursor: pointer;
-  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
   border: 1px solid transparent;
   text-decoration: none;
 }
 
 .admin-denied-btn-primary {
-  background: var(--color-accent-primary);
-  color: var(--color-on-accent);
+  background: var(--dib-color-accent-primary);
+  color: var(--dib-color-on-accent);
 }
 
 .admin-denied-btn-primary:hover {
-  background: var(--color-accent-primary-hover);
-  box-shadow: var(--shadow-glow);
+  background: var(--dib-color-accent-primary-hover);
+  box-shadow: var(--dib-shadow-glow);
 }
 
 .admin-denied-btn-secondary {
-  background: var(--color-bg-surface);
-  color: var(--color-text-secondary);
-  border-color: var(--color-border-strong);
+  background: var(--dib-color-bg-surface);
+  color: var(--dib-color-text-secondary);
+  border-color: var(--dib-color-border-strong);
 }
 
 .admin-denied-btn-secondary:hover {
-  color: var(--color-text-primary);
-  background: var(--color-bg-surface-elevated);
+  color: var(--dib-color-text-primary);
+  background: var(--dib-color-bg-surface-elevated);
 }
 
 .mono {
-  font-family: var(--font-mono);
+  font-family: var(--dib-font-mono);
 }

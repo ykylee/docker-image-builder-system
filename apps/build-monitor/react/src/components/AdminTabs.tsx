@@ -8,11 +8,11 @@
 // active 시 `active` class 적용. `aria-current="page"` 자동 부여 (NavLink
 // 기본 동작).
 //
-// 디자인 토큰: --color-bg-surface / --color-text-secondary /
-// --color-text-primary / --color-accent-primary / --shadow-card /
-// --shadow-glow / --radius-pill / --space-xs / --space-sm /
-// --space-lg / --size-sm / --motion-duration-fast /
-// --motion-easing-standard.
+// 디자인 토큰: --dib-color-bg-surface / --dib-color-text-secondary /
+// --dib-color-text-primary / --dib-color-accent-primary / --dib-shadow-card /
+// --dib-shadow-glow / --dib-radius-pill / --dib-space-xs / --dib-space-sm /
+// --dib-space-lg / --dib-size-sm / --dib-motion-duration-fast /
+// --dib-motion-easing-standard.
 
 import { NavLink } from "react-router-dom";
 import type { CSSProperties, ReactElement } from "react";
@@ -29,30 +29,30 @@ const TABS = [
 export function AdminTabs(): ReactElement {
   const navStyle: CSSProperties = {
     display: "inline-flex",
-    gap: "var(--space-xs)",
-    padding: "var(--space-xs)",
-    background: "var(--color-bg-surface)",
-    border: "1px solid var(--color-border-subtle)",
-    borderRadius: "var(--radius-pill)",
-    boxShadow: "var(--shadow-card)"
+    gap: "var(--dib-space-xs)",
+    padding: "var(--dib-space-xs)",
+    background: "var(--dib-color-bg-surface)",
+    border: "1px solid var(--dib-color-border-subtle)",
+    borderRadius: "var(--dib-radius-pill)",
+    boxShadow: "var(--dib-shadow-card)"
   };
 
   const baseTabStyle: CSSProperties = {
-    padding: "var(--space-sm) var(--space-lg)",
-    borderRadius: "var(--radius-pill)",
-    color: "var(--color-text-secondary)",
-    fontSize: "var(--size-sm)",
-    fontWeight: "var(--weight-medium)",
+    padding: "var(--dib-space-sm) var(--dib-space-lg)",
+    borderRadius: "var(--dib-radius-pill)",
+    color: "var(--dib-color-text-secondary)",
+    fontSize: "var(--dib-size-sm)",
+    fontWeight: "var(--dib-weight-medium)",
     textDecoration: "none",
     transition:
-      "color var(--motion-duration-fast) var(--motion-easing-standard), background var(--motion-duration-fast) var(--motion-easing-standard)"
+      "color var(--dib-motion-duration-fast) var(--dib-motion-easing-standard), background var(--dib-motion-duration-fast) var(--dib-motion-easing-standard)"
   };
 
   const activeTabStyle: CSSProperties = {
     ...baseTabStyle,
-    background: "var(--color-accent-primary)",
-    color: "var(--color-on-accent)",
-    boxShadow: "var(--shadow-glow)"
+    background: "var(--dib-color-accent-primary)",
+    color: "var(--dib-color-on-accent)",
+    boxShadow: "var(--dib-shadow-glow)"
   };
 
   return (

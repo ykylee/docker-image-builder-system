@@ -7,19 +7,19 @@
  * 2026-07-21 UI 검수: `@import "../tokens.css"` 제거. tokens.css 는 이미
  * main.tsx 가 전역으로 import 한다. 여기서 다시 import 하면 `:root` 토큰
  * 블록이 globals.css **뒤에** 한 번 더 emit 되어, globals.css 의 반응형
- * override (@media 로 --layout-gutter 축소) 를 도로 덮어버린다. 실제로
+ * override (@media 로 --dib-layout-gutter 축소) 를 도로 덮어버린다. 실제로
  * 768px 에서 gutter 가 줄지 않던 원인이었다.
  *
- * FilterChips 컴포넌트 디자인은 Svelte 와 같은 토큰 (`--shadow-glow` +
- * `--color-accent-primary` 배경) 을 그대로 사용 — TASK-083 의 canonical
+ * FilterChips 컴포넌트 디자인은 Svelte 와 같은 토큰 (`--dib-shadow-glow` +
+ * `--dib-color-accent-primary` 배경) 을 그대로 사용 — TASK-083 의 canonical
  * 디자인과 정합.
  */
 
 .list-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxl);
-  animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+  gap: var(--dib-space-xxl);
+  animation: fadeIn var(--dib-motion-duration-slow) var(--dib-motion-easing-standard);
 }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
@@ -34,10 +34,10 @@
 
 .list-page h1 {
   margin: 0;
-  font-size: var(--size-xxl);
-  font-weight: var(--weight-semibold);
+  font-size: var(--dib-size-xxl);
+  font-weight: var(--dib-weight-semibold);
   letter-spacing: -0.02em;
-  background: linear-gradient(90deg, var(--color-text-primary), var(--color-text-muted));
+  background: linear-gradient(90deg, var(--dib-color-text-primary), var(--dib-color-text-muted));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -45,12 +45,12 @@
 
 .chips {
   display: inline-flex;
-  gap: var(--space-xs);
-  background: var(--color-bg-surface);
-  padding: var(--space-xs);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border-subtle);
-  box-shadow: var(--shadow-card);
+  gap: var(--dib-space-xs);
+  background: var(--dib-color-bg-surface);
+  padding: var(--dib-space-xs);
+  border-radius: var(--dib-radius-pill);
+  border: 1px solid var(--dib-color-border-subtle);
+  box-shadow: var(--dib-shadow-card);
 }
 
 /* chip 비활성 상태 contrast — TASK-090 self-review 보강.
@@ -65,54 +65,54 @@
  * 배경 + glow 와 시각 hierarchy 분리.
  */
 .chip {
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border-subtle);
-  background: var(--color-bg-surface-elevated);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--size-sm);
-  font-weight: var(--weight-semibold);
+  padding: var(--dib-space-sm) var(--dib-space-lg);
+  border-radius: var(--dib-radius-pill);
+  border: 1px solid var(--dib-color-border-subtle);
+  background: var(--dib-color-bg-surface-elevated);
+  color: var(--dib-color-text-primary);
+  font-family: var(--dib-font-sans);
+  font-size: var(--dib-size-sm);
+  font-weight: var(--dib-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   cursor: pointer;
-  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
 
 .chip:hover {
-  background: var(--color-bg-canvas);
-  border-color: var(--color-border-strong);
-  color: var(--color-text-primary);
+  background: var(--dib-color-bg-canvas);
+  border-color: var(--dib-color-border-strong);
+  color: var(--dib-color-text-primary);
 }
 
 .chip--active {
-  background: var(--color-accent-primary);
-  color: var(--color-on-accent);
-  border-color: var(--color-accent-primary);
-  box-shadow: var(--shadow-glow);
+  background: var(--dib-color-accent-primary);
+  color: var(--dib-color-on-accent);
+  border-color: var(--dib-color-accent-primary);
+  box-shadow: var(--dib-shadow-glow);
 }
 
 .builds-table {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  background: var(--dib-color-bg-surface);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-lg);
+  box-shadow: var(--dib-shadow-card);
   overflow: hidden;
 }
 
 .builds-table thead th {
   text-align: left;
-  padding: var(--space-md) var(--space-lg);
-  background: var(--color-bg-surface-elevated);
-  color: var(--color-text-muted);
-  font-size: var(--size-xs);
-  font-weight: var(--weight-semibold);
+  padding: var(--dib-space-md) var(--dib-space-lg);
+  background: var(--dib-color-bg-surface-elevated);
+  color: var(--dib-color-text-muted);
+  font-size: var(--dib-size-xs);
+  font-weight: var(--dib-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--dib-color-border-subtle);
 }
 
 .builds-table thead th.r {
@@ -124,7 +124,7 @@
  * Light theme 에서 table row hover 가 너무 미묘해서 운영자가 scan 하기
  * 어려움. hover 시 left border accent (indigo) + background tint 로
  * row 자체가 시각 anchor 가 되도록 보강. Svelte BuildRow.svelte 의
- * `row:hover { background: var(--color-bg-surface-elevated); }` 정합.
+ * `row:hover { background: var(--dib-color-bg-surface-elevated); }` 정합.
  *
  * row 의 border-bottom + table 의 overflow:hidden + radius-lg 가
  * 마지막 row 의 하단 border 에 겹침 효과를 일으킴 — :global(tbody >
@@ -133,15 +133,15 @@
  */
 .builds-table tbody tr {
   position: relative;
-  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
 
 .builds-table tbody tr:hover {
-  background: var(--color-bg-surface-elevated);
+  background: var(--dib-color-bg-surface-elevated);
 }
 
 .builds-table tbody tr:hover td:first-child {
-  box-shadow: inset 4px 0 0 var(--color-accent-primary);
+  box-shadow: inset 4px 0 0 var(--dib-color-accent-primary);
 }
 
 .builds-table tbody tr:last-child td {
@@ -149,9 +149,9 @@
 }
 
 .muted {
-  color: var(--color-text-muted);
+  color: var(--dib-color-text-muted);
 }
 
 .err {
-  color: var(--color-accent-danger);
+  color: var(--dib-color-accent-danger);
 }

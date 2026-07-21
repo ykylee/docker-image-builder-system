@@ -20,18 +20,18 @@
   align-items: center;
   justify-content: center;
   /* 높이는 .app-main 이 flex 로 넘겨준다 — viewport 산수 없음. */
-  animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+  animation: fadeIn var(--dib-motion-duration-slow) var(--dib-motion-easing-standard);
 }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
 .card {
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-modal);
-  padding: var(--space-xxl);
+  background: var(--dib-color-bg-surface);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-lg);
+  box-shadow: var(--dib-shadow-modal);
+  padding: var(--dib-space-xxl);
   width: 100%;
   max-width: 400px;
   display: flex;
@@ -45,79 +45,79 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--color-accent-primary), var(--color-accent-info));
+  border-radius: var(--dib-radius-md);
+  background: linear-gradient(135deg, var(--dib-color-accent-primary), var(--dib-color-accent-info));
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--dib-space-lg);
 }
 .logo {
-  color: var(--color-on-accent);
-  font-size: var(--size-xxl);
+  color: var(--dib-color-on-accent);
+  font-size: var(--dib-size-xxl);
   line-height: 1;
 }
 h1 {
-  margin: 0 0 var(--space-xs);
-  font-size: var(--size-xl);
-  color: var(--color-text-primary);
+  margin: 0 0 var(--dib-space-xs);
+  font-size: var(--dib-size-xl);
+  color: var(--dib-color-text-primary);
 }
 .subtitle {
-  margin: 0 0 var(--space-xl);
-  color: var(--color-text-secondary);
-  font-size: var(--size-sm);
+  margin: 0 0 var(--dib-space-xl);
+  color: var(--dib-color-text-secondary);
+  font-size: var(--dib-size-sm);
 }
 form {
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--dib-space-lg);
 }
 .input-group {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: var(--dib-space-xs);
   text-align: left;
 }
 label {
-  font-size: var(--size-xs);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text-secondary);
+  font-size: var(--dib-size-xs);
+  font-weight: var(--dib-weight-semibold);
+  color: var(--dib-color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 input {
   width: 100%;
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border-strong);
-  /* TASK-046 follow-up: light 모드 --color-border-strong 을
+  padding: var(--dib-space-md);
+  border-radius: var(--dib-radius-md);
+  border: 1px solid var(--dib-color-border-strong);
+  /* TASK-046 follow-up: light 모드 --dib-color-border-strong 을
      #cbd5e1 (1.36:1) → #7a889e (3.28:1) 로 올림. Login input 의 흐릿
      한 border 가 토큰 한 곳에서 해결됨. */
-  background: var(--color-bg-canvas);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--size-md);
-  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+  background: var(--dib-color-bg-canvas);
+  color: var(--dib-color-text-primary);
+  font-family: var(--dib-font-sans);
+  font-size: var(--dib-size-md);
+  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
 input:focus {
   outline: none;
-  border-color: var(--color-accent-primary);
-  box-shadow: 0 0 0 2px var(--color-focus-ring);
+  border-color: var(--dib-color-accent-primary);
+  box-shadow: 0 0 0 2px var(--dib-color-focus-ring);
 }
 .btn-primary {
   width: 100%;
-  padding: var(--space-md);
-  border-radius: var(--radius-md);
-  background: var(--color-accent-primary);
-  color: var(--color-on-accent);
-  font-size: var(--size-md);
-  font-weight: var(--weight-semibold);
+  padding: var(--dib-space-md);
+  border-radius: var(--dib-radius-md);
+  background: var(--dib-color-accent-primary);
+  color: var(--dib-color-on-accent);
+  font-size: var(--dib-size-md);
+  font-weight: var(--dib-weight-semibold);
   cursor: pointer;
   border: none;
-  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
 .btn-primary:hover {
-  background: var(--color-accent-primary-hover);
-  box-shadow: var(--shadow-glow);
+  background: var(--dib-color-accent-primary-hover);
+  box-shadow: var(--dib-shadow-glow);
   transform: translateY(-1px);
 }
 .btn-primary:active {

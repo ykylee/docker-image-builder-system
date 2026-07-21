@@ -45,17 +45,17 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         <div
           role="alert"
           style={{
-            padding: "var(--space-xxl)",
-            fontFamily: "var(--font-sans, system-ui, sans-serif)",
-            color: "var(--color-text-primary, inherit)",
-            background: "var(--color-bg-canvas, transparent)",
+            padding: "var(--dib-space-xxl)",
+            fontFamily: "var(--dib-font-sans, system-ui, sans-serif)",
+            color: "var(--dib-color-text-primary, inherit)",
+            background: "var(--dib-color-bg-canvas, transparent)",
             minHeight: "100vh"
           }}
         >
-          <h1 style={{ color: "var(--color-text-primary, inherit)" }}>
+          <h1 style={{ color: "var(--dib-color-text-primary, inherit)" }}>
             Something went wrong
           </h1>
-          <p style={{ color: "var(--color-text-secondary, #666)" }}>
+          <p style={{ color: "var(--dib-color-text-secondary, #666)" }}>
             The build monitor encountered an unexpected error. Refresh the page
             to retry. If the problem persists, file an issue with the error
             message below.
@@ -63,13 +63,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <pre
             data-testid="error-boundary-message"
             style={{
-              padding: "var(--space-md)",
-              borderRadius: "var(--radius-md)",
-              border: "1px solid var(--color-border-subtle, #444)",
-              background: "var(--color-bg-surface, #111)",
-              color: "var(--color-text-secondary, #aaa)",
+              padding: "var(--dib-space-md)",
+              borderRadius: "var(--dib-radius-md)",
+              border: "1px solid var(--dib-color-border-subtle, #444)",
+              background: "var(--dib-color-bg-surface, #111)",
+              color: "var(--dib-color-text-secondary, #aaa)",
               overflow: "auto",
-              fontSize: "var(--size-sm, 0.875rem)"
+              fontSize: "var(--dib-size-sm, 0.875rem)"
             }}
           >
             {this.state.error.message}

@@ -23,14 +23,14 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg-canvas);
-  color: var(--color-text-primary);
-  font-family: var(--font-sans);
-  font-size: var(--size-md);
-  line-height: var(--line-normal);
+  background: var(--dib-color-bg-canvas);
+  color: var(--dib-color-text-primary);
+  font-family: var(--dib-font-sans);
+  font-size: var(--dib-size-md);
+  line-height: var(--dib-line-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color var(--motion-duration-base) var(--motion-easing-standard), color var(--motion-duration-base) var(--motion-easing-standard);
+  transition: background-color var(--dib-motion-duration-base) var(--dib-motion-easing-standard), color var(--dib-motion-duration-base) var(--dib-motion-easing-standard);
 }
 
 /* 앱 루트에는 여백을 두지 않는다. 여백을 여기 두면 sticky 헤더(.hdr)까지
@@ -48,7 +48,7 @@ html, body {
 
 /* 페이지 공통 셸. 모든 라우트의 콘텐츠가 이 안에 들어가며 폭·여백은 여기
  * 한 곳에서만 결정한다 (App.tsx 의 <main className="app-main">).
- * .hdr-inner 과 --layout-max / --layout-gutter 를 공유하므로 헤더 브랜드와
+ * .hdr-inner 과 --dib-layout-max / --dib-layout-gutter 를 공유하므로 헤더 브랜드와
  * 본문의 좌측 기준선이 항상 일치한다 — 개별 페이지에서 max-width 나
  * 좌우 padding 을 다시 잡지 말 것. */
 .app-main {
@@ -56,9 +56,9 @@ html, body {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: var(--layout-max);
+  max-width: var(--dib-layout-max);
   margin: 0 auto;
-  padding: var(--space-xxl) var(--layout-gutter);
+  padding: var(--dib-space-xxl) var(--dib-layout-gutter);
 }
 
 /* 각 라우트의 최상위 요소가 남는 높이를 받는다. 세로 가운데 정렬(Login)이나
@@ -68,25 +68,25 @@ html, body {
   min-height: 0;
 }
 
-/* 좁은 화면에서는 gutter 를 줄여 콘텐츠 폭을 확보한다. --layout-gutter 는
+/* 좁은 화면에서는 gutter 를 줄여 콘텐츠 폭을 확보한다. --dib-layout-gutter 는
  * 헤더도 함께 참조하므로 양쪽이 동시에 좁아진다. */
 @media (max-width: 768px) {
   :root {
-    --layout-gutter: var(--space-lg);
+    --dib-layout-gutter: var(--dib-space-lg);
   }
 }
 
 a {
-  color: var(--color-accent-primary);
+  color: var(--dib-color-accent-primary);
   text-decoration: none;
 }
-a:hover { color: var(--color-accent-primary-hover); text-decoration: underline; }
+a:hover { color: var(--dib-color-accent-primary-hover); text-decoration: underline; }
 
 /* a11y: 명확한 focus outline (DESIGN.md §6 Accessibility) */
 :focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: 2px solid var(--dib-color-focus-ring);
   outline-offset: 2px;
-  border-radius: var(--radius-sm);
+  border-radius: var(--dib-radius-sm);
 }
 
 button {
@@ -99,7 +99,7 @@ button {
 }
 
 code, pre, .mono {
-  font-family: var(--font-mono);
+  font-family: var(--dib-font-mono);
 }
 
 /* TASK-091: PhaseTimeline 의 in-progress dot pulse animation. Svelte

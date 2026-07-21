@@ -3,8 +3,8 @@
 .admin-runners-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxl);
-  animation: admin-fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
+  gap: var(--dib-space-xxl);
+  animation: admin-fadeIn var(--dib-motion-duration-slow) var(--dib-motion-easing-standard);
 }
 
 @keyframes admin-fadeIn {
@@ -16,16 +16,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-lg);
+  gap: var(--dib-space-lg);
   flex-wrap: wrap;
 }
 
 .admin-runners-head h1 {
   margin: 0;
-  font-size: var(--size-xxl);
-  font-weight: var(--weight-semibold);
+  font-size: var(--dib-size-xxl);
+  font-weight: var(--dib-weight-semibold);
   letter-spacing: -0.02em;
-  background: linear-gradient(90deg, var(--color-text-primary), var(--color-text-muted));
+  background: linear-gradient(90deg, var(--dib-color-text-primary), var(--dib-color-text-muted));
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -33,42 +33,42 @@
 
 .admin-runners-head .muted,
 .admin-runners-page .muted {
-  color: var(--color-text-muted);
-  font-size: var(--size-sm);
+  color: var(--dib-color-text-muted);
+  font-size: var(--dib-size-sm);
   margin: 4px 0 0;
 }
 
 .admin-runners-page .err {
-  color: var(--color-accent-danger);
+  color: var(--dib-color-accent-danger);
 }
 
 .admin-runners-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: var(--dib-space-md);
   flex-wrap: wrap;
 }
 
 .btn-primary,
 .btn-secondary,
 .btn-danger {
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: var(--radius-md);
-  font-size: var(--size-sm);
-  font-weight: var(--weight-semibold);
+  padding: var(--dib-space-sm) var(--dib-space-lg);
+  border-radius: var(--dib-radius-md);
+  font-size: var(--dib-size-sm);
+  font-weight: var(--dib-weight-semibold);
   cursor: pointer;
-  transition: all var(--motion-duration-fast) var(--motion-easing-standard);
+  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
   border: 1px solid transparent;
 }
 
 .btn-primary {
-  background: var(--color-accent-primary);
-  color: var(--color-on-accent);
+  background: var(--dib-color-accent-primary);
+  color: var(--dib-color-on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--color-accent-primary-hover);
-  box-shadow: var(--shadow-glow);
+  background: var(--dib-color-accent-primary-hover);
+  box-shadow: var(--dib-shadow-glow);
 }
 
 .btn-primary:disabled {
@@ -77,14 +77,14 @@
 }
 
 .btn-secondary {
-  background: var(--color-bg-surface-elevated);
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-strong);
+  background: var(--dib-color-bg-surface-elevated);
+  color: var(--dib-color-text-secondary);
+  border: 1px solid var(--dib-color-border-strong);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  color: var(--color-text-primary);
-  background: var(--color-bg-canvas);
+  color: var(--dib-color-text-primary);
+  background: var(--dib-color-bg-canvas);
 }
 
 .btn-secondary:disabled {
@@ -94,12 +94,12 @@
 
 .btn-danger {
   background: transparent;
-  color: var(--color-accent-danger);
-  border: 1px solid color-mix(in srgb, var(--color-accent-danger) 35%, transparent);
+  color: var(--dib-color-accent-danger);
+  border: 1px solid color-mix(in srgb, var(--dib-color-accent-danger) 35%, transparent);
 }
 
 .btn-danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent-danger) 15%, transparent);
+  background: color-mix(in srgb, var(--dib-color-accent-danger) 15%, transparent);
   text-decoration: underline;
 }
 
@@ -107,23 +107,23 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  background: var(--dib-color-bg-surface);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-lg);
+  box-shadow: var(--dib-shadow-card);
   overflow: hidden;
 }
 
 .admin-runners-table thead th {
   text-align: left;
-  padding: var(--space-md) var(--space-lg);
-  background: var(--color-bg-surface-elevated);
-  color: var(--color-text-muted);
-  font-size: var(--size-xs);
-  font-weight: var(--weight-semibold);
+  padding: var(--dib-space-md) var(--dib-space-lg);
+  background: var(--dib-color-bg-surface-elevated);
+  color: var(--dib-color-text-muted);
+  font-size: var(--dib-size-xs);
+  font-weight: var(--dib-weight-semibold);
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-bottom: 1px solid var(--color-border-subtle);
+  border-bottom: 1px solid var(--dib-color-border-subtle);
 }
 
 .admin-runners-table thead th.r,
@@ -132,11 +132,11 @@
 }
 
 .admin-runners-table td {
-  padding: var(--space-md) var(--space-lg);
-  border-bottom: 1px solid var(--color-border-subtle);
+  padding: var(--dib-space-md) var(--dib-space-lg);
+  border-bottom: 1px solid var(--dib-color-border-subtle);
 }
 
 .admin-runners-table td.mono {
-  font-family: var(--font-mono);
-  font-size: var(--size-sm);
+  font-family: var(--dib-font-mono);
+  font-size: var(--dib-size-sm);
 }
