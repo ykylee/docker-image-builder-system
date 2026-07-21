@@ -20,6 +20,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -241,7 +242,14 @@ func (f *Fetcher) Fetch(ctx context.Context, buildID string) (*ExtractResult, er
 // name should be surfaced as an error rather than silently
 // rewritten. Rejected conditions:
 //   - absolute paths (Unix `/foo`, Windows `C:\foo` — the latter is
-//     caught by the backslash check below)
+//     caught by the backslash check below). The slash-form check uses
+//     `path.IsAbs`, NOT `filepath.IsAbs`: tar entry names are always
+//     slash-separated per the format spec, whereas `filepath` follows
+//     the *host* OS convention. On a Windows build `filepath.IsAbs`
+//     returns false for `/etc/passwd`, which silently disabled this
+//     guard (TASK-126). `filepath.IsAbs` is kept as an additional
+//     host-specific check so a Windows-absolute form is still caught
+//     when running there.
 //   - any parent-relative component (`..` or `../foo`/`foo/..`/`a/../b`)
 //   - NUL byte (`\x00`) — tar entries are guaranteed not to embed
 //     these by the format spec, but a crafted zip-compatible or
@@ -259,7 +267,7 @@ func validateTarEntryName(name string) error {
 	if name == "" {
 		return fmt.Errorf("reject empty tar entry name")
 	}
-	if filepath.IsAbs(name) {
+	if path.IsAbs(name) || filepath.IsAbs(name) {
 		return fmt.Errorf("reject absolute tar entry name %q", name)
 	}
 	if strings.Contains(name, "..") {

@@ -82,7 +82,7 @@
 - **isolated test**:
   - frontend: `apps/build-monitor` 에서 `vitest run` → **130 PASS**
   - build-server: `apps/build-server` 에서 `node --import tsx --test tests/*.test.ts` → **164 PASS**
-  - runner: `apps/runner` 에서 `go test ./...` → **7/8 package PASS** (`internal/source` 2건 FAIL — 아래 참조)
+  - runner: `apps/runner` 에서 `go test ./...` → **8/8 package PASS**
 - **smoke check**: 서버 기동 후 `GET /health` → `{"status":"ok"}`, `POST /builds`
   (필수 필드 `appName` / `requestedBy` / `entrypointPath` / `sourceArchive{objectKey,checksumSha256,sizeBytes}`),
   `GET /builds` 로 Postgres 왕복 확인
@@ -98,10 +98,10 @@
 - **Docker 미설치 환경에서는 `compose.dev.*.yaml` 기반 e2e 스크립트 11종이 모두 실행
   불가.** runner 는 `RUNNER_DOCKER_BUILD_MODE` 기본값이 `skeleton` 이라 단위 테스트는
   Docker 없이 통과하지만, 실제 이미지 빌드는 검증되지 않는다.
-- **알려진 실패 (미수정)**: `apps/runner/internal/source` 의 tar entry 절대경로 거부
-  테스트 2건이 Windows 에서 FAIL. `validateTarEntryName` 이 `filepath.IsAbs` 를 쓰는데
-  이 함수는 플랫폼 의존이라 Windows 빌드에서 Unix 절대경로(`/etc/passwd`)를 잡지 못한다.
-  Linux 에서는 통과하므로 CI 는 green.
+- **크로스플랫폼 주의 (TASK-126 교훈)**: tar entry 이름처럼 **항상 슬래시 구분자인 값**을
+  다룰 때 `path/filepath` 를 쓰면 안 된다 — `filepath` 는 호스트 OS 규약을 따르므로
+  Windows 빌드에서 Unix 절대경로(`/etc/passwd`)를 놓친다. 슬래시 기반 판정에는 `path` 를
+  쓸 것. 이 결함은 Linux CI 에서는 green 이라 로컬 Windows 환경에서만 드러났다.
 
 ## 다음에 읽을 문서
 
