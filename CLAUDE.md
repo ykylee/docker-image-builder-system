@@ -68,13 +68,40 @@
 
 ## 프로젝트 실행 기본값
 
-- **install**: npm install
-- **run**: TODO: 로컬 실행 명령 입력
-- **quick test**: TODO: 빠른 테스트 명령 입력
-- **isolated test**: TODO: 격리 테스트 명령 입력
-- **smoke check**: TODO: 실행 확인 명령 입력
+아래 명령은 2026-07-21 (TASK-125) 로컬 환경에서 **실행 검증된 값**이다. SSOT 는
+`ai-workflow/memory/active/state.json` 의 `commands`.
 
-위 명령은 추정값이다. 실제 프로젝트 명령으로 보정 후 commit.
+- **install**: `pnpm install`
+  - `Ignored build scripts: esbuild` 경고는 무해 (vitest / vite build 정상 통과 확인).
+- **run (memory backend)**:
+  `BUILD_REPOSITORY_BACKEND=memory node apps/build-server/dist/apps/build-server/src/index.js`
+- **run (Postgres backend — default 개발 경로)**:
+  `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres node apps/build-server/dist/apps/build-server/src/index.js`
+- **quick test**: 각 tsconfig 에 `tsc --noEmit` (shared-contract / shared-config / db /
+  build-server) + `apps/build-monitor` 의 `tsc --noEmit -p tsconfig.react.json`
+- **isolated test**:
+  - frontend: `apps/build-monitor` 에서 `vitest run` → **130 PASS**
+  - build-server: `apps/build-server` 에서 `node --import tsx --test tests/*.test.ts` → **164 PASS**
+  - runner: `apps/runner` 에서 `go test ./...` → **7/8 package PASS** (`internal/source` 2건 FAIL — 아래 참조)
+- **smoke check**: 서버 기동 후 `GET /health` → `{"status":"ok"}`, `POST /builds`
+  (필수 필드 `appName` / `requestedBy` / `entrypointPath` / `sourceArchive{objectKey,checksumSha256,sizeBytes}`),
+  `GET /builds` 로 Postgres 왕복 확인
+- **migration**: `apps/build-server` 에서
+  `MIGRATIONS_DIR=migrations node --import tsx scripts/migrate.ts --list | --bootstrap | --dry-run`
+
+### 환경 주의사항 (Windows 로컬)
+
+- **PowerShell 에서는 `./node_modules/.bin/tsc` 형태가 그대로 동작하지 않는다.** Bash 셸을
+  쓰거나 `.\node_modules\.bin\tsc` 로 바꿔 쓴다.
+- **Postgres 포트는 로컬 native 설치 기준 `5432`.** 기존 문서 다수가 compose 매핑 기준
+  `15432` 로 적혀 있으니 로컬 실행 시 `DATABASE_URL` 을 확인할 것.
+- **Docker 미설치 환경에서는 `compose.dev.*.yaml` 기반 e2e 스크립트 11종이 모두 실행
+  불가.** runner 는 `RUNNER_DOCKER_BUILD_MODE` 기본값이 `skeleton` 이라 단위 테스트는
+  Docker 없이 통과하지만, 실제 이미지 빌드는 검증되지 않는다.
+- **알려진 실패 (미수정)**: `apps/runner/internal/source` 의 tar entry 절대경로 거부
+  테스트 2건이 Windows 에서 FAIL. `validateTarEntryName` 이 `filepath.IsAbs` 를 쓰는데
+  이 함수는 플랫폼 의존이라 Windows 빌드에서 Unix 절대경로(`/etc/passwd`)를 잡지 못한다.
+  Linux 에서는 통과하므로 CI 는 green.
 
 ## 다음에 읽을 문서
 

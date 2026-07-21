@@ -27,7 +27,7 @@ TASK 번호별 요약 + 운영 가이드 인덱스:
 | **TASK-112** | TASK-085 ↔ TASK-111 양 variant 운영 가이드 cross-reference (신규 TASK-085 운영 가이드 포함) | [production-semantic-2026-07-07.md](operations/production-semantic-2026-07-07.md) | `81110df` |
 | **TASK-113** | chunked multi-runner cross-backend 회귀 가드 (TASK-082 의 multi-runner + TASK-106/108/109/110 chunked wire-format 의 4 종 동시 사용) | [multi-runner-chunked-postgres-2026-07-20.md](operations/multi-runner-chunked-postgres-2026-07-20.md) | `7e9f777` |
 
-**누적 회귀 baseline**: TASK-088 baseline 대비 **vitest 7 → 130 (+123)** / **build-server 113 → 165 (+52)** / **TS 5 packages clean** / **postgres migration 0001~0006 적용 정상** / **vite build:react gzip js 99.01KB / css 30.62KB 동일**.
+**누적 회귀 baseline**: TASK-088 baseline 대비 **vitest 7 → 130 (+123)** / **build-server 113 → 164 (+51)** / **TS 5 packages clean** / **postgres migration 0001~0006 적용 정상** / **vite build:react gzip js 99.01KB / css 30.62KB 동일**.
 
 ## 3. 결정 항목 인덱스 (이미 본 세션에서 모두 해소)
 
@@ -149,7 +149,7 @@ bash apps/build-server/scripts/e2e-single-port.sh
 | 항목 | 누적 변화 |
 |---|---|
 | vitest | 7 → 130 (+123, frontend Svelte 135 case 일괄 삭제 + 신규 +26) |
-| build-server node:test | 113 → 165 (+52, legacy 143 변경 0 + chunked 의미 B +11 + 의미 C +4 + `*` +3 + strict +4 / + 신규 운영 / 신규 회귀 가드 0) |
+| build-server node:test | 113 → 164 (+51, legacy 변경 0 + chunked 의미 B +11 + 의미 C +4 + `*` +3 + strict +4 / + 신규 운영 / 신규 회귀 가드 0) — TASK-125 실측 정정 (기존 표기 165 는 산술 오류) |
 | Go 7+ packages | PASS (불변) |
 | TS 5 packages `tsc --noEmit` | clean (불변) |
 | vite build:react gzip | js 99.01KB / css 30.62KB (불변) |
@@ -186,8 +186,8 @@ bash apps/build-server/scripts/e2e-single-port.sh
 
 ## 10. 다음 세션 가이드
 
-- **다음 세션 시작 시 baseline**: main HEAD `53adb75` (TASK-122 sync, **v0.1.0 tagged**), 본 RELEASE_NOTES + [`CHANGELOG.md`](../../CHANGELOG.md) + 32 운영 가이드 + 165 build-server 회귀 가드
-- **v0.1.0 tag anchor**: [`v0.1.0`](../../CHANGELOG.md) (annotated, 2026-07-20) — 본 세션 13 TASK (TASK-102~114) + TASK-122 working tree clean 보존 누적. 운영자 release staging 의 단일 anchor.
+- **다음 세션 시작 시 baseline**: main HEAD `53adb75` (TASK-122 sync, **v0.1.0 tagged**), 본 RELEASE_NOTES + [`CHANGELOG.md`](../CHANGELOG.md) + 32 운영 가이드 + 164 build-server 회귀 가드
+- **v0.1.0 tag anchor**: [`v0.1.0`](../CHANGELOG.md) (annotated, 2026-07-20) — 본 세션 13 TASK (TASK-102~114) + TASK-122 working tree clean 보존 누적. 운영자 release staging 의 단일 anchor.
 - **후속 결정 해소 시**: workflow meta sync 새 TASK 가 본 RELEASE_NOTES 의 §5 + §8 + CHANGELOG §2 + §5 에 append
 - **본 세션 종합 검토 후속**: 옵션 Z 외부 object storage 결정 (본 §8 의 후보 1) — TASK-114 의 본 RELEASE_NOTES 에 append 되는 §11 의 향후 결정 항목
 - **장기 follow-up**: 본 세션의 12 TASK 가 운영 환경 release staging 통과 후 신규 기능 추가 / Nextcloud Tasks 통합 결정 진입

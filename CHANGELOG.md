@@ -71,7 +71,7 @@
 | 항목 | TASK-088 baseline | v0.1.0 | delta |
 |------|-------------------|--------|-------|
 | vitest (build-monitor) | 7 | 130 | +123 |
-| build-server (node:test) | 113 | 165 | +52 |
+| build-server (node:test) | 113 | 164 | +51 |
 | TS packages `tsc --noEmit` | clean | clean | 0 |
 | Go packages (`go test ./...`) | 7+ | 7+ | 0 |
 | vite build:react (gzip js) | n/a | 99.01 KB | n/a |
