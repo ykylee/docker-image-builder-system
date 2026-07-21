@@ -21,7 +21,7 @@
   - 에러가 `TextInput status` 로 **필드에 결속** (이전엔 별도 문단이라 AT 가 어느 입력인지 몰랐다)
   - CSS 148줄 삭제
 
-  **사전 결함 4건**: (1) **`Button`/`Badge` 는 children 이 아니라 `label` prop** — TSC 가 TS2741 로 잡았다. TASK-135 의 렌더 스파이크는 vitest 라 타입검사를 안 거쳐 children 으로 써도 통과했었다 — **스파이크 통과와 타입 통과는 다르다.** (2) **jsdom 25 가 `showModal()` 미구현** → 9건 실패. `test/setup.ts` 에 폴리필 추가 (**포커스 트랩·backdrop 은 재현하지 않는다** — jsdom 으로 검증 불가라 실브라우저에 맡긴다고 주석 명시). (3) `data-testid` 가 실제 `<input>` 이 아니라 래퍼에 붙어 `fireEvent.change` 가 안 먹음 → `getByLabelText` 로 질의 변경. (4) Escape 리스너가 `window` → **dialog 엘리먼트**로 이동 → 발화 지점을 사실에 맞춤 (의도는 유지).
+  **사전 결함 4건**: (1) **`Button`/`Badge` 는 children 이 아니라 `label` prop** — TSC 가 TS2741 로 잡았다. TASK-135 의 렌더 스파이크는 vitest 라 타입검사를 안 거쳐 children 으로 써도 통과했었다 — **스파이크 통과와 타입 통과는 다르다.** (2) **jsdom 25 가 `showModal()` 미구현** → 9건 실패. `test/setup.ts` 에 폴리필 추가 (**포커스 트랩·backdrop 은 재현하지 않는다** — jsdom 으로 검증 불가라 실브라우저에 맡긴다고 주석 명시). (3) ~~`data-testid` 가 래퍼에 붙어 `fireEvent.change` 가 안 먹음~~ — **오기. TASK-138 에서 실측으로 반박**: testid 는 실제 `<input>` 에 붙고 change 도 정상 동작한다. 당시 4건 실패는 error-testid 3건 + **Escape 1건**이었는데 그것을 성공 테스트 실패로 잘못 읽고 원인을 지어냈다. `getByLabelText` 전환 자체는 정당한 개선이라 유지하되, 그것이 실패 원인은 아니었다. (4) Escape 리스너가 `window` → **dialog 엘리먼트**로 이동 → 발화 지점을 사실에 맞춤 (의도는 유지).
 
   **번들 — 지연 로드가 필요했다.** 이관 직후 초기 JS gzip 이 **98.21 → 142.57 (+44.4)** 로 뛰었다. Dialog 가 오버레이 기계장치를 끌고 오는데, 라우트가 전부 정적 import 라 **`/login` 만 여는 일반 사용자까지** 그 비용을 받는다. 모달은 이미 조건부 렌더이므로 `lazy`+`Suspense` 로 분리:
 
