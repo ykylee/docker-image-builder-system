@@ -7,14 +7,28 @@
 // React 측 RegisterRunnerModal 는 Svelte RegisterRunnerModal.svelte 와
 // 1:1 정합. POST /admin/runners (TASK-077). 본 TASK 에서 함께 port.
 
-import { useEffect, useMemo, useState, type ReactElement } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { AdminAccessDenied } from "@/components/AdminAccessDenied";
 import { AdminTabs } from "@/components/AdminTabs";
 import { FilterChips } from "@/components/FilterChips";
-import { RegisterRunnerModal } from "@/components/RegisterRunnerModal";
 import { StatusPill } from "@/components/StatusPill";
+
+// TASK-137: 모달을 지연 로드한다.
+//
+// RegisterRunnerModal 이 Astryx `Dialog` 로 바뀌면서 오버레이 기계장치
+// (Layer / 포커스 트랩 / 위치 계산)를 끌고 들어온다. 정적 import 로 두면
+// **`/login` 만 여는 일반 사용자까지** 그 비용을 초기 번들로 내려받는다 —
+// admin 이 "Register Runner" 를 누를 때만 필요한 코드인데도.
+//
+// 이미 조건부 렌더(`registerModalOpen ? ... : null`)라 지연 로드와 자연스럽게
+// 맞는다. 실측: 초기 JS gzip **142.57 → 104.30KB**, 분리된 모달 청크가
+// gzip 38.21KB (admin 이 모달을 열 때만 내려받는다).
+const RegisterRunnerModal = lazy(async () => {
+  const mod = await import("@/components/RegisterRunnerModal");
+  return { default: mod.RegisterRunnerModal };
+});
 import {
   deleteAdminRunner,
   listAdminRunners,
@@ -204,6 +218,9 @@ export function AdminRunners(): ReactElement {
       )}
 
       {registerModalOpen ? (
+        // fallback 은 null — 모달 청크는 작고, 로딩 표시가 깜빡이면 오히려
+        // 산만하다. 실패 시에는 상위 ErrorBoundary 가 받는다.
+        <Suspense fallback={null}>
         <RegisterRunnerModal
           open={registerModalOpen}
           onClose={() => {
@@ -215,6 +232,7 @@ export function AdminRunners(): ReactElement {
           }}
           callerId={userId}
         />
+        </Suspense>
       ) : null}
     </section>
   );

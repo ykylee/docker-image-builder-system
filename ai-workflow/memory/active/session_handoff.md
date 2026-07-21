@@ -6,6 +6,40 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-21 (rev 130→131: **TASK-137 Astryx 3-1 — RegisterRunnerModal → `Dialog` 이관 봉인**).
+
+  브랜치 `feat/task-137-dialog-migration`. **병합·push 상태는 `git status -sb` / `git log origin/main..main` 을 볼 것** (봉인 시점 서술이 세 번 연속 낡아 정정 커밋이 났으므로 확정 서술을 하지 않는다).
+
+  **착수 시 발견 — 이관 대상에 테스트가 0이었다.** `RegisterRunnerModal` 은 물론 **admin 라우트 4종 전부** 테스트 파일이 없다. 그런데 `docs/PROJECT_PROFILE.md` §3.4 는 "admin 페이지 test 4종 신규 케이스 합계 5건" 을 사실로 서술 중이다. git 이력 확인 결과 그 테스트들은 **Svelte 트리에만**(`apps/build-monitor/src/routes/Admin*.test.ts`) 있었고 **TASK-101(`313ae2e`)이 삭제**했으며 React 트리로는 **한 번도 이관된 적이 없다.** TASK-084 의 admin 가드 라우트 레벨 회귀 5건이 2026-07-18 이래 사라진 상태다. TASK-131 의 문서 무결성 가드는 줄 수·placeholder 만 보므로 이런 **주장-실제 불일치**는 못 잡는다.
+
+  **이관 방식 (앞으로의 본보기)**: 테스트가 0인 컴포넌트를 바로 뜯으면 무엇이 깨졌는지 알 수 없다. **특성화 테스트 10건을 먼저 써서 현재 구현에서 10/10 통과를 확인한 뒤** 이관했고, 이관 후에도 같은 10건이 통과했다 — "겉만 바뀌고 계약은 유지됐다"의 근거.
+
+  **이관으로 실제로 얻은 것** (전부 실브라우저 확인):
+  - 손수 만든 `<div role="dialog">` 는 **`:modal` 이 아니었고 포커스 트랩도 없었다** (Tab 으로 모달 밖으로 나갈 수 있었다) → 네이티브 `<dialog>`, `:modal` **true**
+  - `purpose="form"` — 입력 시작 후 backdrop 클릭 무시. **이전에는 타이핑 도중 backdrop 을 잘못 눌러도 닫혀서 입력이 날아갔다**
+  - `setTimeout(0)` 포커스 해킹 → `hasAutoFocus`
+  - 에러가 `TextInput status` 로 **필드에 결속** (이전엔 별도 문단이라 AT 가 어느 입력인지 몰랐다)
+  - CSS 148줄 삭제
+
+  **사전 결함 4건**: (1) **`Button`/`Badge` 는 children 이 아니라 `label` prop** — TSC 가 TS2741 로 잡았다. TASK-135 의 렌더 스파이크는 vitest 라 타입검사를 안 거쳐 children 으로 써도 통과했었다 — **스파이크 통과와 타입 통과는 다르다.** (2) **jsdom 25 가 `showModal()` 미구현** → 9건 실패. `test/setup.ts` 에 폴리필 추가 (**포커스 트랩·backdrop 은 재현하지 않는다** — jsdom 으로 검증 불가라 실브라우저에 맡긴다고 주석 명시). (3) `data-testid` 가 실제 `<input>` 이 아니라 래퍼에 붙어 `fireEvent.change` 가 안 먹음 → `getByLabelText` 로 질의 변경. (4) Escape 리스너가 `window` → **dialog 엘리먼트**로 이동 → 발화 지점을 사실에 맞춤 (의도는 유지).
+
+  **번들 — 지연 로드가 필요했다.** 이관 직후 초기 JS gzip 이 **98.21 → 142.57 (+44.4)** 로 뛰었다. Dialog 가 오버레이 기계장치를 끌고 오는데, 라우트가 전부 정적 import 라 **`/login` 만 여는 일반 사용자까지** 그 비용을 받는다. 모달은 이미 조건부 렌더이므로 `lazy`+`Suspense` 로 분리:
+
+  | | TASK-136 | 이관 직후 | 지연 로드 후 |
+  |---|---|---|---|
+  | 초기 JS gzip | 98.21 | 142.57 | **104.30** |
+  | 모달 청크 gzip | — | — | **38.21** (열 때만) |
+  | CSS gzip | 27.38 | 26.99 | **26.99** |
+
+  초기 번들 순증 **+6.09KB gzip**. 손 CSS **2,323 → 2,175줄**, 파일 15 → 14.
+
+  **검증**: 특성화 10/10 (이관 전·후 동일) / TSC clean / vitest **229 → 239** / B층 하이재킹 0 · 대비 위반 0 / 실브라우저 `:modal` true + 포커스 dialog 내부 INPUT / 모달 대비 **다크 12.64:1 · 라이트 18.78:1**.
+
+  **자기 정정 1건**: 스크린샷을 보고 "페이지는 다크인데 모달만 라이트"라고 판단했으나 **실측이 반박했다** — 모달 배경은 `rgb(31,31,34)` 로 정상 다크였고 backdrop 이 주변을 덮어 상대적으로 밝아 보였을 뿐이다. 육안 판단을 실측이 뒤집은 사례.
+
+  **드러난 가드 공백**: **B층 가드가 오버레이를 검사하지 못한다** — 3개 라우트를 방문할 뿐 모달을 열지 않는다. 이번엔 수동 측정으로 확인했지만 자동 가드는 덮지 않는다. (sr-only "Close" 텍스트는 rect 0×0 이라 가드의 `isVisible` 이 정확히 건너뛴다 — 오탐 우려 없음 확인.)
+
+  **다음**: **3-2 `Field`+`FormLayout`+`TextInput` ← BuildRequest**. 이어 3-3 `CodeBlock` ← LogStream / 3-4 `Table` ← BuildsList(**StatusPill → Badge 논점 선결**) / 3-5 `AppShell`+`TopNav` ← 레이아웃 셸. follow-up 3건: B층 가드 오버레이 검사 추가 / admin 라우트 테스트 4종 복원 + PROJECT_PROFILE §3.4 정정 / 라우트 지연 로드(admin 4종이 여전히 초기 번들). workflow meta sync (state rev 168→169, handoff 130→131, work_backlog TASK-137 등록, backlog 2026-07-21 rev 14) 같은 commit 안에 포함.
 - Updated: 2026-07-21 (rev 129→130: **TASK-136 Astryx 도입 2단계 — 기반 구축 봉인**).
 
   **✅ 두 브랜치 모두 main 에 병합 완료** — `chore/task-135-astryx-0-1-7` → `feat/task-136-astryx-foundation` fast-forward (`5bcb18f` → `662a828` → **`8894012`**), 작업 브랜치 삭제. 병합 후 main 회귀 재확인: frontend **229** / build-server **178** / TSC 5 clean. **push 완료** — 원격 HEAD `7b9d275` (직전 `61ea7b2`). ahead/behind 0.

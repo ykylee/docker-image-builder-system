@@ -70,3 +70,47 @@ if (typeof globalThis !== "undefined" && typeof window !== "undefined") {
     });
   }
 }
+
+// ── HTMLDialogElement 폴리필 (TASK-137, Astryx Dialog 이관) ──────────────
+//
+// jsdom 25 는 `<dialog>` 를 파싱은 하지만 `showModal()` / `show()` / `close()`
+// 를 구현하지 않는다. Astryx `Dialog` 는 네이티브 `<dialog>` 를 쓰므로 폴리필
+// 없이는 마운트 시점에 `dialog.showModal is not a function` 으로 죽는다.
+//
+// 실제 브라우저 동작을 완전히 재현하지는 않는다 — 특히 **포커스 트랩과
+// backdrop 렌더링은 재현하지 않는다.** 그 둘은 jsdom 으로 검증할 수 없는
+// 영역이므로, Dialog 의 접근성 동작은 B층 실브라우저 가드
+// (scripts/check-theme-contrast.mjs) 와 수동 확인에 맡긴다. 여기서는
+// "열림/닫힘 상태와 close 이벤트" 라는 테스트가 실제로 의존하는 부분만 채운다.
+if (typeof window !== "undefined" && typeof HTMLDialogElement !== "undefined") {
+  const proto = HTMLDialogElement.prototype;
+
+  if (typeof proto.showModal !== "function") {
+    proto.showModal = function showModal(this: HTMLDialogElement): void {
+      this.open = true;
+      this.setAttribute("open", "");
+    };
+  }
+
+  if (typeof proto.show !== "function") {
+    proto.show = function show(this: HTMLDialogElement): void {
+      this.open = true;
+      this.setAttribute("open", "");
+    };
+  }
+
+  if (typeof proto.close !== "function") {
+    proto.close = function close(
+      this: HTMLDialogElement,
+      returnValue?: string
+    ): void {
+      this.open = false;
+      this.removeAttribute("open");
+      if (returnValue !== undefined) {
+        this.returnValue = returnValue;
+      }
+      // 네이티브는 close 를 발화한다. Astryx 가 이걸 구독해 상태를 되돌린다.
+      this.dispatchEvent(new Event("close"));
+    };
+  }
+}
