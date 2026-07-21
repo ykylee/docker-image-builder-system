@@ -40,11 +40,22 @@
 
 ## 프로젝트 실행 기본값
 
-- 설치: `npm install`
-- 로컬 실행: `TODO: 로컬 실행 명령 입력`
-- 빠른 테스트: `TODO: 빠른 테스트 명령 입력`
-- 격리 테스트: `TODO: 격리 테스트 명령 입력`
-- 실행 확인: `node --version`
+아래는 2026-07-21 (TASK-131) 로컬 환경에서 실행 검증된 값이다. SSOT 는
+`ai-workflow/memory/active/state.json` 의 `commands`.
+
+- 설치: `pnpm install`
+- 로컬 실행 (Postgres backend — default 개발 경로):
+  `DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/docker_image_builder BUILD_REPOSITORY_BACKEND=postgres node apps/build-server/dist/apps/build-server/src/index.js`
+- 빠른 테스트: 각 tsconfig 에 `tsc --noEmit` (shared-contract / shared-config / db /
+  build-server) + `apps/build-monitor` 의 `tsc --noEmit -p tsconfig.react.json`
+- 격리 테스트: frontend `vitest run` (133) / build-server
+  `node --import tsx --test tests/*.test.ts` (172) / runner `go test ./...` (8/8 package)
+- 실행 확인: `GET /health` → `{"status":"ok"}` + `POST /builds` + `GET /builds` 로 Postgres 왕복
+
+> 이 항목들은 `9c069a9` (2026-07-09 harness overlay) 가 실제 명령을 `TODO:`
+> placeholder 로 덮어쓴 뒤 12일간 방치돼 있었다. TASK-131 의 문서 무결성 가드가
+> 히스토리 스캔에서 이를 발견해 복구했다. 같은 계열 사고 (`docs/PROJECT_PROFILE.md`
+> 302줄 유실) 는 TASK-124 참조.
 
 ## 문서 작업 기준
 
