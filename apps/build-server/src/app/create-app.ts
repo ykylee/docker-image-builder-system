@@ -83,6 +83,12 @@ const API_REWRITE_ALLOWED_PREFIXES = ["/builds", "/admin/"];
 // wildcard 제외에서 제외한다.
 const API_JSON_PREFIXES = ["/openapi", "/docs", "/health"];
 
+// 브라우저 문서 내비게이션이어도 SPA 로 가로채지 않을 prefix. Swagger UI
+// (`/docs`) 와 OpenAPI 문서는 운영자가 주소창으로 직접 여는 대상이고,
+// `/api/*` 는 프론트엔드 fetch 의 정식 진입점이라 리다이렉트 계약을
+// 유지해야 한다. `/assets/` 는 빌드 산출물 정적 경로.
+const SPA_NAVIGATION_EXCLUDED_PREFIXES = ["/api/", "/openapi", "/docs", "/health", "/assets/"];
+
 export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstance> {
   const app = Fastify({
     logger: true
@@ -202,6 +208,44 @@ async function mountBuildMonitorDist(app: FastifyInstance): Promise<void> {
   });
 
   app.log.info({ distDir: reactDistDir }, "react dist mounted (single SPA)");
+
+  // 브라우저 문서 내비게이션은 SPA 로 (2026-07-21 UI 검수).
+  //
+  // 문제: SPA 라우트 `/builds`, `/admin/builds` 는 Build Server 의 API route
+  // 와 경로가 겹친다. API route 가 먼저 매치되므로 운영자가 주소창에
+  // `/builds` 를 직접 입력하면 화면 대신 원시 JSON 이 뜨고, `/admin/builds`
+  // 는 `{"message":"Admin id header missing."}` 401 이 뜬다. 등록되지 않은
+  // path 만 처리하는 setNotFoundHandler 로는 잡을 수 없다 — 이 경로들은
+  // "등록된" 경로이기 때문. 그래서 라우팅 이전 단계인 onRequest 에서 가른다.
+  //
+  // 판정 기준은 `Sec-Fetch-Dest: document` — 브라우저가 주소창 이동/링크
+  // 클릭 같은 **문서 내비게이션**에만 붙이는 값이다. fetch/XHR 은 `empty`,
+  // iframe 은 `iframe`, 이미지·스크립트는 각각 `image`/`script` 이고, Go
+  // runner 나 curl 같은 비-브라우저 클라이언트는 아예 보내지 않는다.
+  // 따라서 프론트엔드의 `/api/*` 호출과 runner 의 bare `/builds/claim` 호출은
+  // 이 분기에 걸리지 않는다 — 기존 API 계약은 무변경.
+  //
+  // 한계: 헤더 기반이라 Sec-Fetch-* 미지원 클라이언트(구형 브라우저)는 종전
+  // 대로 JSON 을 받는다. 규칙이 암묵적이므로 회귀 가드로 고정해 둔다
+  // (tests/static-serve.test.ts).
+  app.addHook("onRequest", async (request, reply) => {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return;
+    }
+    if (request.headers["sec-fetch-dest"] !== "document") {
+      return;
+    }
+    if (!(request.headers.accept ?? "").includes("text/html")) {
+      return;
+    }
+    const path = request.url.split("?")[0]!;
+    // API / 문서 UI 는 브라우저로 직접 열어야 하므로 가로채지 않는다.
+    if (SPA_NAVIGATION_EXCLUDED_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+      return;
+    }
+    reply.type("text/html");
+    return reply.send(createReadStream(join(reactDistDir, "index.html")));
+  });
 
   // SPA fallback — Build Server 의 fixed route 가 매치되지 않은 GET 만
   // index.html 로 응답. POST/PUT/PATCH/DELETE 는 Build Server 가 자체

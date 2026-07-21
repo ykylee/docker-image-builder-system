@@ -165,6 +165,62 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
     assert.match(ct, /application\/json/);
   });
 
+  // 2026-07-21 UI 검수: SPA 라우트(`/builds`, `/admin/builds`)가 동명의 API
+  // route 에 가려 주소창 직접 진입 시 화면 대신 JSON 이 뜨던 문제의 회귀
+  // 가드. 판정은 `Sec-Fetch-Dest: document` — 브라우저 문서 내비게이션에만
+  // 붙는 값이라 fetch/XHR/runner 호출과 구분된다. 규칙이 헤더 기반이라
+  // 암묵적이므로 양방향(가로챔 / 가로채지 않음)을 모두 고정한다.
+  const NAV_HEADERS = {
+    "sec-fetch-dest": "document",
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+  };
+
+  it("브라우저 내비게이션으로 /builds 진입 시 JSON 이 아니라 SPA 를 받는다", async () => {
+    const res = await fetch(`${baseUrl}/builds`, { headers: NAV_HEADERS });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+    assert.match(await res.text(), new RegExp(REACT_STUB));
+  });
+
+  it("브라우저 내비게이션으로 /admin/builds 진입 시 401 JSON 이 아니라 SPA 를 받는다", async () => {
+    const res = await fetch(`${baseUrl}/admin/builds`, { headers: NAV_HEADERS });
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), new RegExp(REACT_STUB));
+  });
+
+  it("Sec-Fetch-Dest 없는 API 호출은 종전대로 JSON — 계약 무변경", async () => {
+    const res = await fetch(`${baseUrl}/builds`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /application\/json/);
+  });
+
+  it("fetch/XHR (Sec-Fetch-Dest: empty) 은 문서 내비게이션이 아니므로 JSON", async () => {
+    const res = await fetch(`${baseUrl}/builds`, {
+      headers: { "sec-fetch-dest": "empty", accept: "*/*" }
+    });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /application\/json/);
+  });
+
+  it("문서 내비게이션이어도 /docs 와 /health 는 가로채지 않는다", async () => {
+    const health = await fetch(`${baseUrl}/health`, { headers: NAV_HEADERS });
+    assert.match(health.headers.get("content-type") ?? "", /application\/json/);
+    assert.deepEqual(await health.json(), { status: "ok" });
+
+    // Swagger UI 는 운영자가 주소창으로 직접 여는 대상 — SPA 로 대체되면 안 된다.
+    const docs = await fetch(`${baseUrl}/docs`, { headers: NAV_HEADERS });
+    assert.doesNotMatch(await docs.text(), new RegExp(REACT_STUB));
+  });
+
+  it("문서 내비게이션이어도 /api/* 는 307 리다이렉트 계약을 유지한다", async () => {
+    const res = await fetch(`${baseUrl}/api/builds`, {
+      headers: NAV_HEADERS,
+      redirect: "manual"
+    });
+    assert.equal(res.status, 307);
+    assert.equal(res.headers.get("location"), "/builds");
+  });
+
   it("/admin/* deep link still gets React SPA fallback", async () => {
     const res = await fetch(`${baseUrl}/admin/some/very/deep/link`);
     assert.equal(res.status, 200);

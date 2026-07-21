@@ -45,19 +45,23 @@ export function App(): ReactElement {
   return (
     <>
       <Header />
-      <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/builds" element={<BuildsList />} />
-        <Route path="/builds/:buildId" element={<BuildDetail />} />
-        <Route path="/build-request" element={<BuildRequest />} />
-        <Route path="/api-console" element={<ApiConsole />} />
-        <Route path="/admin/builds" element={<AdminBuilds />} />
-        <Route path="/admin/users" element={<AdminUsers />} />
-        <Route path="/admin/admins" element={<AdminAdmins />} />
-        <Route path="/admin/runners" element={<AdminRunners />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      {/* 2026-07-21 UI 검수: 페이지 공통 셸 + <main> 랜드마크.
+          폭·여백은 globals.css 의 .app-main 한 곳에서만 결정한다. */}
+      <main className="app-main">
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/builds" element={<BuildsList />} />
+          <Route path="/builds/:buildId" element={<BuildDetail />} />
+          <Route path="/build-request" element={<BuildRequest />} />
+          <Route path="/api-console" element={<ApiConsole />} />
+          <Route path="/admin/builds" element={<AdminBuilds />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/admins" element={<AdminAdmins />} />
+          <Route path="/admin/runners" element={<AdminRunners />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </main>
     </>
   );
 }

@@ -16,8 +16,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { Theme } from "@astryxdesign/core/theme";
-import { neutralTheme } from "@astryxdesign/theme-neutral/built";
 
 import { App } from "@/App";
 import { useBuildsListStore } from "@/lib/stores/buildsListStore";
@@ -35,9 +33,7 @@ vi.mock("@/lib/api", () => ({
 function renderAt(path: string): void {
   render(
     <MemoryRouter initialEntries={[path]}>
-      <Theme theme={neutralTheme}>
-        <App />
-      </Theme>
+      <App />
     </MemoryRouter>
   );
 }

@@ -24,7 +24,7 @@ import "./BuildDetail.css";
 // loading / not-found placeholder 스타일.
 const placeholderStyle: CSSProperties = {
   padding: "var(--space-xxl, 32px)",
-  fontFamily: "var(--font-family-sans, system-ui, sans-serif)",
+  fontFamily: "var(--font-sans)",
   color: "var(--color-text-primary)"
 };
 

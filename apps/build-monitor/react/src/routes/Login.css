@@ -15,14 +15,11 @@
  *     apps/build-monitor/react/src/tokens.css  ✓
  */
 
-@import "../tokens.css";
-
 .login-page {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* header (64) + main padding-top (space-lg) + main padding-bottom (space-lg) */
-  min-height: calc(100vh - 64px - var(--space-lg) * 2);
+  /* 높이는 .app-main 이 flex 로 넘겨준다 — viewport 산수 없음. */
   animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
 }
 @keyframes fadeIn {

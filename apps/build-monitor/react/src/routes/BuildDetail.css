@@ -11,15 +11,18 @@
  * 부담 ↓). React CSS module 미사용 — globals.css 와 통합 import 로 단순화.
  */
 
+/* 2026-07-21 UI 검수 3건 수정:
+ *   - padding / max-width / margin 제거 → .app-main 이 전담 (이전에는 루트
+ *     여백 위에 자체 padding 이 겹쳐 이 페이지만 여백이 64px 였다)
+ *   - --font-family-sans 는 **정의되지 않은 토큰**이라 system-ui 로 폴백해
+ *     이 페이지만 서체가 달랐다 → --font-sans 로 교정
+ *   - 존재하는 토큰에 붙은 px fallback 제거 (오탈자를 숨긴다) */
 .detail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xxl, 32px);
-  padding: var(--space-xxl, 32px);
-  max-width: 1100px;
-  margin: 0 auto;
+  gap: var(--space-xxl);
   color: var(--color-text-primary);
-  font-family: var(--font-family-sans, system-ui, sans-serif);
+  font-family: var(--font-sans);
 }
 
 .head {

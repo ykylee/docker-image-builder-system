@@ -10,8 +10,7 @@
   flex-direction: column;
   gap: var(--space-lg);
   animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
-  /* header 가 sticky 라서 viewport 에서 header 높이를 뺀 만큼 frame 이 차지. */
-  height: calc(100vh - 64px - var(--space-xl) * 2);
+  /* 높이는 .app-main 이 flex 로 넘겨준다 — viewport 산수 없음. */
 }
 
 @keyframes fadeIn {
@@ -42,7 +41,7 @@
   color: var(--color-text-muted);
   margin-top: var(--space-xs);
   max-width: 60ch;
-  line-height: var(--motion-duration-base);
+  line-height: var(--line-relaxed);
 }
 
 .muted { color: var(--color-text-muted); }
@@ -148,7 +147,7 @@ iframe {
   margin: var(--space-sm) 0 0;
   color: var(--color-text-muted);
   font-size: var(--size-sm);
-  line-height: var(--motion-duration-base);
+  line-height: var(--line-relaxed);
 }
 
 .hint-block code {

@@ -5,12 +5,14 @@
  * 직접 사용 — fallback 없음 (TASK-096.5 디자인 토큰 단일화).
  */
 
+/* max-width 는 .app-main 이 결정한다. 이전에는 여기 max-width: 960px 만 있고
+ * margin: 0 auto 가 빠져 있어 폼이 좌측에 붙고 우측 900px 가 빈 채로 남았다
+ * (2026-07-21 UI 검수). */
 .page {
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
   animation: fadeIn var(--motion-duration-slow) var(--motion-easing-standard);
-  max-width: 960px;
 }
 
 @keyframes fadeIn {
@@ -32,7 +34,7 @@
 .page-head .muted {
   color: var(--color-text-muted);
   margin-top: var(--space-xs);
-  line-height: var(--motion-duration-base);
+  line-height: var(--line-relaxed);
 }
 
 .muted { color: var(--color-text-muted); }

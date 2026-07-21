@@ -68,6 +68,18 @@
   --space-xxl: 2rem;
   --space-xxxl: 3rem;
 
+  /* Layout — 앱 셸 단일 기준 (2026-07-21 UI 검수).
+     이전에는 #app-react 에 padding 만 있고 페이지마다 max-width / padding /
+     calc(100vh - ...) 를 제각각 하드코딩해 헤더와 본문의 좌측 기준선이
+     어긋나고(1920 에서 232px) 세로 계산도 세 페이지가 서로 다른 값을
+     가정하고 있었다. 아래 3개가 그 단일 출처다:
+       --layout-max     본문/헤더 공통 최대 폭
+       --layout-gutter  본문/헤더 공통 좌우 여백 (헤더와 정렬되려면 동일해야 함)
+       --header-h       sticky 헤더 높이. 세로 calc 은 반드시 이 값을 참조할 것. */
+  --layout-max: 1440px;
+  --layout-gutter: var(--space-xxl);
+  --header-h: 64px;
+
   /* Radius */
   --radius-sm: 6px;
   --radius-md: 10px;
