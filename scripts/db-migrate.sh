@@ -42,15 +42,52 @@ fi
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$REPO_ROOT"
 
+BUILD_SERVER_DIR="$REPO_ROOT/apps/build-server"
 MIGRATIONS_DIR_DEFAULT="apps/build-server/migrations"
-CLI="node --import tsx apps/build-server/scripts/migrate.ts"
 VERBOSE="${DB_MIGRATE_VERBOSE:-0}"
+
+# TASK-128: `tsx` 는 build-server 의 devDependency 다. pnpm 은 기본적으로
+# 비-hoist 격리라 repo root 에서 `node --import tsx` 를 부르면
+# ERR_MODULE_NOT_FOUND 로 죽는다 (npm 의 hoisting 환경에서는 우연히
+# 동작했다). 그래서 CLI 는 반드시 build-server 디렉토리를 cwd 로 실행한다.
+#
+# cwd 가 바뀌므로 migrations 경로는 아래 `resolve_migrations_dir` 가
+# REPO_ROOT 기준 절대경로로 정규화해서 넘긴다 — 상대경로를 그대로 넘기면
+# build-server cwd 기준으로 해석돼 엉뚱한 곳을 가리킨다.
+run_cli() {
+  (cd "$BUILD_SERVER_DIR" && node --import tsx scripts/migrate.ts "$@")
+}
+
+# MIGRATIONS_DIR 이 상대경로면 REPO_ROOT 기준으로 절대화한다. 이미
+# 절대경로면 (POSIX `/...` 또는 Windows `C:...`) 그대로 쓴다.
+resolve_migrations_dir() {
+  local dir="${MIGRATIONS_DIR:-$MIGRATIONS_DIR_DEFAULT}"
+  case "$dir" in
+    /* | [A-Za-z]:*) printf '%s' "$dir" ;;
+    *) printf '%s' "$REPO_ROOT/$dir" ;;
+  esac
+}
+
+# 의존성이 설치되지 않은 저장소에서 게이트를 부르면 node 의 raw
+# ERR_MODULE_NOT_FOUND stack trace 가 뜬다. 운영자가 원인을 즉시 알 수
+# 있도록 사전 점검한다.
+require_cli_deps() {
+  if ! command -v node >/dev/null 2>&1; then
+    err "node 를 찾을 수 없습니다 (PATH 확인 필요)"
+    exit 2
+  fi
+  if [ ! -e "$BUILD_SERVER_DIR/node_modules/tsx" ] &&
+     [ ! -e "$REPO_ROOT/node_modules/tsx" ]; then
+    err "tsx 가 설치되어 있지 않습니다 — 저장소 루트에서 'pnpm install' 후 재시도"
+    exit 2
+  fi
+}
 
 # DATABASE_URL 가 --database-url 보다 우선 (env fallback 일관).
 require_database_url() {
   if [ -z "${DATABASE_URL:-}" ]; then
     echo -e "${C_ERR}error${C_RESET}: DATABASE_URL env (or --database-url arg) is required" >&2
-    echo "hint: export DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder" >&2
+    echo "hint: export DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/docker_image_builder" >&2
     exit 2
   fi
 }
@@ -59,6 +96,12 @@ info() { echo -e "${C_INFO}==>${C_RESET} $*"; }
 ok()   { echo -e "${C_OK}ok${C_RESET}   $*"; }
 warn() { echo -e "${C_WARN}warn${C_RESET} $*"; }
 err()  { echo -e "${C_ERR}err${C_RESET}  $*" >&2; }
+
+# 게이트 공통 사전 점검 — 연결 정보와 CLI 실행 가능 여부를 함께 본다.
+preflight() {
+  require_database_url
+  require_cli_deps
+}
 
 print_help() {
   cat <<EOF
@@ -88,25 +131,25 @@ EOF
 }
 
 gate_plan() {
-  require_database_url
+  preflight
   info "dry-run 으로 적용 계획만 확인 (변경 없음)"
-  $CLI \
+  run_cli \
     --database-url "$DATABASE_URL" \
-    --migrations-dir "${MIGRATIONS_DIR:-$MIGRATIONS_DIR_DEFAULT}" \
+    --migrations-dir "$(resolve_migrations_dir)" \
     --dry-run
 }
 
 gate_status() {
-  require_database_url
+  preflight
   info "현재 applied / pending 상태"
-  $CLI \
+  run_cli \
     --database-url "$DATABASE_URL" \
-    --migrations-dir "${MIGRATIONS_DIR:-$MIGRATIONS_DIR_DEFAULT}" \
+    --migrations-dir "$(resolve_migrations_dir)" \
     --list
 }
 
 gate_apply_all() {
-  require_database_url
+  preflight
   local dry_run
   if [ "$VERBOSE" != "1" ]; then
     info "적용 전 dry-run 으로 한 번 확인합니다"
@@ -119,39 +162,39 @@ gate_apply_all() {
   else
     warn "DB_MIGRATE_VERBOSE=1 — dry-run skip"
   fi
-  $CLI \
+  run_cli \
     --database-url "$DATABASE_URL" \
-    --migrations-dir "${MIGRATIONS_DIR:-$MIGRATIONS_DIR_DEFAULT}"
+    --migrations-dir "$(resolve_migrations_dir)"
   ok "적용 완료"
 }
 
 gate_apply_up_to() {
-  require_database_url
+  preflight
   local target="${1:-}"
   if [ -z "$target" ]; then
     err "--apply-up-to <ver> 형식 (e.g. 0002) 필요"
     exit 2
   fi
   info "적용 전 dry-run (목표: ${target})"
-  $CLI \
+  run_cli \
     --database-url "$DATABASE_URL" \
-    --migrations-dir "${MIGRATIONS_DIR:-$MIGRATIONS_DIR_DEFAULT}" \
+    --migrations-dir "$(resolve_migrations_dir)" \
     --to "$target" \
     --dry-run
   info "적용 진행 (목표: ${target})"
-  $CLI \
+  run_cli \
     --database-url "$DATABASE_URL" \
-    --migrations-dir "${MIGRATIONS_DIR:-$MIGRATIONS_DIR_DEFAULT}" \
+    --migrations-dir "$(resolve_migrations_dir)" \
     --to "$target"
   ok "적용 완료 (목표: ${target})"
 }
 
 gate_bootstrap() {
-  require_database_url
+  preflight
   info "greenfield bootstrap DDL + 일괄 적용 (혹시 모를 누락 migration 도 함께)"
-  $CLI \
+  run_cli \
     --database-url "$DATABASE_URL" \
-    --migrations-dir "${MIGRATIONS_DIR:-$MIGRATIONS_DIR_DEFAULT}" \
+    --migrations-dir "$(resolve_migrations_dir)" \
     --bootstrap
   ok "bootstrap 완료"
 }

@@ -41,6 +41,18 @@ TASK-064 (PR #19) 가 봉인한 `apps/build-server/scripts/migrate.ts` standalon
 - `--apply-up-to` 의 `<ver>` 가 빈 문자열이면 즉시 exit 2 — 잘못된 호출을 tsx-side 에 넘기지 않음.
 - `set -euo pipefail` + `dispatch` 함수 + `case` 문으로 typo / 알 수 없는 게이트 모두 즉시 exit 2.
 
+> **TASK-128 정정 (2026-07-21)** — 본 문서가 처음 작성된 시점의 스크립트는 **pnpm 환경에서
+> 실제로는 실행되지 않았다.** repo root 를 cwd 로 `node --import tsx ...` 를 호출했는데
+> `tsx` 는 build-server 의 devDependency 이고 pnpm 은 기본적으로 비-hoist 격리라
+> `ERR_MODULE_NOT_FOUND` 로 죽었다 (npm 의 hoisting 환경에서는 우연히 동작했다).
+> TASK-103 당시 검증한 항목은 `bash -n` / `--help` / 게이트 부재 / `DATABASE_URL` 미설정
+> 네 가지뿐이어서 **실제 DB 연결 경로가 한 번도 실행된 적이 없었고**, 그래서 드러나지 않았다.
+>
+> TASK-128 에서 CLI 를 `apps/build-server` cwd 로 실행하도록 바꾸고, cwd 가 바뀌는 만큼
+> `MIGRATIONS_DIR` 을 REPO_ROOT 기준 절대경로로 정규화하도록 보강했다. 아울러 의존성
+> 미설치 시 raw stack trace 대신 `pnpm install` 안내를 내는 사전 점검을 추가했다.
+> **검증은 6개 게이트를 실제 Postgres 에 모두 실행하는 방식으로 수행했다** (§7 참조).
+
 ### 수정 1: `docs/PROJECT_PROFILE.md` §3
 
 기존 §3 의 5개 명령 (`install` / `run_local` / `run_local_postgres` / `quick_tests` / `isolated_tests` / `smoke_check`) 의 다음에 **migration 운영 권장** 참조 항목 신규 추가. 단일 entrypoint 인 `scripts/db-migrate.sh` 의 위치 / 사용법 / 권장 시나리오 reference + 운영 가이드 link.
@@ -139,6 +151,27 @@ DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder \
 
 1. **`--apply-all` 의 dry-run 자동 선행 정책** — `DB_MIGRATE_VERBOSE=1` 일 때만 dry-run skip. CI / 자동화 환경에서 의도하지 않은 double 호출 회피. 운영자는 verbose=1 로 환경에 따라 결정. **운영 권고**: staging / local 은 verbose=0 (안전). CI / 자동화는 verbose=1 (성능).
 2. **`--dr-stop` 의 안내만 출력 정책** — 본 게이트는 실제 stop / down 명령을 실행하지 않음. dry-run 도 안 함 — 명시적으로 가이드만 표시. 이유: 운영자가 DR 절차의 의미를 모르고 스크립트를 실행해 의도하지 않은 데이터 손실 / 컨테이너 중단을 일으키는 결함 방지. 운영 가이드 §5 의 절차 안내만 표시.
+
+## §7 실행 검증 (TASK-128, 2026-07-21)
+
+TASK-103 의 검증이 정적 점검에 그쳤던 것을 보완해, **6개 게이트를 로컬 PostgreSQL 18.4
+(`localhost:5432`) 에 실제로 실행**해 확인했다.
+
+| 검증 | 결과 |
+|---|---|
+| `bash -n` | syntax OK |
+| `--help` / 게이트 부재 / unknown gate | exit 0 / 2 / 2 |
+| `--status` | `applied: 0001~0006 / pending: (none)` |
+| `--plan` | `would apply: (none)` — 변경 없음 확인 |
+| `--apply-all` | idempotent 재적용 OK |
+| `--apply-up-to 0002` | 목표 버전까지만 처리 OK / 인자 누락 시 exit 2 |
+| `--bootstrap` | greenfield DDL + 일괄 적용 OK |
+| `--dr-stop` | 안내만 출력, exit 0 (실행 없음) |
+| `DATABASE_URL` 미설정 | exit 2 + hint |
+| `MIGRATIONS_DIR` 상대경로 override | REPO_ROOT 기준 정규화되어 정상 동작 |
+| `MIGRATIONS_DIR` 절대경로 override | 그대로 사용, 정상 동작 |
+| 다른 cwd 에서 호출 (`/tmp`) | 정상 동작 — cwd 무관성 확보 |
+| 존재하지 않는 `MIGRATIONS_DIR` | exit 1 — 실패가 조용히 묻히지 않음 |
 
 ## follow-up
 
