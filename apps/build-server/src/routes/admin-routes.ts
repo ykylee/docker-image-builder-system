@@ -14,6 +14,7 @@ import {
   adminRunnerRegisterRequestSchema,
   adminRunnerRegisterResponseSchema,
   adminUserListResponseSchema,
+  validationErrorBody,
   type AdminRunner
 } from "@docker-image-builder-system/shared-contract";
 
@@ -163,10 +164,9 @@ export async function registerAdminRoutes(
       request.query ?? {}
     );
     if (!queryResult.success) {
-      return reply.status(400).send({
-        message: "Invalid admin list query",
-        issues: queryResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid admin list query", queryResult.error.issues)
+      );
     }
 
     const body = await buildService.listBuildsAcrossUsers(queryResult.data);
@@ -249,10 +249,9 @@ export async function registerAdminRoutes(
       request.body ?? {}
     );
     if (!bodyResult.success) {
-      return reply.status(400).send({
-        message: "Invalid admin add request",
-        issues: bodyResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid admin add request", bodyResult.error.issues)
+      );
     }
     allowList.add(bodyResult.data.adminId);
     return reply
@@ -361,10 +360,9 @@ export async function registerAdminRoutes(
       }
       const body = adminRunnerRegisterRequestSchema.safeParse(request.body);
       if (!body.success) {
-        return reply.status(400).send({
-          message: "Invalid runner register request body.",
-          issues: body.error.issues
-        });
+        return reply.status(400).send(
+          validationErrorBody("Invalid runner register request body.", body.error.issues)
+        );
       }
       const result = await buildService.createAdminRunner(body.data.runnerId);
       if (result.kind === "duplicate") {
@@ -436,10 +434,9 @@ export async function registerAdminRoutes(
         request.body ?? {}
       );
       if (!bodyResult.success) {
-        return reply.status(400).send({
-          message: "Invalid admin runner patch request",
-          issues: bodyResult.error.issues
-        });
+        return reply.status(400).send(
+          validationErrorBody("Invalid admin runner patch request", bodyResult.error.issues)
+        );
       }
       const updated = await buildService.setAdminRunnerStatus(
         target,

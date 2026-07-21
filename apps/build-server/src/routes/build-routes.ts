@@ -17,7 +17,8 @@ import {
   testDeploymentQueueRequestSchema,
   testDeploymentQueueResponseSchema,
   testDeploymentReadyRequestSchema,
-  testDeploymentStatusRequestSchema
+  testDeploymentStatusRequestSchema,
+  validationErrorBody
 } from "@docker-image-builder-system/shared-contract";
 
 import type { BuildService } from "../services/build-service.js";
@@ -42,10 +43,9 @@ export async function registerBuildRoutes(
   app.get("/builds", async (request, reply) => {
     const queryResult = buildListQuerySchema.safeParse(request.query ?? {});
     if (!queryResult.success) {
-      return reply.status(400).send({
-        message: "Invalid list query",
-        issues: queryResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid list query", queryResult.error.issues)
+      );
     }
     const body = await buildService.listBuilds(queryResult.data);
     return reply.status(200).send(body);
@@ -54,10 +54,9 @@ export async function registerBuildRoutes(
   app.post("/builds", async (request, reply) => {
     const payloadResult = buildRequestSchema.safeParse(request.body ?? {});
     if (!payloadResult.success) {
-      return reply.status(400).send({
-        message: "Invalid build request payload",
-        issues: payloadResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid build request payload", payloadResult.error.issues)
+      );
     }
     const result = await buildService.createBuild(payloadResult.data);
 
@@ -73,10 +72,9 @@ export async function registerBuildRoutes(
   app.get("/builds/:buildId", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const result = await buildService.getBuild(paramsResult.data.buildId);
 
@@ -93,10 +91,9 @@ export async function registerBuildRoutes(
   app.get("/builds/:buildId/logs", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const result = await buildService.getBuildLogs(paramsResult.data.buildId);
 
@@ -114,10 +111,9 @@ export async function registerBuildRoutes(
     const body = request.body ?? {};
     const payloadResult = claimRequestSchema.safeParse(body);
     if (!payloadResult.success) {
-      return reply.status(400).send({
-        message: "Invalid claim payload",
-        issues: payloadResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid claim payload", payloadResult.error.issues)
+      );
     }
     const payload = payloadResult.data;
     void payload.capabilities;
@@ -133,18 +129,16 @@ export async function registerBuildRoutes(
   app.post("/builds/:buildId/phase", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const body = request.body ?? {};
     const payloadResult = phaseUpdateRequestSchema.safeParse(body);
     if (!payloadResult.success) {
-      return reply.status(400).send({
-        message: "Invalid phase update payload",
-        issues: payloadResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid phase update payload", payloadResult.error.issues)
+      );
     }
     const payload = payloadResult.data;
     if (!buildPhases.includes(payload.phase)) {
@@ -177,18 +171,16 @@ export async function registerBuildRoutes(
   app.post("/builds/:buildId/preview", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const body = request.body ?? {};
     const payloadResult = testDeploymentQueueRequestSchema.safeParse(body);
     if (!payloadResult.success) {
-      return reply.status(400).send({
-        message: "Invalid preview queue payload",
-        issues: payloadResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid preview queue payload", payloadResult.error.issues)
+      );
     }
     const payload = payloadResult.data;
     const result = await buildService.queueTestDeployment(
@@ -213,18 +205,16 @@ export async function registerBuildRoutes(
   app.post("/builds/:buildId/test-deployment/ready", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const body = request.body ?? {};
     const payloadResult = testDeploymentReadyRequestSchema.safeParse(body);
     if (!payloadResult.success) {
-      return reply.status(400).send({
-        message: "Invalid preview ready payload",
-        issues: payloadResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid preview ready payload", payloadResult.error.issues)
+      );
     }
     const payload = payloadResult.data;
     const result = await buildService.reportPreviewStatus(
@@ -250,18 +240,16 @@ export async function registerBuildRoutes(
   app.post("/builds/:buildId/test-deployment/status", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const body = request.body ?? {};
     const payloadResult = testDeploymentStatusRequestSchema.safeParse(body);
     if (!payloadResult.success) {
-      return reply.status(400).send({
-        message: "Invalid preview status payload",
-        issues: payloadResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid preview status payload", payloadResult.error.issues)
+      );
     }
     const payload = payloadResult.data;
     const result = await buildService.reportPreviewStatus(
@@ -277,18 +265,16 @@ export async function registerBuildRoutes(
   app.post("/builds/:buildId/deployment", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const body = request.body ?? {};
     const payloadResult = deploymentReportRequestSchema.safeParse(body);
     if (!payloadResult.success) {
-      return reply.status(400).send({
-        message: "Invalid deployment payload",
-        issues: payloadResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid deployment payload", payloadResult.error.issues)
+      );
     }
     const result = await buildService.reportDeploymentResult(
       paramsResult.data.buildId,
@@ -304,10 +290,9 @@ export async function registerBuildRoutes(
   app.get("/builds/:buildId/test-deployment", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const result = await buildService.getTestDeployment(paramsResult.data.buildId);
     if (result.kind === "not_found") {
@@ -331,10 +316,9 @@ export async function registerBuildRoutes(
   app.post("/builds/:buildId/source", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
 
     // The metadata we need to verify the upload against is read via
@@ -406,10 +390,9 @@ export async function registerBuildRoutes(
   app.get("/builds/:buildId/source", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
 
     const result = await buildService.getSourceArchive(paramsResult.data.buildId);
@@ -445,10 +428,9 @@ export async function registerBuildRoutes(
   app.post("/builds/:buildId/source/chunk", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     if (!Buffer.isBuffer(request.body)) {
       return reply.status(415).send({
@@ -554,10 +536,9 @@ export async function registerBuildRoutes(
   app.delete("/builds/:buildId/source", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
-      return reply.status(400).send({
-        message: "Invalid buildId parameter",
-        issues: paramsResult.error.issues
-      });
+      return reply.status(400).send(
+        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
+      );
     }
     const result = await buildService.deleteSourceArchive(
       paramsResult.data.buildId

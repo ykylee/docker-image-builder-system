@@ -29,6 +29,8 @@ import {
   adminRunnerSchema,
   adminUserBuildSummarySchema,
   adminUserListResponseSchema,
+  apiErrorIssueSchema,
+  apiErrorResponseSchema,
   buildErrorSchema,
   buildAcceptedResponseSchema,
   buildCurrentPhaseSchema,
@@ -67,6 +69,12 @@ const registry = new OpenAPIRegistry();
 // mapping from `components.schemas.<Id>` to the underlying zod schema.
 const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "BuildError", schema: buildErrorSchema },
+  // TASK-130: canonical 4xx error envelope. 프론트는 생성된
+  // `components.schemas.ApiErrorResponse` 타입으로 에러를 소비하므로,
+  // 서버가 형태를 바꾸면 프론트 빌드가 깨져서 계약 불일치가 컴파일
+  // 타임에 드러난다 (TASK-129 회귀의 재발 방지).
+  { id: "ApiErrorIssue", schema: apiErrorIssueSchema },
+  { id: "ApiErrorResponse", schema: apiErrorResponseSchema },
   { id: "BuildAcceptedResponse", schema: buildAcceptedResponseSchema },
   { id: "BuildDuplicateResponse", schema: buildDuplicateResponseSchema },
   { id: "BuildLifecycle", schema: buildLifecycleSchema },

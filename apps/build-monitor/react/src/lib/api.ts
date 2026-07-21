@@ -374,13 +374,27 @@ export function parseApiError(err: unknown): ParsedApiError {
     return { summary: raw, fieldErrors: [] };
   }
   const jsonText = raw.slice(jsonStart, jsonEnd + 1);
-  type ZodIssueLike = { path?: string[]; message?: string };
-  let envelope: { message?: string; issues?: ZodIssueLike[] } | null = null;
+  // TASK-130: envelope 타입을 shared-contract 가 생성한 OpenAPI 타입에
+  // 묶는다. 서버가 `ApiErrorResponse` 의 형태를 바꾸면 `openapi.d.ts` 가
+  // 함께 바뀌고, 이 파일이 컴파일에서 깨진다 — TASK-129 처럼 런타임에
+  // 조용히 어긋나는 대신 빌드가 먼저 실패한다.
+  //
+  // `Partial<>` 인 이유: 여기 들어오는 문자열은 서버 응답이라는 보장이
+  // 없다 (네트워크 계층 에러 메시지, 레거시 500 envelope 등). 계약 타입은
+  // 필드 이름과 자료형을 고정하는 용도로 쓰고, 존재 여부는 런타임에서 본다.
+  // `Pick<>` 으로 감싸는 것이 핵심이다. 생성된 `ApiErrorResponse` 는
+  // 서버 스키마가 `.loose()` 라 `& { [key: string]: unknown }` index
+  // signature 를 달고 있어서, 그대로 쓰면 `envelope.problems` 같은 오타도
+  // `unknown` 으로 통과해 버린다. `Pick` 은 index signature 를 버리므로
+  // 계약에 없는 필드를 읽으면 컴파일이 깨진다.
+  type ApiErrorResponse = Pick<
+    components["schemas"]["ApiErrorResponse"],
+    "message" | "issues"
+  >;
+  type ZodIssueLike = Partial<components["schemas"]["ApiErrorIssue"]>;
+  let envelope: Partial<ApiErrorResponse> | null = null;
   try {
-    envelope = JSON.parse(jsonText) as {
-      message?: string;
-      issues?: ZodIssueLike[];
-    };
+    envelope = JSON.parse(jsonText) as Partial<ApiErrorResponse>;
   } catch {
     return { summary: raw, fieldErrors: [] };
   }

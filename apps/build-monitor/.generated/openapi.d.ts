@@ -382,12 +382,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Deployment state recorded. */
+                /** @description Deployment state recorded. Response carries the canonical BuildStatusResponse with the just-updated `deploy` and `resultDelivery` blocks. */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["BuildStatusResponse"];
+                    };
                 };
             };
         };
@@ -430,6 +432,118 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/builds/{buildId}/source": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Download the raw source archive bytes for a build. Response is application/octet-stream; the SHA-256 is surfaced in the `X-Source-Checksum-Sha256` response header and the byte count in `X-Source-Size-Bytes`. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    buildId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Source archive bytes. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/octet-stream": string;
+                    };
+                };
+                /** @description Build or source archive not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** @description Upload the raw source archive bytes for a build. Body is application/octet-stream; the server recomputes the SHA-256 and size and refuses the upload if they do not match the build's `sourceArchive` metadata. The Skill is expected to call this after `POST /builds` has succeeded. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    buildId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            responses: {
+                /** @description Source archive accepted and verified. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SourceArchiveUploadResponse"];
+                    };
+                };
+                /** @description Checksum or size mismatch (recomputed from body). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Build not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** @description Delete the stored source archive bytes for a build. Returns 204 on success and 404 when the build itself is unknown. The declared `sourceArchive` metadata on the build row is preserved. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    buildId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Source archive dropped. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Build not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -578,6 +692,214 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/runners": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Admin-only. List every registered runner (ACTIVE + DISABLED) sorted by runnerId. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Snapshot of the runner registry. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRunnerListResponse"];
+                    };
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        /** @description Admin-only. Pre-register a runner record so the admin can see it in the registry before the runner process boots. The runner record starts as ACTIVE with zero counters; once the runner actually starts and self-registers on its first claim, the existing self-register refreshes lastSeenAt without changing status. Idempotent at the storage level (ON CONFLICT DO NOTHING), but a duplicate runnerId returns 409 so the admin UI can surface the misconfiguration. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdminRunnerRegisterRequest"];
+                };
+            };
+            responses: {
+                /** @description Runner pre-registered (record created). */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRunnerRegisterResponse"];
+                    };
+                };
+                /** @description Invalid body (empty runnerId, extra fields, type mismatch). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Runner already registered (duplicate runnerId). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/runners/{runnerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Admin-only. Permanently remove a runner from the registry. Idempotent — unknown runner id still returns 200 with removedRunnerId echoed back so the admin UI can clear stale entries. */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runnerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Removed (or already absent). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRunnerDeleteResponse"];
+                    };
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        /** @description Admin-only. Toggle a runner's status (DISABLED blocks future claims, ACTIVE re-enables). 404 for an unknown runner id (no prior claim seen). */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    runnerId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["AdminRunnerPatchRequest"];
+                };
+            };
+            responses: {
+                /** @description Status toggled. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AdminRunnerPatchResponse"];
+                    };
+                };
+                /** @description Invalid status value or empty runnerId. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Runner id has not yet registered (no claim observed). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -587,6 +909,26 @@ export interface components {
             /** @enum {string} */
             code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "PREVIEW_PROVISION_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
             message: string;
+        };
+        /** @description One field-level validation failure. Mirrors a zod issue narrowed to the fields the API contract guarantees. */
+        ApiErrorIssue: {
+            /** @description Field path of the failing value (dot-joinable). */
+            path: (string | number)[];
+            /** @description Human-readable reason. */
+            message: string;
+            /** @description zod issue code, when present. */
+            code?: string;
+        } & {
+            [key: string]: unknown;
+        };
+        /** @description Canonical error envelope for 4xx responses. `issues` is populated on schema-validation failures so clients can render field-level errors. */
+        ApiErrorResponse: {
+            /** @description Human-readable summary. Always present. */
+            message: string;
+            /** @description Field-level validation failures. Present when the request failed schema validation (HTTP 400). */
+            issues?: components["schemas"]["ApiErrorIssue"][];
+        } & {
+            [key: string]: unknown;
         };
         /** @description Returned on POST /builds when a new build is queued (HTTP 202). */
         BuildAcceptedResponse: {
@@ -825,7 +1167,7 @@ export interface components {
             claimed: boolean;
             build: components["schemas"]["BuildStatusResponse"] & unknown;
             /** @enum {string|null} */
-            reason: "NO_BUILD_AVAILABLE" | "ACTIVE_BUILD_EXISTS" | "QUEUE_CLAIM_FAILED" | null;
+            reason: "NO_BUILD_AVAILABLE" | "ACTIVE_BUILD_EXISTS" | "QUEUE_CLAIM_FAILED" | "RUNNER_DISABLED" | "RUNNER_ID_REQUIRED" | null;
         };
         /** @description Runner phase report payload (PKG-005). */
         PhaseUpdateRequest: {
@@ -881,6 +1223,13 @@ export interface components {
         /** @description Source archive reference uploaded by the Skill before build request. */
         SourceArchive: {
             objectKey: string;
+            checksumSha256: string;
+            sizeBytes: number;
+        };
+        /** @description Response body for POST /builds/{buildId}/source. The server echoes the recomputed SHA-256 and observed size after accepting the upload. */
+        SourceArchiveUploadResponse: {
+            /** Format: uuid */
+            buildId: string;
             checksumSha256: string;
             sizeBytes: number;
         };
@@ -979,6 +1328,94 @@ export interface components {
              * @description createdAt of the user's most recent build. null when the user has no builds (should not normally appear in this list).
              */
             lastBuildAt: string | null;
+        };
+        /** @description Admin view of a runner. Returned by GET /admin/runners and GET /admin/runners/:runnerId. `currentBuildId` is the most recent claim that has not yet transitioned to a terminal phase. */
+        AdminRunner: {
+            /** @description Canonical runner id. Matches the `RUNNER_ID` env value the runner process booted with. Self-registers on first claim. */
+            runnerId: string;
+            status: components["schemas"]["RunnerStatus"];
+            /**
+             * Format: date-time
+             * @description ISO8601 timestamp of the first claim ever observed by the Build Server for this runner.
+             */
+            firstSeenAt: string;
+            /**
+             * Format: date-time
+             * @description ISO8601 timestamp of the most recent claim/phase report from this runner.
+             */
+            lastSeenAt: string;
+            /** @description Total number of builds claimed by this runner. */
+            buildsClaimed: number;
+            /** @description Total number of builds this runner reported `phase=DOCKER_BUILD_COMPLETED`. */
+            buildsCompleted: number;
+            /**
+             * Format: uuid
+             * @description The build id this runner most recently claimed and is still working on. null when the runner has not claimed a build or has finished the previous one.
+             */
+            currentBuildId: string | null;
+            /** @description Last error message reported by this runner for the current claim (PHASE=FAILED reason). null when no error is recorded. */
+            lastError: string | null;
+        };
+        /**
+         * @description Lifecycle state of a registered runner. ACTIVE = accepting claims. DISABLED = admin-disabled; subsequent claims return reason=RUNNER_DISABLED and no build payload.
+         * @enum {string}
+         */
+        RunnerStatus: "ACTIVE" | "DISABLED";
+        /** @description Response body for GET /admin/runners. */
+        AdminRunnerListResponse: {
+            runners: components["schemas"]["AdminRunner"][];
+        };
+        /** @description Request body for PATCH /admin/runners/:runnerId. */
+        AdminRunnerPatchRequest: {
+            /**
+             * @description New lifecycle state. DISABLED blocks future claims; ACTIVE re-enables.
+             * @enum {string}
+             */
+            status: "ACTIVE" | "DISABLED";
+        };
+        /** @description Response body for PATCH /admin/runners/:runnerId. */
+        AdminRunnerPatchResponse: {
+            runner: components["schemas"]["AdminRunner"];
+        };
+        /** @description Response body for DELETE /admin/runners/:runnerId. */
+        AdminRunnerDeleteResponse: {
+            /** @description The runnerId that was just removed from the registry. */
+            removedRunnerId: string;
+        };
+        /** @description Request body for POST /admin/runners. The runnerId must be unique within the registry (a duplicate returns 409). Status fields (buildsClaimed/currentBuildId/etc.) are not user-supplied — they are derived from the runner's own claim activity after the runner starts. */
+        AdminRunnerRegisterRequest: {
+            /** @description Canonical runner id. Must match the `RUNNER_ID` env the runner process boots with — otherwise its first claim will be rejected (mismatched-id). Pre-registration with the wrong id is a misconfiguration that the admin UI cannot auto-detect; the same is true for self-registration. */
+            runnerId: string;
+        };
+        /** @description Response body for POST /admin/runners. */
+        AdminRunnerRegisterResponse: {
+            /** @description The freshly registered runner record. `status` is ACTIVE (admin can later PATCH to DISABLE), `firstSeenAt` and `lastSeenAt` are both set to the registration time (will be replaced by the runner's first claim timestamp). */
+            runner: {
+                /** @description Canonical runner id. Matches the `RUNNER_ID` env value the runner process booted with. Self-registers on first claim. */
+                runnerId: string;
+                status: components["schemas"]["RunnerStatus"];
+                /**
+                 * Format: date-time
+                 * @description ISO8601 timestamp of the first claim ever observed by the Build Server for this runner.
+                 */
+                firstSeenAt: string;
+                /**
+                 * Format: date-time
+                 * @description ISO8601 timestamp of the most recent claim/phase report from this runner.
+                 */
+                lastSeenAt: string;
+                /** @description Total number of builds claimed by this runner. */
+                buildsClaimed: number;
+                /** @description Total number of builds this runner reported `phase=DOCKER_BUILD_COMPLETED`. */
+                buildsCompleted: number;
+                /**
+                 * Format: uuid
+                 * @description The build id this runner most recently claimed and is still working on. null when the runner has not claimed a build or has finished the previous one.
+                 */
+                currentBuildId: string | null;
+                /** @description Last error message reported by this runner for the current claim (PHASE=FAILED reason). null when no error is recorded. */
+                lastError: string | null;
+            };
         };
     };
     responses: never;
