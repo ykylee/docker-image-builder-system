@@ -8,7 +8,9 @@
 - Status: stable (TASK-120 정합)
 - Updated: 2026-07-21 (rev 125→126: **구동 확인 완료 + TASK-132 UI 균형 붕괴 수정 봉인**).
 
-  **⚠️ 브랜치 상태 — 이번 커밋은 main 이 아니다.** TASK-132 는 `fix/task-132-ui-balance` 브랜치의 `306c2be` 에 있다. main 은 여전히 `origin/main` 보다 **9 커밋** 앞서 있고 미push. 합류하려면 `git checkout main && git merge --ff-only fix/task-132-ui-balance`. push 여부와 병합 여부 모두 사용자 결정 대기.
+  **✅ push 완료 — 로컬과 원격이 동기화된 상태로 인계한다.** TASK-132 는 `fix/task-132-ui-balance` 에서 작업한 뒤 사용자 승인으로 main 에 fast-forward 병합했고, 이전 세션부터 보류돼 있던 9 커밋(TASK-124~131)과 함께 **11 커밋을 push** 했다: `origin/main` `8905cb0` → **`36cedfc`**. 작업 브랜치는 병합 후 삭제. `main...origin/main` ahead/behind 0 확인. **2026-07-20 이후 처음으로 원격이 갱신됐다** — 다음 세션은 미push 커밋 걱정 없이 시작하면 된다.
+  - TASK-132 커밋: `306c2be` (UI 수정) + `36cedfc` (메타 동기화)
+  - push 직전 회귀 재확인: TSC 4 프로젝트 clean / frontend **133 PASS** / build-server **178 PASS, fail 0**
 
   **이전 세션이 남긴 "구동 확인" 과제는 완료됐다.** TS 빌드 → `vite build:react` → Postgres backend 로 build-server 기동 → `/health` · SPA · `/api` 307 · TASK-127 400 계약 · Postgres 왕복 전부 확인. 그 과정에서 **포트는 3000** 임이 확인됐다 (문서에 명시가 없어 로그로 확인 — `curl :3000`). 확인 중 사용자가 "UI 균형이 굉장히 이상하다" 고 보고해 TASK-132 로 이어졌다.
 
