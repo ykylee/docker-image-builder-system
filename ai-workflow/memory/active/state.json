@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-21T19:30:00Z",
+  "generated_at": "2026-07-21T20:00:00Z",
   "purpose_digest": "TASK-134 Astryx 도입 1단계 — 디자인 토큰 네임스페이스 --dib-*. 사용자 요청으로 Astryx 도입을 재검토한 결과 '제대로 도입' 결정. 재검토 사실: Astryx 는 진짜 Meta 프로젝트(npm maintainer 에 astryxdesignteam@meta.com / opensource+npm@fb.com), MIT, 107 컴포넌트, StyleX 기반. 단 최초 배포가 2026-06-24 로 4주 된 pre-1.0 이고 latest 0.1.7 인데 우리는 0.1.4 고정(한 달에 3버전). 핵심 발견 2건: (1) StyleX 컴파일러 불필요 — dist/astryx.css 로 컴파일된 CSS 를 동봉한다. TASK-088 PoC 가 미완이었을 뿐 기술 장벽이 아니었음. (2) neutralTheme 은 default 가 아니라 named export — PoC 가 여기서 막혔을 가능성. 스파이크로 <Theme><Button> 렌더 통과 확인. 번들 실측 CSS gzip 5.34→26.98(+21.6, astryx.css 단일파일 전량) / JS gzip 90.66→103.55(Button+Badge). 1단계로 토큰 67종(tokens.css 66 + StatusPill 지역 --pill-color)을 --dib-* 로 개명 — theme-neutral 과 이름이 겹치던 4종(--color-text-primary/secondary/disabled + 어제 TASK-133 에서 새로 만든 --color-on-accent 까지)이 0종이 됐다. 마지막 항목이 시사적: 이름 충돌은 한 번 치우면 끝나는 게 아니라 새 토큰을 만들 때마다 재발하는 구조적 문제라 접두사로만 차단된다. 치환은 긴 이름부터 + 토큰 경계 (?![a-z0-9-]) 고정(--color-text 를 먼저 바꾸면 --color-text-primary 가 깨짐). 31 파일 + B층 스크립트(react/src 밖이라 수동). 검증: 충돌 4→0 / TSC clean / vitest 216 불변 / B층 실브라우저 하이재킹0·위반0 / css 38.46→41.59KB(gzip 5.34→5.44). 다음: 2단계 <Theme>+astryx.css 재도입(충돌 0 이라 안전, B층이 수용 기준) → 3단계 컴포넌트 점진 이관 (Table/Dialog/Badge/CodeBlock/Field 우선) → 0.1.4→0.1.7 업데이트.",
-  "purpose_digest_rev": 163,
+  "purpose_digest_rev": 164,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,8 +28,8 @@
   },
   "session": {
     "current_baseline": "TASK-134 (디자인 토큰 네임스페이스) 봉인 (rev 157→158). 누적 회귀 baseline: frontend vitest 216 / build-server 178 / TS 5 packages clean / go 8/8 package PASS / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 / 양 테마 WCAG AA 대비 전수 통과 / Astryx 토큰 충돌 0종.",
-    "current_axis": "Astryx 도입 재검토 → '제대로 도입' 결정 → 3단계 계획 중 1단계(토큰 네임스페이스) 봉인. 브랜치 feat/task-134-token-namespace, main 미병합. 직전 TASK-133 의 fix/task-133-theme-contrast-guard 도 main 미병합 상태 — 두 브랜치가 순차 누적돼 있다.",
-    "current_focus": "다음 세션: (1) **Astryx 2단계** — <Theme> + astryx.css 재도입. 토큰 충돌이 0 이므로 안전하며, B층 가드가 재도입 직후 하이재킹 0 을 확인하는 것이 수용 기준. (2) **3단계 컴포넌트 점진 이관** — Table(BuildsList) / Dialog(RegisterRunnerModal) / Badge(StatusPill) / CodeBlock(LogStream) / Field+FormLayout(BuildRequest) 우선. (3) 0.1.4 → 0.1.7 업데이트 (pre-1.0 churn 추적 비용 감수 결정). (4) 이월: B층 CI 통합 / PhaseTimeline.tsx 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. 미병합 브랜치 2개(TASK-133, TASK-134) 병합·push 여부는 사용자 결정 대기.",
+    "current_axis": "Astryx 도입 재검토 → '제대로 도입' 결정 → 3단계 계획 중 1단계(토큰 네임스페이스) 봉인. **TASK-133 + TASK-134 두 브랜치를 main 에 fast-forward 병합 완료** (61ea7b2 → 6d60b2d → 4147a3f), 작업 브랜치 2개 삭제. 병합 후 main 에서 회귀 재확인 (frontend 216 / build-server 178 / TSC 5 clean). **아직 push 하지 않음 — main 이 origin/main 보다 2 커밋 앞서 있다.** push 여부는 사용자 결정 대기.",
+    "current_focus": "다음 세션: (0) **미push 2 커밋** — main 이 origin/main(61ea7b2) 보다 앞서 있다. (1) **Astryx 2단계** — <Theme> + astryx.css 재도입. 토큰 충돌이 0 이므로 안전하며, B층 가드가 재도입 직후 하이재킹 0 을 확인하는 것이 수용 기준. 재도입 전에 0.1.4 → 0.1.7 업데이트를 먼저 하는 편이 breaking change 를 한 번에 처리하는 길. (2) **3단계 컴포넌트 점진 이관** — Table(BuildsList) / Dialog(RegisterRunnerModal) / Badge(StatusPill) / CodeBlock(LogStream) / Field+FormLayout(BuildRequest) 우선. (3) 이월: B층 CI 통합 / PhaseTimeline.tsx 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.",
     "blocked_items": [],
     "recent_done_items": [
       "TASK-134 (Astryx 도입 1단계 — 디자인 토큰 네임스페이스 --dib-*, Code refactor): 사용자 요청으로 Astryx 도입 재검토 → '제대로 도입' 결정 후 선행 필수 단계 수행. 재검토 사실 — Astryx 는 진짜 Meta 프로젝트 (npm maintainer astryxdesignteam@meta.com / opensource+npm@fb.com / liya@meta.com), MIT, 107 컴포넌트, StyleX 기반, 이 앱이 손으로 만든 것과 직접 대응 17종. 단 최초 배포 2026-06-24 로 4주 된 pre-1.0, latest 0.1.7 인데 우리는 0.1.4(한 달에 3버전 뒤처짐), canary 다수. 핵심 발견 2건: (1) **StyleX 컴파일러 불필요** — dist/astryx.css 로 컴파일된 CSS 동봉. 즉 TASK-088 PoC 는 기술 장벽이 아니라 미완이었던 것. (2) neutralTheme 은 default 가 아니라 **named export** (import { neutralTheme }) — PoC 가 여기서 막혔을 가능성. 스파이크 <Theme theme={neutralTheme}><Button> 렌더 통과. 번들 실측(스파이크 후 원복): CSS gzip 5.34→26.98 (+21.6, astryx.css 가 단일 파일이라 컴포넌트 1개만 써도 전량) / JS gzip 90.66→103.55 (Button+Badge). **본 단계**: theme-neutral 과 이름이 겹치는 토큰이 4종이었다 — TASK-132 P0 의 직접 원인인 --color-text-primary/secondary/disabled 에 더해 **어제 TASK-133 에서 새로 만든 --color-on-accent 까지 겹쳤다**. 이 마지막 항목이 시사적: 이름 충돌은 한 번 치우면 끝나는 문제가 아니라 새 토큰을 만들 때마다 재발하는 구조적 문제이므로 접두사로만 차단된다. tokens.css 선언 66종 + StatusPill 지역 선언 --pill-color = 67종을 --dib-* 로 개명. 치환은 **긴 이름부터** + 토큰 경계 (?![a-z0-9-]) 고정 (--color-text 를 먼저 바꾸면 --color-text-primary 가 깨진다). 대상은 우리가 선언한 토큰만 — Astryx 토큰 미접촉. react/src 31 파일 + scripts/check-theme-contrast.mjs (react/src 밖이라 수동). TASK-133 A층/B층 가드는 같은 문자열이라 자동 반영. 검증: **Astryx 충돌 4종 → 0종** / 잔여 미개명 0 (남은 3건은 TASK-132 경위 서술 주석) / TSC clean / vitest 216 불변 / A층 81 PASS / B층 실브라우저 다크·라이트 × 3 라우트 하이재킹0·위반0 / css 38.46→41.59KB (gzip 5.34→5.44, 접두사 6자 × 사용처). 백엔드 영향 0. SQL/schema/migration/version/git tag 변경 0. follow-up: 2단계 <Theme>+astryx.css 재도입 / 3단계 컴포넌트 점진 이관 / 0.1.4→0.1.7 업데이트.",
@@ -159,7 +159,7 @@
       "TASK-131 문서 무결성 가드 (rev 43 sync 봉인, 히스토리 166 쌍 오탐 0 + 미발견 사고 2호 발견·복구)",
       "TASK-132 UI 균형 붕괴 수정 (rev 44 sync 봉인, Astryx 토큰 충돌 제거 + 레이아웃 셸 — build-server 172 → 178)",
       "TASK-133 테마별 시각 회귀 가드 (rev 45 sync 봉인, 2계층 가드 + AA 위반 11건 전수 해소 — frontend 133 → 216)",
-      "TASK-134 Astryx 도입 1단계 — 디자인 토큰 네임스페이스 --dib-* (rev 46 sync 봉인, Astryx 토큰 충돌 4종 → 0종)"
+      "TASK-134 Astryx 도입 1단계 — 디자인 토큰 네임스페이스 --dib-* (rev 46 sync 봉인, Astryx 토큰 충돌 4종 → 0종, commit 4147a3f main 병합 완료)"
     ],
     "index_rev": "72",
     "latest_rev": "49"

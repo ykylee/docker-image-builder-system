@@ -8,7 +8,7 @@
 - Status: stable (TASK-120 정합)
 - Updated: 2026-07-21 (rev 127→128: **TASK-134 Astryx 도입 1단계 — 디자인 토큰 네임스페이스 `--dib-*` 봉인**).
 
-  **⚠️ 미병합 브랜치가 2개 누적됐다.** `fix/task-133-theme-contrast-guard` → `feat/task-134-token-namespace` 순차 누적. 병합·push 여부는 사용자 결정 대기.
+  **✅ 두 브랜치 모두 main 에 병합 완료.** `fix/task-133-theme-contrast-guard` → `feat/task-134-token-namespace` 를 fast-forward 로 병합 (`61ea7b2` → `6d60b2d` → **`4147a3f`**), 작업 브랜치 2개 삭제. 병합 후 main 에서 회귀 재확인 — frontend 216 / build-server 178 / TSC 5 clean. **단 아직 push 하지 않았다 — main 이 `origin/main` 보다 2 커밋 앞서 있다.**
 
   **Astryx 재검토 → "제대로 도입" 결정 (사용자).** 재검토에서 확인한 사실:
   - **진짜 Meta 프로젝트다.** npm maintainer 에 `astryxdesignteam@meta.com` / `opensource+npm@fb.com` / `liya@meta.com`. MIT, 107 컴포넌트, StyleX 기반. 이 앱이 손으로 만든 것과 직접 대응되는 것이 **17종** (Table / Dialog / Badge / CodeBlock / Field / FormLayout / AppShell / TopNav …).
@@ -27,7 +27,7 @@
   **다음 세션 우선순위**: (1) **Astryx 2단계** — `<Theme>` + `astryx.css` 재도입. 충돌 0 이므로 안전하며, **B층 가드가 재도입 직후 하이재킹 0 을 확인하는 것이 수용 기준**이다. (2) **3단계 컴포넌트 점진 이관** — `Table`(BuildsList) / `Dialog`(RegisterRunnerModal) / `Badge`(StatusPill) / `CodeBlock`(LogStream) / `Field`+`FormLayout`(BuildRequest) 우선. 이관이 진행되면 손 CSS 2,323줄이 줄어드는 만큼 astryx.css 의 +21.6KB 를 상쇄한다. (3) `0.1.4 → 0.1.7` 업데이트. (4) 이월: B층 CI 통합 / `PhaseTimeline.tsx` 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 기존 결정 대기 5종. workflow meta sync (state rev 162→163, handoff 127→128, work_backlog TASK-134 등록, backlog 2026-07-21 rev 11) 같은 commit 안에 포함.
 - Updated: 2026-07-21 (rev 126→127: **TASK-133 테마별 시각 회귀 가드 봉인** — TASK-132 최대 교훈의 직접 대응).
 
-  **⚠️ 브랜치 `fix/task-133-theme-contrast-guard` 에서 작업했고 main 미병합·미push 상태다.** 병합 여부는 사용자 결정 대기.
+  **✅ main 에 병합 완료** (commit `6d60b2d`, TASK-134 와 함께 fast-forward). 작업 브랜치 삭제. 미push 상태.
 
   **사용자 결정 3건**: (1) 가드 범위 = **계층 방어 (A+B)** — A층만으로는 TASK-132 의 P0 를 원리적으로 못 잡기 때문. (2) 발견된 AA 위반 = **전수 수정** (allowlist 없이 임계값을 WCAG AA 그대로). (3) 사용처 0건인 Astryx 의존성 2종은 **유지** (재도입 가능성) — 그래서 B층의 가치가 더 크다.
 
