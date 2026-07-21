@@ -6,6 +6,35 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 131→132: **TASK-138 Astryx 3-2 — BuildRequest 폼 → `TextInput`/`NumberInput` 봉인**).
+
+  브랜치 `feat/task-138-buildrequest-form` (병합·push 상태는 `git status -sb` 를 볼 것).
+
+  **착수 중 TASK-137 기록의 오기를 발견해 정정했다 (별도 커밋 `4e09115`).** Astryx `TextInput` 동작을 실측하다 "사전 결함 3" 이 사실이 아님을 확인 — `data-testid` 는 **실제 `<input>` 에** 붙고 `getByLabelText` 와 동일 요소이며 `fireEvent.change` 도 정상 동작한다(원래 질의로 되돌려 재현 → 통과). 당시 4건 실패는 error-testid 3건 + **Escape 1건**이었고 `"called 1 times, got 0"` 은 `onSuccess` 가 아니라 `onClose` 였다. **실패 목록을 정확히 읽지 않고 원인을 추정한 것이 잘못이다.** 덕분에 본 TASK 는 기존 회귀 18건의 `getByTestId` 결합을 **그대로 유지**할 수 있었다.
+
+  **구현**: 8개 필드가 `<label><span><input><small>` 를 각각 반복하던 약 130줄을 **`FIELDS` 선언 테이블 + `.map()`** 으로 대체 — 라벨·힌트·필수 표시·에러 결속이 한 곳에 모여 필드 간 어긋남이 구조적으로 사라진다. `errorPath` 로 검증 오류를 **해당 입력에 결속**(실브라우저에서 `aria-invalid="true"` + `aria-describedby` 확인). **요약 배너는 유지** — 필드 결속 + 요약 병행이 폼 접근성 권장 패턴이다. 액션 버튼 2종은 Astryx `Button` 으로, 단 **"View Builds list" 는 `Link` 로 유지**(탐색이므로 버튼으로 바꾸면 새 탭·주소 복사가 막히고 스크린리더가 button 으로 읽는다).
+
+  **TASK-099 의 ref 우회는 불필요했다.** "React state batching 회피" 로 8개 input 에 ref 를 달아 submit 시점 DOM 값을 직접 읽던 것을 state 읽기로 되돌렸고, **기존 회귀 18건이 그대로 통과하는지로 그 우회가 실제로 필요했는지 확인했다** — 통과했다.
+
+  **사전 결함 2건**:
+  1. **`NumberInput` 의 `min` 은 화면과 상태를 갈라놓는다 (실측).** `min={1}` 인 입력에 `"0"` 을 넣으면 **표시값은 0 인데 `onChange` 가 호출되지 않아 상태는 이전 값(60)으로 남는다** — 사용자가 보는 값과 제출될 값이 다르다. → `min` 을 일부러 넘기지 않고 범위 검증을 우리 쪽에 두어 `status` 로 필드에 결속.
+  2. **`Login.css` 의 bare element 셀렉터가 앱 전체로 유출되고 있었다.** `label {}` / `input {}` 이 스코프 없이 선언돼 있었고, 라우트 CSS 는 한 번들로 합쳐지고 **unlayered 라 Astryx 의 @layer 보다 우선**한다 — Login 을 거치지 않아도 다른 페이지의 Astryx `TextInput` 내부 input 을 덮었다. **실제 피해**: BuildRequest 이관 직후 입력 높이가 **48.8px** 이 되어 Astryx 의 **32px** 래퍼를 뚫고 나오고 힌트와 **4px 겹쳤다** (`padding:12px`/`font-size:16px` 이 정확히 Login 의 `--dib-space-md`/`--dib-size-md`). → `.login-page` 스코프로 한정. 수정 후 입력 20px/padding 0/래퍼 초과 없음, **Login 은 47px 로 불변**(양쪽 실측). TASK-132 의 중복 `@import` 와 같은 계열 — **페이지 CSS 가 자기 경계를 넘는 구조**.
+
+  **검증**: 기존 회귀 **18/18 그대로 통과**(질의 변경 없이) / TSC clean / vitest **239 불변** / B층 하이재킹 0 · 대비 위반 0 / 겹침 해소 실측 / Login 회귀 없음.
+
+  **번들 — 라우트 지연 로드가 시급해졌다**:
+
+  | | TASK-137 | TASK-138 |
+  |---|---|---|
+  | 초기 JS gzip | 104.30 | **134.51** |
+  | 모달 청크 gzip | 38.21 | **8.99** |
+  | CSS gzip | 26.99 | **26.88** |
+
+  모달 청크가 준 것은 공용 폼 기계장치가 **초기 번들로 이동**했기 때문이다(BuildRequest 는 메인 라우트인데 정적 import). 모달을 여는 사용자 총량은 142.51 → 143.50 으로 거의 같지만 **`/login` 만 여는 사용자도 +30.2KB 를 받는다.** 손 CSS **2,175 → 2,120줄**.
+
+  **다음 세션 권장: 라우트 지연 로드를 먼저 (TASK-139 후보).** 라우트 9종이 전부 정적 import 라 이관이 진행될수록 모든 사용자의 초기 번들이 같이 커진다. TASK-137 에서 모달 하나를 lazy 로 뺐지만 그건 국소 처방이고, 메인 라우트가 Astryx 를 쓰기 시작하면 효과가 없다. 3-3(LogStream)·3-4(BuildsList) 를 이관하면 같은 증가가 반복되므로 **먼저 깔아두는 편이 낫다.** 이어서 3-3 `CodeBlock` ← LogStream / 3-4 `Table` ← BuildsList(**StatusPill → Badge 논점 선결**) / 3-5 `AppShell`+`TopNav` ← 레이아웃 셸.
+
+  이월: B층 가드가 오버레이(모달)를 검사하지 못함 / **admin 라우트 테스트 4종이 없는데 PROJECT_PROFILE §3.4 는 있다고 서술 중** / `PhaseTimeline.tsx` 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 170→171, handoff 131→132, work_backlog TASK-138 등록, backlog 2026-07-21 rev 15) 같은 commit 안에 포함.
 - Updated: 2026-07-21 (rev 130→131: **TASK-137 Astryx 3-1 — RegisterRunnerModal → `Dialog` 이관 봉인**).
 
   브랜치 `feat/task-137-dialog-migration`. **병합·push 상태는 `git status -sb` / `git log origin/main..main` 을 볼 것** (봉인 시점 서술이 세 번 연속 낡아 정정 커밋이 났으므로 확정 서술을 하지 않는다).

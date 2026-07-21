@@ -77,14 +77,27 @@ form {
   gap: var(--dib-space-xs);
   text-align: left;
 }
-label {
+/* TASK-138: bare element 셀렉터를 페이지 스코프로 한정.
+ *
+ * 이 파일의 `label {}` / `input {}` 은 셀렉터에 스코프가 없어 **앱 전체의
+ * label·input 에 적용**되고 있었다. 라우트 CSS 는 하나의 번들로 합쳐지고
+ * unlayered 라 Astryx 의 @layer 보다 우선하므로, Login 을 거치지 않아도
+ * 다른 페이지의 Astryx TextInput 내부 input 까지 이 규칙이 덮었다.
+ *
+ * 실제 피해: BuildRequest 를 Astryx 로 이관하자 입력의 실제 높이가 48.8px
+ * 이 되어 Astryx 가 잡은 32px 래퍼를 위아래로 뚫고 나왔고, 힌트 텍스트와
+ * 4px 겹쳤다 (padding 12px / font-size 16px 이 여기서 왔다).
+ *
+ * TASK-132 가 찾은 중복 `@import` 와 같은 계열의 결함이다 — 페이지 CSS 가
+ * 자기 경계를 넘는다. */
+.login-page label {
   font-size: var(--dib-size-xs);
   font-weight: var(--dib-weight-semibold);
   color: var(--dib-color-text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
-input {
+.login-page input {
   width: 100%;
   padding: var(--dib-space-md);
   border-radius: var(--dib-radius-md);
@@ -98,7 +111,7 @@ input {
   font-size: var(--dib-size-md);
   transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
-input:focus {
+.login-page input:focus {
   outline: none;
   border-color: var(--dib-color-accent-primary);
   box-shadow: 0 0 0 2px var(--dib-color-focus-ring);

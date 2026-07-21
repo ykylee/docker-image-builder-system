@@ -18,9 +18,11 @@
 //   2) 같은 appName 으로 즉시 재시도 → duplicate 배너 + 기존 build 표시
 //   3) "Random appName" 클릭 → 다른 appName 으로 payload 갱신 후 submit
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, ReactElement } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
+import { Button, NumberInput, TextInput } from "@astryxdesign/core";
 
 import { StatusPill } from "@/components/StatusPill";
 import {
@@ -60,6 +62,107 @@ const DEFAULT_FORM: FormState = {
   dockerfilePath: "Dockerfile",
   previewTtlMinutes: 60
 };
+
+/**
+ * 폼 필드 선언 — TASK-138 (Astryx Field 이관).
+ *
+ * 이전에는 8개 필드가 `<label><span><input><small>` 를 각각 손으로 반복해
+ * 약 130줄이었다. 라벨/힌트/필수 표시/에러 결속이 필드마다 흩어져 있어
+ * 하나를 고치면 나머지 7개와 어긋나기 쉬웠다.
+ *
+ * `errorPath` 는 서버(zod)와 클라이언트 검증이 쓰는 경로 문자열이며, 이
+ * 값으로 해당 필드에 에러를 **결속**한다 — 이전에는 에러가 폼 아래 배너에만
+ * 모여 있어 어느 입력의 문제인지 스크린리더가 알 수 없었다.
+ */
+const FIELDS: readonly {
+  key: keyof FormState;
+  label: string;
+  errorPath: string;
+  kind: "text" | "number";
+  required: boolean;
+  placeholder?: string;
+  hint: string;
+  testId: string;
+}[] = [
+  {
+    key: "appName",
+    label: "appName",
+    errorPath: "appName",
+    kind: "text",
+    required: true,
+    placeholder: "hello-world",
+    hint: "Canonical app identity. Active-build lock key.",
+    testId: "req-appName"
+  },
+  {
+    key: "requestedBy",
+    label: "requestedBy",
+    errorPath: "requestedBy",
+    kind: "text",
+    required: true,
+    placeholder: "alice",
+    hint: "Owner userId. 같은 값으로 build list filter 가능.",
+    testId: "req-requestedBy"
+  },
+  {
+    key: "objectKey",
+    label: "sourceArchive.objectKey",
+    errorPath: "sourceArchive.objectKey",
+    kind: "text",
+    required: true,
+    placeholder: "ref://github.com/owner/repo",
+    hint: "Skill 이 발행한 archive reference.",
+    testId: "req-objectKey"
+  },
+  {
+    key: "checksumSha256",
+    label: "sourceArchive.checksumSha256",
+    errorPath: "sourceArchive.checksumSha256",
+    kind: "text",
+    required: true,
+    placeholder: "0..0 (64 hex)",
+    hint: "실제 upload 시 server 가 검증. zod 는 min(1) 만 검사.",
+    testId: "req-checksum"
+  },
+  {
+    key: "sizeBytes",
+    label: "sourceArchive.sizeBytes",
+    errorPath: "sourceArchive.sizeBytes",
+    kind: "number",
+    required: true,
+    hint: "Archive byte size. non-negative.",
+    testId: "req-sizeBytes"
+  },
+  {
+    key: "entrypointPath",
+    label: "entrypointPath",
+    errorPath: "entrypointPath",
+    kind: "text",
+    required: true,
+    placeholder: "src/index.ts",
+    hint: "Container 시작점.",
+    testId: "req-entrypoint"
+  },
+  {
+    key: "dockerfilePath",
+    label: "dockerfilePath",
+    errorPath: "dockerfilePath",
+    kind: "text",
+    required: false,
+    placeholder: "Dockerfile",
+    hint: "Default 'Dockerfile'.",
+    testId: "req-dockerfile"
+  },
+  {
+    key: "previewTtlMinutes",
+    label: "previewTtlMinutes",
+    errorPath: "previewTtlMinutes",
+    kind: "number",
+    required: false,
+    hint: "Preview container TTL.",
+    testId: "req-ttl"
+  }
+];
 
 function makePreset(
   kind: "hello" | "minimal" | "typescript",
@@ -127,24 +230,6 @@ export function BuildRequest(): ReactElement {
   const [submitFieldErrors, setSubmitFieldErrors] = useState<FieldError[]>([]);
   const [lastResult, setLastResult] = useState<BuildRequestResponse | null>(null);
 
-  // input ref — submit 시점에 React state batching 을 우회하여 native
-  // input value 를 직접 read. controlled input 의 DOM property value 는
-  // React 가 dispatch 후에 동기화되지만, onSubmit handler 가 호출되는
-  // 시점에는 React state 가 batched 상태로 남아 있을 수 있어 production
-  // 환경에서도 같은 race 가 발생할 수 있음. refs 는 항상 최신 DOM 값.
-  // React 19 의 useRef<HTMLInputElement>(null) 는 RefObject<HTMLInputElement | null>
-  // 으로 추론되므로 명시적 | null 표기.
-  const refs = {
-    appName: useRef<HTMLInputElement | null>(null),
-    requestedBy: useRef<HTMLInputElement | null>(null),
-    objectKey: useRef<HTMLInputElement | null>(null),
-    checksumSha256: useRef<HTMLInputElement | null>(null),
-    sizeBytes: useRef<HTMLInputElement | null>(null),
-    entrypointPath: useRef<HTMLInputElement | null>(null),
-    dockerfilePath: useRef<HTMLInputElement | null>(null),
-    previewTtlMinutes: useRef<HTMLInputElement | null>(null)
-  };
-
   // userId store + 첫 진입 시 default preset 적용.
   useEffect(() => {
     const stored = localStorage.getItem("userId");
@@ -194,21 +279,20 @@ export function BuildRequest(): ReactElement {
     setSubmitError(null);
     setSubmitFieldErrors([]);
 
-    // React state batching 회피: input ref 로 native DOM value 직접 read.
-    // fireEvent.change → setForm → setForm batch → submit 호출 사이의 race
-    // 를 ref 기반 read 로 우회. refs 는 React render 와 무관하게 항상 최신
-    // DOM property 를 가리키므로 controlled input 의 .value 가 React state
-    // 와 sync 되지 않은 시점에서도 안정적.
-    const readField = (ref: React.RefObject<HTMLInputElement | null>): string =>
-      ref.current?.value ?? "";
-    const appNameValue = readField(refs.appName);
-    const requestedByValue = readField(refs.requestedBy);
-    const objectKeyValue = readField(refs.objectKey);
-    const checksumValue = readField(refs.checksumSha256);
-    const sizeBytesValue = Number(readField(refs.sizeBytes));
-    const entrypointValue = readField(refs.entrypointPath);
-    const dockerfileValue = readField(refs.dockerfilePath);
-    const previewTtlValue = Number(readField(refs.previewTtlMinutes));
+    // TASK-138: 이전에는 input ref 로 native DOM value 를 직접 읽었다
+    // (TASK-099 가 "React state batching 회피" 로 도입). Astryx TextInput 은
+    // controlled 컴포넌트라 ref 패턴을 그대로 쓸 수 없어 state 읽기로
+    // 되돌렸고, **기존 회귀 18건이 그대로 통과하는지로 그 우회가 실제로
+    // 필요했는지 확인했다** — 통과했으므로 필요 없었다. fireEvent 각각이
+    // 별개의 discrete event 라 submit 시점에는 이미 flush 되어 있다.
+    const appNameValue = form.appName;
+    const requestedByValue = form.requestedBy;
+    const objectKeyValue = form.objectKey;
+    const checksumValue = form.checksumSha256;
+    const sizeBytesValue = Number(form.sizeBytes);
+    const entrypointValue = form.entrypointPath;
+    const dockerfileValue = form.dockerfilePath;
+    const previewTtlValue = Number(form.previewTtlMinutes);
 
     // form validation — zod 가 backend 에서도 검증하지만 client-side sanity
     // check 로 빠르게 피드백. BuildRequest schema 그대로. native form
@@ -346,147 +430,79 @@ export function BuildRequest(): ReactElement {
 
       <form className="form" onSubmit={submit} data-testid="req-form">
         <div className="grid">
-          <label>
-            <span className="lbl">appName <em>*</em></span>
-            <input
-              type="text"
-              name="appName"
-              ref={refs.appName}
-              value={form.appName}
-              onChange={(e) => setForm((prev) => ({ ...prev, appName: e.target.value }))}
-              placeholder="hello-world"
-              data-testid="req-appName"
-            />
-            <small className="hint">Canonical app identity. Active-build lock key.</small>
-          </label>
+          {FIELDS.map((f) => {
+            // 이 필드에 해당하는 검증 오류를 찾아 **입력에 직접 결속**한다.
+            const fieldError = submitFieldErrors.find((e) => e.path === f.errorPath);
+            const status = fieldError
+              ? ({ type: "error", message: fieldError.message } as const)
+              : undefined;
+            const common = {
+              label: f.label,
+              description: f.hint,
+              isRequired: f.required,
+              isOptional: !f.required,
+              status,
+              htmlName: f.key,
+              "data-testid": f.testId
+            };
 
-          <label>
-            <span className="lbl">requestedBy <em>*</em></span>
-            <input
-              type="text"
-              name="requestedBy"
-              ref={refs.requestedBy}
-              value={form.requestedBy}
-              onChange={(e) => setForm((prev) => ({ ...prev, requestedBy: e.target.value }))}
-              placeholder="alice"
-              data-testid="req-requestedBy"
-            />
-            <small className="hint">Owner userId. 같은 값으로 build list filter 가능.</small>
-          </label>
+            if (f.kind === "number") {
+              return (
+                <NumberInput
+                  key={f.key}
+                  {...common}
+                  value={form[f.key] as number}
+                  // min 을 **일부러 넘기지 않는다.** Astryx NumberInput 은 min
+                  // 미만 값이 들어오면 onChange 를 호출하지 않는데, 입력 요소의
+                  // 표시값은 그대로 바뀐다 — 즉 **사용자가 보는 값과 제출될 값이
+                  // 갈린다** (min=1 에 "0" 입력 시 화면 0 / 상태 60 실측 확인).
+                  // 범위 검증은 아래 submit 의 우리 검증이 이미 하고 있고,
+                  // 그 결과가 status 로 필드에 결속돼 사용자에게 보인다.
+                  step={1}
+                  onChange={(value) => {
+                    // 빈 입력은 0 으로 — 이전 구현의 동작을 그대로 유지한다
+                    // (검증이 0 을 걸러내므로 사용자는 안내를 받는다).
+                    setForm((prev) => ({
+                      ...prev,
+                      [f.key]: value === null || !Number.isFinite(value) ? 0 : value
+                    }));
+                  }}
+                />
+              );
+            }
 
-          <label>
-            <span className="lbl">sourceArchive.objectKey <em>*</em></span>
-            <input
-              type="text"
-              name="objectKey"
-              ref={refs.objectKey}
-              value={form.objectKey}
-              onChange={(e) => setForm((prev) => ({ ...prev, objectKey: e.target.value }))}
-              placeholder="ref://github.com/owner/repo"
-              data-testid="req-objectKey"
-            />
-            <small className="hint">Skill 이 발행한 archive reference.</small>
-          </label>
-
-          <label>
-            <span className="lbl">sourceArchive.checksumSha256 <em>*</em></span>
-            <input
-              type="text"
-              name="checksumSha256"
-              ref={refs.checksumSha256}
-              value={form.checksumSha256}
-              onChange={(e) => setForm((prev) => ({ ...prev, checksumSha256: e.target.value }))}
-              placeholder="0..0 (64 hex)"
-              data-testid="req-checksum"
-            />
-            <small className="hint">실제 upload 시 server 가 검증. zod 는 min(1) 만 검사.</small>
-          </label>
-
-          <label>
-            <span className="lbl">sourceArchive.sizeBytes <em>*</em></span>
-            <input
-              type="number"
-              name="sizeBytes"
-              ref={refs.sizeBytes}
-              min={0}
-              step={1}
-              value={form.sizeBytes}
-              onChange={(e) => {
-                const next = e.target.value === "" ? 0 : Number(e.target.value);
-                setForm((prev) => ({ ...prev, sizeBytes: Number.isFinite(next) ? next : 0 }));
-              }}
-              data-testid="req-sizeBytes"
-            />
-            <small className="hint">Archive byte size. non-negative.</small>
-          </label>
-
-          <label>
-            <span className="lbl">entrypointPath <em>*</em></span>
-            <input
-              type="text"
-              name="entrypointPath"
-              ref={refs.entrypointPath}
-              value={form.entrypointPath}
-              onChange={(e) => setForm((prev) => ({ ...prev, entrypointPath: e.target.value }))}
-              placeholder="src/index.ts"
-              data-testid="req-entrypoint"
-            />
-            <small className="hint">Container 시작점.</small>
-          </label>
-
-          <label>
-            <span className="lbl">dockerfilePath</span>
-            <input
-              type="text"
-              name="dockerfilePath"
-              ref={refs.dockerfilePath}
-              value={form.dockerfilePath}
-              onChange={(e) => setForm((prev) => ({ ...prev, dockerfilePath: e.target.value }))}
-              placeholder="Dockerfile"
-              data-testid="req-dockerfile"
-            />
-            <small className="hint">Default <code>Dockerfile</code>.</small>
-          </label>
-
-          <label>
-            <span className="lbl">previewTtlMinutes</span>
-            <input
-              type="number"
-              name="previewTtlMinutes"
-              ref={refs.previewTtlMinutes}
-              min={1}
-              step={1}
-              value={form.previewTtlMinutes}
-              onChange={(e) => {
-                const next = e.target.value === "" ? 0 : Number(e.target.value);
-                setForm((prev) => ({
-                  ...prev,
-                  previewTtlMinutes: Number.isFinite(next) ? next : 0
-                }));
-              }}
-              data-testid="req-ttl"
-            />
-            <small className="hint">Preview container TTL.</small>
-          </label>
+            return (
+              <TextInput
+                key={f.key}
+                {...common}
+                value={form[f.key] as string}
+                placeholder={f.placeholder}
+                onChange={(value) => {
+                  setForm((prev) => ({ ...prev, [f.key]: value }));
+                }}
+              />
+            );
+          })}
         </div>
 
         <div className="actions">
-          <button
+          <Button
             type="submit"
-            className="btn-primary"
-            disabled={submitting}
+            variant="primary"
+            label={submitting ? "Submitting…" : "Submit Build"}
+            isDisabled={submitting}
             data-testid="req-submit"
-          >
-            {submitting ? "Submitting…" : "Submit Build"}
-          </button>
-          <button
+          />
+          <Button
             type="button"
-            className="btn-secondary"
+            variant="secondary"
+            label="Reset form"
             onClick={resetForm}
             data-testid="req-reset"
-          >
-            Reset form
-          </button>
+          />
+          {/* 목록으로 가는 것은 **탐색**이므로 버튼이 아니라 링크여야 한다.
+              Astryx Button 으로 바꾸면 시각은 맞아도 의미가 틀린다
+              (새 탭 열기·주소 복사 불가, 스크린리더가 button 으로 읽음). */}
           <Link to="/builds" className="btn-secondary" data-testid="req-list">
             View Builds list →
           </Link>

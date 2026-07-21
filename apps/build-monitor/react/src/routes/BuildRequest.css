@@ -100,86 +100,18 @@
   .grid { grid-template-columns: 1fr; }
 }
 
-label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--dib-space-xs);
-}
-
-label .lbl {
-  font-size: var(--dib-size-xs);
-  font-weight: var(--dib-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--dib-color-text-secondary);
-}
-
-label .lbl em {
-  color: var(--dib-color-accent-danger);
-  font-style: normal;
-  margin-left: 2px;
-}
-
-input[type="text"], input[type="number"] {
-  padding: var(--dib-space-sm) var(--dib-space-md);
-  border-radius: var(--dib-radius-md);
-  border: 1px solid var(--dib-color-border-strong);
-  background: var(--dib-color-bg-surface-elevated);
-  color: var(--dib-color-text-primary);
-  font-family: var(--dib-font-mono);
-  font-size: var(--dib-size-sm);
-  transition: border-color var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
-}
-
-input:focus {
-  outline: none;
-  border-color: var(--dib-color-accent-primary);
-  box-shadow: var(--dib-shadow-glow);
-}
-
-.hint {
-  color: var(--dib-color-text-muted);
-  font-size: var(--dib-size-xs);
-}
-
-.hint code {
-  background: var(--dib-color-bg-surface-elevated);
-  padding: 0 4px;
-  border-radius: var(--dib-radius-sm);
-  font-family: var(--dib-font-mono);
-}
+/* TASK-138: 폼 필드 스타일 제거 — Astryx TextInput / NumberInput 이 담당한다.
+ *
+ * 특히 여기 있던 `label { }` 과 `input[type="text"] { }` 는 **bare element
+ * 셀렉터**였다. 이 파일은 unlayered 라 Astryx 의 @layer 보다 우선하므로,
+ * 그 규칙들이 Astryx 컴포넌트 **내부의** label/input 까지 덮어쓰고 있었다.
+ * 페이지 CSS 에 요소 셀렉터를 두면 이렇게 컴포넌트 경계를 넘는다. */
 
 .actions {
   display: flex;
   gap: var(--dib-space-sm);
   flex-wrap: wrap;
   align-items: center;
-}
-
-.btn-primary {
-  padding: var(--dib-space-sm) var(--dib-space-xl);
-  border-radius: var(--dib-radius-md);
-  background: var(--dib-color-accent-primary);
-  color: var(--dib-color-on-accent);
-  font-weight: var(--dib-weight-semibold);
-  font-size: var(--dib-size-sm);
-  border: none;
-  cursor: pointer;
-  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
-  text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  box-shadow: var(--dib-shadow-glow);
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: var(--dib-shadow-glow);
-}
-
-.btn-primary:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .btn-secondary {
