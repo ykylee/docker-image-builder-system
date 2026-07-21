@@ -74,7 +74,7 @@
 }
 
 .logo {
-  color: white;
+  color: var(--color-on-accent);
   font-size: var(--size-lg);
   line-height: 1;
 }

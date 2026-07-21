@@ -51,7 +51,7 @@ export function AdminTabs(): ReactElement {
   const activeTabStyle: CSSProperties = {
     ...baseTabStyle,
     background: "var(--color-accent-primary)",
-    color: "white",
+    color: "var(--color-on-accent)",
     boxShadow: "var(--shadow-glow)"
   };
 

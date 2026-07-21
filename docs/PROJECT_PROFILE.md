@@ -327,3 +327,4 @@
 - TASK-113 Multi-runner Chunked Postgres 운영 가이드: [multi-runner-chunked-postgres-2026-07-20.md](operations/multi-runner-chunked-postgres-2026-07-20.md)
 - [CHANGELOG.md](../CHANGELOG.md) (TASK-123 v0.1.0 release staging anchor)
 - TASK-131 문서 무결성 가드 운영 가이드: [doc-integrity-guard-2026-07-21.md](operations/doc-integrity-guard-2026-07-21.md)
+- TASK-133 테마별 시각 회귀 가드 운영 가이드: [theme-contrast-guard-2026-07-21.md](operations/theme-contrast-guard-2026-07-21.md)

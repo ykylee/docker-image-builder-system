@@ -51,7 +51,7 @@
   margin-bottom: var(--space-lg);
 }
 .logo {
-  color: white;
+  color: var(--color-on-accent);
   font-size: var(--size-xxl);
   line-height: 1;
 }
@@ -108,7 +108,7 @@ input:focus {
   padding: var(--space-md);
   border-radius: var(--radius-md);
   background: var(--color-accent-primary);
-  color: white;
+  color: var(--color-on-accent);
   font-size: var(--size-md);
   font-weight: var(--weight-semibold);
   cursor: pointer;

@@ -14,6 +14,7 @@
     "check:react": "tsc --noEmit -p tsconfig.react.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "check:theme-contrast": "node scripts/check-theme-contrast.mjs",
     "predev": "tsx scripts/generate-openapi.ts",
     "prebuild": "tsx scripts/generate-openapi.ts",
     "generate:openapi": "tsx scripts/generate-openapi.ts"
@@ -26,6 +27,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
     "openapi-typescript": "^7.4.4",
+    "playwright-core": "^1.61.1",
     "tslib": "^2.7.0",
     "tsx": "^4.20.3",
     "typescript": "^5.6.3",

@@ -35,6 +35,6 @@
 
 .admin-tab.active {
   background: var(--color-accent-primary);
-  color: white;
+  color: var(--color-on-accent);
   box-shadow: var(--shadow-glow);
 }

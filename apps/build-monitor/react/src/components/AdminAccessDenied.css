@@ -84,7 +84,7 @@
 
 .admin-denied-btn-primary {
   background: var(--color-accent-primary);
-  color: white;
+  color: var(--color-on-accent);
 }
 
 .admin-denied-btn-primary:hover {

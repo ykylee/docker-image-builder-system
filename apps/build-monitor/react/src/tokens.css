@@ -26,19 +26,44 @@
   --color-bg-surface-elevated: #1a1d27;
   --color-text-primary: #f8f9fa;
   --color-text-secondary: #a0a8b4;
-  --color-text-muted: #646b79;
+  /* muted: 세 배경 전부에서 AA 통과 — canvas 5.26 / surface 4.90 /
+     surface-elevated 4.52. #646b79 는 canvas 에서도 3.65 로 미달이었다.
+     라이트 모드는 TASK-046 에서 5.36 으로 교정됐지만 다크 동등물이 없어
+     남아 있던 비대칭. 기준 배경은 반드시 **가장 밝은** surface-elevated
+     까지 봐야 한다 — canvas 만 보면 통과처럼 보인다. (TASK-133). */
+  --color-text-muted: #7d8593;
+  /* disabled: 비활성 표시는 WCAG 1.4.3 의 inactive component 예외라
+     AA 면제. 1.97:1 유지. (TASK-046 / TASK-133 가드에서 명시 제외) */
   --color-text-disabled: #3d4351;
 
   --color-border-subtle: #242936;
-  --color-border-strong: #333a4d;
+  /* border-strong: canvas 3.23 / surface 3.01 — UI component 3:1 통과.
+     #333a4d (1.72:1) 은 미달이었다. 라이트는 3.28 로 이미 교정돼
+     있었으나 다크만 누락. (TASK-133). */
+  --color-border-strong: #566282;
 
-  --color-accent-primary: #6366f1; /* Indigo */
-  --color-accent-primary-hover: #818cf8;
+  /* accent: 다크 모드에서 StatusPill 이 `color-mix(accent 15%, transparent)`
+     틴트 위에 accent 를 텍스트로 얹으므로 (StatusPill.tsx), 그 합성 배경
+     기준 4.5:1 을 만족해야 한다. primary 3.51 / danger 4.18 이 미달이라
+     명도만 한 단계 올렸다 (색상 계열 유지). success / warning / info 는
+     각각 5.72 / 6.56 / 5.30 으로 이미 통과라 그대로 둔다. (TASK-133). */
+  --color-accent-primary: #7e81f3; /* Indigo */
+  --color-accent-primary-hover: #9a9cf6;
   --color-accent-success: #10b981; /* Emerald */
   --color-accent-warning: #f59e0b; /* Amber */
-  --color-accent-danger: #ef4444; /* Red */
+  --color-accent-danger: #f15656; /* Red */
   --color-accent-info: #0ea5e9; /* Sky */
-  --color-focus-ring: rgba(99, 102, 241, 0.5);
+  --color-focus-ring: rgba(126, 129, 243, 0.5);
+
+  /* on-accent: accent 를 **솔리드 배경**으로 쓰는 곳(.btn-primary /
+     .admin-tab.active / .badge / .chip--active / .logo)의 전경색.
+     이전에는 `color: white` 하드코딩이었는데, 다크 모드의 밝은 accent
+     위에서는 흰 글자가 원리적으로 AA 에 도달할 수 없다 — 예: 흰색 on
+     amber #f59e0b = 2.15:1 이고 amber 를 어떻게 조정해도 4.5 가 안 된다.
+     같은 amber 위에 canvas 색을 얹으면 9.10:1 로 통과하므로, 전경색을
+     테마별 토큰으로 분리했다. 라이트는 accent 가 충분히 어두워 흰색이
+     그대로 정답 (6.1~6.3:1). (TASK-133). */
+  --color-on-accent: #0b0c10;
 
   --glass-bg: rgba(19, 21, 28, 0.7);
   --glass-border: rgba(255, 255, 255, 0.05);
@@ -89,7 +114,9 @@
   /* Code surface (terminal/log) */
   --code-bg: #0b0c10;
   --code-fg: #e2e8f0;
-  --code-muted: #64748b;
+  /* code-muted: code-bg 위 4.53:1 — AA 통과. #64748b (4.11:1) 은 미달.
+     LogStream 의 타임스탬프가 이 토큰을 텍스트로 쓴다. (TASK-133). */
+  --code-muted: #6a7b93;
   --code-phase: #38bdf8;
   --code-border: var(--color-border-strong);
   --code-inset-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
@@ -98,7 +125,7 @@
   --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5);
   --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.6), 0 4px 6px -4px rgba(0, 0, 0, 0.6), 0 0 0 1px var(--color-accent-primary);
   --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
-  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.3);
+  --shadow-glow: 0 0 20px rgba(126, 129, 243, 0.3);
 
   /* Motion */
   --motion-duration-fast: 150ms;
@@ -141,13 +168,23 @@
      (TASK-046 follow-up). */
   --color-border-strong: #7a889e;
 
+  /* accent (라이트): 다크와 달리 세 역할 — StatusPill 틴트 위 텍스트 /
+     솔리드 배경 위 흰 글자 / 중립 면 위 텍스트 — 이 **모두 같은 방향**
+     (어둡게) 을 요구하므로 명도만 낮춰 동시에 해결된다.
+     실측 미달분: success 2.90 / warning 2.49 / info 3.12 / danger 3.51
+     (StatusPill 기준, 모두 AA 4.5 미달) → 아래 값으로 전부 4.50+ 통과.
+     primary 는 4.61 로 이미 통과라 그대로. (TASK-133). */
   --color-accent-primary: #4f46e5;
   --color-accent-primary-hover: #4338ca;
-  --color-accent-success: #059669;
-  --color-accent-warning: #d97706;
-  --color-accent-danger: #dc2626;
-  --color-accent-info: #0284c7;
+  --color-accent-success: #04704e;
+  --color-accent-warning: #945104;
+  --color-accent-danger: #bb1e1e;
+  --color-accent-info: #02679c;
   --color-focus-ring: rgba(79, 70, 229, 0.4);
+
+  /* on-accent (라이트): accent 가 충분히 어두우므로 흰색이 정답
+     (6.11~6.33:1). 다크는 canvas 색. (TASK-133). */
+  --color-on-accent: #ffffff;
 
   --glass-bg: rgba(255, 255, 255, 0.8);
   --glass-border: rgba(0, 0, 0, 0.05);
@@ -157,10 +194,13 @@
   --shadow-modal: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
   --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.15);
 
-  /* Code surface (terminal/log) — 라이트 모드도 터미널 톤 유지 */
+  /* Code surface (terminal/log) — 라이트 모드도 터미널 톤 유지.
+     code-* 는 라이트에서도 다크와 같은 값이어야 하므로 dark 블록의
+     code-muted 교정 (#64748b 4.11 → #6a7b93 4.53) 을 여기서도 동일하게
+     반영한다. 한쪽만 고치면 라이트에서만 AA 미달이 남는다. (TASK-133) */
   --code-bg: #0b0c10;
   --code-fg: #e2e8f0;
-  --code-muted: #64748b;
+  --code-muted: #6a7b93;
   --code-phase: #38bdf8;
   --code-border: var(--color-border-strong);
   --code-inset-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);

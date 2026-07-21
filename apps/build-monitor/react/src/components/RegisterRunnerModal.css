@@ -16,9 +16,9 @@
 
 .modal {
   background: var(--color-bg-surface-elevated);
-  color: var(--color-text, #f0f0f0);
-  border-radius: var(--radius-md, 6px);
-  box-shadow: var(--shadow-modal, 0 8px 32px rgba(0, 0, 0, 0.5));
+  color: var(--color-text-primary);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
   width: min(480px, 92vw);
   max-height: 80vh;
   overflow: auto;
@@ -29,7 +29,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--color-border, #333);
+  border-bottom: 1px solid var(--color-border-subtle);
 }
 
 .modal-header h2 {
@@ -40,14 +40,14 @@
 .modal-close {
   background: transparent;
   border: 0;
-  color: var(--color-text-muted, #aaa);
+  color: var(--color-text-muted);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 0 0.25rem;
 }
 
 .modal-close:hover {
-  color: var(--color-text, #f0f0f0);
+  color: var(--color-text-primary);
 }
 
 .modal-body {
@@ -60,7 +60,7 @@
 .modal-help {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--color-text-muted, #aaa);
+  color: var(--color-text-muted);
   line-height: 1.4;
 }
 
@@ -72,22 +72,22 @@
 
 .modal-label {
   font-size: 0.85rem;
-  color: var(--color-text-muted, #aaa);
+  color: var(--color-text-muted);
   font-family: monospace;
 }
 
 .modal-field input {
   padding: 0.5rem 0.7rem;
   background: var(--color-bg-surface-elevated);
-  border: 1px solid var(--color-border, #444);
+  border: 1px solid var(--color-border-strong);
   border-radius: 4px;
-  color: var(--color-text, #f0f0f0);
+  color: var(--color-text-primary);
   font-family: monospace;
 }
 
 .modal-field input:focus {
   outline: none;
-  border-color: var(--color-accent-primary, #5b8def);
+  border-color: var(--color-accent-primary);
 }
 
 .modal-field input:disabled {
@@ -98,9 +98,9 @@
   margin: 0;
   padding: 0.6rem 0.8rem;
   background: rgba(220, 80, 80, 0.15);
-  border: 1px solid var(--color-accent-danger, #c85050);
+  border: 1px solid var(--color-accent-danger);
   border-radius: 4px;
-  color: var(--color-accent-danger, #ff8080);
+  color: var(--color-accent-danger);
   font-size: 0.85rem;
   font-family: monospace;
 }
@@ -110,7 +110,7 @@
   justify-content: flex-end;
   gap: 0.75rem;
   padding: 0.85rem 1.25rem;
-  border-top: 1px solid var(--color-border, #333);
+  border-top: 1px solid var(--color-border-subtle);
 }
 
 .btn-primary,
@@ -123,8 +123,8 @@
 }
 
 .btn-primary {
-  background: var(--color-accent-primary, #5b8def);
-  color: white;
+  background: var(--color-accent-primary);
+  color: var(--color-on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -139,10 +139,10 @@
 
 .btn-secondary {
   background: var(--color-bg-surface-elevated);
-  color: var(--color-text, #f0f0f0);
-  border: 1px solid var(--color-border, #444);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border-strong);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: var(--color-border, #333);
+  background: var(--color-border-subtle);
 }

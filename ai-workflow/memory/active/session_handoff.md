@@ -6,6 +6,29 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-21 (rev 126→127: **TASK-133 테마별 시각 회귀 가드 봉인** — TASK-132 최대 교훈의 직접 대응).
+
+  **⚠️ 브랜치 `fix/task-133-theme-contrast-guard` 에서 작업했고 main 미병합·미push 상태다.** 병합 여부는 사용자 결정 대기.
+
+  **사용자 결정 3건**: (1) 가드 범위 = **계층 방어 (A+B)** — A층만으로는 TASK-132 의 P0 를 원리적으로 못 잡기 때문. (2) 발견된 AA 위반 = **전수 수정** (allowlist 없이 임계값을 WCAG AA 그대로). (3) 사용처 0건인 Astryx 의존성 2종은 **유지** (재도입 가능성) — 그래서 B층의 가치가 더 크다.
+
+  **A층 (vitest, 항상 실행, +83 케이스)**: `react/src/test/contrast.ts` (파싱 + WCAG 계산. light 맵은 `:root` 상속 후 덮는 **실제 cascade 를 재현** — light 블록만 읽으면 재정의 안 한 토큰에서 실제와 다른 값을 검사하게 된다) + `tokens.contrast.test.ts` 81건 (양 테마 × 본문텍스트 / 비텍스트 UI / 터미널 / **StatusPill 합성 배경** / 솔리드 accent 위 전경 / 중립면 accent + **테마 대칭성**) + `tokens.defined.test.ts` 2건 (미정의 토큰 lint — **폴백이 있어도 실패**로 본다. 폴백은 테마 전환에 반응하지 않아 정확히 TASK-132 P3 증상을 만든다).
+
+  **B층 (opt-in)**: `scripts/check-theme-contrast.mjs` + `pnpm check:theme-contrast`. 의존성은 `playwright-core` (브라우저 미포함) + `channel: "chrome"` — 번들 chromium 은 이 네트워크에서 CDN **ETIMEDOUT** 이라 못 받는다 (TASK-132 와 동일 제약). 검사 2종 = 토큰 하이재킹 + 실제 텍스트 대비.
+
+  **착수 실측 — AA 위반 11건.** TASK-046 이 라이트만 교정하고 **다크 동등물이 없던 비대칭**이 그대로 남아 있었다 (`tokens.css` 주석도 라이트 수정만 기록 중): dark `text-muted` 3.65 / `border-strong` 1.72 / `code-muted` 4.11 / pill primary 3.51 / pill danger 4.18. 그리고 **라이트 StatusPill 4종은 아무도 측정한 적이 없었다** (warning 2.72 / success 3.14 / info 3.39 / danger 3.81) + `.result-head.duplicate` 2.91.
+
+  **핵심 구조 발견**: `--color-accent-*` 하나가 **세 역할**(틴트 위 pill 텍스트 / 솔리드 배경 위 전경 / 중립면 텍스트)을 겸하는데, 라이트는 세 요구가 같은 방향(어둡게)이라 명도 조정으로 동시에 풀리지만 **다크는 정면 충돌**한다. 게다가 **흰 글자 on 앰버는 어떤 명도로도 4.5 에 도달할 수 없다** (최대 2.15 — 앰버가 본질적으로 밝은 색). 같은 앰버에 canvas 색을 얹으면 9.10. 즉 **다크의 실패 원인은 색 선택이 아니라 `color: white` 하드코딩 15곳**이었다 → `--color-on-accent` 토큰 도입 (다크 `#0b0c10` / 라이트 `#ffffff`) 으로 해소. **시각 변화: 다크 모드 primary 버튼·활성 탭·배지 글자가 흰색 → 짙은 색.** 기본 테마가 다크라 첫 화면에서 보인다 (사용자 승인).
+
+  **가드가 즉시 찾아낸 미발견 결함**: `RegisterRunnerModal.css` 가 존재하지 않는 `--color-text` / `--color-border` 를 **9곳**에서 참조 중이었다. TASK-132 가 **같은 파일**의 `--color-bg-elevated` / `--color-bg-input` 만 고치고 놓친 잔여분 (수동 grep 의 한계). 폴백 `#f0f0f0` 는 거의 흰색인데 `.modal` 배경은 `surface-elevated` (라이트 `#dde4ed`) 라 **라이트 모드에서 이 모달만 글자가 안 보이는 상태**였다.
+
+  **사전 결함 3건 (2번이 가장 중요)**: (1) 초기 토큰 해를 canvas 기준으로만 계산 → A층이 `surface` / `surface-elevated` 미달을 즉시 검출, 최악 배경 기준 재계산. **가드가 가드 제작자의 실수를 잡았다.** (2) **B층 하이재킹 검출기 초판이 사고를 놓쳤다** — 초판은 "루트 계산값 vs 하위 계산값" 비교였는데, 사고를 재현해 돌리니 대비 위반 7건은 잡으면서 **하이재킹 0건**이었다. Astryx 는 `<Theme>` 가 **루트에** 속성을 붙였으므로 루트도 함께 오염돼 차이가 사라진다. 기준을 `tokens.css` **선언값**으로 바꾸니 2건 정확 검출 (`:root (문서 루트)` 로 귀속). → *가드를 만든 것과 가드가 동작하는 것은 다르다 (TASK-130 교훈의 반복).* (3) 그라디언트 배경 위 로고를 canvas 위로 오판해 6건 오탐 → **측정 불가로 명시 보고** + 건수를 요약에 출력 (조용히 건너뛰면 "전부 검사했다" 로 오독된다).
+
+  **회귀**: TS 5 clean / frontend **133 → 216 PASS** / build-server **178 불변** / go **8/8** / B층 정상앱 = 하이재킹 0 · 위반 0 · 측정불가 6 / B층 사고재현 = 하이재킹 2 · 위반 7 (브랜드 텍스트 1.04:1). SQL / schema / migration / version / git tag 변경 0. 신규 devDependency 1종.
+
+  **운영 가이드 신규**: `docs/operations/theme-contrast-guard-2026-07-21.md` (8 섹션 — 왜 있는가 / 왜 2계층인가 / A층 / B층 + 함정 실측 / 해소한 위반 목록 / 폴백을 실패로 보는 이유 / 한계 / follow-up).
+
+  **다음 세션 우선순위**: (1) **B층 CI 통합** — 앱 기동 단계 필요. 문서 무결성 가드 `--range` CI 통합과 같은 계열이라 함께 처리하면 효율적. (2) **디자인 토큰 네임스페이스 `--dib-*`** — 본 TASK 는 하이재킹을 *검출*만 하고 *차단*하지 못한다. Astryx 2종이 유지 결정됐으므로 재도입 시 필수. (3) 호버/포커스/비활성 상태 대비 확장. (4) 이월: `PhaseTimeline.tsx` 9 phase 수동 복제 / 진단-필드 응답 40여 곳 helper 흡수 / 기존 결정 대기 5종. workflow meta sync (state rev 161→162, handoff 126→127, work_backlog TASK-133 등록, backlog 2026-07-21 rev 10) 같은 commit 안에 포함.
 - Updated: 2026-07-21 (rev 125→126: **구동 확인 완료 + TASK-132 UI 균형 붕괴 수정 봉인**).
 
   **✅ push 완료 — 로컬과 원격이 동기화된 상태로 인계한다.** TASK-132 는 `fix/task-132-ui-balance` 에서 작업한 뒤 사용자 승인으로 main 에 fast-forward 병합했고, 이전 세션부터 보류돼 있던 9 커밋(TASK-124~131)과 함께 **11 커밋을 push** 했다: `origin/main` `8905cb0` → **`36cedfc`**. 작업 브랜치는 병합 후 삭제. `main...origin/main` ahead/behind 0 확인. **2026-07-20 이후 처음으로 원격이 갱신됐다** — 다음 세션은 미push 커밋 걱정 없이 시작하면 된다.
