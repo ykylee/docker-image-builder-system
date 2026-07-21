@@ -8,7 +8,7 @@
 - Status: stable (TASK-120 정합)
 - Updated: 2026-07-21 (rev 129→130: **TASK-136 Astryx 도입 2단계 — 기반 구축 봉인**).
 
-  **⚠️ 미병합 브랜치 2개 누적**: `chore/task-135-astryx-0-1-7` → `feat/task-136-astryx-foundation`. main 은 `origin/main` 보다 3 커밋 앞선 채 미push.
+  **✅ 두 브랜치 모두 main 에 병합 완료** — `chore/task-135-astryx-0-1-7` → `feat/task-136-astryx-foundation` fast-forward (`5bcb18f` → `662a828` → **`8894012`**), 작업 브랜치 삭제. 병합 후 main 회귀 재확인: frontend **229** / build-server **178** / TSC 5 clean. **단 아직 push 하지 않았다 — main 이 `origin/main` 보다 5 커밋 앞서 있다.**
 
   **사용자 결정 3건**: 시각 정체성 = **브랜드 색만 이식**(나머지는 Astryx neutral 위임) / **점진 이관**(매 단계 회귀 통과 유지) / 레이아웃 셸 = **AppShell 로 교체**(3단계에서).
 
@@ -42,7 +42,7 @@
   이월: B층 CI 통합 / `PhaseTimeline.tsx` 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 165→166, handoff 129→130, work_backlog TASK-136 등록, backlog 2026-07-21 rev 13) 같은 commit 안에 포함.
 - Updated: 2026-07-21 (rev 128→129: **TASK-135 Astryx 0.1.4 → 0.1.7 업데이트 봉인** — 2단계 사전 정지작업).
 
-  **브랜치 `chore/task-135-astryx-0-1-7` — main 미병합.** (TASK-133/134 는 병합 완료, main 이 `origin/main` 보다 3 커밋 앞선 채 미push.)
+  **commit `662a828` — main 병합 완료 (작업 브랜치 삭제, 미push).** (TASK-133/134 는 병합 완료, main 이 `origin/main` 보다 3 커밋 앞선 채 미push.)
 
   **왜 2단계 전에 했나**: 어차피 `<Theme>` 를 재도입하는 김에 최신에 맞추면 breaking change 를 한 번에 처리한다. 3버전치를 재도입 이후로 미루면 **"재도입 때문에 깨진 것"과 "버전 올려서 깨진 것"이 섞여** 원인 분리가 어려워진다.
 
