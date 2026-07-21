@@ -6,7 +6,27 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
-- Updated: 2026-07-21 (rev 124→125: **세션 종료 정리**). 본 세션 8 TASK 봉인 (TASK-124~131). 사용자 결정: **CI 통합은 보류**, 다음 세션은 **구동 확인**부터.
+- Updated: 2026-07-21 (rev 125→126: **구동 확인 완료 + TASK-132 UI 균형 붕괴 수정 봉인**).
+
+  **⚠️ 브랜치 상태 — 이번 커밋은 main 이 아니다.** TASK-132 는 `fix/task-132-ui-balance` 브랜치의 `306c2be` 에 있다. main 은 여전히 `origin/main` 보다 **9 커밋** 앞서 있고 미push. 합류하려면 `git checkout main && git merge --ff-only fix/task-132-ui-balance`. push 여부와 병합 여부 모두 사용자 결정 대기.
+
+  **이전 세션이 남긴 "구동 확인" 과제는 완료됐다.** TS 빌드 → `vite build:react` → Postgres backend 로 build-server 기동 → `/health` · SPA · `/api` 307 · TASK-127 400 계약 · Postgres 왕복 전부 확인. 그 과정에서 **포트는 3000** 임이 확인됐다 (문서에 명시가 없어 로그로 확인 — `curl :3000`). 확인 중 사용자가 "UI 균형이 굉장히 이상하다" 고 보고해 TASK-132 로 이어졌다.
+
+  **TASK-132 — UI 검수 및 수정 (P0~P3)**. 코드 정독 후 **Playwright + 로컬 Chrome 실측**으로 검증 (playwright 번들 chromium 은 `cdn.playwright.dev` 가 이 네트워크에서 **ETIMEDOUT** 이라 받을 수 없다 → `chromium.launch({ channel: "chrome" })` 로 설치된 Chrome 구동. 다음에도 같은 방법을 쓸 것).
+  - **P0 근본 원인 — Astryx 디자인 토큰 하이재킹**: `@astryxdesign/theme-neutral` 이 우리와 **이름이 같은 토큰 3종** (`--color-text-primary` / `--color-text-secondary` / `--color-text-disabled`) 을 재정의하고, `<Theme>` 가 `data-astryx-theme="neutral"` 을 문서 루트에 붙여 하위 전체에 상속시켜 tokens.css 값이 컴포넌트 위치에서 덮였다. 동시에 하위 `color-scheme` 이 `light dark` 가 되어 **`light-dark()` 가 다크 모드에서도 light 분기**를 골랐다 → `.brand` 계산색 `rgb(23,23,23)` on `#0b0c10` = **대비 약 1.16:1**, 브랜드명·배지·칩이 비가시. **기본 테마가 다크라 첫 진입 화면이 이 상태**. 조치: `<Theme>` + `theme.css` 제거 (Astryx 컴포넌트 사용처 **0건**). 폰트 Figtree → Inter 복귀, CSS **175→38KB**, JS **328→296KB**.
+  - **P1 페이지 셸 부재**: 로고 x 264 vs 본문 x 32 (**232px 어긋남**), sticky 헤더가 좌우 32px 안쪽에 갇힘, 768px 가로 스크롤, BuildRequest 좌측 쏠림 → `--layout-max` / `--layout-gutter` / `--header-h` 단일 출처 + `<main class="app-main">` 신규. 세로 `calc(100vh-...)` 전부 flex 로 대체.
+  - **P2 SPA 딥링크**: `Sec-Fetch-Dest: document` 기반 `onRequest` 분기로 주소창 진입만 SPA. runner bare 경로 · 프론트 `/api/*` **영향 0**. 회귀 가드 6건.
+  - **P3**: 미정의 토큰 3종 + `line-height` 에 모션 토큰 3곳.
+  - **부수 발견**: `BuildsList.css` / `Login.css` 의 중복 `@import "../tokens.css"` 가 `:root` 를 globals.css 뒤에 재선언해 **모든 반응형 override 를 무력화**하고 있었다 → 제거.
+
+  **본 세션 최대 교훈**: **기본 테마는 다크인데 육안 검증은 라이트 기준으로만 이뤄져 P0 가 오래 잠복했다.** 라이트에서는 `#171717` 이 정상으로 보이기 때문. 또한 `tokens.css`/`theme.css` 주석이 "Astryx 토큰은 우리에게 영향 0" 이라 **단언**하고 있었고 그 단언이 가장 많이 쓰는 토큰에서 틀렸다 — 주석의 단언을 실측 없이 신뢰하면 안 된다.
+
+  **누적 baseline 갱신**: frontend vitest **133** (불변) / build-server **172 → 178** (P2 가드 6건) / go **8/8 package** / TS 5 프로젝트 clean.
+
+  **정리 상태**: 검수용 샘플 빌드 3건 삭제 완료 (`build_request` 0건), build-server 종료, 포트 3000 해제. 단 `build_log` 에 **이전 세션 잔재로 보이는 고아 레코드 3건**(대응 `build_request` 없음)이 남아 있다 — 본 세션 데이터가 아니라 손대지 않았다.
+
+  **다음 세션 우선순위**: (1) **테마별 시각 회귀 가드** (본 세션 교훈의 직접 대응), (2) **디자인 토큰 네임스페이스** (`--dib-*` 접두사 — 서드파티 충돌을 구조적으로 차단, Astryx 재도입 시 필수), (3) 미정의 토큰 lint, (4) 이월 중인 CI 통합 (`--range origin/main..HEAD`) 과 `PhaseTimeline.tsx` 9 phase 수동 복제 drift, (5) 기존 결정 대기 5종. workflow meta sync (state rev 155→156, handoff 125→126, work_backlog TASK-132 등록, backlog 2026-07-21 rev 9) 같은 commit 안에 포함.
+- Updated: 2026-07-21 (rev 124→125: **세션 종료 정리**). 본 세션 8 TASK 봉인 (TASK-124~131). 사용자 결정: **CI 통합은 보류**, 다음 세션은 **구동 확인**부터. (**rev 126 에서 이 과제는 완료됨** — 위 항목 참조.)
 
   **⚠️ 다음 세션이 가장 먼저 알아야 할 것 — 로컬 main 이 `origin/main` 보다 8 커밋 앞서 있고 아직 push 하지 않았다.** 미push 커밋: `f5f8fc2`(124) `e5c0333`(125) `1cbea4e`(126) `f661679`(127) `3eff1a5`(128) `31edefb`(129) `9d39386`(130) `fbbce1c`(131). push 여부는 사용자 결정 대기.
 
