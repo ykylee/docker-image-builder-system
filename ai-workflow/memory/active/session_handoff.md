@@ -6,6 +6,27 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-21 (rev 128→129: **TASK-135 Astryx 0.1.4 → 0.1.7 업데이트 봉인** — 2단계 사전 정지작업).
+
+  **브랜치 `chore/task-135-astryx-0-1-7` — main 미병합.** (TASK-133/134 는 병합 완료, main 이 `origin/main` 보다 3 커밋 앞선 채 미push.)
+
+  **왜 2단계 전에 했나**: 어차피 `<Theme>` 를 재도입하는 김에 최신에 맞추면 breaking change 를 한 번에 처리한다. 3버전치를 재도입 이후로 미루면 **"재도입 때문에 깨진 것"과 "버전 올려서 깨진 것"이 섞여** 원인 분리가 어려워진다.
+
+  **Breaking change 2건 (동봉 CHANGELOG 조사)**:
+  - Table plugin render-prop 의 StyleX 배열 필드 `styles` → `xstyle` (`TableRenderProps` 등 6종 + `scrollWrapper` 계약, codemod 제공) → **우리 영향 0** (custom plugin 작성자 대상, 사용처 0)
+  - peer `@stylexjs/stylex` `^0.18.3` → **`^0.19.0`** → **영향 있음.** pnpm `unmet peer` 경고 발생 → `@stylexjs/stylex@^0.19.0` 을 **명시 의존성으로 선언**해 해소. 지금까지 transitive 였으나 Astryx 를 실제로 쓸 것이므로 요구사항이 드러나게 두는 편이 낫다.
+
+  **주목할 신규 기능**: `Button` 의 `width` prop (full-width CTA 에서 xstyle override 불필요) / **i18n** (`<InternationalizationProvider>` + `useTranslator()`, 미사용 시 기존 영문 그대로) / authoring factory 를 core 에서 직접 export.
+
+  **검증**: core 0.1.7 / theme-neutral 0.1.7 / stylex 0.19.0, peer 경고 해소 / 렌더 스파이크(임시, 후 제거) — `<Theme>` 안에서 `Button` + `Badge` + **신규 `width` prop** 통과 / **Astryx 토큰 충돌 0종** / TSC clean / vitest **216 불변** / **vite build 산출물이 해시까지 동일** (`index-B9RCS-CJ.css` / `index-Bu3GPmdg.js`) → Astryx 미import 상태라 런타임 동작 변화 0.
+
+  **TASK-134 네임스페이스의 효과 확인**: theme-neutral 0.1.7 은 토큰을 **172종** 정의하는데 우리와 겹치는 것은 **0**. 다만 네임스페이스가 없었다면 겹쳤을 토큰은 4종으로 **0.1.4 때와 동일** — 늘지는 않았다 (과대평가 금지).
+
+  **부수 확인 2건**:
+  1. `Badge` 는 children 이 아니라 **`label` prop** — 스파이크 초판이 `<Badge>QUEUED</Badge>` 로 썼다 실패했다. 동봉 **docs CLI** (`node node_modules/@astryxdesign/core/docs.mjs <Component>`) 로 확인. 3단계 이관에서 이 CLI 가 유용하다.
+  2. **3단계 설계 논점 발견** — Astryx `Badge` 문서가 *"Don't: Repeat the same badge in every row of a table or list"* 를 명시한다. 그런데 우리 `BuildsList` 는 **모든 행에 StatusPill 을 렌더**한다. StatusPill → Badge 이관은 단순 치환이 아니라 이 논점을 함께 판단해야 한다.
+
+  **다음 세션 우선순위**: (0) 미push 3 커밋 + TASK-135 브랜치 병합 여부. (1) **Astryx 2단계** — `<Theme>` + `astryx.css` 재도입. 충돌 0 이라 안전하며 **B층 가드의 하이재킹 0 확인이 수용 기준**. 비용 예상 CSS gzip **+21.6KB**. (2) **3단계 점진 이관** — Table(BuildsList) / Dialog(RegisterRunnerModal) / Badge(StatusPill, 위 논점 선결) / CodeBlock(LogStream) / Field+FormLayout(BuildRequest). (3) 이월: B층 CI 통합 / PhaseTimeline.tsx 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 164→165, handoff 128→129, work_backlog TASK-135 등록, backlog 2026-07-21 rev 12) 같은 commit 안에 포함.
 - Updated: 2026-07-21 (rev 127→128: **TASK-134 Astryx 도입 1단계 — 디자인 토큰 네임스페이스 `--dib-*` 봉인**).
 
   **✅ 두 브랜치 모두 main 에 병합 완료.** `fix/task-133-theme-contrast-guard` → `feat/task-134-token-namespace` 를 fast-forward 로 병합 (`61ea7b2` → `6d60b2d` → **`4147a3f`**), 작업 브랜치 2개 삭제. 병합 후 main 에서 회귀 재확인 — frontend 216 / build-server 178 / TSC 5 clean. **단 아직 push 하지 않았다 — main 이 `origin/main` 보다 2 커밋 앞서 있다.**
