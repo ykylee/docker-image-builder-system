@@ -70,17 +70,24 @@ describe("App (router shell)", () => {
     expect(screen.getByLabelText(/user id/i)).toBeInTheDocument();
   });
 
-  it("renders the BuildsList on /builds when signed in", () => {
+  // TASK-139: /login 을 제외한 라우트는 지연 로드되므로 청크가 도착할 때까지
+  // 기다려야 한다. 검증 대상(라우터가 이 경로에 이 페이지를 붙이는가)은 그대로다.
+  it("renders the BuildsList on /builds when signed in", async () => {
     localStorage.setItem("userId", "yklee");
     renderAt("/builds");
-    expect(screen.getByRole("heading", { name: "Builds" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: "Builds" })
+    ).toBeInTheDocument();
   });
 
   it("renders the BuildDetail on /builds/:id (TASK-091)", async () => {
     renderAt("/builds/00000000-0000-0000-0000-000000000001");
     // getBuildMock 이 infinite pending — BuildDetail 의 loading state 가
     // 그대로 노출되는지 검증 (placeholder 가 mount 되지 않음).
-    expect(screen.getByTestId("build-detail-loading")).toBeInTheDocument();
+    // TASK-139: 지연 로드라 청크 도착까지 대기 후 검사한다. 여기서 기다리는
+    // 것은 **청크 로딩**이고, 검증 대상인 **BuildDetail 자체의 loading state**
+    // 는 getBuild 가 영원히 pending 이므로 그대로 남아 있다 — 둘을 혼동하지 말 것.
+    expect(await screen.findByTestId("build-detail-loading")).toBeInTheDocument();
     expect(
       screen.getByText(/Loading build 00000000-0000-0000-0000-000000000001/)
     ).toBeInTheDocument();

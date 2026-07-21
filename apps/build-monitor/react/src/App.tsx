@@ -27,19 +27,33 @@
 // pages 는 자체 svelte-spa-router 의 Routes 를 사용하고 React 측은 별도
 // 빌드 (TASK-093 의 mount 구조).
 
-import type { ReactElement } from "react";
+import { Suspense, lazy, type ReactElement } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 
 import { Header } from "@/components/Header";
-import { AdminAdmins } from "@/routes/AdminAdmins";
-import { AdminBuilds } from "@/routes/AdminBuilds";
-import { AdminRunners } from "@/routes/AdminRunners";
-import { AdminUsers } from "@/routes/AdminUsers";
-import { ApiConsole } from "@/routes/ApiConsole";
-import { BuildDetail } from "@/routes/BuildDetail";
-import { BuildRequest } from "@/routes/BuildRequest";
-import { BuildsList } from "@/routes/BuildsList";
 import { Login } from "@/routes/Login";
+
+// TASK-139: 라우트 지연 로드.
+//
+// 왜: 라우트 9종이 전부 정적 import 라 **모든 사용자가 모든 페이지의 코드를
+// 초기 번들로 받고 있었다.** `/login` 만 여는 사용자도 admin 4종과 빌드 요청
+// 폼을 함께 내려받는다. Astryx 이관이 진행되면서 이 비용이 눈에 띄게 커졌다 —
+// TASK-138 에서 BuildRequest 한 페이지를 옮기자 초기 JS gzip 이 104.30 →
+// 134.51KB 로 뛰었고, 남은 이관(LogStream / BuildsList / 레이아웃 셸)마다
+// 같은 증가가 반복될 구조였다. 그래서 이관을 더 진행하기 전에 깔아둔다.
+//
+// Login 만 eager 인 이유: `/` 가 `/login` 으로 redirect 하므로 인증 전
+// 사용자의 **첫 화면**이다. 이것까지 lazy 로 만들면 첫 페인트에 청크 왕복이
+// 하나 더 붙는다. 나머지는 최소 한 번의 사용자 행동(로그인/탐색) 뒤에
+// 필요하므로 그 시점에 받아도 늦지 않다.
+const BuildsList = lazy(async () => ({ default: (await import("@/routes/BuildsList")).BuildsList }));
+const BuildDetail = lazy(async () => ({ default: (await import("@/routes/BuildDetail")).BuildDetail }));
+const BuildRequest = lazy(async () => ({ default: (await import("@/routes/BuildRequest")).BuildRequest }));
+const ApiConsole = lazy(async () => ({ default: (await import("@/routes/ApiConsole")).ApiConsole }));
+const AdminBuilds = lazy(async () => ({ default: (await import("@/routes/AdminBuilds")).AdminBuilds }));
+const AdminUsers = lazy(async () => ({ default: (await import("@/routes/AdminUsers")).AdminUsers }));
+const AdminAdmins = lazy(async () => ({ default: (await import("@/routes/AdminAdmins")).AdminAdmins }));
+const AdminRunners = lazy(async () => ({ default: (await import("@/routes/AdminRunners")).AdminRunners }));
 
 export function App(): ReactElement {
   return (
@@ -48,19 +62,23 @@ export function App(): ReactElement {
       {/* 2026-07-21 UI 검수: 페이지 공통 셸 + <main> 랜드마크.
           폭·여백은 globals.css 의 .app-main 한 곳에서만 결정한다. */}
       <main className="app-main">
-        <Routes>
-          <Route path="/" element={<Navigate to="/login" replace />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/builds" element={<BuildsList />} />
-          <Route path="/builds/:buildId" element={<BuildDetail />} />
-          <Route path="/build-request" element={<BuildRequest />} />
-          <Route path="/api-console" element={<ApiConsole />} />
-          <Route path="/admin/builds" element={<AdminBuilds />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/admins" element={<AdminAdmins />} />
-          <Route path="/admin/runners" element={<AdminRunners />} />
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+        {/* 청크를 받는 동안의 대체 표시. 각 페이지가 자체 로딩 상태에서
+            쓰는 `.muted` 문구와 같은 형태라 전환이 튀지 않는다. */}
+        <Suspense fallback={<p className="muted">Loading…</p>}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/builds" element={<BuildsList />} />
+            <Route path="/builds/:buildId" element={<BuildDetail />} />
+            <Route path="/build-request" element={<BuildRequest />} />
+            <Route path="/api-console" element={<ApiConsole />} />
+            <Route path="/admin/builds" element={<AdminBuilds />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/admins" element={<AdminAdmins />} />
+            <Route path="/admin/runners" element={<AdminRunners />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </Suspense>
       </main>
     </>
   );

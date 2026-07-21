@@ -6,6 +6,33 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 132→133: **TASK-139 라우트 지연 로드 봉인** — Astryx 이관 재개 전 정지작업).
+
+  브랜치 `feat/task-139-route-lazy` (병합·push 상태는 `git status -sb` 를 볼 것).
+
+  **왜 이관을 멈추고 이걸 먼저 했나**: 라우트 9종이 **전부 정적 import** 라 모든 사용자가 모든 페이지 코드를 초기 번들로 받고 있었다 — `/login` 만 여는 사용자도 admin 4종과 빌드 요청 폼을 함께 내려받는다. TASK-138 에서 **BuildRequest 한 페이지**를 옮기자 초기 JS gzip 이 104.30 → 134.51 로 뛰었고, 남은 이관(LogStream / BuildsList / 레이아웃 셸)마다 같은 증가가 반복될 구조였다. TASK-137 의 모달 `lazy` 는 국소 처방이라 **메인 라우트가 Astryx 를 쓰기 시작하면 효과가 없다**는 것이 TASK-138 에서 드러났다.
+
+  **구현**: `Login` 을 제외한 8종을 `React.lazy` + `Suspense` 로 분리. **`Login` 만 eager 인 이유** — `/` 가 `/login` 으로 redirect 하므로 인증 전 사용자의 **첫 화면**이고, 이것까지 lazy 면 첫 페인트에 청크 왕복이 하나 더 붙는다. `Suspense` fallback 은 각 페이지가 자체 로딩에 쓰는 `.muted` 문구와 같은 형태라 전환이 튀지 않는다.
+
+  **효과 (실측, gzip)**:
+
+  | | TASK-136 (이관 전) | TASK-138 | **TASK-139** |
+  |---|---|---|---|
+  | 초기 JS | 98.21 | 134.51 | **94.56** |
+  | 초기 CSS | 27.38 | 26.88 | **24.51** |
+  | **초기 합계** | 125.59 | 161.39 | **119.07** |
+
+  `/login` 진입 기준 **-42.3KB gzip**. 주목할 점은 초기 JS 가 **Astryx 이관을 시작하기 전인 TASK-136 의 98.21 보다도 낮아졌다**는 것 — 분할이 이관 비용을 상쇄하고도 남았다. CSS 도 라우트별로 쪼개졌고(BuildsList 0.78 / BuildRequest 1.22 / admin 각 0.74~0.93), 공용 Astryx 폼 기계장치는 `TextInput` 청크(gzip **29.57**)로 분리되어 **그것을 쓰는 페이지에서만** 로드된다.
+
+  **실브라우저 확인**: `/login` 초기 진입 JS **299,094 bytes**(메인 청크만) → Builds / New Build / API Console 탐색 시 필요한 청크만 **374,960 bytes** 추가 로드. 탐색·렌더 정상.
+
+  **테스트 조정 2건**: `App.test.tsx` 의 BuildsList / BuildDetail 검증이 동기 `getBy` 였는데 지연 로드는 본질적으로 비동기라 `findBy` 로 바꿨다 — **검증 대상(라우터가 이 경로에 이 페이지를 붙이는가)은 그대로다.** BuildDetail 테스트에는 주석을 남겼다: 여기서 기다리는 것은 **청크 로딩**이고, 검증 대상인 **BuildDetail 자체의 loading state** 는 `getBuild` 가 영원히 pending 이라 그대로 남아 있다 — 둘을 혼동하면 가드가 무의미해진다.
+
+  **검증**: TSC clean / vitest **239 불변** / B층 하이재킹 0 · 대비 위반 0 / 실브라우저 탐색 정상. 백엔드 영향 0.
+
+  **다음: 3-3 `CodeBlock` ← LogStream.** 라우트 분할이 끝났으므로 **이후 이관은 해당 라우트 청크만 커지고 초기 로드에는 영향이 없다** — 매 단계 번들 기록은 계속하되 압박은 줄었다. 이어서 3-4 `Table` ← BuildsList(**StatusPill → Badge 논점 선결**) / 3-5 `AppShell`+`TopNav` ← 레이아웃 셸.
+
+  이월: B층 가드가 오버레이(모달)를 검사하지 못함 / **admin 라우트 테스트 4종이 없는데 PROJECT_PROFILE §3.4 는 있다고 서술 중** / `PhaseTimeline.tsx` 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 171→172, handoff 132→133, work_backlog TASK-139 등록, backlog 2026-07-21 rev 16) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 131→132: **TASK-138 Astryx 3-2 — BuildRequest 폼 → `TextInput`/`NumberInput` 봉인**).
 
   브랜치 `feat/task-138-buildrequest-form` (병합·push 상태는 `git status -sb` 를 볼 것).
