@@ -1,3 +1,18 @@
+/* TASK-140: 파일 전체를 `.login-page` 스코프로 한정.
+ *
+ * TASK-138 에서 이 파일의 bare `label {}` / `input {}` 이 앱 전체로 새는 것을
+ * 고쳤는데, **같은 파일에 같은 종류의 유출이 더 있었다**:
+ *   - bare `form {}` / `h1 {}` — 모든 페이지의 form·h1 에 적용
+ *   - 일반적인 클래스명 `.card` / `.logo` / `.subtitle` / `.btn-primary` 등
+ *
+ * 특히 `.card` 가 실제 피해를 냈다. Astryx `CodeBlock` 은 `container="card"`
+ * 일 때 요소에 literal `card` 클래스를 붙이는데(실측: `astryx-codeblock sm
+ * log card`), 여기 있던 `.card { max-width: 400px }` 가 unlayered 라 그것을
+ * 이겨서 **BuildDetail 의 로그 뷰어가 400px 로 잘렸다.** `width="100%"` 를
+ * 넘겼는데도 `--x-width: 100%` 위에서 max-width 가 덮은 것이다.
+ *
+ * 한 규칙만 고치면 같은 사고가 또 난다 — 파일 전체를 스코프로 닫는다. */
+
 /* TASK-089: Login 페이지 React 마이그레이션.
  *
  * Svelte routes/Login.svelte <style> 와 시각 정합 — React 측 디자인 토큰
@@ -26,7 +41,7 @@
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.card {
+.login-page .card {
   background: var(--dib-color-bg-surface);
   border: 1px solid var(--dib-color-border-subtle);
   border-radius: var(--dib-radius-lg);
@@ -39,7 +54,7 @@
   align-items: center;
   text-align: center;
 }
-.logo-wrapper {
+.login-page .logo-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -50,28 +65,28 @@
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
   margin-bottom: var(--dib-space-lg);
 }
-.logo {
+.login-page .logo {
   color: var(--dib-color-on-accent);
   font-size: var(--dib-size-xxl);
   line-height: 1;
 }
-h1 {
+.login-page h1 {
   margin: 0 0 var(--dib-space-xs);
   font-size: var(--dib-size-xl);
   color: var(--dib-color-text-primary);
 }
-.subtitle {
+.login-page .subtitle {
   margin: 0 0 var(--dib-space-xl);
   color: var(--dib-color-text-secondary);
   font-size: var(--dib-size-sm);
 }
-form {
+.login-page form {
   width: 100%;
   display: flex;
   flex-direction: column;
   gap: var(--dib-space-lg);
 }
-.input-group {
+.login-page .input-group {
   display: flex;
   flex-direction: column;
   gap: var(--dib-space-xs);
@@ -116,7 +131,7 @@ form {
   border-color: var(--dib-color-accent-primary);
   box-shadow: 0 0 0 2px var(--dib-color-focus-ring);
 }
-.btn-primary {
+.login-page .btn-primary {
   width: 100%;
   padding: var(--dib-space-md);
   border-radius: var(--dib-radius-md);
@@ -128,11 +143,11 @@ form {
   border: none;
   transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
 }
-.btn-primary:hover {
+.login-page .btn-primary:hover {
   background: var(--dib-color-accent-primary-hover);
   box-shadow: var(--dib-shadow-glow);
   transform: translateY(-1px);
 }
-.btn-primary:active {
+.login-page .btn-primary:active {
   transform: translateY(0);
 }

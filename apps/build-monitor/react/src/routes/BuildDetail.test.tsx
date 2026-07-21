@@ -236,10 +236,13 @@ describe("BuildDetail", () => {
       expect(screen.getByTestId("log-stream")).toBeInTheDocument();
     });
 
-    const entries = screen.getAllByTestId("log-entry");
-    expect(entries).toHaveLength(2);
-    expect(screen.getByText("Build request accepted")).toBeInTheDocument();
-    expect(screen.getByText("docker build started")).toBeInTheDocument();
+    // TASK-140: LogStream 이 Astryx CodeBlock 으로 바뀌면서 엔트리별 요소
+    // (`data-testid="log-entry"`) 가 사라지고 한 덩어리 코드 문자열이 됐다.
+    // 검증 의도(두 엔트리가 렌더된다)는 그대로 두고 대상만 바꾼다.
+    const pre = screen.getByTestId("log-stream-pre");
+    expect(pre.textContent).toContain("Build request accepted");
+    expect(pre.textContent).toContain("docker build started");
+    expect(pre.textContent).toContain("[REQUEST_ACCEPTED]");
   });
 
   it("tolerates getBuildLogs failure (renders empty LogStream)", async () => {
@@ -251,7 +254,14 @@ describe("BuildDetail", () => {
     await waitFor(() => {
       expect(screen.getByTestId("log-stream")).toBeInTheDocument();
     });
-    expect(screen.queryAllByTestId("log-entry")).toHaveLength(0);
+    // TASK-140: 이전 단언 `queryAllByTestId("log-entry")).toHaveLength(0)` 은
+    // CodeBlock 이관 후 **실패할 수 없는 단언**이 됐다 — log-entry 요소 자체가
+    // 더는 존재하지 않으므로 로그가 렌더되든 말든 항상 0 이다. 실제로 비어
+    // 있는지를 보도록 바꾼다.
+    // CodeBlock 은 내용이 비어도 zero-width space(U+200B)를 렌더하므로
+    // 그것을 걷어내고 비교한다.
+    const emptyPre = screen.getByTestId("log-stream-pre");
+    expect(emptyPre.textContent?.replace(/​/g, "")).toBe("");
   });
 
   it("renders Legacy preview block with deprecated badge + preview fields", async () => {

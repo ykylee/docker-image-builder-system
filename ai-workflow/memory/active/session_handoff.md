@@ -6,6 +6,31 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 133→134: **TASK-140 Astryx 3-3 — LogStream → `CodeBlock` 봉인**).
+
+  브랜치 `feat/task-140-logstream-codeblock` (병합·push 상태는 `git status -sb` 를 볼 것).
+
+  **얻은 것**: 로그 **복사 버튼**(이전에는 드래그 선택뿐이라 운영자가 실패 로그를 공유할 수단이 없었다) / 줄 번호 / `maxHeight`·`isWrapped` prop 화(인라인 스타일 14종 제거).
+
+  **보존한 것**: (1) **양 테마 터미널 톤** — `tokens.css` 의 "라이트도 터미널 톤 유지" 는 의도적 선택인데 CodeBlock 은 테마를 따라가므로 `syntaxTheme={tokyoNight}` 로 다크 프리셋을 고정했다(실브라우저 확인). (2) **부분별 색 구분** — 타임스탬프/`[PHASE]` 구분은 "운영자가 빠르게 스캔" 이라는 TASK-091 의 목적 그 자체라, `code: string` 평탄화로 사라지므로 custom `tokenizer` 로 되살렸다.
+
+  **한계 (기록해 둠)**: CodeBlock 은 본래 **코드**용이고 로그는 구조화된 레코드다. 토크나이저로 맞춘 것이지 의미가 완전히 일치하지는 않는다 — 검색·필터·자동 스크롤 요구가 붙으면 전용 컴포넌트로 되돌리는 편이 나을 수 있다.
+
+  **발견한 결함 — `Login.css` 전역 유출, 두 번째.** TASK-138 에서 이 파일의 bare `label {}` / `input {}` 을 고쳤는데 **같은 파일에 같은 종류가 더 있었다**: bare `form {}` / `h1 {}` + 일반 클래스명 `.card` / `.logo` / `.subtitle` / `.btn-primary`. **`.card` 가 실제 피해를 냈다** — Astryx `CodeBlock` 은 `container="card"` 일 때 요소에 literal `card` 클래스를 붙이는데(실측 `astryx-codeblock sm log card`), `.card { max-width: 400px }` 가 unlayered 라 이겨서 **로그 뷰어가 400px 로 잘렸다**(`width="100%"` 를 넘겨 `--x-width: 100%` 도 설정됐는데 그 위에서 `max-width` 가 덮음). 한 규칙만 고치면 재발하므로 **파일 전체를 `.login-page` 스코프로 닫았다** → 로그 뷰어 400 → **1342px**, Login 은 카드 400px·input 47px **불변**(양쪽 실측).
+
+  **자기 정정 2건 — 둘 다 제 측정 오류였다**:
+  1. **"토크나이저가 프로덕션에서 동작하지 않는다"** — DOM 에서 `astryx-token-*` span 을 찾았는데 없었다. 실제로는 CodeBlock 이 경로를 나눈다: `useSpans = 'spans' || (auto && !hasHighlightAPI()) || (auto && isSafari())`. **jsdom 은 CSS Custom Highlight API 가 없어 span 경로, Chrome 은 있어 Range 기반 `::highlight()` 경로**라 DOM 은 평문이고 색은 Highlight API 가 입힌다 (`CSS.highlights.size === 2` 확인, 화면에서도 색 정상). **span 이 없다 ≠ 색이 없다.** → 부작용: `LogStream.test.tsx` 의 색 검증은 **span 폴백 경로**를 검사한다(Chrome 사용자가 보는 경로가 아니다) — 테스트에 주석으로 남겼다.
+  2. **"라이트 모드에서 배경이 흰색"** — 바깥 컨테이너를 재고 있었다. 실제 코드 영역은 양 테마 모두 다크였다.
+
+  **테스트 — 무의미해진 단언 1건을 발견해 고쳤다.** BuildDetail 의 `expect(queryAllByTestId("log-entry")).toHaveLength(0)` 은 이관 후 `log-entry` 요소 자체가 사라져 **로그가 렌더되든 말든 항상 통과**하게 됐다. 실제로 비어 있는지 보도록 바꿨다(CodeBlock 은 빈 내용에도 zero-width space 를 렌더). `LogStream.test.tsx` 신규 7건 — 색 검증은 **색이 지정돼 있는지 먼저 확인**해 공허한 통과를 막았다.
+
+  **검증**: TSC clean / vitest **239 → 246** / B층 하이재킹 0 · 대비 위반 0 / 실브라우저 양 테마(다크 터미널 톤·줄 번호·색 구분·복사 버튼·전체 폭) / Login 회귀 없음 / 검수 데이터 정리(`build_request` 0건).
+
+  **번들 — TASK-139 의 전제가 그대로 확인됐다**: 초기 JS gzip 94.56 → **94.59**(사실상 불변), BuildDetail 청크 3.15 → **12.14**. CodeBlock 비용이 **그것을 쓰는 라우트 청크에만** 실렸다. `LogStream.tsx` 107 → 137줄 — 이 이관은 코드를 줄이는 게 아니라 **기능을 얻는** 이관이었다.
+
+  **다음: 3-4 `Table` ← BuildsList.** 착수 전 **StatusPill → Badge 논점 선결 필요** — Astryx Badge 문서가 *"모든 행에 같은 배지를 반복하지 말라(정보가 아니라 노이즈)"* 를 명시하는데 BuildsList 는 전 행에 StatusPill 을 렌더한다. 이어서 3-5 `AppShell`+`TopNav`.
+
+  **신규 follow-up: 다른 라우트 CSS 도 전역 유출 감사 필요** — Login.css 에서 두 번 연속 나왔으므로 `.card` 같은 일반 클래스명 충돌이 다른 파일에도 있을 수 있다. 이월: B층 가드 오버레이 검사 / admin 라우트 테스트 4종 복원 + PROJECT_PROFILE §3.4 정정 / `PhaseTimeline.tsx` 9 phase 수동 복제 / 결정 대기 5종. workflow meta sync (state rev 173→174, handoff 133→134, work_backlog TASK-140 등록, backlog 2026-07-21 rev 17) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 132→133: **TASK-139 라우트 지연 로드 봉인** — Astryx 이관 재개 전 정지작업).
 
   브랜치 `feat/task-139-route-lazy` (병합·push 상태는 `git status -sb` 를 볼 것).
