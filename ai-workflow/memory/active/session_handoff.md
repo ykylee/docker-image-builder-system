@@ -6,6 +6,38 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 134→135: **TASK-141 Astryx 3-4 — BuildsList → `Table` + StatusPill 배지 정책 변경 봉인**).
+
+  브랜치 `feat/task-141-buildslist-table` (병합·push 상태는 `git status -sb` 를 볼 것).
+
+  **핵심은 Table 이관이 아니라 배지 정책 변경이다.** Astryx `Badge` 문서가 *"정상 상태에 success 배지를 달지 말라 / 모든 행에 같은 배지를 반복하지 말라 — 정보가 아니라 노이즈다"* 를 명시하는데, 빌드 목록은 대부분의 행이 COMPLETED 로 끝난다. 전부 초록 배지를 달면 화면이 초록으로 덮이고 **정작 봐야 할 FAILED 가 묻힌다.**
+
+  세 안(직역 이관 / Table 만 이관 / 권고 반영) 중 사용자가 **권고 반영**을 선택했다 — **주의가 필요한 상태만 배지**:
+
+  | | 상태 | 표시 |
+  |---|---|---|
+  | warning | PREPARING_SOURCE, BUILDING | 배지 |
+  | info | TESTING, DEPLOYING, CLAIMED, TEST_READY, PROVISIONING, PREVIEW_* | 배지 |
+  | error | FAILED, DISABLED | 배지 |
+  | — | RECEIVED, QUEUED, *_SUCCESS, COMPLETED, CANCELLED, EXPIRED, ACTIVE | **평문** |
+
+  **`success` variant 를 어떤 상태에도 쓰지 않는 것**이 정책의 핵심이다 (성공은 기대되는 결과이므로 강조할 이유가 없다). 테스트로 고정했다. **실브라우저 확인**(COMPLETED 2 / FAILED 1 / BUILDING 1 시드): `BUILDING [배지]` `FAILED [배지]` `COMPLETED (평문)` `COMPLETED (평문)` — 실패와 진행 중이 한눈에 들어온다.
+
+  이 변경은 `StatusPill` 을 쓰는 **6개 파일 전체**에 전파된다 (BuildRow / PhaseTimeline / AdminRunners / BuildDetail / BuildRequest).
+
+  **a11y 계약 유지**: 평문으로 낮췄다고 스크린리더에서 상태가 사라지면 안 되므로, **배지든 평문이든** `role="status"` + `aria-label="Status: <STATUS>"` 를 동일하게 유지했다.
+
+  **Table 이관**: 손수 만든 `<table>` + `BuildRow` → Astryx `Table`. 열 정의를 `buildColumns.tsx` 로 분리해 **AdminBuilds / AdminUsers 이관 때 재사용**할 수 있게 했다(`withOwner` 로 5열 지원). "Build" 셀은 탐색이므로 `Link` 유지. **과도기 중복**: admin 2종이 아직 `BuildRow` 를 쓰므로 셀 렌더링이 두 곳에 있다 — admin 이관 후 `BuildRow.tsx` 를 지운다.
+
+  **테스트**: 기존 `StatusPill.test.tsx` 는 인라인 스타일 세부(`--dib-pill-color` / `padding 4px` / `alpha 15%`)에 결합돼 있었고 그 구현을 의도적으로 걷어냈으므로 해당 단언도 함께 제거했다. **지속되는 계약**(a11y / 상태→심각도 / lifecycleStatus 우선 / UNKNOWN)만 남겨 43건 재작성. `BuildsList.test.tsx` 의 `getAllByTestId("build-row")` 는 Table 이 자체 행을 렌더하므로 **시맨틱 `role="row"`** 로 전환(검증 의도 동일).
+
+  **검증**: TSC clean / vitest **246 → 266** / B층 하이재킹 0 · 대비 위반 0 / 실브라우저 정책 확인(양 테마) / 테이블 4열·4행·hover·우측 정렬 / 검수 데이터 정리(`build_request` 0건).
+
+  **번들**: 초기 JS gzip 94.59 → **94.65**(사실상 불변), BuildsList 청크 0.92 → **12.07**. TASK-139 분할 덕에 Table 비용이 그 라우트에만 실렸다.
+
+  **측정 오류 1건 (자기 정정)**: 브라우저에서 행 수를 `querySelectorAll('[role="row"]')` 로 세다 **0** 이 나와 "테이블이 안 그려졌다" 고 오판했다. 속성 선택자는 `<tr>` 의 **암묵 role** 을 잡지 못한다 (RTL 의 `getAllByRole` 은 잡는다). `tbody tr` 로 세니 4행 정상. **TASK-140 에 이어 측정 방법 오류가 반복되고 있다** — DOM 을 볼 때 암묵 role / 렌더 경로 차이를 먼저 확인할 것.
+
+  **다음**: (1) **AdminBuilds / AdminUsers 를 `buildColumns` 로 이관** → `BuildRow.tsx` 제거. (2) **3-5 `AppShell`+`TopNav` ← 레이아웃 셸** — TASK-132 의 수작업을 대체하되 그때 실측한 정렬(272/272)을 Astryx 기준으로 **재검증**해야 한다. 이월: 라우트 CSS 전역 유출 감사 / B층 가드 오버레이 검사 / admin 라우트 테스트 4종 복원 + PROJECT_PROFILE §3.4 정정 / `PhaseTimeline.tsx` 9 phase 수동 복제 / 결정 대기 5종. workflow meta sync (state rev 174→175, handoff 134→135, work_backlog TASK-141 등록, backlog 2026-07-21 rev 18) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 133→134: **TASK-140 Astryx 3-3 — LogStream → `CodeBlock` 봉인**).
 
   브랜치 `feat/task-140-logstream-codeblock` (병합·push 상태는 `git status -sb` 를 볼 것).

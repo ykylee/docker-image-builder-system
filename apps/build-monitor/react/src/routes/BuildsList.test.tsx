@@ -68,6 +68,16 @@ const sample = (
   updatedAt: "2026-07-03T00:00:00.000Z"
 });
 
+// TASK-141: 손수 만든 <table> + BuildRow 가 Astryx Table 로 바뀌면서
+// `data-testid="build-row"` 가 사라졌다. 검증 의도(보이는 빌드 행 수)는
+// 그대로 두고, 구조 결합 대신 **시맨틱 role** 로 센다.
+// `role="row"` 에는 헤더 행도 포함되므로 헤더를 제외한다.
+function visibleBuildRows(): number {
+  const rows = screen.queryAllByRole("row");
+  const headers = screen.queryAllByRole("columnheader");
+  return headers.length > 0 ? rows.length - 1 : rows.length;
+}
+
 describe("BuildsList (React)", () => {
   it("redirects to / when no userId is stored and skips listBuilds", async () => {
     renderList();
@@ -111,19 +121,19 @@ describe("BuildsList (React)", () => {
 
     renderList();
 
-    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(3));
+    await waitFor(() => expect(visibleBuildRows()).toBe(3));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "BUILDING" }));
     });
-    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(1));
+    await waitFor(() => expect(visibleBuildRows()).toBe(1));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "FAILED" }));
     });
-    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(1));
+    await waitFor(() => expect(visibleBuildRows()).toBe(1));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "ALL" }));
     });
-    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(3));
+    await waitFor(() => expect(visibleBuildRows()).toBe(3));
   });
 
   it("prefers lifecycleStatus when emitted alongside legacy status", async () => {
@@ -155,14 +165,14 @@ describe("BuildsList (React)", () => {
 
     renderList();
 
-    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(3));
+    await waitFor(() => expect(visibleBuildRows()).toBe(3));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "BUILDING" }));
     });
-    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(2));
+    await waitFor(() => expect(visibleBuildRows()).toBe(2));
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: "COMPLETED" }));
     });
-    await waitFor(() => expect(screen.getAllByTestId("build-row")).toHaveLength(1));
+    await waitFor(() => expect(visibleBuildRows()).toBe(1));
   });
 });

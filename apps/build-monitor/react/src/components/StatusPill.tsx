@@ -1,50 +1,59 @@
-// TASK-090: StatusPill (React).
+// TASK-141: StatusPill — Astryx `Badge` 이관 + **배지 정책 변경**.
 //
-// Svelte src/components/StatusPill.svelte 와 1:1 정합. canonical
-// lifecycleStatus 가 emit 되면 그 값을 우선 표시, 없으면 legacy status.
-// a11y: role="status" + aria-label="Status: <STATUS>".
+// ── 무엇이 바뀌었나 ───────────────────────────────────────────────────
+// 이전에는 **모든 상태**를 색이 있는 알약으로 그렸다. Astryx Badge 문서는 그
+// 패턴을 명시적으로 권하지 않는다:
 //
-// color 매핑도 Svelte colorFor switch 와 동일한 토큰 사용. CSS class
-// 대신 inline CSS variable (`--dib-pill-color`) 로 동일 톤.
+//   "Don't: Apply a success badge to every healthy/active/normal item.
+//    If all rows show green Active badges, none stand out."
+//   "Don't: Repeat the same badge in every row of a table or list."
+//
+// 빌드 목록은 대부분의 행이 COMPLETED 로 끝난다 — 전부 초록 배지를 달면
+// 화면이 초록으로 덮이고 **정작 봐야 할 FAILED 가 묻힌다.**
+//
+// 그래서 **주의가 필요한 상태만 배지**로 두고, 정상 종료·대기 상태는 평문으로
+// 낮췄다 (사용자 결정). 실패와 진행 중이 한눈에 들어온다.
+//
+// ── 유지한 계약 ───────────────────────────────────────────────────────
+// - `role="status"` + `aria-label="Status: <STATUS>"` — 두 경로 모두. 평문으로
+//   낮췄다고 스크린리더에서 상태가 사라지면 안 된다.
+// - `lifecycleStatus` 가 있으면 그것을 우선 (없으면 legacy `status`).
+// - 빈 값 → `UNKNOWN`.
 
-import type { CSSProperties, ReactElement } from "react";
+import type { ReactElement } from "react";
+import { Badge, Text } from "@astryxdesign/core";
 
-function colorFor(s: string): string {
-  switch (s) {
-    case "RECEIVED":
-    case "QUEUED":
-      return "var(--dib-color-text-secondary)";
-    case "PREPARING_SOURCE":
-    case "BUILDING":
-      return "var(--dib-color-accent-warning)";
-    case "BUILD_SUCCESS":
-    case "TEST_SUCCESS":
-    case "DEPLOY_SUCCESS":
-    case "COMPLETED":
-      return "var(--dib-color-accent-success)";
-    case "TESTING":
-    case "DEPLOYING":
-      return "var(--dib-color-accent-info)";
-    case "FAILED":
-      return "var(--dib-color-accent-danger)";
-    case "CANCELLED":
-      return "var(--dib-color-text-secondary)";
-    case "CLAIMED":
-    case "TEST_READY":
-      return "var(--dib-color-accent-info)";
-    case "PROVISIONING":
-    case "PREVIEW_QUEUED":
-    case "PREVIEW_READY":
-      return "var(--dib-color-accent-info)";
-    case "EXPIRED":
-      return "var(--dib-color-text-secondary)";
-    case "ACTIVE":
-      return "var(--dib-color-accent-success)";
-    case "DISABLED":
-      return "var(--dib-color-accent-danger)";
-    default:
-      return "var(--dib-color-text-secondary)";
-  }
+type BadgeVariant = "info" | "success" | "warning" | "error";
+
+/**
+ * **주의가 필요한** 상태만 배지로 올린다.
+ *
+ * 여기 없는 상태(RECEIVED / QUEUED / CANCELLED / EXPIRED / *_SUCCESS /
+ * COMPLETED / ACTIVE)는 평문이다 — 정상이거나 기다리는 중이라 사용자의 행동을
+ * 요구하지 않는다.
+ *
+ * `success` variant 를 **아무 상태에도 쓰지 않는 것**이 이 정책의 핵심이다.
+ * 성공은 기대되는 결과이므로 강조할 이유가 없다.
+ */
+const ATTENTION_VARIANT: Readonly<Record<string, BadgeVariant>> = {
+  // 진행 중 — 아직 끝나지 않았음을 알린다
+  PREPARING_SOURCE: "warning",
+  BUILDING: "warning",
+  TESTING: "info",
+  DEPLOYING: "info",
+  CLAIMED: "info",
+  TEST_READY: "info",
+  PROVISIONING: "info",
+  PREVIEW_QUEUED: "info",
+  PREVIEW_READY: "info",
+  // 실패 — 사용자의 행동이 필요하다
+  FAILED: "error",
+  DISABLED: "error"
+};
+
+/** 이 상태가 배지로 강조되는지. 테스트와 호출부가 정책을 확인할 때 쓴다. */
+export function attentionVariantFor(status: string): BadgeVariant | null {
+  return ATTENTION_VARIANT[status] ?? null;
 }
 
 export function StatusPill({
@@ -55,41 +64,30 @@ export function StatusPill({
   lifecycleStatus?: string;
 }): ReactElement {
   const effective = lifecycleStatus ?? status;
-  const color = colorFor(effective);
   const label = effective || "UNKNOWN";
+  const variant = attentionVariantFor(label);
 
-  const style: CSSProperties = {
-    // React CSS variable binding — Svelte `style="--dib-pill-color: {color}"`
-    // 와 의미상 동일. Svelte scoped CSS 가 --dib-pill-color 를 자동 인식하는
-    // 반면 React 는 inline style 로 직접 주입.
-    //
-    // TASK-096: 디자인 토큰 baseline 정합. TASK-090 의 self-review 에서
-    // padding/font-size/background-alpha 키워서 dark mode 가독성 ↑ 보강이
-    // 있었으나, Svelte StatusPill.svelte 와 의미상 1:1 정합이라는
-    // TASK-090 PR description 과 정합하지 않음. 본 TASK 에서 Svelte
-    // baseline 으로 통일 — 양쪽 모두 padding 4px / size-xs / background
-    // alpha 15% / border alpha 30% / box-shadow 8px.
-    ["--dib-pill-color" as string]: color,
-    display: "inline-block",
-    padding: "4px var(--dib-space-md)",
-    borderRadius: "var(--dib-radius-pill)",
-    background: "color-mix(in srgb, var(--dib-pill-color) 15%, transparent)",
-    color: "var(--dib-pill-color)",
-    border: "1px solid color-mix(in srgb, var(--dib-pill-color) 30%, transparent)",
-    boxShadow:
-      "0 0 8px color-mix(in srgb, var(--dib-pill-color) 15%, transparent)",
-    fontFamily: "var(--dib-font-mono)",
-    fontSize: "var(--dib-size-xs)",
-    fontWeight: "var(--dib-weight-semibold)",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em",
-    lineHeight: "var(--dib-line-tight)",
-    whiteSpace: "nowrap"
-  };
+  // 평문 경로 — 정상/대기 상태. 배지가 아니어도 상태는 읽혀야 하므로
+  // role 과 aria-label 은 동일하게 유지한다.
+  if (variant === null) {
+    return (
+      <Text
+        role="status"
+        aria-label={`Status: ${label}`}
+        type="supporting"
+        color="secondary"
+      >
+        {label}
+      </Text>
+    );
+  }
 
   return (
-    <span role="status" aria-label={`Status: ${label}`} style={style}>
-      {label}
-    </span>
+    <Badge
+      role="status"
+      aria-label={`Status: ${label}`}
+      variant={variant}
+      label={label}
+    />
   );
 }

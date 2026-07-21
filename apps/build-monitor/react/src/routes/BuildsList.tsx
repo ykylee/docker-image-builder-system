@@ -17,8 +17,9 @@
 import { useEffect, useMemo, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
-import { BuildRow } from "@/components/BuildRow";
-import type { BuildSummary } from "@/lib/api";
+import { Table } from "@astryxdesign/core";
+
+import { buildColumns } from "@/components/buildColumns";
 import { matchesChip, type StatusFilter } from "@/lib/chipFilter";
 import { useBuildsListStore } from "@/lib/stores/buildsListStore";
 import { useUserId } from "@/lib/useUserId";
@@ -95,21 +96,16 @@ export function BuildsList(): ReactElement {
       ) : visible.length === 0 ? (
         <p className="muted">No builds.</p>
       ) : (
-        <table className="builds-table">
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Build</th>
-              <th>App</th>
-              <th className="r">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((b: BuildSummary) => (
-              <BuildRow key={b.buildId} build={b} />
-            ))}
-          </tbody>
-        </table>
+        // TASK-141: 손수 만든 <table> + BuildRow → Astryx Table.
+        // 정렬·밀도·잘림 처리·헤더 시맨틱이 컴포넌트 쪽으로 넘어갔다.
+        <Table
+          data={visible}
+          columns={buildColumns()}
+          idKey="buildId"
+          density="balanced"
+          hasHover
+          textOverflow="truncate"
+        />
       )}
     </section>
   );
