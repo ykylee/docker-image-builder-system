@@ -72,11 +72,15 @@ describe("App (router shell)", () => {
 
   // TASK-139: /login 을 제외한 라우트는 지연 로드되므로 청크가 도착할 때까지
   // 기다려야 한다. 검증 대상(라우터가 이 경로에 이 페이지를 붙이는가)은 그대로다.
+  //
+  // TASK-142: findBy 기본 타임아웃(1000ms)이 전체 스위트를 함께 돌릴 때
+  // 부하로 초과돼 flaky 했다. 청크 로딩을 기다리는 성격이 분명하므로
+  // 타임아웃을 명시적으로 늘린다 — 로직 검증이 아니라 I/O 대기다.
   it("renders the BuildsList on /builds when signed in", async () => {
     localStorage.setItem("userId", "yklee");
     renderAt("/builds");
     expect(
-      await screen.findByRole("heading", { name: "Builds" })
+      await screen.findByRole("heading", { name: "Builds" }, { timeout: 5000 })
     ).toBeInTheDocument();
   });
 
@@ -87,7 +91,9 @@ describe("App (router shell)", () => {
     // TASK-139: 지연 로드라 청크 도착까지 대기 후 검사한다. 여기서 기다리는
     // 것은 **청크 로딩**이고, 검증 대상인 **BuildDetail 자체의 loading state**
     // 는 getBuild 가 영원히 pending 이므로 그대로 남아 있다 — 둘을 혼동하지 말 것.
-    expect(await screen.findByTestId("build-detail-loading")).toBeInTheDocument();
+    expect(
+      await screen.findByTestId("build-detail-loading", {}, { timeout: 5000 })
+    ).toBeInTheDocument();
     expect(
       screen.getByText(/Loading build 00000000-0000-0000-0000-000000000001/)
     ).toBeInTheDocument();

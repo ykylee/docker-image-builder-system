@@ -9,7 +9,7 @@ import { useNavigate } from "react-router-dom";
 
 import { AdminAccessDenied } from "@/components/AdminAccessDenied";
 import { AdminTabs } from "@/components/AdminTabs";
-import { BuildRow } from "@/components/BuildRow";
+import { Table } from "@astryxdesign/core";
 import {
   listAdminBuilds,
   listAdminUsers,
@@ -17,6 +17,7 @@ import {
   type AdminUserListResponse,
   type BuildSummary
 } from "@/lib/api";
+import { buildColumns } from "@/components/buildColumns";
 import { ensureAdminAccess } from "@/lib/admin-guard";
 import { useUserId } from "@/lib/useUserId";
 
@@ -184,24 +185,17 @@ export function AdminUsers(): ReactElement {
           ) : selectedBuilds.length === 0 ? (
             <p className="muted">No builds.</p>
           ) : (
-            <table className="admin-users-table">
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Build</th>
-                  <th>App</th>
-                  <th className="r">Updated</th>
-                </tr>
-              </thead>
-              <tbody>
-                {selectedBuilds.map((b) => (
-                  <BuildRow
-                    key={b.buildId}
-                    build={b as BuildSummary & { requestedBy?: string }}
-                  />
-                ))}
-              </tbody>
-            </table>
+            // TASK-142: recent builds 패널을 Astryx Table 로. owner 는 이미
+            // @selectedUser 로 필터된 단일 사용자라 열로 반복하지 않는다
+            // (buildColumns(false) — Owner 열 없음).
+            <Table
+              data={selectedBuilds as (BuildSummary & { requestedBy?: string })[]}
+              columns={buildColumns(false)}
+              idKey="buildId"
+              density="compact"
+              hasHover
+              textOverflow="truncate"
+            />
           )}
         </section>
       ) : null}

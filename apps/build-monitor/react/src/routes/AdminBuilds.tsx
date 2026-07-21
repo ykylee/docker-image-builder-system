@@ -11,8 +11,9 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { AdminAccessDenied } from "@/components/AdminAccessDenied";
 import { AdminTabs } from "@/components/AdminTabs";
-import { BuildRow } from "@/components/BuildRow";
+import { Table } from "@astryxdesign/core";
 import { FilterChips } from "@/components/FilterChips";
+import { buildColumns } from "@/components/buildColumns";
 import {
   listAdminBuilds,
   type AdminUserBuildSummary,
@@ -183,26 +184,22 @@ export function AdminBuilds(): ReactElement {
       ) : visible.length === 0 ? (
         <p className="muted">No builds.</p>
       ) : (
-        <table className="admin-builds-table">
-          <thead>
-            <tr>
-              <th>Status</th>
-              <th>Build</th>
-              <th>Project</th>
-              <th>Repository</th>
-              <th>Owner</th>
-              <th className="r">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((b) => (
-              <BuildRow
-                key={b.buildId}
-                build={b as BuildSummary & { requestedBy?: string }}
-              />
-            ))}
-          </tbody>
-        </table>
+        // TASK-142: 손수 만든 <table> + BuildRow → Astryx Table.
+        //
+        // 이관 전 헤더는 6열(Status/Build/Project/Repository/Owner/Updated)을
+        // 선언했지만 BuildSummary 에는 project/repository 필드가 **없다** — 본문
+        // BuildRow 는 App(appName) 한 열이었다. 즉 Project/Repository 는
+        // 존재하지 않는 데이터를 가리키는 **유령 헤더**였고 헤더-본문 열이
+        // 어긋나 있었다 (admin 테스트가 삭제된 상태라 미검출, TASK-137 참조).
+        // buildColumns 로 통일하면서 해소된다.
+        <Table
+          data={visible as (BuildSummary & { requestedBy?: string })[]}
+          columns={buildColumns(true)}
+          idKey="buildId"
+          density="balanced"
+          hasHover
+          textOverflow="truncate"
+        />
       )}
       {/* Link import 는 현재 사용되지 않지만, 향후 deep link 통합 가능성으로 보존. */}
       <Link to="/admin/users" style={{ display: "none" }} aria-hidden="true">

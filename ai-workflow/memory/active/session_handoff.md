@@ -6,6 +6,25 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 135→136: **TASK-142 Astryx 3-4b — Admin 테이블 이관 + BuildRow 제거 봉인**).
+
+  브랜치 `feat/task-142-admin-table` (병합·push 상태는 `git status -sb` 를 볼 것).
+
+  TASK-141 이 만든 `buildColumns.tsx` 를 그대로 재사용해 AdminBuilds / AdminUsers 를 Astryx `Table` 로 이관했고, 두 사용처가 사라져 **`BuildRow.tsx`(111줄) 삭제**. buildColumns 의 재사용 설계가 검증됐다.
+
+  **발견한 기존 결함 — AdminBuilds 유령 헤더.** 헤더가 **6열**(Status/Build/Project/Repository/Owner/Updated)을 선언했는데 `BuildSummary` 에는 `project`/`repository` 필드가 **존재하지 않는다**. 본문 `BuildRow` 는 App(appName) 한 열이었다 — 즉 "Project | Repository" 는 **존재하지 않는 데이터를 가리키는 유령 헤더**였고 헤더 6열 vs 본문 4~5열로 정렬이 어긋나 있었다. **admin 라우트 테스트가 삭제된 상태(TASK-137 에서 발견)라 이 결함이 잡히지 않았다.** `buildColumns(true)`(5열)로 이관하며 헤더-본문이 단일 정의로 통일돼 **자동 해소**됐다 (실브라우저 헤더 6 → 5 확인).
+
+  **이관 상세**: AdminUsers recent-builds 패널은 `buildColumns(false)` — owner 는 이미 `@selectedUser` 로 필터된 단일 사용자라 열로 반복하지 않는다. user rollup 테이블(User/Builds/Last build)은 손 테이블 그대로 유지. 배지 정책(TASK-141)이 admin 에도 적용됨(실브라우저 BUILDING/FAILED 배지 확인).
+
+  **flaky 테스트 안정화**: BuildRow 삭제 후 전체 스위트에서 `App.test.tsx` 의 "renders the BuildsList" 가 **간헐적으로** 실패했다(격리 실행은 항상 통과). TASK-139 지연 로드의 `findBy` 기본 타임아웃(1000ms)이 전체 스위트를 함께 돌릴 때 부하로 초과된 것이다. 청크 로딩을 기다리는 성격이 분명하므로 타임아웃을 **5000ms 로 명시**(로직 검증이 아니라 I/O 대기). **3회 연속 266 통과**로 해소 확인.
+
+  **검증**: TSC clean(BuildRow 삭제 후에도) / vitest **266 불변** / B층 통과 / AdminBuilds 헤더 6 → 5 정렬 + @bob owner + 배지 정책 / AdminUsers recent 4열 + 배지 + rollup 유지 / 검수 데이터 정리(`build_request` 0건).
+
+  **번들**: 초기 JS gzip 94.65 → **94.66**(불변), admin 청크 거의 불변(Table 은 공용 청크 공유). `BuildRow.tsx` 111줄 삭제, StatusPill 실사용 5파일로 정리.
+
+  **다음: 3-5 `AppShell`+`TopNav` ← 레이아웃 셸** — TASK-132 가 손으로 만든 셸(`--dib-layout-max` / `--dib-header-h` / `<main class=app-main>`)을 Astryx `AppShell`+`TopNav` 로 대체. AppShell 은 responsive mobile nav + skip-to-content 를 자동 처리한다. 단 TASK-132 가 실측해 맞춘 정렬(272/272, 헤더-본문 기준선 일치)을 Astryx 기준으로 **재검증**해야 한다. **이것이 3단계의 마지막 큰 이관이다.**
+
+  이월: **admin 라우트 테스트 4종 복원**(이번에 유령 헤더 결함을 놓친 직접 원인) + PROJECT_PROFILE §3.4 정정 / 라우트 CSS 전역 유출 감사 / B층 가드 오버레이 검사 / `PhaseTimeline.tsx` 9 phase 수동 복제 / 결정 대기 5종. workflow meta sync (state rev 175→176, handoff 135→136, work_backlog TASK-142 등록, backlog 2026-07-21 rev 19) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 134→135: **TASK-141 Astryx 3-4 — BuildsList → `Table` + StatusPill 배지 정책 변경 봉인**).
 
   브랜치 `feat/task-141-buildslist-table` (병합·push 상태는 `git status -sb` 를 볼 것).
