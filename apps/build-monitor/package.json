@@ -29,6 +29,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "jsdom": "^25.0.1",
     "openapi-typescript": "^7.4.4",
+    "playwright": "^1.61.1",
     "playwright-core": "^1.61.1",
     "tslib": "^2.7.0",
     "tsx": "^4.20.3",

@@ -20,6 +20,12 @@ coverage/
 .visual/
 apps/build-monitor/.visual/
 
+# TASK-152: baseline PNG 자체는 binary 라 git 에서 제외 — README 의
+# "PNG 는 LFS 또는 외부 diff 도구로 관리" 정책. 디렉터리 구조 + capture.py
+# + diff.py + README 만 tracked. 운영자는 `cp -r .visual/<ts>/* baseline/`
+# 로 baseline 을 갱신하고 LFS / 외부 저장소로 PNG 를 동기화.
+apps/build-monitor/tests/visual/baseline/
+
 # Playwright MCP CLI cache (TASK-088 검증 중 자동 생성). 캡쳐/snapshot/
 # console-log 일회성 산출물 — workspace root 에만 떨어지며 같은 이름이
 # agent session 간 충돌나지 않도록 local-only.

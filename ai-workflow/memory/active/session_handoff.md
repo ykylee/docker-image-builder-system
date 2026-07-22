@@ -6,6 +6,56 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 145→146: **TASK-152 DESIGN.md v2 + visual QA baseline** — 부분 봉인, 다음 세션이 5단계로 즉시 완료 가능).
+
+  브랜치 미생성 (working tree 에 staged 변경 + untracked PNG 22개만 있는 상태) — 다음 세션이 `git status` 확인 후 `feat/task-152-design-and-visual` 같은 브랜치 파서 작업 권장.
+
+  ## TASK-152 현재 상태 (다음 세션 즉시 이어받기)
+
+  **완료**:
+  - `docs/DESIGN.md` v2 — 9 섹션 (Stack / Tokens / Foundations / Components / Layout / Voice & Tone / A11y / Do & Don't / References) **React 19 + Astryx 0.1.4 정합**. tokens.css 단일 source-of-truth 와 1:1 정합. 현 라우트 셋 (9개) + RegisterRunnerModal 1호 오버레이 + Task-150 PhaseTimeline drift + Task-151 buildColumns 등 포함. Svelte 5 시절 stack / PR#5·6 / Svelte 측 components 모두 폐기 reference §8.3 명시.
+  - `apps/build-monitor/tests/visual/capture.py` v3:
+    - `set_theme_and_reload` (mode 마다 reload + data-theme 강제 적용)
+    - Login 라우트 격리 컨텍스트 (userId 없음)
+    - `capture_admin_runners_isolated` (admin 가드 fetch 영향 차단)
+    - `capture_modal` (RegisterRunnerModal 별도 컨텍스트)
+    - data-testid 셀렉터 안정 (role+name regex 회피)
+  - `apps/build-monitor/tests/visual/README.md` v3 (현 라우트 셋 + 모달)
+  - `.gitignore` 보강 (`tests/visual/baseline/` binary 제외, README 의 LFS 정책)
+  - `apps/build-monitor/package.json` devDependency: `playwright: ^1.61.1` 추가 (TASK-149 B층 가드와 동일 패턴)
+  - `pip3 install --user --break-system-packages playwright` (시스템 Python) — baseline 22 PNG 모두 정상 캡처, dark ≠ light MD5 다름 확인
+  - `.visual/2026-07-22T16-10-00Z/` 22 PNG (login × 2, builds/build-detail/build-request/api-console/admin-builds/admin-users/admin-admins × 2 each, admin-runners × 2 baseline, admin-runners × 2 modal — 모두 별도 컨텍스트)
+
+  **남은 5단계** (다음 세션이 즉시 수행):
+  1. **PNG baseline 승격**:
+     ```
+     rm -rf apps/build-monitor/tests/visual/baseline
+     mkdir -p apps/build-monitor/tests/visual/baseline
+     cp -r .visual/2026-07-22T16-10-00Z/* apps/build-monitor/tests/visual/baseline/
+     ```
+  2. **`diff.py` self-test**:
+     ```
+     python3 apps/build-monitor/tests/visual/diff.py \
+         --baseline apps/build-monitor/tests/visual/baseline \
+         --run .visual/2026-07-22T16-10-00Z \
+         --threshold 0.001
+     ```
+     20/20 PASS 확인 (run == baseline 이라 0 차이). diff.py 자체는 라우트 셋을 직접 들고 있지 않고 디렉터리를 walk 하므로 셋 정합은 자동.
+  3. **운영 가이드 신규** — `docs/operations/build-monitor-ui-visual-2026-07-22.md` (TASK-152, 7 섹션 — Why / 라우트 선택 근거 / 절차 / diff 검증 / 단위 테스트 / 한계 / 변경 이력). §1 라우트 셋 + RegisterRunnerModal 1호 오버레이 + 채널 chrome + 1440×900 정합.
+  4. **workflow meta sync** (rev 145→146):
+     - `state.json` (rev 188→189): `current_baseline` 에 TASK-152 추가, `current_focus` 에 사후 알림 자동화 유지
+     - `work_backlog.md` (104→105): 헤더 rev 한 줄
+     - `backlog/2026-07-21.md` (rev 27→28): §29 TASK-152 신규 (시도 / 진단 — set_theme 안 되는 문제 → data-theme 강제 적용 → MD5 다름 확인)
+  5. **commit + main push**: 한 sync commit 으로 6 파일 (DESIGN.md, capture.py, README.md, .gitignore, package.json, 운영 가이드) + 4종 workflow meta + 1 baseline 승격은 untracked PNG 가 .gitignore 에 의해 제외되므로 staged 안 됨.
+
+  **TASK-152 follow-up 후보 (봉인 후)**:
+  - 사후 알림 자동화 (nightly 실패 → Issue / Slack) — TASK-149 후속
+  - 결정 대기 5종 유지 (옵션 Z 외부 object storage / 신규 기능 / Nextcloud Tasks / CI migration validation / git tag 다음 version)
+  - visual baseline 의 CI 통합 (nightly-visual 워크플로) — 가드 PNG 들 git LFS 외부 저장소 동기화 정책 결정 필요 (가벼운 워크플로)
+
+  **이전 봉인 (TASK-149 → TASK-150/151)**: `c9ed95c` CI 통합 + `d9b3f07` 이월 해소 2건 main push 완료. 그 사이 4 sync commit 모두 `origin/main` 동기.
+
+  **핵심 교훈 (TASK-152 캡처)**: ① React 19 SPA + `themeStore.init()` 가 mount-time 1회만 localStorage 의 theme 를 읽음 → mode 전환 시 setItem 만으로는 store.mode 가 안 바뀜. ② store 가 mode 를 reset 하면 `<Theme>` 가 useEffect 에서 mode 를 localStorage 의 mode 로 동기화 + `themeStore.applyMode` 가 `data-theme` attribute 박음. ③ 두 효과가 충돌 → screenshot 직전에 `documentElement.setAttribute('data-theme', mode)` + `removeAttribute` (dark) 직접 evaluate + 200ms wait 가 정답. ④ capture.py 가 setItem + reload + data-theme 강제 적용 3-단계로 안정.
 - Updated: 2026-07-22 (rev 144→145: **TASK-150 + TASK-151 이월 해소 sync commit** — 단일 commit 으로 묶음).
 
   브랜치 `feat/task-150-151-rollover` (병합·push 상태는 `git status -sb`).

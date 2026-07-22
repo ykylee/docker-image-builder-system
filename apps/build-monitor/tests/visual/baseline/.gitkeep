@@ -1,5 +1,0 @@
-# This directory holds the PNG baseline for `capture.py`. The PNG files
-# themselves are binary artifacts and are not committed to git; they are
-# regenerated on demand by the capture script and consumed by the
-# (future) `diff.py` baseline comparator. Keep this .gitkeep so the
-# directory itself stays tracked.
