@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-22T09:30:00Z",
+  "generated_at": "2026-07-22T10:00:00Z",
   "purpose_digest": "Astryx 도입 프로젝트 진행 중 (사용자 결정: 제대로 도입). 3단계 계획 — 1단계 토큰 네임스페이스 --dib-*(TASK-134) / 사전 정지작업 0.1.4→0.1.7(TASK-135) / 2단계 기반 구축(TASK-136) 봉인 완료. 3단계 컴포넌트 점진 이관이 남았다. 사용자 결정 3건: 시각 정체성은 **브랜드 색만 이식**(나머지는 Astryx neutral 위임 — 이식이 적을수록 pre-1.0 churn 에 덜 흔들리고 컴포넌트 조합 안 접근성을 우리가 계속 책임지지 않아도 됨) / **점진 이관**(매 단계 회귀 통과 유지) / 레이아웃 셸은 **AppShell 로 교체**(3단계). TASK-136 은 <Theme> + astryx.css 재도입 + defineTheme(--color-accent 1종만) + themeStore(Zustand) 신규. 테마 상태를 ThemeToggle 지역 state 에서 끌어올린 이유는 <Theme mode> 가 App 보다 위에서 같은 값을 봐야 하기 때문이고, 부수적으로 '토글 버튼이 없는 페이지에서 테마 미적용' 여지도 해소됐다. mode='system' 을 쓰지 않고 store 값을 명시 전달 — Astryx 내부가 light-dark() 를 쓰므로 어긋나면 페이지는 다크인데 컴포넌트만 light 로 렌더된다. 재도입 안전 근거 4가지 실측: 토큰 충돌 0종 / astryx.css 에 전역 element·:root·html·body 규칙 0건 (순수 스코프 클래스) / @layer 계층에서 unlayered 인 우리 손 CSS 가 항상 이김 / 우리 CSS 에 light-dark() 부재 + color-scheme 명시 선언. reset.css 는 전역 리셋이라 이관 중 손 CSS 를 흔들 수 있어 의도적 미도입. **가장 의미 있는 검증**: <Theme> 가 P0 때와 똑같이 문서 루트에 속성을 붙였는데도(wrapperIsRoot true) 하이재킹 0 — '이름이 겹치지 않으면 하이재킹은 성립하지 않는다'가 실증됐다. 회귀: TSC clean / vitest 216→229 / B층 다크·라이트 × 3라우트 하이재킹0·위반0 / 스크린샷 양 테마 정상. 번들 고정비용 gzip CSS +21.9KB · JS +7.5KB (컴포넌트 0개 사용 상태) — 3단계에서 손 CSS 2,000여 줄이 줄며 상쇄, 추이를 매 단계 기록할 것. 다음: 3-1 Dialog←RegisterRunnerModal / 3-2 Field+FormLayout←BuildRequest / 3-3 CodeBlock←LogStream / 3-4 Table←BuildsList(StatusPill→Badge 논점 선결) / 3-5 AppShell+TopNav←레이아웃 셸.",
-  "purpose_digest_rev": 177,
+  "purpose_digest_rev": 178,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-142 (Astryx 3-4b Admin 테이블 이관 + BuildRow 제거) 봉인 (rev 165→166). 누적 회귀 baseline: frontend vitest 266 / build-server 178 / TS 5 packages clean / go 8/8 / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 / 양 테마 WCAG AA 대비 전수 통과 / Astryx 토큰 충돌 0종 / 초기 로드 JS gzip 94.66 / 손 CSS 2,135줄.",
-    "current_axis": "Astryx 3단계 이관 — 3-1(Dialog)/3-2(BuildRequest 폼)/3-3(LogStream→CodeBlock)/3-4(BuildsList→Table+배지 정책)/3-4b(Admin 테이블 + BuildRow 제거) 봉인. 중간에 라우트 지연 로드(TASK-139) 정지작업. TASK-140~142 는 main 에 병합 완료(HEAD 8773fbc), 작업 브랜치 전부 삭제 — 로컬 브랜치는 main 단독. 남은 큰 이관은 3-5 AppShell+TopNav ← 레이아웃 셸. 원격 반영 여부는 `git log origin/main..main` 을 볼 것.",
-    "current_focus": "다음: **3-5 AppShell+TopNav ← 레이아웃 셸** — TASK-132 가 손으로 만든 셸(--dib-layout-max/--dib-header-h/<main class=app-main>)을 Astryx AppShell+TopNav 로 대체. AppShell 은 responsive mobile nav + skip-to-content 를 자동 처리한다. 단 TASK-132 가 실측해 맞춘 정렬(272/272, 헤더-본문 기준선 일치)을 Astryx 기준으로 **재검증** 필요. 이것이 3단계의 마지막 큰 이관이다. 이월: **admin 라우트 테스트 4종 복원**(TASK-142 에서 유령 헤더 결함을 놓친 직접 원인) + PROJECT_PROFILE §3.4 정정 / 라우트 CSS 전역 유출 감사(Login.css 에서 두 번 나옴) / B층 가드가 오버레이를 검사하지 못함 / PhaseTimeline.tsx 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.",
+    "current_baseline": "TASK-143 (admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정) 봉인 (rev 166→167). 누적 회귀 baseline: frontend vitest 281 / build-server 178 / TS 5 packages clean / go 8/8 / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 / 양 테마 WCAG AA 대비 전수 통과 / Astryx 토큰 충돌 0종 / admin 가드 라우트 레벨 회귀 복원.",
+    "current_axis": "Astryx 3단계 이관 — 3-1~3-4b 봉인 + 라우트 지연 로드(TASK-139) 정지작업 + admin 통합 테스트 복원(TASK-143). TASK-143 은 main 미병합(작업 브랜치 feat/task-143-admin-tests). 남은 큰 이관은 3-5 AppShell+TopNav ← 레이아웃 셸. 병합 상태는 git 참조.",
+    "current_focus": "다음: **3-5 AppShell+TopNav ← 레이아웃 셸** (3단계의 마지막 큰 이관). TASK-132 가 손으로 만든 셸(--dib-layout-max/--dib-header-h/<main class=app-main>/Header)을 Astryx AppShell+TopNav 로 대체. AppShell 은 responsive mobile nav + skip-to-content 자동 처리. 단 TASK-132 가 실측한 정렬(272/272)을 Astryx 기준으로 재검증 필요. Header 재구성 시 admin 조건부 노출 로직이 얽혀 있는데, **이제 TASK-143 의 admin 통합 테스트가 안전망을 깔았으므로 셸 교체가 admin 진입을 깨면 잡힌다.** 이월: 라우트 CSS 전역 유출 감사(Login.css 에서 두 번 나옴) / B층 가드가 오버레이를 검사하지 못함 / PhaseTimeline.tsx 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-143 (admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정, Test + Doc): admin 라우트 테스트는 Svelte 트리에만 있었고 TASK-101(313ae2e)이 삭제, React 로 이관된 적 없어 TASK-084 의 admin 가드 라우트 레벨 회귀가 2026-07-18 이래 부재(TASK-137 발견). 그 공백의 대가를 TASK-142 유령 헤더 결함으로 치렀다. **복원**: 살아있는 테스트(admin-guard.test 헬퍼 / AdminAccessDenied 패널 / AdminTabs 탭)가 덮는 것은 반복 안 하고 **라우트가 실제로 가드를 호출하고 결과에 맞게 동작하는가** 통합 계약에 집중. react/src/routes/admin-routes.test.tsx 신규 15건: 4 라우트 공통 3 시나리오(userId 없음 → / redirect + backend 미호출 / 비-admin → AdminAccessDenied + 목록 API 미호출 / admin → 정상 렌더 + 목록 API 호출) — AdminBuilds/Users/Runners 는 describe.each, AdminAdmins 는 store 기반이라 별도 — + 페이지 고유 회귀(AdminBuilds 유령 헤더 5열 검증 / AdminUsers recent 패널 / AdminRunners Register Runner 모달). **유령 헤더 가드 실증**: 결함을 되살려(buildColumns 를 Project/Repository 섞은 버전으로 임시 교체) 정확히 실패하는지 확인 후 원복 — '가드를 만든 것과 가드가 동작하는 것은 다르다'. 발견 과정에서 확인한 구현 특성: AdminBuilds 는 visible.length===0 이면 'No builds' 분기라 Table 미렌더 → 헤더 검사는 빌드 1건 필요(반영). **PROJECT_PROFILE §3.4 정정**: 'admin 페이지 test 4종 5건' 을 현재 사실로 서술 중이었으나 그건 삭제된 Svelte 것 — React 통합 테스트로 교체 + 경위 명시. **검증**: TSC clean / vitest 266 → 281 / 유령 헤더 가드 실증(재현 실패·정상 통과) / 문서 무결성 가드 통과. 코드 동작 변경 0(테스트+문서만), 백엔드 영향 0.",
       "TASK-142 (Astryx 3-4b — Admin 테이블 이관 + BuildRow 제거, Code + Test): TASK-141 이 만든 buildColumns.tsx 를 그대로 재사용해 AdminBuilds/AdminUsers 를 Astryx Table 로 이관, 두 사용처가 사라져 BuildRow.tsx (111줄) 삭제. **발견한 기존 결함 — AdminBuilds 유령 헤더**: 헤더가 6열(Status/Build/Project/Repository/Owner/Updated)을 선언했는데 BuildSummary 에는 project/repository 필드가 **없다**. 본문 BuildRow 는 App(appName) 한 열이었다 — 즉 Project/Repository 는 존재하지 않는 데이터를 가리키는 **유령 헤더**였고 헤더 6열 vs 본문 4~5열로 정렬이 어긋나 있었다. admin 라우트 테스트가 삭제된 상태(TASK-137 발견)라 미검출. buildColumns(true) (5열)로 이관하며 헤더-본문이 단일 정의로 통일돼 **자동 해소**(실브라우저 헤더 6→5 확인). AdminUsers recent-builds 패널은 buildColumns(false) (owner 는 이미 @selectedUser 로 필터된 단일 사용자라 열로 반복 안 함), user rollup 테이블은 손 테이블 그대로 유지. 배지 정책(TASK-141)이 admin 에도 적용됨(실브라우저 BUILDING/FAILED 배지 확인). **flaky 테스트 안정화**: BuildRow 삭제 후 전체 스위트에서 App.test 의 'renders BuildsList' 가 간헐 실패(격리 실행은 항상 통과). TASK-139 지연 로드의 findBy 기본 타임아웃(1000ms)이 전체 스위트 부하로 초과된 것 — 청크 로딩 대기 성격이 분명하므로 타임아웃 5000ms 명시(로직이 아니라 I/O). 3회 연속 266 통과로 해소. **검증**: TSC clean(BuildRow 삭제 후에도) / vitest 266 불변 / B층 통과 / AdminBuilds 헤더 6→5 정렬 + @bob owner + 배지 / AdminUsers recent 4열 + 배지 + rollup 유지 / 검수 데이터 정리. **번들**: 초기 JS gzip 94.65 → 94.66(불변), admin 청크 거의 불변(Table 은 공용 청크 공유). BuildRow.tsx 111줄 삭제, StatusPill 실사용 5파일로 정리.",
       "TASK-141 (Astryx 3-4 — BuildsList → Table + StatusPill 배지 정책 변경, Code + Test): **배지 정책이 핵심 변경**. Astryx Badge 문서가 '정상 상태에 success 배지를 달지 말라 / 모든 행에 같은 배지를 반복하지 말라' 를 명시하는데, 빌드 목록은 대부분 COMPLETED 로 끝나므로 전부 초록 배지를 달면 **정작 봐야 할 FAILED 가 묻힌다**. 세 안 중 사용자가 '권고 반영'을 선택 → **주의가 필요한 상태만 배지** (warning: PREPARING_SOURCE/BUILDING, info: TESTING/DEPLOYING/CLAIMED/TEST_READY/PROVISIONING/PREVIEW_*, error: FAILED/DISABLED), 정상 종료·대기는 평문(RECEIVED/QUEUED/*_SUCCESS/COMPLETED/CANCELLED/EXPIRED/ACTIVE). **success variant 를 어떤 상태에도 쓰지 않는 것**이 정책의 핵심이며 테스트로 고정했다. 실브라우저 확인(COMPLETED 2/FAILED 1/BUILDING 1 시드): BUILDING[배지] FAILED[배지] COMPLETED(평문) COMPLETED(평문) — 실패와 진행 중이 한눈에 들어온다. 이 변경은 StatusPill 을 쓰는 **6개 파일 전체**에 전파. **a11y 계약 유지**: 평문으로 낮췄다고 스크린리더에서 상태가 사라지면 안 되므로 배지든 평문이든 role='status' + aria-label='Status: X' 동일 유지, lifecycleStatus 우선 / 빈 값 → UNKNOWN 도 그대로. **Table 이관**: 손수 만든 <table>+BuildRow → Astryx Table(data/columns/idKey), 열 정의를 buildColumns.tsx 로 분리해 AdminBuilds/AdminUsers 이관 때 재사용(withOwner 플래그로 5열 지원). 'Build' 셀은 탐색이므로 Link 유지. **과도기 중복**: admin 2종이 아직 BuildRow 를 쓰므로 셀 렌더링이 두 곳에 있다 — admin 이관 후 BuildRow.tsx 제거 예정. **테스트**: 기존 StatusPill.test 는 인라인 스타일 세부(--dib-pill-color/padding/alpha%)에 결합돼 있었고 그 구현을 의도적으로 걷어냈으므로 해당 단언도 제거, 지속되는 계약만 남겨 43건 재작성. BuildsList.test 의 getAllByTestId('build-row') 는 Table 이 자체 행을 렌더하므로 시맨틱 role='row' 로 전환 (검증 의도 동일). **검증**: TSC clean / vitest 246 → 266 / B층 하이재킹 0·위반 0 / 실브라우저 정책 확인 / 검수 데이터 정리. **번들**: 초기 JS gzip 94.59 → 94.65(사실상 불변), BuildsList 청크 0.92 → 12.07 — TASK-139 분할 덕에 Table 비용이 그 라우트에만 실렸다. **측정 오류 1건(자기 정정)**: 브라우저에서 행 수를 querySelectorAll('[role=\"row\"]') 로 세다 0 이 나와 '테이블 미렌더' 로 오판. 속성 선택자는 <tr> 의 **암묵 role** 을 못 잡는다(RTL getAllByRole 은 잡는다). tbody tr 로 세니 4행 정상. TASK-140 에 이어 측정 방법 오류가 반복 — DOM 을 볼 때 암묵 role/렌더 경로 차이를 먼저 확인할 것.",
       "TASK-140 (Astryx 3-3 — LogStream → CodeBlock, Code + Test): **얻은 것** — 로그 복사 버튼(이전엔 드래그 선택뿐이라 운영자가 실패 로그를 공유할 수단이 없었다) / 줄 번호 / maxHeight·isWrapped prop 화(인라인 스타일 14종 제거). **보존한 것** — (1) 양 테마 터미널 톤: tokens.css 의 '라이트도 터미널 톤 유지' 는 의도적 선택인데 CodeBlock 은 테마를 따라가므로 syntaxTheme={tokyoNight} 로 다크 프리셋 고정(실브라우저 확인). (2) 부분별 색 구분: 타임스탬프/[PHASE] 구분은 '운영자가 빠르게 스캔' 이라는 TASK-091 목적 그 자체라 code:string 평탄화로 사라지므로 custom tokenizer 로 되살림(타임스탬프→comment, [PHASE]→keyword). **한계**: CodeBlock 은 본래 코드용이고 로그는 구조화된 레코드다 — 토크나이저로 맞춘 것이지 의미가 완전히 일치하진 않는다. 검색·필터·자동스크롤 요구가 붙으면 전용 컴포넌트로 되돌리는 편이 나을 수 있다. **발견한 결함 — Login.css 전역 유출 2회차**: TASK-138 에서 bare label{}/input{} 을 고쳤는데 같은 파일에 bare form{}/h1{} + 일반 클래스명 .card/.logo/.subtitle/.btn-primary 가 더 있었다. **.card 가 실제 피해**: Astryx CodeBlock 은 container='card' 일 때 literal card 클래스를 붙이는데(실측 'astryx-codeblock sm log card') .card{max-width:400px} 가 unlayered 라 이겨서 **로그 뷰어가 400px 로 잘렸다**(width='100%' 를 넘겨 --x-width:100% 가 설정됐는데 그 위에서 max-width 가 덮음). 한 규칙만 고치면 재발하므로 **파일 전체를 .login-page 스코프로 닫음** → 로그 뷰어 400→1342px, Login 은 카드 400px·input 47px 불변(양쪽 실측). **자기 정정 2건 — 둘 다 측정 오류**: (1) '토크나이저가 프로덕션에서 동작 안 함' — DOM 에서 astryx-token span 을 찾았는데 없었다. 실제로는 CodeBlock 이 useSpans = spans || (auto && !hasHighlightAPI()) || (auto && isSafari()) 로 경로를 나눈다. jsdom 은 Highlight API 가 없어 span 경로, Chrome 은 있어 Range 기반 ::highlight() 경로라 DOM 은 평문이고 색은 Highlight API 가 입힌다(CSS.highlights.size===2 확인). **span 이 없다 ≠ 색이 없다.** 부작용으로 LogStream.test 의 색 검증은 span 폴백 경로를 검사한다는 사실을 주석에 남김. (2) '라이트에서 배경이 흰색' — 바깥 컨테이너를 재고 있었고 실제 코드 영역은 양 테마 다크. **테스트**: 기존 단언 하나가 무의미해진 것을 발견해 고침 — BuildDetail 의 queryAllByTestId('log-entry').toHaveLength(0) 은 이관 후 log-entry 요소가 사라져 **항상 통과**하게 됐다. LogStream.test.tsx 신규 7건(색 검증은 색이 지정돼 있는지 먼저 확인해 공허한 통과 차단). **검증**: TSC clean / vitest 239 → 246 / B층 하이재킹 0·위반 0 / 실브라우저 양 테마 확인 / Login 회귀 없음 / 검수 데이터 정리(build_request 0건). **번들**: 초기 JS gzip 94.56 → **94.59**(사실상 불변), BuildDetail 청크 3.15 → **12.14** — TASK-139 라우트 분할 덕에 CodeBlock 비용이 쓰는 라우트에만 실렸다. LogStream.tsx 107 → 137줄 — 이 이관은 코드를 줄이는 게 아니라 **기능을 얻는** 이관이었다.",
@@ -109,15 +110,15 @@
       "TASK-078 container self-dogfood (PR #28)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 101,
+    "handoff_rev": 102,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 96,
-    "latest_rev": 44,
+    "index_rev": 97,
+    "latest_rev": 45,
     "in_progress_items": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-21.md",
-    "task_count": 53,
+    "task_count": 54,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -175,10 +176,11 @@
       "TASK-139 라우트 지연 로드 (rev 51 sync 봉인, 초기 로드 gzip 161.39 → 119.07KB)",
       "TASK-140 Astryx 3-3 LogStream → CodeBlock (rev 52 sync 봉인, 복사 버튼·줄번호 획득 + Login.css 전역 유출 2회차 수정)",
       "TASK-141 Astryx 3-4 BuildsList → Table + StatusPill 배지 정책 (rev 53 sync 봉인, 주의 상태만 배지 — vitest 246 → 266)",
-      "TASK-142 Astryx 3-4b Admin 테이블 이관 + BuildRow 제거 (rev 54 sync 봉인, 유령 헤더 결함 해소 + flaky 안정화)"
+      "TASK-142 Astryx 3-4b Admin 테이블 이관 + BuildRow 제거 (rev 54 sync 봉인, 유령 헤더 결함 해소 + flaky 안정화)",
+      "TASK-143 admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정 (rev 55 sync 봉인, 신규 15건 + 유령 헤더 가드 실증 — vitest 266 → 281)"
     ],
-    "index_rev": "80",
-    "latest_rev": "57"
+    "index_rev": "81",
+    "latest_rev": "58"
   },
   "next_documents": [
     "ai-workflow/memory/active/session_handoff.md",

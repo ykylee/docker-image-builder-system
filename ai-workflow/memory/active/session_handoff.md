@@ -6,6 +6,25 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 136→137: **TASK-143 admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정 봉인**).
+
+  브랜치 `feat/task-143-admin-tests` (병합·push 상태는 `git status -sb` 를 볼 것).
+
+  **왜 필요했나**: admin 라우트 테스트는 **Svelte 트리에만** 있었고 TASK-101(`313ae2e`)이 삭제했다. React 트리로는 이관된 적이 없어 TASK-084 의 admin 가드 라우트 레벨 회귀가 2026-07-18 이래 부재했다(TASK-137 발견). **그 공백의 대가를 TASK-142 유령 헤더 결함으로 치렀다** — 이 테스트가 있었으면 잡혔을 것이다.
+
+  **복원**: 살아있는 테스트(`admin-guard.test` 헬퍼 / `AdminAccessDenied` 패널 / `AdminTabs` 탭)가 이미 덮는 것은 반복하지 않고, **라우트가 실제로 가드를 호출하고 그 결과에 맞게 동작하는가** 라는 통합 계약에 집중했다. `react/src/routes/admin-routes.test.tsx` 신규 **15건**:
+  - **4 라우트 공통 3 시나리오** (AdminBuilds/Users/Runners 는 `describe.each`, AdminAdmins 는 store 기반이라 별도): userId 없음 → `/` redirect + backend·가드 **미호출** / 비-admin → AdminAccessDenied + **목록 API 미호출**(defense in depth) / admin → 정상 렌더 + 목록 API 호출(callerId 로 admin id 전달)
+  - **페이지 고유 회귀**: AdminBuilds **유령 헤더**(정확히 Status/Build/App/Owner/Updated 5열, Project/Repository 없음) / AdminUsers recent 패널 / AdminRunners Register Runner 모달
+
+  **유령 헤더 가드 실증**: 가드를 만든 것과 가드가 동작하는 것은 다르므로 **결함을 되살려** 확인했다 — `buildColumns(true)` 를 Project/Repository 유령 컬럼을 섞은 버전으로 임시 교체 → 해당 테스트가 **정확히 실패**, 원복 후 통과. 발견 과정에서 구현 특성도 확인: **AdminBuilds 는 `visible.length === 0` 이면 "No builds" 분기라 Table 을 렌더하지 않는다** — 헤더 검사는 빌드 1건이 필요하다(반영).
+
+  **PROJECT_PROFILE §3.4 정정**: 문서가 "admin 페이지 test 4종 신규 케이스 합계 5건" 을 **현재 사실로** 서술 중이었으나 그건 삭제된 Svelte 것이었다. React 통합 테스트로 교체하고 경위(Svelte 전용 → TASK-101 삭제 → 미이관 → TASK-143 복원)를 명시했다.
+
+  **검증**: TSC clean / vitest **266 → 281** / 유령 헤더 가드 실증(재현 시 실패·정상 시 통과) / 문서 무결성 가드 통과. 코드 동작 변경 0(테스트 + 문서만), 백엔드 영향 0.
+
+  **다음: 3-5 `AppShell`+`TopNav` ← 레이아웃 셸** (3단계의 마지막 큰 이관). TASK-132 가 손으로 만든 셸(`--dib-layout-max`/`--dib-header-h`/`<main class=app-main>`/Header)을 Astryx `AppShell`+`TopNav` 로 대체. AppShell 은 responsive mobile nav + skip-to-content 를 자동 처리한다. 단 TASK-132 가 실측한 정렬(272/272)을 Astryx 기준으로 **재검증** 필요. Header 재구성 시 admin 조건부 노출 로직이 얽혀 있는데, **이제 TASK-143 의 admin 통합 테스트가 안전망을 깔았으므로 셸 교체가 admin 진입을 깨면 잡힌다.**
+
+  이월: 라우트 CSS 전역 유출 감사 / B층 가드 오버레이 검사 / `PhaseTimeline.tsx` 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 177→178, handoff 136→137, work_backlog TASK-143 등록, backlog 2026-07-21 rev 20) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 135→136: **TASK-142 Astryx 3-4b — Admin 테이블 이관 + BuildRow 제거 봉인**).
 
   브랜치 `feat/task-142-admin-table` (병합·push 상태는 `git status -sb` 를 볼 것).

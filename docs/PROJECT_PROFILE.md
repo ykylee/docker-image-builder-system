@@ -138,8 +138,9 @@
   - `apps/build-monitor/react/src/components/AdminAccessDenied.tsx` — 공통 권한 없음 패널. `page-head` + danger accent h1 + Login.tsx `.card` 패턴 차용 카드 + 두 액션 (`Back to Builds` 는 userId 유지하며 `/builds` 로 이동, `Switch user` 는 userIdStore clear 후 `/login` redirect).
 - amend: `AdminBuilds.tsx` / `AdminUsers.tsx` / `AdminAdmins.tsx` / `AdminRunners.tsx` — useEffect 첫 단계에서 (1) `userId` 부재 시 navigate("/login") (기존), (2) `ensureAdminAccess(userId)` 호출, (3) `!isAdmin` 시 `accessDenied` state set + 친절한 패널 노출. backend 호출 (listAdminBuilds / listAdminUsers / listAdminRunners / refresh)은 frontend 가드 통과 후에야 일어남 — raw 403 envelope 이 화면에 노출될 surface 가 사라진다.
 - Backend 동작은 변경 없음. Build Server 의 `X-Admin-Id` 401/403 envelope (TASK-049 / TASK-076) 은 그대로 유지 — frontend 가드 통과 후에도 backend 는 동일하게 한 번 더 검증 (defense in depth).
-- 신규 회귀 가드: `admin-guard.test.ts` 4건 + admin 페이지 test 4종 신규 케이스 합계 5건 (AdminBuilds/AdminUsers/AdminRunners/AdminAdmins 각 1건 + AdminUsers 의 FORBIDDEN 별도 1건) — 비-admin userId 시 accessDenied 분기 + backend API 미호출 검증.
-- 회귀: TS 5 packages `tsc --noEmit` clean, build-monitor vitest **130/130 PASS** (TASK-101 baseline), vite build:react 정상 — gzip js **99.01KB** / css **30.62KB**.
+- 회귀 가드 (TASK-143 정정): `admin-guard.test.ts` 는 `ensureAdminAccess` **헬퍼 로직**을 덮는다. **라우트가 실제로 그 가드를 호출하는지** 는 `react/src/routes/admin-routes.test.tsx` (TASK-143 신규) 가 통합 레벨로 덮는다 — 4 라우트 공통 3 시나리오 (userId 없음 → `/` redirect + backend 미호출 / 비-admin → AdminAccessDenied + backend 미호출 / admin → 정상 렌더 + 목록 API 호출) + 페이지 고유 회귀 (AdminBuilds 유령 헤더 / AdminUsers recent 패널 / AdminRunners Register Runner).
+  - **경위**: 이 자리에는 원래 "admin 페이지 test 4종 5건" 이 있었는데, 그 테스트는 **Svelte 트리에만** (`src/routes/Admin*.test.ts`) 존재했고 TASK-101(`313ae2e`)이 Svelte scaffold 를 정리하며 삭제했다. React 트리로는 이관된 적이 없어 admin 가드 라우트 레벨 회귀가 2026-07-18 이래 부재했다 (TASK-137 발견 / TASK-142 유령 헤더 결함의 직접 원인). TASK-143 이 React 통합 테스트로 복원하며 본 서술을 정정했다.
+- 회귀 (TASK-143 기준): TS 5 packages `tsc --noEmit` clean, build-monitor vitest **281 PASS** (Astryx 이관 시리즈 TASK-136~143 누적).
 
 ## 3.5 Production semantic 운영 검증 (TASK-085)
 - 의도: TASK-081-B / TASK-082 의 dummy (size 0 source) 검증이 build 가 FAILED 로 끝나는 시나리오만 다뤘던 한계를 보완. busybox/scratch Dockerfile + 실제 `tar.gz` source archive 로 build 가 COMPLETED 까지 가는 운영 시나리오 자동 재현. `docs/operations/dogfood-e2e-2026-07-06.md` §2.2 의 `bab5995f-…-95d53684263d` (수동 dogfood) 의 자동 재현 동등물.
