@@ -29,8 +29,9 @@
 
 import { Suspense, lazy, type ReactElement } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { AppShell } from "@astryxdesign/core";
 
-import { Header } from "@/components/Header";
+import { AppHeader } from "@/components/AppHeader";
 import { Login } from "@/routes/Login";
 
 // TASK-139: 라우트 지연 로드.
@@ -57,29 +58,42 @@ const AdminRunners = lazy(async () => ({ default: (await import("@/routes/AdminR
 
 export function App(): ReactElement {
   return (
-    <>
-      <Header />
-      {/* 2026-07-21 UI 검수: 페이지 공통 셸 + <main> 랜드마크.
-          폭·여백은 globals.css 의 .app-main 한 곳에서만 결정한다. */}
-      <main className="app-main">
-        {/* 청크를 받는 동안의 대체 표시. 각 페이지가 자체 로딩 상태에서
-            쓰는 `.muted` 문구와 같은 형태라 전환이 튀지 않는다. */}
-        <Suspense fallback={<p className="muted">Loading…</p>}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/builds" element={<BuildsList />} />
-            <Route path="/builds/:buildId" element={<BuildDetail />} />
-            <Route path="/build-request" element={<BuildRequest />} />
-            <Route path="/api-console" element={<ApiConsole />} />
-            <Route path="/admin/builds" element={<AdminBuilds />} />
-            <Route path="/admin/users" element={<AdminUsers />} />
-            <Route path="/admin/admins" element={<AdminAdmins />} />
-            <Route path="/admin/runners" element={<AdminRunners />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Suspense>
-      </main>
-    </>
+    // TASK-144: 손수 만든 <header> + <main class=app-main> 셸 →
+    // Astryx AppShell. skip-to-content 링크와 responsive mobile nav 를
+    // AppShell 이 자동 처리한다 (TASK-132 가 손으로 만든 셸을 대체).
+    //
+    // height="auto": 우리 페이지는 콘텐츠에 따라 자란다(빌드 목록·폼). 'fill'
+    // 은 100dvh 고정 + 내부 독립 스크롤이라 대시보드용이다.
+    //
+    // contentPadding={4}: 폼/텍스트가 지배적인 콘텐츠라 16px. 폭 중앙정렬은
+    // Astryx 기본을 따른다(사용자 결정) — TASK-132 의 --dib-layout-max 는
+    // globals.css 에서 제거됐다.
+    <AppShell
+      topNav={<AppHeader />}
+      height="auto"
+      contentPadding={4}
+      // <md 에서 TopNav 를 mobile-bar 로 전환 + 탐색 링크를 drawer 로.
+      // 명시하지 않아도 disabled 는 아니지만(=== false 만 disabled), toggle
+      // 동작을 확실히 하려고 config 를 준다. breakpoint 기본 md(768px).
+      mobileNav={{ breakpoint: "md" }}
+    >
+      {/* 청크를 받는 동안의 대체 표시. 각 페이지가 자체 로딩 상태에서
+          쓰는 `.muted` 문구와 같은 형태라 전환이 튀지 않는다. */}
+      <Suspense fallback={<p className="muted">Loading…</p>}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/builds" element={<BuildsList />} />
+          <Route path="/builds/:buildId" element={<BuildDetail />} />
+          <Route path="/build-request" element={<BuildRequest />} />
+          <Route path="/api-console" element={<ApiConsole />} />
+          <Route path="/admin/builds" element={<AdminBuilds />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/admins" element={<AdminAdmins />} />
+          <Route path="/admin/runners" element={<AdminRunners />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
+    </AppShell>
   );
 }

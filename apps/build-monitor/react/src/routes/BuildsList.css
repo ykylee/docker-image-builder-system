@@ -30,6 +30,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  /* TASK-144: 좁은 화면에서 h1 + 필터 칩이 한 줄에 안 맞아 칩이 화면 밖으로
+     잘렸다 (AppShell 이관 후 가로 스크롤은 없지만 칩이 넘침). 세로로 쌓고
+     칩은 여러 줄로 감싸 잘림을 없앤다. */
+  flex-wrap: wrap;
+  gap: var(--dib-space-md);
 }
 
 .list-page h1 {
@@ -45,6 +50,7 @@
 
 .chips {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: var(--dib-space-xs);
   background: var(--dib-color-bg-surface);
   padding: var(--dib-space-xs);

@@ -61,9 +61,10 @@ import "@/globals.css";
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { Theme } from "@astryxdesign/core";
+import { LinkProvider, Theme } from "@astryxdesign/core";
 
 import { ErrorBoundary } from "@/lib/ErrorBoundary";
+import { RouterLink } from "@/lib/RouterLink";
 import { useThemeStore } from "@/lib/stores/themeStore";
 import { dibTheme } from "@/theme";
 import { App } from "@/App";
@@ -94,7 +95,12 @@ function ThemedApp(): React.ReactElement {
   return (
     <Theme theme={dibTheme} mode={mode}>
       <BrowserRouter>
-        <App />
+        {/* TASK-144: 모든 Astryx 링크(TopNavItem / Link 등)가 react-router
+            로 SPA 내비게이션하도록 어댑터를 전역 등록한다. LinkProvider 는
+            react-router context 를 쓰므로 반드시 BrowserRouter 안쪽. */}
+        <LinkProvider component={RouterLink}>
+          <App />
+        </LinkProvider>
       </BrowserRouter>
     </Theme>
   );

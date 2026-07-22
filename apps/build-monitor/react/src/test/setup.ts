@@ -114,3 +114,23 @@ if (typeof window !== "undefined" && typeof HTMLDialogElement !== "undefined") {
     };
   }
 }
+
+// ── ResizeObserver 폴리필 (TASK-144, Astryx AppShell 이관) ──────────────
+//
+// jsdom 은 ResizeObserver 를 구현하지 않는다. Astryx AppShell / TopNav 의
+// responsive 처리(breakpoint 감지, 모바일 nav 전환)가 이를 쓰므로, 폴리필
+// 없이는 마운트 시점에 `ResizeObserver is not defined` 로 죽는다.
+//
+// jsdom 에는 레이아웃 엔진이 없어 실제 크기 변화를 관측할 수 없다 — 이
+// 폴리필은 인터페이스만 만족시키는 no-op 이다. **반응형 브레이크포인트
+// 동작(모바일 nav 전환 등)은 jsdom 으로 검증 불가**하므로 실브라우저에
+// 맡긴다. 여기서는 컴포넌트가 마운트 중 죽지 않게만 한다.
+if (typeof globalThis.ResizeObserver === "undefined") {
+  class ResizeObserverStub {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  }
+  globalThis.ResizeObserver =
+    ResizeObserverStub as unknown as typeof ResizeObserver;
+}

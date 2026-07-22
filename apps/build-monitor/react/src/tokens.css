@@ -93,17 +93,10 @@
   --dib-space-xxl: 2rem;
   --dib-space-xxxl: 3rem;
 
-  /* Layout — 앱 셸 단일 기준 (2026-07-21 UI 검수).
-     이전에는 #app-react 에 padding 만 있고 페이지마다 max-width / padding /
-     calc(100vh - ...) 를 제각각 하드코딩해 헤더와 본문의 좌측 기준선이
-     어긋나고(1920 에서 232px) 세로 계산도 세 페이지가 서로 다른 값을
-     가정하고 있었다. 아래 3개가 그 단일 출처다:
-       --dib-layout-max     본문/헤더 공통 최대 폭
-       --dib-layout-gutter  본문/헤더 공통 좌우 여백 (헤더와 정렬되려면 동일해야 함)
-       --dib-header-h       sticky 헤더 높이. 세로 calc 은 반드시 이 값을 참조할 것. */
-  --dib-layout-max: 1440px;
-  --dib-layout-gutter: var(--dib-space-xxl);
-  --dib-header-h: 64px;
+  /* Layout — TASK-144 에서 제거. TASK-132 가 도입한 --dib-layout-max /
+     --dib-layout-gutter / --dib-header-h 는 손수 만든 셸(.app-main + .hdr)의
+     폭·여백·헤더 높이 단일 출처였다. 그 셸이 Astryx AppShell + TopNav 로
+     이관되면서(3-5) 폭·여백·헤더-본문 정렬을 AppShell 이 담당한다. */
 
   /* Radius */
   --dib-radius-sm: 6px;

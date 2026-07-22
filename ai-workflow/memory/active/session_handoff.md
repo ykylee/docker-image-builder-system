@@ -6,6 +6,27 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 137→138: **TASK-144 Astryx 3-5 — 레이아웃 셸 → `AppShell`+`TopNav` 봉인, 3단계 마지막 큰 이관**).
+
+  브랜치 `feat/task-144-appshell` (병합·push 상태는 `git status -sb` 를 볼 것). **이것으로 Astryx 컴포넌트 이관이 사실상 마무리됐다.**
+
+  **사용자 결정 2건**: 이관 범위 = **AppShell 전면 교체** / 폭 = **Astryx 기본값 따름**(`--dib-layout-max` 제거).
+
+  **이관**: `Header` + `<main class=app-main>` → `AppShell topNav={<AppHeader/>}` (height="auto" / contentPadding={4}). `AppHeader` 신규 — Header 로직(admin auto-enable/logout/prefetch) 유지, 마크업만 TopNav 슬롯. **react-router 통합**: Astryx 링크는 `as` 컴포넌트에 `href` 를 넘기는데 `Link` 는 `to` 를 읽으므로 `RouterLink` 어댑터(href→to, 외부·`_blank` 는 네이티브 `<a>`) + `<LinkProvider component={RouterLink}>` **전역 등록** → 모든 Astryx 링크가 SPA 내비게이션. **얻은 것**: skip-to-content 자동 / `role="main"` 랜드마크 / responsive mobile-bar+drawer. **제거**: `Header.tsx`·`css`(298줄) + `--dib-layout-max`/`gutter`/`header-h` + globals 의 `.app-main`/`#app-react` flex/반응형 gutter. 손 CSS 2,120 → **1,956줄**.
+
+  **모바일 반응형 회귀 — 발견하고 해결** (사용자 "지금 고치고 봉인"): 이관 직후 **모바일 390px 가로 스크롤**(TASK-132 회귀). **원인 규명**: (1) AppShell 의 `mobileNav` 자동 처리는 **SideNav 전용**이다. (2) TopNav 의 mobile-bar 모드는 **startContent(nav items)만 숨기고 endContent 는 그대로** 둔다. (3) 우리가 endContent 에 링크 3개(API Console/OpenAPI/Docs)를 넣어 모바일에서 넘쳤다(login 페이지 585px, FilterChips 무관). **해결**: 탐색 링크 전부를 startContent 로 이동(mobile-bar 가 숨김 + 햄버거 drawer 로 접근), endContent 는 세션 컨트롤(@user/Logout/Theme)만, `mobileNav={{breakpoint:"md"}}` 명시, FilterChips `.page-head`/`.chips` 에 `flex-wrap`(칩 잘림 해결). **부수효과**: 데스크톱 헤더도 개선(탐색 좌측 / 컨트롤 우측 분리).
+
+  **jsdom 폴리필**: AppShell 이 `ResizeObserver` 를 써서 App.test 4건이 죽었다 → `test/setup.ts` 에 no-op 폴리필(Dialog 폴리필과 같은 자리). **반응형 브레이크포인트 동작은 jsdom 으로 검증 불가**라 실브라우저에 맡긴다고 주석 명시.
+
+  **테스트**: `Header.test`(14) → `AppHeader.test`(8). TopNav 로 링크 testid 가 사라져 접근성 질의(role="link"+name)로 전환, 지속 계약(로그인 시 링크 노출 / admin auto-enable / logout / 외부 링크 target)만 유지.
+
+  **검증**: TSC clean / vitest **275** / B층 하이재킹 0 · 대비 위반 0 / skip-to-content 자동 / **모바일 390px 가로 스크롤 0 · 햄버거 drawer · 칩 4개 전부 표시** / Login 회귀 없음.
+
+  **번들**: 초기 JS gzip 94.66 → **134.63** (+40). **AppShell/TopNav 는 셸이라 모든 페이지가 쓰므로 초기 번들 필수 비용**이다(라우트 청크로 뺄 수 없다). CSS gzip 24.51 → 24.07.
+
+  **남은 것 (수용됨)**: 헤더 브랜드(x=40) vs 본문 heading(x=16) **24px 정렬 어긋남** — TopNav 브랜드 패딩과 AppShell contentPadding 의 기본 차이. "Astryx 기본값 따름" 결정 + TASK-132 의 "손 정렬은 반드시 어긋난다" 교훈으로 픽셀 조정하지 않고 수용. 거슬리면 contentPadding 조정 가능(단 반응형 재어긋남 위험).
+
+  **다음 세션 — Astryx 이관이 마무리됐으므로 마감/보강 국면**: (1) 헤더-본문 24px 정렬(수용 중, 필요 시 contentPadding 조정) / (2) **라우트 CSS 전역 유출 감사** — Login.css 에서 두 번 연속 나왔으므로 다른 파일에도 `.card` 같은 일반 클래스명·bare 셀렉터 충돌 가능 / (3) B층 가드 오버레이(모달) 검사 확장 / (4) **reset.css 도입 검토** — 손 CSS 가 1,956줄로 줄었으니 전역 리셋 재검토 시점 / (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 178→179, handoff 137→138, work_backlog TASK-144 등록, backlog 2026-07-21 rev 21) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 136→137: **TASK-143 admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정 봉인**).
 
   브랜치 `feat/task-143-admin-tests` (병합·push 상태는 `git status -sb` 를 볼 것).
