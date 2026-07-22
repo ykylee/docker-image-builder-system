@@ -6,6 +6,28 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 138→139: **TASK-145 라우트 CSS 전역 유출 감사 봉인 — 실제 회귀 발견·수정**).
+
+  브랜치 `fix/task-145-css-leak-audit` (병합·push 상태는 `git status -sb`).
+
+  **감사가 진짜 시각 회귀를 발견했다.** Login.css 에서 두 번 나온 유출 패턴(TASK-138 bare label/input, TASK-140 `.card`)을 전 CSS 에서 기계적으로 감사(정적 grep + 실측). 정적 스캔은 bare 일반 클래스 5개(`.badge`/`.banner`/`.chip`/`.form`/`.grid`) 후보만 줬고 **클래스 충돌 실측은 0건**. 그런데 **globals 의 bare `a`/`button` 실측이 진짜 문제를 드러냈다**:
+
+  - Astryx TopNavItem(`<a>`) color 가 우리 `--dib-color-accent-primary` 로 덮임
+  - **Astryx Button(`<button>`) background 가 우리 `button { background: none }` 으로 덮여 사라짐**
+
+  실브라우저 확인: BuildRequest 의 **Submit Build** + RegisterRunnerModal 의 **Register**(둘 다 Astryx primary)가 **배경 없이 회색 텍스트**로 렌더 — **모든 Astryx primary/secondary 버튼이 배경을 잃은 상태**였다.
+
+  **근본 원인 — unlayered × element 셀렉터**: 우리 CSS 는 Astryx @layer 보다 우선하는 unlayered 다. `button {}` 은 element 셀렉터라 Astryx `<button>` 에도 적용되고, **unlayered 라 specificity 무관하게 atomic 을 이긴다**. TASK-137(Dialog 이관) 때부터 있던 회귀인데 그동안 못 봤다.
+
+  **오판 정정**: 처음엔 `:where()` 화가 원인이라 의심했으나 원복 후에도 transparent 라 `:where` 무관(specificity 가 아니라 layer 문제)임이 드러났다.
+
+  **수정**: `a`/`button` base reset 을 **`:not([class*="astryx-"])`** 로 Astryx 요소를 매칭에서 제외 → Submit Build 배경 `rgb(126,129,243)` 인디고 **복구**(실측), 순수 `<a>`/우리 버튼 유지. bare `iframe`(ApiConsole.css)도 `.frame-wrap iframe` 스코프.
+
+  **재발 방지 lint**: `css-leak.test.ts` 신규 2건 — 라우트 CSS 에 bare element 셀렉터 금지(globals 예외, @keyframes from/to 제외) + globals 의 a/button 이 Astryx 제외 확인. **실증**: iframe 을 bare 로 되돌리니 lint 정확히 실패, 스코프 후 통과.
+
+  **검증**: TSC clean / vitest **275 → 277** / B층 하이재킹 0 · 대비 위반 0 / Astryx 버튼 배경 복구 / 검수 데이터 정리. 코드 로직 변경 0(CSS 스코프 + 테스트만), 백엔드 영향 0.
+
+  **다음 후보**: (1) **실측 CSS 유출 가드 스크립트화** — 이번에 쓴 "우리 클래스가 Astryx 요소에 붙는가" 실브라우저 검사를 B층처럼 opt-in 스크립트로(정적 lint 가 못 잡는 클래스 충돌 커버). (2) 헤더-본문 24px 정렬(수용 중). (3) B층 오버레이 검사 확장. (4) reset.css 도입 검토. (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 180→181, handoff 138→139, work_backlog TASK-145 등록, backlog 2026-07-21 rev 22) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 137→138: **TASK-144 Astryx 3-5 — 레이아웃 셸 → `AppShell`+`TopNav` 봉인, 3단계 마지막 큰 이관**).
 
   브랜치 `feat/task-144-appshell` (병합·push 상태는 `git status -sb` 를 볼 것). **이것으로 Astryx 컴포넌트 이관이 사실상 마무리됐다.**

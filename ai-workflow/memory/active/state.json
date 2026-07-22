@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-22T11:30:00Z",
+  "generated_at": "2026-07-22T12:30:00Z",
   "purpose_digest": "Astryx 도입 완료 국면. 재검토 후 '제대로 도입' 결정(TASK-134~) → 토큰 네임스페이스 --dib-* / 0.1.7 업데이트 / <Theme>+astryx.css 기반 / 라우트 지연 로드 / 컴포넌트 이관 3-1~3-5 + admin. 3단계 컴포넌트 이관 사실상 마무리: Dialog(RegisterRunnerModal) / TextInput·NumberInput(BuildRequest 폼) / CodeBlock(LogStream) / Table(BuildsList+Admin) + StatusPill 배지 정책(주의 상태만 배지) / AppShell+TopNav(레이아웃 셸). BuildRow.tsx 제거, admin 라우트 통합 테스트 복원. 매 이관 방식: 특성화/기존 테스트로 계약 고정 → 이관 → 같은 테스트 통과 → 실브라우저 실측 + B층 가드. 누적 발견·수정: Login.css 전역 유출 2회(bare label/input/form/h1 + .card max-width 가 Astryx CodeBlock 을 덮어 로그 뷰어 400px 잘림) / AdminBuilds 유령 헤더(존재하지 않는 project/repository 컬럼) / 반복된 측정 오류(span 부재≠색 부재 / 속성선택자는 암묵 role 못 잡음). 회귀: frontend vitest 275 / build-server 178 / TS 5 clean. 번들 초기 JS gzip 94.66→134.63(AppShell 셸 필수 비용). 손 CSS 2,323→1,956줄. 다음: 헤더-본문 24px 정렬(수용) / 라우트 CSS 전역 유출 감사 / B층 오버레이 검사 / reset.css 검토.",
-  "purpose_digest_rev": 180,
+  "purpose_digest_rev": 181,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -27,11 +27,12 @@
     "runtime_checks": "GET /health, POST /builds, GET /builds/:buildId, GET /builds/:buildId/logs 응답과 docs/PROJECT_PROFILE.md, state.json, session_handoff.md, work_backlog.md 간 current focus 정합성 점검"
   },
   "session": {
-    "current_baseline": "TASK-144 (Astryx 3-5 레이아웃 셸 → AppShell+TopNav) 봉인 (rev 167→168). 누적 회귀 baseline: frontend vitest 275 / build-server 178 / TS 5 packages clean / go 8/8 / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 / 양 테마 WCAG AA 대비 전수 통과 / Astryx 토큰 충돌 0종 / skip-to-content 자동 / 모바일 가로 스크롤 0 / 손 CSS 1,956줄.",
-    "current_axis": "Astryx 3단계 컴포넌트 이관 **완료** — 3-1~3-5 + admin 테이블/테스트. 마지막 3-5(AppShell+TopNav)로 손수 만든 레이아웃 셸을 대체하고 모바일 반응형 회귀까지 해결. TASK-143(admin 테스트) + TASK-144(AppShell) 는 main 에 병합 완료(HEAD 86e40be), 작업 브랜치 전부 삭제 — 로컬 브랜치는 main 단독. 이후는 마감/보강 국면. 원격 반영 여부는 `git log origin/main..main` 을 볼 것.",
-    "current_focus": "Astryx 컴포넌트 이관이 마무리됐다. 다음 후보: (1) **헤더-본문 24px 정렬** — TopNav 브랜드 패딩 vs AppShell contentPadding 기본 차이. 'Astryx 기본값 따름' 결정으로 수용 중이나 거슬리면 contentPadding 조정. (2) **라우트 CSS 전역 유출 감사** — Login.css 에서 두 번 연속 나왔으므로(.card/.logo/.subtitle/bare form·h1) 다른 파일에도 일반 클래스명·bare 셀렉터 충돌 가능. (3) B층 가드 오버레이(모달) 검사 확장. (4) reset.css 도입 검토 — 손 CSS 가 1,956줄로 줄었으니 전역 리셋 재검토 시점. (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.",
+    "current_baseline": "TASK-145 (라우트 CSS 전역 유출 감사) 봉인 (rev 168→169). 누적 회귀 baseline: frontend vitest 277 / build-server 178 / TS 5 packages clean / go 8/8 / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 / 양 테마 WCAG AA 대비 전수 통과 / Astryx 토큰 충돌 0종 / CSS 전역 유출 lint / Astryx 버튼 배경 복구.",
+    "current_axis": "Astryx 이관 완료 후 마감/보강 국면. TASK-145 로 라우트 CSS 전역 유출 감사 — globals bare a/button 이 Astryx 버튼 배경을 없애던 실제 회귀 발견·수정 + 재발 방지 lint. TASK-145 는 main 미병합(브랜치 fix/task-145-css-leak-audit). 병합 상태는 git 참조.",
+    "current_focus": "다음 후보: (1) **실측 CSS 유출 가드 스크립트화** — TASK-145 에서 쓴 '우리 클래스가 Astryx 요소에 붙는가' 실브라우저 검사를 B층처럼 opt-in 스크립트로(정적 lint 가 못 잡는 클래스 충돌 커버). (2) 헤더-본문 24px 정렬(수용 중, 필요 시 contentPadding 조정). (3) B층 가드 오버레이(모달) 검사 확장. (4) reset.css 도입 검토 — 손 CSS 가 줄었으니 전역 리셋 재검토. (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.",
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-145 (라우트 CSS 전역 유출 감사, Code 버그수정 + Test): Login.css 에서 두 번 나온 유출 패턴(TASK-138 bare label/input, TASK-140 .card)을 전 CSS 에서 기계적으로 감사(정적 grep + 실측). 정적 스캔은 bare 일반 클래스 5개(.badge/.banner/.chip/.form/.grid) 후보만 줬고 클래스 충돌 실측은 0건. **그러나 globals 의 bare a/button 실측이 진짜 회귀를 발견**: Astryx TopNavItem(a) color 가 우리 accent 로, **Astryx Button(button) background 가 우리 button{background:none} 으로 덮여 사라짐** — BuildRequest 의 Submit Build + RegisterRunnerModal 의 Register(둘 다 Astryx primary)가 배경 없이 회색 텍스트로 렌더되고 있었다(모든 Astryx primary/secondary 버튼 배경 소실). **근본 원인**: 우리 CSS 는 unlayered 라 Astryx @layer 보다 우선하고, button{} 은 element 셀렉터라 Astryx <button> 에도 적용되며 unlayered 라 specificity 무관하게 atomic 을 이긴다. TASK-137(Dialog 이관) 때부터 있던 회귀인데 그동안 못 봤다. **오판 정정**: 처음엔 :where() 화가 원인이라 의심했으나 원복 후에도 transparent 라 :where 무관(specificity 아니라 layer 문제)임이 드러났다. **수정**: a/button base reset 을 :not([class*='astryx-']) 로 Astryx 요소를 매칭 제외 → Submit Build 배경 rgb(126,129,243) 인디고 복구(실측), 순수 a/우리 버튼 유지. bare iframe(ApiConsole.css)도 .frame-wrap iframe 스코프. **재발 방지 lint**: css-leak.test.ts 신규 2건(라우트 CSS bare element 금지 + globals a/button 이 Astryx 제외 확인, @keyframes from/to 제외). 실증: iframe bare 재현 시 lint 실패·스코프 후 통과. **검증**: TSC clean / vitest 275→277 / B층 하이재킹 0·위반 0 / Astryx 버튼 배경 복구 / 검수 데이터 정리. 코드 로직 변경 0(CSS 스코프+테스트만), 백엔드 영향 0. follow-up: 실측 CSS 유출 가드 스크립트화(정적 lint 가 못 잡는 클래스 충돌 커버).",
       "TASK-144 (Astryx 3-5 — 레이아웃 셸 → AppShell+TopNav, Code 최대 규모): 3단계 마지막 큰 이관. 사용자 결정 — AppShell 전면 교체 + Astryx 기본 폭(--dib-layout-max 제거). Header + <main class=app-main> 셸 → AppShell topNav={<AppHeader/>} (height=auto, contentPadding=4). AppHeader 신규(Header 로직 유지, 마크업만 TopNav 슬롯). **react-router 통합**: Astryx 링크는 as 컴포넌트에 href 를 넘기는데 Link 는 to 를 읽으므로 RouterLink 어댑터(href→to, 외부·_blank 는 네이티브 a) + <LinkProvider component={RouterLink}> 전역 등록 → 모든 Astryx 링크가 SPA 내비게이션. **얻은 것**: skip-to-content 자동 / role=main 랜드마크 / responsive mobile-bar+drawer. **제거**: Header.tsx·css(298줄) + --dib-layout-max/gutter/header-h + globals 의 .app-main/#app-react flex/반응형 gutter. 손 CSS 2,120→1,956줄. **모바일 반응형 회귀 발견·해결**(사용자 '지금 고치고 봉인'): 이관 직후 모바일 390px 가로 스크롤(TASK-132 회귀). 원인 규명 — AppShell mobileNav 는 SideNav 전용이고, TopNav mobile-bar 모드는 startContent(nav items)만 숨기고 endContent 는 그대로 두는데 우리가 endContent 에 링크 3개(API Console/OpenAPI/Docs)를 넣어 모바일에서 넘쳤다(login 585px). 해결: 탐색 링크 전부를 startContent 로 이동(mobile-bar 가 숨김+drawer 접근), endContent 는 세션 컨트롤(@user/Logout/Theme)만, mobileNav={{breakpoint:'md'}} 명시 + FilterChips .page-head/.chips 에 flex-wrap(칩 잘림 해결). 부수효과: 데스크톱 헤더도 개선(탐색 좌측/컨트롤 우측 분리). **jsdom 폴리필**: AppShell 이 ResizeObserver 를 써서 App.test 4건 죽음 → test/setup.ts 에 no-op 폴리필(반응형 브레이크포인트는 jsdom 검증 불가, 실브라우저에 맡긴다고 주석). **테스트**: Header.test 14 → AppHeader.test 8, TopNav 로 링크 testid 사라져 접근성 질의(role=link+name)로 전환, 지속 계약만 유지. **검증**: TSC clean / vitest 275 / B층 하이재킹 0·위반 0 / skip-to-content 자동 / 모바일 390px 가로 스크롤 0·햄버거 drawer·칩 4개 전부 표시 / Login 회귀 없음. **번들**: 초기 JS gzip 94.66→134.63(+40, AppShell 은 셸이라 초기 번들 필수 — 라우트 청크로 못 뺌), CSS gzip 24.51→24.07. **남은 것(수용)**: 헤더 브랜드(x40) vs 본문 heading(x16) 24px 정렬 어긋남 — Astryx TopNav/content 패딩 기본 차이, '기본값 따름' 결정 + TASK-132 '손 정렬은 어긋난다' 교훈으로 수용.",
       "TASK-143 (admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정, Test + Doc): admin 라우트 테스트는 Svelte 트리에만 있었고 TASK-101(313ae2e)이 삭제, React 로 이관된 적 없어 TASK-084 의 admin 가드 라우트 레벨 회귀가 2026-07-18 이래 부재(TASK-137 발견). 그 공백의 대가를 TASK-142 유령 헤더 결함으로 치렀다. **복원**: 살아있는 테스트(admin-guard.test 헬퍼 / AdminAccessDenied 패널 / AdminTabs 탭)가 덮는 것은 반복 안 하고 **라우트가 실제로 가드를 호출하고 결과에 맞게 동작하는가** 통합 계약에 집중. react/src/routes/admin-routes.test.tsx 신규 15건: 4 라우트 공통 3 시나리오(userId 없음 → / redirect + backend 미호출 / 비-admin → AdminAccessDenied + 목록 API 미호출 / admin → 정상 렌더 + 목록 API 호출) — AdminBuilds/Users/Runners 는 describe.each, AdminAdmins 는 store 기반이라 별도 — + 페이지 고유 회귀(AdminBuilds 유령 헤더 5열 검증 / AdminUsers recent 패널 / AdminRunners Register Runner 모달). **유령 헤더 가드 실증**: 결함을 되살려(buildColumns 를 Project/Repository 섞은 버전으로 임시 교체) 정확히 실패하는지 확인 후 원복 — '가드를 만든 것과 가드가 동작하는 것은 다르다'. 발견 과정에서 확인한 구현 특성: AdminBuilds 는 visible.length===0 이면 'No builds' 분기라 Table 미렌더 → 헤더 검사는 빌드 1건 필요(반영). **PROJECT_PROFILE §3.4 정정**: 'admin 페이지 test 4종 5건' 을 현재 사실로 서술 중이었으나 그건 삭제된 Svelte 것 — React 통합 테스트로 교체 + 경위 명시. **검증**: TSC clean / vitest 266 → 281 / 유령 헤더 가드 실증(재현 실패·정상 통과) / 문서 무결성 가드 통과. 코드 동작 변경 0(테스트+문서만), 백엔드 영향 0.",
       "TASK-142 (Astryx 3-4b — Admin 테이블 이관 + BuildRow 제거, Code + Test): TASK-141 이 만든 buildColumns.tsx 를 그대로 재사용해 AdminBuilds/AdminUsers 를 Astryx Table 로 이관, 두 사용처가 사라져 BuildRow.tsx (111줄) 삭제. **발견한 기존 결함 — AdminBuilds 유령 헤더**: 헤더가 6열(Status/Build/Project/Repository/Owner/Updated)을 선언했는데 BuildSummary 에는 project/repository 필드가 **없다**. 본문 BuildRow 는 App(appName) 한 열이었다 — 즉 Project/Repository 는 존재하지 않는 데이터를 가리키는 **유령 헤더**였고 헤더 6열 vs 본문 4~5열로 정렬이 어긋나 있었다. admin 라우트 테스트가 삭제된 상태(TASK-137 발견)라 미검출. buildColumns(true) (5열)로 이관하며 헤더-본문이 단일 정의로 통일돼 **자동 해소**(실브라우저 헤더 6→5 확인). AdminUsers recent-builds 패널은 buildColumns(false) (owner 는 이미 @selectedUser 로 필터된 단일 사용자라 열로 반복 안 함), user rollup 테이블은 손 테이블 그대로 유지. 배지 정책(TASK-141)이 admin 에도 적용됨(실브라우저 BUILDING/FAILED 배지 확인). **flaky 테스트 안정화**: BuildRow 삭제 후 전체 스위트에서 App.test 의 'renders BuildsList' 가 간헐 실패(격리 실행은 항상 통과). TASK-139 지연 로드의 findBy 기본 타임아웃(1000ms)이 전체 스위트 부하로 초과된 것 — 청크 로딩 대기 성격이 분명하므로 타임아웃 5000ms 명시(로직이 아니라 I/O). 3회 연속 266 통과로 해소. **검증**: TSC clean(BuildRow 삭제 후에도) / vitest 266 불변 / B층 통과 / AdminBuilds 헤더 6→5 정렬 + @bob owner + 배지 / AdminUsers recent 4열 + 배지 + rollup 유지 / 검수 데이터 정리. **번들**: 초기 JS gzip 94.65 → 94.66(불변), admin 청크 거의 불변(Table 은 공용 청크 공유). BuildRow.tsx 111줄 삭제, StatusPill 실사용 5파일로 정리.",
@@ -111,15 +112,15 @@
       "TASK-078 container self-dogfood (PR #28)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 103,
+    "handoff_rev": 104,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 98,
-    "latest_rev": 46,
+    "index_rev": 99,
+    "latest_rev": 47,
     "in_progress_items": []
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-21.md",
-    "task_count": 55,
+    "task_count": 56,
     "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
@@ -179,10 +180,11 @@
       "TASK-141 Astryx 3-4 BuildsList → Table + StatusPill 배지 정책 (rev 53 sync 봉인, 주의 상태만 배지 — vitest 246 → 266)",
       "TASK-142 Astryx 3-4b Admin 테이블 이관 + BuildRow 제거 (rev 54 sync 봉인, 유령 헤더 결함 해소 + flaky 안정화)",
       "TASK-143 admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정 (rev 55 sync 봉인, 신규 15건 + 유령 헤더 가드 실증 — vitest 266 → 281)",
-      "TASK-144 Astryx 3-5 레이아웃 셸 → AppShell+TopNav (rev 56 sync 봉인, 3단계 마지막 큰 이관 + 모바일 반응형 회귀 해결 — vitest 275)"
+      "TASK-144 Astryx 3-5 레이아웃 셸 → AppShell+TopNav (rev 56 sync 봉인, 3단계 마지막 큰 이관 + 모바일 반응형 회귀 해결 — vitest 275)",
+      "TASK-145 라우트 CSS 전역 유출 감사 (rev 57 sync 봉인, globals bare button 이 Astryx 버튼 배경을 없애던 회귀 수정 + lint — vitest 275 → 277)"
     ],
-    "index_rev": "82",
-    "latest_rev": "59"
+    "index_rev": "83",
+    "latest_rev": "60"
   },
   "next_documents": [
     "ai-workflow/memory/active/session_handoff.md",

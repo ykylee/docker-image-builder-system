@@ -40,11 +40,19 @@ html, body {
  * (App.tsx 의 <AppShell> 참조.) */
 
 
-a {
+/* TASK-145: base 링크/버튼 reset 이 Astryx 요소를 덮지 않게 제외한다.
+ *
+ * bare `a {}` / `button {}` 은 element 셀렉터이고 **unlayered** 라 Astryx 의
+ * @layer atomic 클래스를 specificity 무관하게 이긴다. 그래서 우리
+ * `button { background: none }` 이 **모든 Astryx primary Button 의 배경을
+ * 없앴다** (실측: Submit Build / Register 가 배경 없이 렌더). :not([class*="astryx-"])
+ * 로 Astryx 요소를 매칭에서 제외해, 우리 base 는 순수/우리 요소에만 적용하고
+ * Astryx 컴포넌트는 자기 스타일을 그대로 쓰게 한다. */
+a:not([class*="astryx-"]) {
   color: var(--dib-color-accent-primary);
   text-decoration: none;
 }
-a:hover { color: var(--dib-color-accent-primary-hover); text-decoration: underline; }
+a:not([class*="astryx-"]):hover { color: var(--dib-color-accent-primary-hover); text-decoration: underline; }
 
 /* a11y: 명확한 focus outline (DESIGN.md §6 Accessibility) */
 :focus-visible {
@@ -53,7 +61,7 @@ a:hover { color: var(--dib-color-accent-primary-hover); text-decoration: underli
   border-radius: var(--dib-radius-sm);
 }
 
-button {
+button:not([class*="astryx-"]) {
   font-family: inherit;
   font-size: inherit;
   color: inherit;
