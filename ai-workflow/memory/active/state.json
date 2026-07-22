@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-22T13:15:00Z",
+  "generated_at": "2026-07-22T13:30:00Z",
   "purpose_digest": "Astryx 도입 완료 국면. 재검토 후 '제대로 도입' 결정(TASK-134~) → 토큰 네임스페이스 --dib-* / 0.1.7 업데이트 / <Theme>+astryx.css 기반 / 라우트 지연 로드 / 컴포넌트 이관 3-1~3-5 + admin. 3단계 컴포넌트 이관 사실상 마무리: Dialog(RegisterRunnerModal) / TextInput·NumberInput(BuildRequest 폼) / CodeBlock(LogStream) / Table(BuildsList+Admin) + StatusPill 배지 정책(주의 상태만 배지) / AppShell+TopNav(레이아웃 셸). BuildRow.tsx 제거, admin 라우트 통합 테스트 복원. 매 이관 방식: 특성화/기존 테스트로 계약 고정 → 이관 → 같은 테스트 통과 → 실브라우저 실측 + B층 가드. 누적 발견·수정: Login.css 전역 유출 2회(bare label/input/form/h1 + .card max-width 가 Astryx CodeBlock 을 덮어 로그 뷰어 400px 잘림) / AdminBuilds 유령 헤더(존재하지 않는 project/repository 컬럼) / 반복된 측정 오류(span 부재≠색 부재 / 속성선택자는 암묵 role 못 잡음). 회귀: frontend vitest 275 / build-server 178 / TS 5 clean. 번들 초기 JS gzip 94.66→134.63(AppShell 셸 필수 비용). 손 CSS 2,323→1,956줄. 다음: 헤더-본문 24px 정렬(수용) / 라우트 CSS 전역 유출 감사 / B층 오버레이 검사 / reset.css 검토.",
-  "purpose_digest_rev": 182,
+  "purpose_digest_rev": 183,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,7 +28,7 @@
   },
   "session": {
     "current_baseline": "TASK-146 (실측 CSS 유출 가드 스크립트화) 봉인 (rev 169→170). 누적 회귀 baseline: frontend vitest 277 / build-server 178 / TS 5 packages clean / go 8/8 / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 / 문서 무결성 가드 / 양 테마 WCAG AA 대비 전수 통과 / Astryx 토큰 충돌 0종 / CSS 유출 방어 2층(정적 lint + 실측 가드).",
-    "current_axis": "Astryx 이관 완료 후 마감/보강 국면. TASK-145(CSS 유출 감사 — Astryx 버튼 배경 복구) 후속으로 TASK-146 실측 CSS 유출 가드 스크립트화. CSS 유출 방어가 정적 lint(항상) + 실측 가드(opt-in) 2층 완성. TASK-146 은 main 미병합(브랜치 feat/task-146-css-leak-guard). 병합 상태는 git 참조.",
+    "current_axis": "Astryx 이관 완료 후 마감/보강 국면. TASK-145(CSS 유출 감사 — Astryx 버튼 배경 복구) + TASK-146(실측 CSS 유출 가드 스크립트화)로 CSS 유출 방어 2층(정적 lint + 실측 가드) 완성. TASK-145/146 은 main 에 병합 완료(HEAD f327b2f), 작업 브랜치 전부 삭제 — 로컬 브랜치는 main 단독. 원격 반영 여부는 `git log origin/main..main` 을 볼 것.",
     "current_focus": "다음 후보: (1) 헤더-본문 24px 정렬(수용 중, 필요 시 contentPadding 조정) / (2) B층 가드 오버레이(모달) 검사 확장 / (3) reset.css 도입 검토(손 CSS 감소로 재검토 시점) / (4) CI 통합 — B층·문서 무결성·CSS 유출 실측 가드가 모두 앱 기동 단계 필요라 같이 다룰 이월 항목 / (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.",
     "blocked_items": [],
     "recent_done_items": [
