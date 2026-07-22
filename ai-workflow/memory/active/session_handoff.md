@@ -6,6 +6,23 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 146→147: **TASK-152 완전 봉인 — 남은 5단계 완료**).
+
+  이전 세션의 부분 봉인(rev 145→146, commit `bd1dfb7`)이 이월한 5단계를 본 세션에서 마무리했다. **주의**: 이전 handoff 는 "working tree 에 staged 변경 + untracked PNG 22개" 로 적혔으나, 실제로는 부분 봉인 commit `bd1dfb7` 가 이미 main 에 반영돼 **working tree 는 clean·origin/main 동기** 상태였고, `.visual/` baseline PNG 는 gitignore 대상이라 세션 종료 후 로컬에서 소거된 상태였다.
+
+  ## TASK-152 완료 내역 (5단계)
+
+  1. **baseline 재캡처 + 승격** — `.visual/` 산출물이 없어 재생성: `pnpm install`(`@vitejs/plugin-react` 미설치 복구) + Pillow `--user` 설치 → build-server(memory, dist 직접 실행, `/health` 200) + vite dev(5174) 기동 → `capture.py --base http://127.0.0.1:5174` → **20 PNG**(9 라우트 × 2 + RegisterRunnerModal 2), zero-size 0 / dark≠light MD5 상이 / modal≠baseline 확인 → `apps/build-monitor/tests/visual/baseline/` 로 승격(gitignore 대상, 커밋 안 됨).
+  2. **diff.py self-test** — `--threshold 0.001` → matched 20 / missing 0 / exceeded 0 / **PASS**(전 항목 ratio 0.0000), exit 0.
+  3. **test_diff.py 단위** — 5/5 PASS.
+  4. **운영 가이드 신규** — `docs/operations/build-monitor-ui-visual-2026-07-22.md`(7 섹션).
+  5. **workflow meta sync + commit** — 본 handoff(146→147) / state.json(purpose_digest_rev 188→189, handoff_rev 110→111, backlog index 84→85·latest 61→62, done/recent_done 등록) / work_backlog(104→105) / daily 2026-07-21(rev 27→28, §29 신규).
+
+  **커밋 산출물**: 운영 가이드 1종 + workflow meta 4종. baseline PNG 는 gitignore 로 제외 → 코드/테스트/번들 변경 0.
+
+  **회귀 baseline 불변**: frontend vitest 277 / build-server 178 / TS 5 packages clean / go 8/8.
+
+  **follow-up**: ① baseline PNG 외부 LFS/저장소 동기화 정책(미결) — visual baseline 의 CI 통합(nightly-visual) 선행 조건 ② 사후 알림 자동화(nightly 실패 → Issue/Slack) ③ 결정 대기 5종.
 - Updated: 2026-07-23 (rev 145→146: **TASK-152 DESIGN.md v2 + visual QA baseline** — 부분 봉인, 다음 세션이 5단계로 즉시 완료 가능).
 
   브랜치 미생성 (working tree 에 staged 변경 + untracked PNG 22개만 있는 상태) — 다음 세션이 `git status` 확인 후 `feat/task-152-design-and-visual` 같은 브랜치 파서 작업 권장.
