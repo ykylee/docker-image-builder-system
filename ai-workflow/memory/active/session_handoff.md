@@ -6,6 +6,24 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 140→141: **TASK-147 Astryx reset.css 도입 검토 — 미도입 결정, 코드 변경 0**).
+
+  브랜치 `feat/task-147-reset-css` (변경 없는 빈 브랜치 — 결정만 남기고 삭제 예정).
+
+  TASK-136 이 "손 CSS 2,000여 줄을 흔들 수 있어" 미룬 항목을, 손 CSS 가 **1,956줄로 줄고** 폼·버튼·테이블이 Astryx 로 넘어간 시점에 재검토했다.
+
+  **실측**: reset.css 를 astryx.css 앞에 임시 import 후 빌드 → 전 라우트 실브라우저 측정 + reset **ON/OFF 요소별 computed-style 지문 대조**.
+
+  **결론 = 미도입.** 근거 3가지:
+  1. **안전하나 무익** — reset.css 는 `@layer reset`(최하위) + `:where()`(zero specificity)라 우리 unlayered CSS·Astryx atomic 을 절대 못 이긴다. 우리 앱의 모든 요소는 우리 클래스 또는 Astryx atomic 으로 **이미 스타일**돼 reset 이 닿는 순수 미스타일 요소가 없다. `h1`/`input`/`section`/`.preset-btn` 요소별 지문이 reset **ON/OFF 완전 동일**(margin/padding/border/bg 전부 불변).
+  2. 우리 globals 가 이미 필요한 reset(`* { box-sizing: border-box }`, `html,body { margin:0; padding:0 }`)을 보유 — reset.css 의 실질 추가분이 우리 요소엔 0.
+  3. 비용은 CSS gzip **+0.97KB** + import 1줄 + 의존 표면.
+
+  **부수 실증**: reset ON 상태로 TASK-146 실측 CSS 유출 가드 전 6 라우트 통과 → reset.css 가 Astryx primary 버튼을 **안 깬다**는 것을 가드가 확인(가드 가치 재실증).
+
+  **자기 정정 1건(반복 패턴)**: 첫 측정에서 `button.astryx-button` **첫 요소**의 bg 가 transparent 라 "reset 이 Astryx 버튼 깸" 으로 오판했으나, 그 첫 요소는 **Logout(ghost variant, 정상 투명)** 이었고 실제 **Submit Build 는 `rgb(126,129,243)` 인디고 정상**. 엉뚱한 요소 잡고 회귀로 단정하는 측정 오류가 또 재발(TASK-140/141 계열) — DOM 측정 시 **어떤 요소를 잡았는지 먼저 확인**.
+
+  **결과**: `main.tsx` 원복(reset import 없음), 코드/테스트/번들 변경 0. TASK-136 미도입 판단이 데이터로 유효 확인(단 근거를 "위험해서" → "무익해서" 로 정정). **reset.css 검토는 종결 — 재개 불필요.** workflow meta sync (state rev 183→184, handoff 140→141) 포함.
 - Updated: 2026-07-22 (rev 139→140: **TASK-146 실측 CSS 유출 가드 스크립트화 봉인 — CSS 유출 방어 2층 완성**).
 
   브랜치 `feat/task-146-css-leak-guard` (병합 상태는 `git status -sb`).
