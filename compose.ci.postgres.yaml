@@ -1,0 +1,23 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — CI / nightly 가드 통합 compose, postgres override
+# =============================================================================
+#  TASK-149: compose.ci.yaml 의 build-server 가 memory backend 로 뜨는 것을
+#  postgres 로 전환하고 schema 까지 자동 bootstrap. 사용:
+#
+#    docker compose -f compose.ci.yaml --profile postgres \
+#      -f compose.ci.postgres.yaml up -d
+#    docker compose -f compose.ci.yaml exec -T guard \
+#      bash /workspace/scripts/run-b-layer-guards.sh
+#    docker compose -f compose.ci.yaml down -v
+# =============================================================================
+
+services:
+  build-server:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BUILD_REPOSITORY_BACKEND: postgres
+      DATABASE_URL: postgres://dibs:dibs@postgres:5432/dibs
+      DB_AUTO_BOOTSTRAP: "true"

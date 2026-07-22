@@ -6,6 +6,27 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 143→144: **TASK-149 CI 통합 봉인 — B층 + 문서 무결성 가드의 nightly/main-push/수동 운영**).
+
+  브랜치 `feat/task-149-ci-integration` (병합·push 상태는 `git status -sb`).
+
+  **문제** — B층 가드(대비/CSS 유출) + 문서 무결성 가드(`--range`) 가 모두 **앱 기동 + (B층만) Chrome** 이 필요해 PR 단계에 끼우면 PR 시간이 길어진다. **해결** = PR 단계 = 정적 가드만(`docker-build.yml` 기존), 실측 가드는 nightly + main push(관련 경로만) + 수동 워크플로(`nightly-b-layer.yml` 신규).
+
+  **구현 4종**:
+  - `compose.ci.yaml` — `build-server`(`node:22-bookworm-slim` + pnpm + tsx + healthcheck) + `guard`(`mcr.microsoft.com/playwright:v1.55.0-jammy` — Chrome 포함) + 옵션 `postgres` (profile). default = memory backend. host docker socket mount 없음 — CI 환경 단순화.
+  - `compose.ci.postgres.yaml` — override. `BUILD_REPOSITORY_BACKEND=postgres` + `DATABASE_URL` + `DB_AUTO_BOOTSTRAP=true`. 사용: `docker compose -f compose.ci.yaml --profile postgres -f compose.ci.postgres.yaml up -d`.
+  - `scripts/run-b-layer-guards.sh` — wrapper. 환경 점검(node / Chrome / curl /health) → 3 가드 직렬 → 종료 코드/소요시간 요약. **fail-open** (첫 실패에서 멈추지 않음).
+  - `.github/workflows/nightly-b-layer.yml` — `cron: 0 3 * * *` + main push(관련 경로 필터) + workflow_dispatch(memory/postgres 선택). `concurrency: cancel-in-progress: true`.
+
+  **검증** (로컬 dry-run): `docker compose -f compose.ci.yaml --profile memory config` 통과 (YAML 의미 OK) / `... --profile postgres -f compose.ci.postgres.yaml config` 통과 / `bash -n run-b-layer-guards.sh` 통과 / YAML 셋 Python yaml.safe_load 통과. 실측 가드 실행은 CI 환경(Chrome + 도커)에서 최종 확인 — 본 환경에선 의존성 미설치.
+
+  **운영 가이드 1종 신규**: `docs/operations/ci-integration-2026-07-22.md` (7 섹션 — 왜 / compose / wrapper / 워크플로 / 운영 주의 / 후속 결정 / 한 줄 요약).
+
+  **다음 후보** (state.json current_focus 갱신):
+  (1) 사후 알림 자동화 (nightly 실패 → Issue / Slack) — TASK-149 후속
+  (2) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종.
+
+  workflow meta sync (state rev 186→187, handoff 143→144, work_backlog 102→103, backlog index 85→86 / latest 62→63) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 142→143: **TASK-148 B층 가드 오버레이(모달) 검사 확장 봉인**).
 
   브랜치 `feat/task-148-overlay-guard` (병합·push 상태는 `git status -sb`).

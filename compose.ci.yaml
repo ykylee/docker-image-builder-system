@@ -1,0 +1,106 @@
+# syntax=compose-spec/docker-compose:latest-spec
+# =============================================================================
+#  docker-image-builder-system — CI / nightly 가드 통합 compose
+# =============================================================================
+#  TASK-149: PR 단계가 아니라 nightly 또는 main 머지 시점에 도는 B층 가드
+#  (check-theme-contrast, check-css-leak) + 문서 무결성 가드(--range) 의
+#  실행 환경을 단일 compose 로 정의한다.
+#
+#  PR 워크플로는 가벼운 정적 가드(tsc / vitest / go test / node --test /
+#  docs 무결성 staged)만 돌리고, 이 compose 는 nightly 에서만 쓴다.
+#
+#  -- why separate from compose.dev.yaml --
+#  compose.dev.yaml 은 host docker socket 을 mount 하는 self-dogfood
+#  runner 까지 포함한다. CI 환경(특히 GitHub Actions ubuntu-latest) 에선
+#  docker-in-docker 가 필요해 그 구성을 그대로 쓰기 어렵고, 무엇보다
+#  nightly 가드의 목적은 "**SPA + build-server** 가 떠 있는 상태에서
+#  실브라우저 가드를 도는 것"이지 실제 이미지를 빌드하는 게 아니다.
+#  그래서 이 compose 는 build-server + (옵션) postgres + 가드 실행기로
+#  구성한다. runner / docker socket / host volume mount 모두 없음.
+#
+#  사용 (CI / nightly):
+#    # memory backend (default — 빠름)
+#    docker compose -f compose.ci.yaml up -d
+#    docker compose -f compose.ci.yaml exec -T guard \
+#      bash /workspace/scripts/run-b-layer-guards.sh
+#    docker compose -f compose.ci.yaml down -v
+#
+#    # postgres backend (override 로 backend 전환)
+#    docker compose -f compose.ci.yaml --profile postgres \
+#      -f compose.ci.postgres.yaml up -d
+#    docker compose -f compose.ci.yaml exec -T guard \
+#      bash /workspace/scripts/run-b-layer-guards.sh
+#    docker compose -f compose.ci.yaml down -v
+# =============================================================================
+
+services:
+  # default: memory backend. CI 러닝타임을 줄이기 위함.
+  build-server:
+    image: node:22-bookworm-slim
+    working_dir: /workspace
+    volumes:
+      - .:/workspace
+      - build-server-node-modules:/workspace/node_modules
+      - build-server-pnpm-store:/workspace/.pnpm-store
+    command: >-
+      sh -c "corepack enable &&
+             pnpm install --frozen-lockfile &&
+             pnpm --filter @docker-image-builder-system/shared-contract run build &&
+             pnpm --filter @docker-image-builder-system/shared-config run build &&
+             pnpm --filter @docker-image-builder-system/db run build &&
+             pnpm --filter @docker-image-builder-system/build-server run build &&
+             ./node_modules/.bin/tsx apps/build-server/src/index.js"
+    environment:
+      PORT: "3000"
+      HOST: "0.0.0.0"
+      BUILD_REPOSITORY_BACKEND: memory
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 60s
+    ports:
+      - "3000:3000"
+
+  # 가드 실행기 — build-server 와 같은 network 에서 chrome + playwright-core
+  # 로 B층 가드 두 종류를 돌린다. playwright 번들 chromium 은 우리 네트워크
+  # 에서 CDN ETIMEDOUT 이라 channel: 'chrome' 으로 설치된 Chrome 을 구동.
+  # mcr.microsoft.com/playwright 이미지에 Chrome 이 함께 들어있다.
+  guard:
+    image: mcr.microsoft.com/playwright:v1.55.0-jammy
+    working_dir: /workspace
+    depends_on:
+      build-server:
+        condition: service_healthy
+    volumes:
+      - .:/workspace
+      - build-monitor-node-modules:/workspace/apps/build-monitor/node_modules
+    environment:
+      # 가드 스크립트의 DEFAULT_URL 은 127.0.0.1:3000. build-server 가 같은
+      # network 의 service name 으로 resolve 되니 그 이름으로 닿을 수 있다.
+      CI_BASE_URL: http://build-server:3000
+    command: ["sleep", "infinity"]
+
+  # postgres service 는 default 로 비활성. --profile postgres + override
+  # compose.ci.postgres.yaml 시 활성 + build-server 가 postgres 로 전환.
+  postgres:
+    image: postgres:18-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: dibs
+      POSTGRES_PASSWORD: dibs
+      POSTGRES_DB: dibs
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dibs -d dibs"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - ci-postgres-data:/var/lib/postgresql/data
+
+volumes:
+  build-server-node-modules:
+  build-server-pnpm-store:
+  build-monitor-node-modules:
+  ci-postgres-data:

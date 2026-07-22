@@ -1,0 +1,130 @@
+# =============================================================================
+#  docker-image-builder-system — Nightly B-layer Guard
+# =============================================================================
+#  TASK-149: PR 단계가 아니라 nightly + main push + 수동 트리거에 도는
+#  실브라우저 가드(B층 대비 / B층 CSS 유출) + 문서 무결성 가드.
+#
+#  PR 단계에서는 정적 가드(tsc / vitest / go test / node --test / docs 무결성
+#  staged)만 빠르게 도는 docker-build.yml 이 돌고, 이 워크플로는 앱 기동 +
+#  Chrome 이 필요해 PR 단계에 끼우면 PR 시간이 길어진다.
+#
+#  -- memory / postgres backend 선택 --
+#  workflow_dispatch 의 inputs.backend 로 결정. nightly / main push 는
+#  memory backend (default — 빠름) 로만 돌고, postgres backend 가 필요하면
+#  수동으로 트리거한다.
+# =============================================================================
+
+name: nightly-b-layer
+
+on:
+  schedule:
+    # 매일 UTC 03:00 (한국 12:00). GitHub Actions cron 은 늦을 수 있어
+    # ±15 분 여유를 본다.
+    - cron: "0 3 * * *"
+  push:
+    branches: [main]
+    # nightly-b-layer 와 관련된 파일이 바뀐 main push 에서만 trigger.
+    paths:
+      - 'apps/build-monitor/scripts/**'
+      - 'apps/build-monitor/src/**'
+      - 'scripts/run-b-layer-guards.sh'
+      - 'scripts/check-doc-integrity.sh'
+      - 'compose.ci.yaml'
+      - 'compose.ci.postgres.yaml'
+      - '.github/workflows/nightly-b-layer.yml'
+  workflow_dispatch:
+    inputs:
+      backend:
+        description: "build-server backend"
+        required: true
+        type: choice
+        default: "memory"
+        options:
+          - memory
+          - postgres
+      range_from:
+        description: "doc-integrity --range 의 from (default: main)"
+        required: false
+        type: string
+        default: "main"
+      range_to:
+        description: "doc-integrity --range 의 to (default: HEAD)"
+        required: false
+        type: string
+        default: "HEAD"
+
+permissions:
+  contents: read
+
+concurrency:
+  # 같은 브랜치에 동시 trigger 가 와도 한 번만 돌게 — 이전 실행 취소.
+  group: nightly-b-layer-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: b-layer / ${{ inputs.backend || 'memory' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 문서 무결성 가드 --range 가 git log 를 본다. fetch-depth: 0
+          # 으로 전체 히스토리를 가져온다.
+          fetch-depth: 0
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine backend
+        id: backend
+        run: |
+          backend="${{ inputs.backend || 'memory' }}"
+          echo "value=$backend" >> "$GITHUB_OUTPUT"
+
+      - name: Start compose
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          if [[ "${{ steps.backend.outputs.value }}" == "postgres" ]]; then
+            docker compose -f compose.ci.yaml --profile postgres \
+              -f compose.ci.postgres.yaml up -d
+          else
+            docker compose -f compose.ci.yaml up -d
+          fi
+
+      - name: Wait for build-server health
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 90); do
+            if docker compose -f compose.ci.yaml ps build-server 2>/dev/null \
+              | grep -q "(healthy)"; then
+              echo "build-server healthy (after ${i}s)"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "✗ build-server 가 90 초 안에 healthy 가 되지 않았습니다." >&2
+          docker compose -f compose.ci.yaml logs --tail=200 build-server >&2 || true
+          exit 1
+
+      - name: Run B-layer guards
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+          docker compose -f compose.ci.yaml exec -T guard \
+            bash /workspace/scripts/run-b-layer-guards.sh
+
+      - name: Always tear down compose
+        if: always()
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          # 실패 시에도 teardown. -v 로 named volume 도 정리.
+          docker compose -f compose.ci.yaml down -v || true
+          echo "── docker compose ps (snapshot) ──"
+          docker compose -f compose.ci.yaml ps || true
+          echo "── build-server logs (tail 200) ──"
+          docker compose -f compose.ci.yaml logs --tail=200 build-server || true
+          echo "── guard logs (tail 200) ──"
+          docker compose -f compose.ci.yaml logs --tail=200 guard || true
