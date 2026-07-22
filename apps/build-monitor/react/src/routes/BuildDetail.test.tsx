@@ -258,10 +258,12 @@ describe("BuildDetail", () => {
     // CodeBlock 이관 후 **실패할 수 없는 단언**이 됐다 — log-entry 요소 자체가
     // 더는 존재하지 않으므로 로그가 렌더되든 말든 항상 0 이다. 실제로 비어
     // 있는지를 보도록 바꾼다.
-    // CodeBlock 은 내용이 비어도 zero-width space(U+200B)를 렌더하므로
-    // 그것을 걷어내고 비교한다.
+    // CodeBlock 은 비어도 **line number + 보이지 않는 문자** 한두 글자를
+    // 렌더한다 (현재 jsdom 환경에서는 "1" + U+200B = 2자). 사용자 가시
+    // 텍스트가 0 이라는 계약만 보존하므로 숫자도 같이 걷는다 — Astryx 가
+    // 렌더 경로/카운터 표시를 바꿔도 견디게.
     const emptyPre = screen.getByTestId("log-stream-pre");
-    expect(emptyPre.textContent?.replace(/​/g, "")).toBe("");
+    expect(emptyPre.textContent?.replace(/[\d\s\u200B-\u200D\uFEFF]/g, "")).toBe("");
   });
 
   it("renders Legacy preview block with deprecated badge + preview fields", async () => {

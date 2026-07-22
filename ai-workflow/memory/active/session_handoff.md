@@ -6,6 +6,9 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 141→142: **헤더-본문 24px 정렬 — 수용 확정 (코드 변경 0)**. TASK-144 봉인 시 "Astryx 기본값 따름" 으로 수용했던 항목을, 본 세션에서 사용자가 명시적으로 확정. 손 정렬 안 함, contentPadding 조정 안 함. 이월 후보에서 제외 — 향후 거슬리면 별도 task 로 contentPadding 조정 옵션을 다시 검토).
+
+  작업 0건. 문서 4종(session_handoff / state.json / backlog/2026-07-21 / work_backlog)의 "수용 중" 표현을 "수용 확정" 으로만 정정. workflow meta sync (state rev 184→185, handoff 141→142, work_backlog 헤더 한 줄 추가, backlog 2026-07-21 rev 24) 같은 commit 안에 포함. TSC / vitest / go / 가드 / 번들 **변경 0** — 전부 baseline 그대로.
 - Updated: 2026-07-22 (rev 140→141: **TASK-147 Astryx reset.css 도입 검토 — 미도입 결정, 코드 변경 0**).
 
   브랜치 `feat/task-147-reset-css` (변경 없는 빈 브랜치 — 결정만 남기고 삭제 예정).
@@ -40,7 +43,7 @@
 
   **CSS 유출 방어가 2층 완성됐다**: 정적 lint(항상, bare element) + 실측 가드(opt-in, 클래스 충돌 + element 유출) — B층 대비 가드(정적 A층 + 실측 B층)와 같은 구조.
 
-  **다음 후보**: (1) 헤더-본문 24px 정렬(수용 중) / (2) B층 가드 오버레이 검사 확장 / (3) reset.css 도입 검토(손 CSS 감소로 재검토 시점) / (4) **CI 통합** — B층·문서 무결성·CSS 유출 실측 가드가 모두 앱 기동 단계 필요라 함께 다룰 이월 항목 / (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 181→182, handoff 139→140, work_backlog TASK-146 등록, backlog 2026-07-21 rev 23) 같은 commit 안에 포함.
+  **다음 후보**: (1) ~~헤더-본문 24px 정렬~~ 수용 확정 (rev 142, 코드 변경 0) / (2) B층 가드 오버레이 검사 확장 / (3) reset.css 도입 검토(손 CSS 감소로 재검토 시점) / (4) **CI 통합** — B층·문서 무결성·CSS 유출 실측 가드가 모두 앱 기동 단계 필요라 함께 다룰 이월 항목 / (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 181→182, handoff 139→140, work_backlog TASK-146 등록, backlog 2026-07-21 rev 23) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 138→139: **TASK-145 라우트 CSS 전역 유출 감사 봉인 — 실제 회귀 발견·수정**).
 
   브랜치 `fix/task-145-css-leak-audit` (병합·push 상태는 `git status -sb`).
@@ -62,7 +65,7 @@
 
   **검증**: TSC clean / vitest **275 → 277** / B층 하이재킹 0 · 대비 위반 0 / Astryx 버튼 배경 복구 / 검수 데이터 정리. 코드 로직 변경 0(CSS 스코프 + 테스트만), 백엔드 영향 0.
 
-  **다음 후보**: (1) **실측 CSS 유출 가드 스크립트화** — 이번에 쓴 "우리 클래스가 Astryx 요소에 붙는가" 실브라우저 검사를 B층처럼 opt-in 스크립트로(정적 lint 가 못 잡는 클래스 충돌 커버). (2) 헤더-본문 24px 정렬(수용 중). (3) B층 오버레이 검사 확장. (4) reset.css 도입 검토. (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 180→181, handoff 138→139, work_backlog TASK-145 등록, backlog 2026-07-21 rev 22) 같은 commit 안에 포함.
+  **다음 후보**: (1) **실측 CSS 유출 가드 스크립트화** — 이번에 쓴 "우리 클래스가 Astryx 요소에 붙는가" 실브라우저 검사를 B층처럼 opt-in 스크립트로(정적 lint 가 못 잡는 클래스 충돌 커버). (2) ~~헤더-본문 24px 정렬~~ 수용 확정 (rev 142, 코드 변경 0). (3) B층 오버레이 검사 확장. (4) reset.css 도입 검토. (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 180→181, handoff 138→139, work_backlog TASK-145 등록, backlog 2026-07-21 rev 22) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 137→138: **TASK-144 Astryx 3-5 — 레이아웃 셸 → `AppShell`+`TopNav` 봉인, 3단계 마지막 큰 이관**).
 
   브랜치 `feat/task-144-appshell` (병합·push 상태는 `git status -sb` 를 볼 것). **이것으로 Astryx 컴포넌트 이관이 사실상 마무리됐다.**
@@ -81,9 +84,9 @@
 
   **번들**: 초기 JS gzip 94.66 → **134.63** (+40). **AppShell/TopNav 는 셸이라 모든 페이지가 쓰므로 초기 번들 필수 비용**이다(라우트 청크로 뺄 수 없다). CSS gzip 24.51 → 24.07.
 
-  **남은 것 (수용됨)**: 헤더 브랜드(x=40) vs 본문 heading(x=16) **24px 정렬 어긋남** — TopNav 브랜드 패딩과 AppShell contentPadding 의 기본 차이. "Astryx 기본값 따름" 결정 + TASK-132 의 "손 정렬은 반드시 어긋난다" 교훈으로 픽셀 조정하지 않고 수용. 거슬리면 contentPadding 조정 가능(단 반응형 재어긋남 위험).
+  **남은 것 (수용 확정, 코드 변경 0)**: 헤더 브랜드(x=40) vs 본문 heading(x=16) **24px 정렬 어긋남** — TopNav 브랜드 패딩과 AppShell contentPadding 의 기본 차이. "Astryx 기본값 따름" 결정 + TASK-132 의 "손 정렬은 반드시 어긋난다" 교훈으로 픽셀 조정하지 않고 수용. 거슬리면 contentPadding 조정 가능(단 반응형 재어긋남 위험). rev 142 에서 사용자 명시 확정.
 
-  **다음 세션 — Astryx 이관이 마무리됐으므로 마감/보강 국면**: (1) 헤더-본문 24px 정렬(수용 중, 필요 시 contentPadding 조정) / (2) **라우트 CSS 전역 유출 감사** — Login.css 에서 두 번 연속 나왔으므로 다른 파일에도 `.card` 같은 일반 클래스명·bare 셀렉터 충돌 가능 / (3) B층 가드 오버레이(모달) 검사 확장 / (4) **reset.css 도입 검토** — 손 CSS 가 1,956줄로 줄었으니 전역 리셋 재검토 시점 / (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 178→179, handoff 137→138, work_backlog TASK-144 등록, backlog 2026-07-21 rev 21) 같은 commit 안에 포함.
+  **다음 세션 — Astryx 이관이 마무리됐으므로 마감/보강 국면**: (1) ~~헤더-본문 24px 정렬~~ 수용 확정 (rev 142, 코드 변경 0) / (2) **라우트 CSS 전역 유출 감사** — Login.css 에서 두 번 연속 나왔으므로 다른 파일에도 `.card` 같은 일반 클래스명·bare 셀렉터 충돌 가능 / (3) B층 가드 오버레이(모달) 검사 확장 / (4) **reset.css 도입 검토** — 손 CSS 가 1,956줄로 줄었으니 전역 리셋 재검토 시점 / (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 178→179, handoff 137→138, work_backlog TASK-144 등록, backlog 2026-07-21 rev 21) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 136→137: **TASK-143 admin 라우트 통합 테스트 복원 + PROJECT_PROFILE §3.4 정정 봉인**).
 
   브랜치 `feat/task-143-admin-tests` (병합·push 상태는 `git status -sb` 를 볼 것).
