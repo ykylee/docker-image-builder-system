@@ -134,3 +134,33 @@ export function validationErrorBody(
     }))
   };
 }
+
+// TASK-151: 검증 실패가 아닌 4xx (404 / 409 / 415 / 416 …) 응답 helper.
+//
+// `validationErrorBody` 가 envelope 에 `issues` 까지 박는 것과 달리, 이쪽은
+// `message` 만 강제하고 `extras` 로 진단 필드(`reason` / `expected` / `actual`
+// / `header` / `fromPhase` / `toPhase` / `receivedContentType` / `idx` /
+// `totalChunks` / `declared` / `supplied` / `allowed` …) 를 자유롭게 실어
+// 보낸다. envelope 자체는 동일(`{ message, ...extras }`)하므로 클라이언트
+// 의 `parseApiError` 가 두 응답을 같은 분기로 처리할 수 있다.
+//
+// 반환 타입이 `ApiErrorResponse` (좁은 타입) 인 것은 validationErrorBody 와
+// 동일 — `message` 가 빠지거나 이름이 바뀌면 이 줄이 컴파일을 깨서 호출부가
+// 한꺼번에 드러난다.
+//
+// 이름: `notFoundBody` 는 404 의 표준 케이스에서 가독성을 위해 shorthand.
+// `errorBody` 가 일반형, `notFoundBody` 는 `errorBody(message)` 의 thin
+// alias. 둘 다 같은 envelope 을 반환한다.
+export function errorBody(
+  message: string,
+  ...extras: ReadonlyArray<Record<string, unknown>>
+): ApiErrorResponse {
+  // extras 가 여러 개면 뒤로 갈수록 앞쪽 키를 덮어쓴다 (Object.assign 순서).
+  // 단 현재 호출부는 항상 0~1 개만 넘기므로 그 순서는 무관 — 그래도 안전하게
+  // 순서대로 합친다.
+  return Object.assign({}, ...extras, { message });
+}
+
+export function notFoundBody(message: string): ApiErrorResponse {
+  return errorBody(message);
+}

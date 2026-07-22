@@ -1,14 +1,20 @@
 // TASK-091: PhaseTimeline (React).
+// TASK-150: PhaseTimeline drift 수정 — canonical phases 가 9 → 11 로 늘어났음
+// (DEPLOYMENT_STARTED / DEPLOYMENT_COMPLETED 추가, TASK-106 source archive
+// chunked + TASK-107 RFC 7233 의 후속 빌드 흐름 보강). shared-contract 의
+// buildPhases 를 직접 import 해서 drift 자체를 구조적으로 봉인 — 프론트
+// 컴포넌트 안에 리터럴로 박지 않는다.
 //
-// Svelte src/components/PhaseTimeline.svelte 와 1:1 정합. canonical 9 phases
+// Svelte src/components/PhaseTimeline.svelte 와 1:1 정합. canonical 11 phases
 // 전체를 표시하고 각 phase 는 "완료 / 현재 진행 / 미진행" 셋 중 하나의
 // 상태로 시각화:
 //   - 완료: completed dot + completedAt 타임스탬프
 //   - 현재: dot + "in-progress" 라벨 + startedAt
 //   - 미진행: dot 만 흐리게
 //
-// FAILED phase 가 completedMap 에 push 되면 자동 danger 톤 (Svelte 와 동일
-// data-phase="FAILED" selector 로 별도 처리 — 디자인 토큰 자동 follow).
+// FAILED phase 가 completedMap 에 push 되면 자동 danger 톤 (디자인 토큰 자동 follow).
+// DEPLOYMENT_* phase 는 DOCKER_BUILD_COMPLETED 와 COMPLETED 사이의 실제 단계를
+// 표시한다 — 운영자가 PREVIEW_READY → COMPLETED 직행으로 오해하지 않게.
 //
 // a11y: <ol role="list"> + 각 step role="listitem" + 상태별 aria-label.
 //
@@ -18,20 +24,12 @@
 
 import type { CSSProperties, ReactElement } from "react";
 
-// canonical 9 phases. shared-contract 와 동일한 순서/철자.
-const CANONICAL_PHASES = [
-  "REQUEST_ACCEPTED",
-  "QUEUE_CLAIMED",
-  "SOURCE_PREPARED",
-  "DOCKER_BUILD_STARTED",
-  "DOCKER_BUILD_COMPLETED",
-  "PREVIEW_QUEUED",
-  "PREVIEW_READY",
-  "COMPLETED",
-  "FAILED"
-] as const;
+import { buildPhases, type BuildPhase } from "@docker-image-builder-system/shared-contract";
 
-type BuildPhase = (typeof CANONICAL_PHASES)[number];
+// shared-contract 의 buildPhases 를 그대로 사용 — drift 구조적 봉인.
+// BuildPhase 타입은 shared-contract 가 정식 export. 컴포넌트는 이 배열을
+// 표시 목록으로 삼는다 (배열 순서가 곧 UI 순서).
+const CANONICAL_PHASES: readonly BuildPhase[] = buildPhases;
 
 // prop type 은 넓게 string 으로 받는다. api.ts 의 BuildStatusResponse 가
 // generated type 으로 좁혀져 있어도, 미래의 새 phase 가 추가돼도 component

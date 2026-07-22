@@ -13,6 +13,8 @@ import {
   claimRequestSchema,
   claimResponseSchema,
   deploymentReportRequestSchema,
+  errorBody,
+  notFoundBody,
   phaseUpdateRequestSchema,
   testDeploymentQueueRequestSchema,
   testDeploymentQueueResponseSchema,
@@ -79,9 +81,7 @@ export async function registerBuildRoutes(
     const result = await buildService.getBuild(paramsResult.data.buildId);
 
     if (!result) {
-      return reply.status(404).send({
-        message: "Build not found."
-      });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
 
     const body = buildStatusResponseSchema.parse(result);
@@ -98,9 +98,7 @@ export async function registerBuildRoutes(
     const result = await buildService.getBuildLogs(paramsResult.data.buildId);
 
     if (!result) {
-      return reply.status(404).send({
-        message: "Build logs not found."
-      });
+      return reply.status(404).send(notFoundBody("Build logs not found."));
     }
 
     const body = buildLogsResponseSchema.parse(result);
@@ -142,10 +140,12 @@ export async function registerBuildRoutes(
     }
     const payload = payloadResult.data;
     if (!buildPhases.includes(payload.phase)) {
-      return reply.status(400).send({
-        message: `Unknown build phase: ${payload.phase}`,
-        allowed: buildPhases
-      });
+      return reply.status(400).send(
+        errorBody(
+          `Unknown build phase: ${payload.phase}`,
+          { allowed: buildPhases }
+        )
+      );
     }
     const result = await buildService.reportPhase(
       paramsResult.data.buildId,
@@ -153,16 +153,15 @@ export async function registerBuildRoutes(
       payload.runnerId
     );
     if (result.kind === "not_found") {
-      return reply.status(404).send({
-        message: "Build not found."
-      });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     if (result.kind === "invalid_transition") {
-      return reply.status(409).send({
-        message: `Invalid phase transition: ${result.fromPhase} → ${result.toPhase}`,
-        fromPhase: result.fromPhase,
-        toPhase: result.toPhase
-      });
+      return reply.status(409).send(
+        errorBody(
+          `Invalid phase transition: ${result.fromPhase} → ${result.toPhase}`,
+          { fromPhase: result.fromPhase, toPhase: result.toPhase }
+        )
+      );
     }
     return reply.status(200).send(result.response);
   });
@@ -189,13 +188,12 @@ export async function registerBuildRoutes(
       payload.ttlMinutes
     );
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     if (result.kind === "invalid_state") {
-      return reply.status(409).send({
-        message: "Build is not in a queueable state",
-        reason: result.reason
-      });
+      return reply.status(409).send(
+        errorBody("Build is not in a queueable state", { reason: result.reason })
+      );
     }
     const body2 = testDeploymentQueueResponseSchema.parse(result.response);
     return reply.status(202).send(body2);
@@ -231,7 +229,7 @@ export async function registerBuildRoutes(
       }
     );
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     return reply.status(200).send(result.response);
   });
@@ -257,7 +255,7 @@ export async function registerBuildRoutes(
       payload.status
     );
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     return reply.status(200).send(result.response);
   });
@@ -281,7 +279,7 @@ export async function registerBuildRoutes(
       payloadResult.data
     );
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     return reply.status(200).send(result.response);
   });
@@ -296,10 +294,10 @@ export async function registerBuildRoutes(
     }
     const result = await buildService.getTestDeployment(paramsResult.data.buildId);
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     if (result.kind === "not_requested") {
-      return reply.status(404).send({ message: "Test deployment not requested." });
+      return reply.status(404).send(notFoundBody("Test deployment not requested."));
     }
     return reply.status(200).send({ testDeployment: result.testDeployment });
   });
@@ -330,7 +328,7 @@ export async function registerBuildRoutes(
       paramsResult.data.buildId
     );
     if (metadataResult.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     const expectedSourceArchive = metadataResult.sourceArchive;
 
@@ -339,10 +337,12 @@ export async function registerBuildRoutes(
     // (e.g. JSON) is rejected with a 415-style 400 — the only
     // accepted content type for this endpoint is octet-stream.
     if (!Buffer.isBuffer(request.body)) {
-      return reply.status(400).send({
-        message: "Source archive must be uploaded as application/octet-stream.",
-        receivedContentType: request.headers["content-type"] ?? null
-      });
+      return reply.status(400).send(
+        errorBody(
+          "Source archive must be uploaded as application/octet-stream.",
+          { receivedContentType: request.headers["content-type"] ?? null }
+        )
+      );
     }
 
     const result = await buildService.storeSourceArchive(
@@ -353,23 +353,23 @@ export async function registerBuildRoutes(
     );
 
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     if (result.kind === "checksum_mismatch") {
-      return reply.status(400).send({
-        message:
+      return reply.status(400).send(
+        errorBody(
           "Source archive checksum does not match the build's sourceArchive.checksumSha256 metadata.",
-        expected: result.expected,
-        actual: result.actual
-      });
+          { expected: result.expected, actual: result.actual }
+        )
+      );
     }
     if (result.kind === "size_mismatch") {
-      return reply.status(400).send({
-        message:
+      return reply.status(400).send(
+        errorBody(
           "Source archive size does not match the build's sourceArchive.sizeBytes metadata.",
-        expected: result.expected,
-        actual: result.actual
-      });
+          { expected: result.expected, actual: result.actual }
+        )
+      );
     }
 
     return reply.status(201).send({
@@ -397,7 +397,7 @@ export async function registerBuildRoutes(
 
     const result = await buildService.getSourceArchive(paramsResult.data.buildId);
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Source archive not found for build." });
+      return reply.status(404).send(notFoundBody("Source archive not found for build."));
     }
 
     // The bytes are a Uint8Array. Buffer.from(view) is a zero-copy view
@@ -433,15 +433,13 @@ export async function registerBuildRoutes(
       );
     }
     if (!Buffer.isBuffer(request.body)) {
-      return reply.status(415).send({
-        message: "Source chunk body must be application/octet-stream."
-      });
+      return reply.status(415).send(notFoundBody("Source chunk body must be application/octet-stream."));
     }
     const metadataResult = await buildService.getSourceArchiveMetadata(
       paramsResult.data.buildId
     );
     if (metadataResult.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     const checksumHeader = request.headers["x-source-checksum-sha256"];
     const perChunkChecksumSha256 =
@@ -461,17 +459,15 @@ export async function registerBuildRoutes(
     if (parsed === null && contentRangeHeader !== null) {
       // Header was supplied but unparseable — surface a 416
       // Range Not Satisfiable (RFC 7233 §4.4).
-      return reply.status(416).send({
-        message: "Content-Range header is malformed.",
-        header: contentRangeHeader
-      });
+      return reply.status(416).send(
+        errorBody("Content-Range header is malformed.", { header: contentRangeHeader })
+      );
     }
     const contentRange = parsed?.kind === "ok" ? parsed.parts : undefined;
     if (parsed && parsed.kind === "invalid_range") {
-      return reply.status(416).send({
-        message: "Content-Range header is invalid.",
-        reason: parsed.reason
-      });
+      return reply.status(416).send(
+        errorBody("Content-Range header is invalid.", { reason: parsed.reason })
+      );
     }
     const result = await buildService.storeSourceChunk(
       paramsResult.data.buildId,
@@ -481,40 +477,42 @@ export async function registerBuildRoutes(
       contentRange
     );
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     if (result.kind === "content_range_invalid") {
-      return reply.status(400).send({
-        message: "Content-Range end does not match start + bytes.length - 1."
-      });
+      return reply.status(400).send(notFoundBody("Content-Range end does not match start + bytes.length - 1."));
     }
     if (result.kind === "content_range_mismatch") {
-      return reply.status(400).send({
-        message: "Content-Range total does not match the build's declared sourceArchive.sizeBytes.",
-        declared: result.declared,
-        supplied: result.supplied
-      });
+      return reply.status(400).send(
+        errorBody(
+          "Content-Range total does not match the build's declared sourceArchive.sizeBytes.",
+          { declared: result.declared, supplied: result.supplied }
+        )
+      );
     }
     if (result.kind === "checksum_mismatch") {
-      return reply.status(400).send({
-        message: "Source chunk checksum mismatch.",
-        expected: result.expected,
-        actual: result.actual
-      });
+      return reply.status(400).send(
+        errorBody(
+          "Source chunk checksum mismatch.",
+          { expected: result.expected, actual: result.actual }
+        )
+      );
     }
     if (result.kind === "size_mismatch") {
-      return reply.status(400).send({
-        message: "Source chunk size mismatch.",
-        expected: result.expected,
-        actual: result.actual
-      });
+      return reply.status(400).send(
+        errorBody(
+          "Source chunk size mismatch.",
+          { expected: result.expected, actual: result.actual }
+        )
+      );
     }
     if (result.kind === "idx_out_of_range") {
-      return reply.status(409).send({
-        message: "Source chunk index out of range for declared total.",
-        idx: result.idx,
-        totalChunks: result.totalChunks
-      });
+      return reply.status(409).send(
+        errorBody(
+          "Source chunk index out of range for declared total.",
+          { idx: result.idx, totalChunks: result.totalChunks }
+        )
+      );
     }
     reply.header("X-Chunk-Is-Final", String(result.isFinalChunk));
     return reply.status(201).send({
@@ -544,7 +542,7 @@ export async function registerBuildRoutes(
       paramsResult.data.buildId
     );
     if (result.kind === "not_found") {
-      return reply.status(404).send({ message: "Build not found." });
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     return reply.status(204).send();
   });

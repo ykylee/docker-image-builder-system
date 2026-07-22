@@ -21,6 +21,7 @@
     "generate:openapi": "tsx scripts/generate-openapi.ts"
   },
   "devDependencies": {
+    "@docker-image-builder-system/shared-contract": "workspace:*",
     "@testing-library/jest-dom": "^6.5.0",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^19.0.0",

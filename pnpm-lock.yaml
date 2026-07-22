@@ -49,6 +49,9 @@ importers:
         specifier: ^5.0.2
         version: 5.0.14(@types/react@19.2.17)(react@19.2.7)
     devDependencies:
+      '@docker-image-builder-system/shared-contract':
+        specifier: workspace:*
+        version: link:../../packages/shared-contract
       '@testing-library/jest-dom':
         specifier: ^6.5.0
         version: 6.9.1

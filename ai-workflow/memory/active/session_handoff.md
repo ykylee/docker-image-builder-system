@@ -6,6 +6,29 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 144→145: **TASK-150 + TASK-151 이월 해소 sync commit** — 단일 commit 으로 묶음).
+
+  브랜치 `feat/task-150-151-rollover` (병합·push 상태는 `git status -sb`).
+
+  **TASK-150: PhaseTimeline 9 → 11 phase drift 수정**.
+  - `apps/build-monitor/react/src/components/PhaseTimeline.tsx` 가 9 phase 를 하드코딩하면서 shared-contract 의 11 phase 와 drift. DEPLOYMENT_STARTED / DEPLOYMENT_COMPLETED 2종이 누락돼 운영자가 PREVIEW_READY → COMPLETED 직행으로 오해할 수 있는 시각 회귀.
+  - **수정**: `import { buildPhases, type BuildPhase } from "@docker-image-builder-system/shared-contract"` + `const CANONICAL_PHASES: readonly BuildPhase[] = buildPhases`. drift 자체를 **구조적으로 봉인** (배열 변경 시 컴파일 타임에 잡힘).
+  - `BuildDetail.test.tsx` 의 "9 phases" → "11 phases" 정정 (5 completed + 1 current + 5 pending) + DEPLOYMENT_* 노출 단언 추가.
+  - **사전 작업**: `apps/build-monitor/package.json` 에 `@docker-image-builder-system/shared-contract: workspace:*` devDependency 추가 + `pnpm install` (TASK-135 의 breaking change 와 같은 계열 — import 가 필요한 패키지는 의존성으로 명시).
+
+  **TASK-151: 진단-필드 응답 helper 흡수**.
+  - TASK-130 의 follow-up 이월. build-routes.ts 의 4xx 응답이 `{ message: "..." }` (message-only, 17 곳) + `{ message, ...extras }` (multi-line, 11 곳) = **28 곳**이 `validationErrorBody` 외에 각자 리터럴로 박혀 있어 envelope 일관성 결여.
+  - **신규 helper** (`packages/shared-contract/src/build/errors.ts`): `errorBody(message, ...extras)` + `notFoundBody(message)`. 둘 다 `ApiErrorResponse` (좁은 타입) 반환 → `message` 강제 / extras 는 `Object.assign({}, ...extras, { message })` 로 순차 merge. `notFoundBody` 는 `errorBody(message)` 의 thin alias.
+  - **흡수**: build-routes.ts 28 곳을 `notFoundBody("...")` / `errorBody("...", { ...extras })` 로 변환. envelope 동일 → `parseApiError` 가 같은 분기로 처리 가능.
+  - **자기 정정 1건(반복 패턴)**: 첫 시도가 Python regex 일괄 변환이었는데 (1) `""...""` 이중 quote 가 들어가거나 (2) extras 가 object 가 아닌 bare 로 들어가거나 (3) brace 가 한 개 더 들어가거나 — 4가지 결함 동시 발생 → git revert 후 **read_file + search_replace 1:1** 로 재작업. **`bash -n` OK / TSC clean / vitest 277 / build-server 178 / go 8/8** 전부 PASS — 회귀 0.
+
+  **검증**: TSC 5 packages clean / vitest 277 / build-server 178 / go 8/8 / 문서 무결성 가드 staged PASS / state.json JSON valid. 운영 영향 0 (외부 계약 동일 — envelope 의 message 가 보존되고 extras 도 같은 키로 전달).
+
+  **다음 후보** (state.json current_focus 갱신):
+  (1) 사후 알림 자동화 (nightly 실패 → Issue / Slack) — TASK-149 후속
+  (2) 이월: PhaseTimeline 9 → 11 drift (TASK-150) ✅ 해소 / 진단-필드 응답 helper 흡수 (TASK-151) ✅ 해소 / 결정 대기 5종 (옵션 Z / 신규 기능 / Nextcloud Tasks / CI migration validation / git tag 다음 version).
+
+  workflow meta sync (state rev 187→188, handoff 144→145, work_backlog 103→104, backlog index 86→87 / latest 63→64) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 143→144: **TASK-149 CI 통합 봉인 — B층 + 문서 무결성 가드의 nightly/main-push/수동 운영**).
 
   브랜치 `feat/task-149-ci-integration` (병합·push 상태는 `git status -sb`).
