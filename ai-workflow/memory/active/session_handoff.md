@@ -6,6 +6,21 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 142→143: **TASK-148 B층 가드 오버레이(모달) 검사 확장 봉인**).
+
+  브랜치 `feat/task-148-overlay-guard` (병합·push 상태는 `git status -sb`).
+
+  **문제** — TASK-137 회고에 "B층 가드가 모달을 열지 않아 오버레이는 검사 범위 밖" 이라고 적혀 있었고, TASK-146 에서 CSS 유출 가드만 admin/runners 의 Register Runner 모달을 인라인으로 클릭해 열었다. 그 외 라우트의 모달 / 미래 모달은 자동으로 열리지 않았다. **해결** = `data-open-modal` 어트리뷰트 트리거 규약 + 공용 helper `_overlay-trigger.mjs` + 양 가드의 2차 패스. 모달 추가 시 마크업 어트리뷰트 1줄 + 가드 등록 1줄로 끝.
+
+  **구현**: AdminRunners 의 "+ Register Runner" 버튼에 `data-open-modal="register-runner"` 추가 / `_overlay-trigger.mjs` 신규 — `MODAL_TRIGGERS` 배열로 라우트 매치, 트리거 클릭 후 scopeSelector 의 DOM 존재 확인(지연 로드 모달 대비 2초 폴링), 미발견 시 stderr 경고 + **fail-open** / `check-theme-contrast.mjs` 와 `check-css-leak.mjs` 의 `auditInPage` 에 `scope` 옵션 추가해 모달 안만 tree-walk / 오버레이 잡힌 위반·하이재킹은 `오버레이: ` prefix 로 어느 패스인지 표시.
+
+  **사전 결함 1건(이번 sync commit 에 포함)**: `LogStream.tsx` 가 `syntaxTheme={tokyoNight}` prop 을 박고 있었는데 Astryx 0.1.4 의 `CodeBlockProps` 는 이 prop 을 **노출하지 않는다** (defineTheme.d.ts 주석엔 "per-instance via syntaxTheme prop" 이라 적혀 있으나 인터페이스엔 부재 — Astryx 측 미구현). TASK-140 봉인 시점에 prop 박은 것이 type 과 어긋났다. **수정** = prop + import(`@astryxdesign/core/theme/syntax`) 제거 + 헤더 코멘트의 "syntaxTheme 에 다크 프리셋을 고정" 서술을 정직한 표현("양 테마 터미널 톤은 wrapper 배경으로 표현")으로 갱신.
+
+  **운영 가이드 1종 신규**: `docs/operations/b-layer-overlay-extension-2026-07-22.md` (7 섹션 — 의도 / 트리거 규약 / 동작 흐름 / 사용법 / 한계 / 추후 모달 추가 절차). `theme-contrast-guard-2026-07-21.md` §7 에 짧은 cross-reference 추가.
+
+  **검증**: TSC 5 packages clean (LogStream 사전 결함 해소) / vitest 277 (회복) / build-server 178 / go 8/8 / 가드 셋 syntax OK (node --check) / 문서 무결성 가드 (staged) PASS / JSON valid. 운영 가드 실측은 다음 CI 통합(TASK-149 후보)에서 Chrome + 앱 기동 단계로.
+
+  **다음 후보**: (1) **CI 통합** — B층·문서 무결성·CSS 유출 실측 가드가 모두 앱 기동 단계 필요라 같이 다룰 이월 항목 / (2) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 185→186, handoff 142→143, work_backlog TASK-148 등록, backlog 2026-07-21 rev 25) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 141→142: **헤더-본문 24px 정렬 — 수용 확정 (코드 변경 0)**. TASK-144 봉인 시 "Astryx 기본값 따름" 으로 수용했던 항목을, 본 세션에서 사용자가 명시적으로 확정. 손 정렬 안 함, contentPadding 조정 안 함. 이월 후보에서 제외 — 향후 거슬리면 별도 task 로 contentPadding 조정 옵션을 다시 검토).
 
   작업 0건. 문서 4종(session_handoff / state.json / backlog/2026-07-21 / work_backlog)의 "수용 중" 표현을 "수용 확정" 으로만 정정. workflow meta sync (state rev 184→185, handoff 141→142, work_backlog 헤더 한 줄 추가, backlog 2026-07-21 rev 24) 같은 commit 안에 포함. TSC / vitest / go / 가드 / 번들 **변경 0** — 전부 baseline 그대로.

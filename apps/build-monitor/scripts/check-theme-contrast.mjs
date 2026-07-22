@@ -42,6 +42,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { openOverlaysIfAny } from "./_overlay-trigger.mjs";
+
 const TOKENS_PATH = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   "../react/src/tokens.css"
@@ -123,7 +125,19 @@ function readExpectedTokens(theme) {
  *
  * 브라우저 컨텍스트로 직렬화되어 넘어가므로 외부 스코프를 참조하지 않는다.
  */
-function auditInPage({ watchedTokens, expectedTokens, aaText, aaLarge }) {
+function auditInPage({ watchedTokens, expectedTokens, aaText, aaLarge, scope = null }) {
+  // TASK-148: 모달 자동 오픈 후 호출되면 scope 셀렉터로 감사 범위를 좁힌다.
+  // 모달 바깥은 1차 패스(페이지 진입 직후)에서 이미 감사했으므로 2차는
+  // 중복 없이 모달 안만 본다. scope 가 null 이면 페이지 전체(기존 동작).
+  const root = scope ? document.querySelector(scope) : document.body;
+  if (scope && !root) {
+    // 모달 scope 가 없으면 검사할 게 없다. 호출 측이 이미 경고했다.
+    return { hijacks: [], violations: [], skipped: [] };
+  }
+  if (!root) {
+    return { hijacks: [], violations: [], skipped: [] };
+  }
+
   const parseRgb = (value) => {
     const m = /rgba?\(([^)]+)\)/.exec(value);
     if (!m) return null;
@@ -215,7 +229,7 @@ function auditInPage({ watchedTokens, expectedTokens, aaText, aaLarge }) {
   const hijacks = [];
   const probes = [
     document.documentElement,
-    ...Array.from(document.querySelectorAll("body *")).filter(isVisible)
+    ...Array.from(root.querySelectorAll("*")).filter(isVisible)
   ];
   for (const [token, expected] of Object.entries(expectedTokens)) {
     if (!watchedTokens.includes(token)) continue;
@@ -238,7 +252,7 @@ function auditInPage({ watchedTokens, expectedTokens, aaText, aaLarge }) {
   const violations = [];
   const skipped = [];
   const seen = new Set();
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   let textNode = walker.nextNode();
   while (textNode) {
     const text = textNode.nodeValue.trim();
@@ -368,6 +382,32 @@ async function main() {
             aaLarge: AA_LARGE_TEXT
           }
         );
+
+        // TASK-148: 모달/오버레이 자동 감사.
+        // 페이지 진입 직후(1차)는 모달이 닫혀 있어 그 안의 텍스트를 못 본다.
+        // helper 가 트리거를 찾아 클릭해 모달을 열고, 2차 패스는 모달 안만
+        // 감사한다(1차 결과는 페이지 전체 — 모달 바깥). 결과를 합쳐서
+        // 라우트 1회 출력.
+        const overlayScope = await openOverlaysIfAny(page, route);
+        if (overlayScope) {
+          const overlay = await page.evaluate(auditInPage, {
+            watchedTokens: WATCHED_TOKENS,
+            expectedTokens: readExpectedTokens(theme),
+            aaText: AA_TEXT,
+            aaLarge: AA_LARGE_TEXT,
+            scope: overlayScope
+          });
+          // prefix 로 "오버레이: " 를 붙여 어느 패스에서 잡혔는지 분명히 한다.
+          for (const h of overlay.hijacks) {
+            hijacks.push({ ...h, element: `오버레이: ${h.element}` });
+          }
+          for (const v of overlay.violations) {
+            violations.push({ ...v, element: `오버레이: ${v.element}` });
+          }
+          for (const s of overlay.skipped) {
+            skipped.push({ ...s, element: `오버레이: ${s.element}` });
+          }
+        }
 
         // 측정 불가 항목은 반드시 드러낸다. 조용히 건너뛰면 "전부 검사했다" 로
         // 읽히는데, 실제로는 그 자리가 사각지대다.

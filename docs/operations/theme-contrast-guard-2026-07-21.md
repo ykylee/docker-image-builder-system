@@ -204,6 +204,24 @@ TASK-132 는 이 **같은 파일**의 `--color-bg-elevated` / `--color-bg-input`
 - `--color-text-disabled` 는 WCAG 1.4.3 의 inactive component 예외라 **의도적으로
   제외**했다 (다크 1.97 / 라이트 2.64).
 
+## 7. 오버레이(모달) 검사 — TASK-148
+
+기존 B층은 페이지 진입 직후의 **보이는 텍스트만** 감사했다. 모달은 사용자
+상호작용으로만 열리고, 진입 상태에는 DOM 에 없으므로 모달 안의 텍스트·버튼·
+입력 라벨이 감사 사각지대였다.
+
+TASK-148 에서 이 사각지대를 generic 트리거로 메웠다.
+
+- **마크업 규약** — 모달을 여는 버튼에 `data-open-modal="<name>"` 어트리뷰트.
+- **가드 등록** — `apps/build-monitor/scripts/_overlay-trigger.mjs` 의
+  `MODAL_TRIGGERS` 에 `{ route, name, scopeSelector }` 한 줄.
+- **동작** — 1차(페이지 전체) → 모달 자동 오픈 → 2차(scopeSelector 안).
+  오버레이에서 잡힌 위반/하이재킹에는 `오버레이: ` prefix 가 붙는다.
+
+1호 실증: `RegisterRunnerModal` (`/admin/runners`). 새 모달 추가는 §6 절차만
+거치면 가드 코드 변경 없이 자동 감사된다. 자세한 의도 / 한계 / 절차는
+전용 운영 가이드 [`b-layer-overlay-extension-2026-07-22.md`](b-layer-overlay-extension-2026-07-22.md) 참조.
+
 ## 8. follow-up
 
 - **B층 CI 통합** — 앱을 띄우는 단계가 필요하다. 문서 무결성 가드의 `--range`

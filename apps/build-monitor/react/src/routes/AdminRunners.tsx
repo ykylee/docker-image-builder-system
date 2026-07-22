@@ -158,6 +158,10 @@ export function AdminRunners(): ReactElement {
               setRegisterModalOpen(true);
             }}
             data-testid="admin-runners-register"
+            // TASK-148: B층 가드(check-theme-contrast, check-css-leak)가 이
+            // 어트리뷰트로 모달을 자동으로 열어 오버레이(모달 내부)까지 감사.
+            // 트리거 이름은 가드 MODAL_TRIGGERS 의 `name` 과 일치해야 한다.
+            data-open-modal="register-runner"
           >
             + Register Runner
           </button>

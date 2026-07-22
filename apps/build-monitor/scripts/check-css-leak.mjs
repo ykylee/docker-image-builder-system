@@ -46,6 +46,8 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { openOverlaysIfAny } from "./_overlay-trigger.mjs";
+
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CSS_DIR = path.resolve(HERE, "../react/src");
 
@@ -135,7 +137,14 @@ function collectOurClasses() {
  * 우리 클래스를 가진 요소가 Astryx 요소이기도 한지 + Astryx 폼/링크 요소가
  * 우리 base reset 을 받는지 확인한다.
  */
-function auditInPage({ ourClasses }) {
+function auditInPage({ ourClasses, scope = null }) {
+  const root = scope ? document.querySelector(scope) : document.body;
+  if (scope && !root) {
+    // 모달 scope 가 없으면 검사할 게 없다. 호출 측이 이미 경고를 출력한다.
+    return [];
+  }
+  if (!root) return [];
+
   const isAstryxEl = (el) =>
     [...el.classList].some(
       (c) => c.startsWith("astryx-") || /^x[0-9a-z]{5,}$/.test(c)
@@ -147,7 +156,7 @@ function auditInPage({ ourClasses }) {
   for (const cls of ourClasses) {
     let el;
     try {
-      el = document.querySelector("." + CSS.escape(cls));
+      el = root.querySelector("." + CSS.escape(cls));
     } catch {
       continue;
     }
@@ -168,7 +177,7 @@ function auditInPage({ ourClasses }) {
   //
   //    ghost/secondary 오탐을 피하려고 조건을 좁힌다: 배경 alpha 0 + 글자가
   //    거의 흰색이거나 거의 canvas 색(우리 --dib-color-on-accent 후보).
-  for (const btn of document.querySelectorAll("button.astryx-button")) {
+  for (const btn of root.querySelectorAll("button.astryx-button")) {
     const cs = getComputedStyle(btn);
     const bgm = cs.backgroundColor.match(/[\d.]+/g);
     const bgAlpha = bgm && bgm.length > 3 ? Number.parseFloat(bgm[3]) : 1;
@@ -248,15 +257,14 @@ async function main() {
         .catch(() => {});
 
       // Register Runner 모달처럼 상호작용으로만 열리는 오버레이도 열어 검사한다.
-      if (route === "/admin/runners") {
-        const btn = page.getByRole("button", { name: /Register Runner/i });
-        if ((await btn.count()) > 0) {
-          await btn.first().click();
-          await page.waitForTimeout(500);
-        }
-      }
+      // TASK-148: 트리거 로직을 공용 helper 로 옮겼고, 모달을 새로 추가할 때
+      // data-open-modal + MODAL_TRIGGERS 한 줄이면 된다.
+      const overlayScope = await openOverlaysIfAny(page, route);
 
-      const leaks = await page.evaluate(auditInPage, { ourClasses });
+      const leaks = await page.evaluate(auditInPage, {
+        ourClasses,
+        scope: overlayScope ?? null
+      });
       if (leaks.length === 0) {
         console.log(`✓ ${route}`);
       } else {

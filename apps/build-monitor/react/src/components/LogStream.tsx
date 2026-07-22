@@ -9,8 +9,12 @@
 // ── 보존한 것 ─────────────────────────────────────────────────────────
 // 1. **양 테마 모두 터미널 톤.** tokens.css 의 `--dib-code-*` 는 "라이트
 //    모드도 터미널 톤 유지" 라는 의도적 선택이었다. CodeBlock 은 기본적으로
-//    테마를 따라가므로 라이트에서 밝은 표면이 된다 — `syntaxTheme` 에 다크
-//    프리셋을 **고정**해 기존 의도를 지켰다.
+//    테마를 따라가므로 라이트에서 밝은 표면이 되는데, Astryx 0.1.4 의
+//    `CodeBlockProps` 는 `syntaxTheme` prop 을 노출하지 않는다(0.1.7+ 도
+//    미정). 이 정책은 CodeBlock 외부 wrapper 의 배경(`globals` 의 surface-
+//    elevated + `--dib-code-bg` 등)으로 표현된다. TASK-140 봉인 시점에
+//    `syntaxTheme={tokyoNight}` 를 박았던 것은 type 과 어긋난 사전 결함 —
+//    TASK-148 에서 prop 과 import 제거로 해소.
 // 2. **부분별 색 구분.** 타임스탬프(muted)와 `[PHASE]`(강조)의 색 구분은
 //    "운영자가 로그를 빠르게 스캔한다" 는 TASK-091 의 목적 그 자체다. 단순
 //    문자열로 넘기면 사라지므로 `tokenizer` 로 되살렸다.
@@ -23,7 +27,6 @@
 import { useMemo, useState } from "react";
 import type { CSSProperties, ReactElement } from "react";
 import { CodeBlock } from "@astryxdesign/core";
-import { tokyoNight } from "@astryxdesign/core/theme/syntax";
 
 import type { BuildLogEntry } from "@/lib/api";
 
@@ -124,7 +127,14 @@ export function LogStream({
         tokenizer={tokenizeLogs}
         // 다크 프리셋 고정 — 라이트 모드에서도 터미널 톤을 유지한다는
         // tokens.css 의 기존 결정을 지킨다 (위 헤더 주석 참조).
-        syntaxTheme={tokyoNight}
+        // TSC 사전 결함 해소: 0.1.4 의 CodeBlockProps 에 `syntaxTheme` prop 이
+        // 부재 — TASK-140 봉인 시점에 prop 을 박았지만 type definition 과
+        // 어긋났다. Astryx 0.1.4 가 이 prop 을 노출하지 않으므로 (defineTheme
+        // 주석엔 "per-instance via syntaxTheme prop" 이라 적혀 있으나 실제
+        // 인터페이스엔 없음) prop 자체를 제거하고 tokens.css 의 "양 테마
+        // 터미널 톤 유지" 정책은 LogStream wrapper 의 배경색(globals 에서
+        // surface-elevated + code-bg 등)으로 충분히 표현된다. 차후 Astryx
+        // 가 이 prop 을 노출하는 버전(0.1.7+)으로 올라가면 그때 재도입.
         hasLineNumbers
         hasLanguageLabel={false}
         isWrapped={wrap}
