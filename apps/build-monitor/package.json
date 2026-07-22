@@ -15,6 +15,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:theme-contrast": "node scripts/check-theme-contrast.mjs",
+    "check:css-leak": "node scripts/check-css-leak.mjs",
     "predev": "tsx scripts/generate-openapi.ts",
     "prebuild": "tsx scripts/generate-openapi.ts",
     "generate:openapi": "tsx scripts/generate-openapi.ts"

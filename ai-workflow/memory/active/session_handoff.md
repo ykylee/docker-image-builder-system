@@ -6,6 +6,23 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-22 (rev 139→140: **TASK-146 실측 CSS 유출 가드 스크립트화 봉인 — CSS 유출 방어 2층 완성**).
+
+  브랜치 `feat/task-146-css-leak-guard` (병합 상태는 `git status -sb`).
+
+  TASK-145 의 정적 lint(`css-leak.test.ts`)는 **bare element 셀렉터**만 잡는다. 그러나 우리 CSS 사고의 절반은 **일반 클래스명 충돌**이었다 — TASK-140 의 `.card { max-width }` 가 Astryx CodeBlock(container="card" 일 때 literal `card` 클래스를 붙임)을 덮은 것. `.card` 는 CSS 문법상 정당해 정적으로 못 잡고, Astryx 가 런타임에 붙이는 클래스는 실브라우저에서만 안다. TASK-145 에서 그 회귀를 찾은 실측 로직을 재사용 opt-in 가드 `scripts/check-css-leak.mjs` 로 남겼다 (B층 대비 가드와 동일 패턴).
+
+  **검사 2종**: (1) 클래스 충돌 — 우리 **단독 클래스 규칙**(`.card {}`)의 클래스명을 가진 요소가 동시에 Astryx 클래스를 가지면 유출. (2) element 유출 — Astryx solid Button(대비색 글자)이 배경을 잃으면 우리 `button` reset 유출.
+
+  **정밀화**: 초판이 "클래스 이름 존재"만 봐서 `.md`(주석 `DESIGN.md` 오인) / `.secondary`(우리는 `.preset-btn.secondary` 복합으로만 씀)를 오탐 → 주석 제거 + **단독 클래스 셀렉터**만 수집(복합/자손은 조상·형제가 함께 있어야 매칭돼 Astryx 를 우연히 안 덮음).
+
+  **실증**: 정상 상태 전 6 라우트 통과 / TASK-145 회귀 재현(button reset 제외 제거) 시 Register(primary) 등 배경 소실 **3건 검출**. admin/runners 는 Register Runner 모달을 자동으로 열어 오버레이 버튼도 검사한다.
+
+  **검증**: TSC clean / vitest **277 불변** / 가드 정상 통과·회귀 검출 실증 / `package.json` `check:css-leak` 등록. 코드 동작 변경 0(가드 도구 + 등록만), 백엔드 영향 0.
+
+  **CSS 유출 방어가 2층 완성됐다**: 정적 lint(항상, bare element) + 실측 가드(opt-in, 클래스 충돌 + element 유출) — B층 대비 가드(정적 A층 + 실측 B층)와 같은 구조.
+
+  **다음 후보**: (1) 헤더-본문 24px 정렬(수용 중) / (2) B층 가드 오버레이 검사 확장 / (3) reset.css 도입 검토(손 CSS 감소로 재검토 시점) / (4) **CI 통합** — B층·문서 무결성·CSS 유출 실측 가드가 모두 앱 기동 단계 필요라 함께 다룰 이월 항목 / (5) 이월: PhaseTimeline 9 phase 수동 복제 / 진단-필드 응답 helper 흡수 / 결정 대기 5종. workflow meta sync (state rev 181→182, handoff 139→140, work_backlog TASK-146 등록, backlog 2026-07-21 rev 23) 같은 commit 안에 포함.
 - Updated: 2026-07-22 (rev 138→139: **TASK-145 라우트 CSS 전역 유출 감사 봉인 — 실제 회귀 발견·수정**).
 
   브랜치 `fix/task-145-css-leak-audit` (병합·push 상태는 `git status -sb`).
