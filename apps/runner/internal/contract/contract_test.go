@@ -121,7 +121,7 @@ func TestErrorCodeConstLookup(t *testing.T) {
 			ErrorCodeActiveBuildExists, ErrorCodeInvalidRequest,
 			ErrorCodeBuildNotFound, ErrorCodeLogsNotFound,
 			ErrorCodeQueueClaimFailed, ErrorCodeDockerBuildFailed,
-			ErrorCodePreviewProvisionFailed, ErrorCodeDeploymentFailed,
+			ErrorCodeContainerTestFailed, ErrorCodeDeploymentFailed,
 			ErrorCodeUnknownError,
 		} {
 			if decl == v {

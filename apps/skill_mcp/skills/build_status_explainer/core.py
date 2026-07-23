@@ -120,7 +120,7 @@ def _next_action_for_error_code(error_code: str | None) -> str:
         "LOGS_NOT_FOUND": "CHECK_SOURCE",
         "QUEUE_CLAIM_FAILED": "CONTACT_OPERATOR",
         "DOCKER_BUILD_FAILED": "FIX_DOCKERFILE",
-        "PREVIEW_PROVISION_FAILED": "FIX_PORT",
+        "CONTAINER_TEST_FAILED": "FIX_PORT",
         "DEPLOYMENT_FAILED": "CONTACT_OPERATOR",
         "ACTIVE_BUILD_EXISTS": "WAIT",
         "UNKNOWN_ERROR": "CONTACT_OPERATOR",
@@ -417,7 +417,7 @@ def explain(input_data: Any) -> Explanation:
         error_summary = _error_summary_from_logs(log_tail) or None
         if error_code == "DOCKER_BUILD_FAILED":
             user_msg = "이미지 빌드가 실패했어요. Dockerfile 의 베이스 이미지 / 빌드 단계를 확인해 주세요."
-        elif error_code == "PREVIEW_PROVISION_FAILED":
+        elif error_code == "CONTAINER_TEST_FAILED":
             user_msg = "테스트 환경 준비에 실패했어요. 앱이 실제로 듣는 포트와 의존성을 확인해 주세요."
         elif error_code == "INVALID_REQUEST":
             user_msg = "요청에 잘못된 값이 있어요. 입력 필드를 다시 확인해 주세요."

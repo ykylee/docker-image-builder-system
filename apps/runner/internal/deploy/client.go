@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	defaultTargetType = "DOCKER_REGISTRY"
-	defaultTargetRef  = "registry.example.com/docker-image-builder-system"
-	defaultMode       = "skeleton"
-	defaultDockerBin  = "docker"
+	defaultTargetType  = "DOCKER_REGISTRY"
+	defaultTargetRef   = "registry.example.com/docker-image-builder-system"
+	defaultMode        = "skeleton"
+	defaultDockerBin   = "docker"
 	defaultPushTimeout = 120 * time.Second
 )
 

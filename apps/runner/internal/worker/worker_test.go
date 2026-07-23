@@ -34,10 +34,10 @@ func (c *tickerClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedB
 	return nil, nil
 }
 
-func (c *tickerClient) ReportPhase(ctx context.Context, buildID, phase, runnerID string) error {
+func (c *tickerClient) ReportPhase(ctx context.Context, buildID string, report hostclient.PhaseReport) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.phases = append(c.phases, phase)
+	c.phases = append(c.phases, report.Phase)
 	return nil
 }
 

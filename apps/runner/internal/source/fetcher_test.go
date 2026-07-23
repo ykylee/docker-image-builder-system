@@ -31,7 +31,7 @@ func (s *stubClient) DownloadSource(ctx context.Context, buildID string) ([]byte
 func (s *stubClient) ClaimNextBuild(context.Context) (*hostclient.ClaimedBuildResponse, error) {
 	return nil, nil
 }
-func (s *stubClient) ReportPhase(context.Context, string, string, string) error {
+func (s *stubClient) ReportPhase(context.Context, string, hostclient.PhaseReport) error {
 	return nil
 }
 func (s *stubClient) StartContainerTest(context.Context, string, hostclient.StartContainerTestRequest) error {

@@ -59,7 +59,7 @@ CAUSE_BY_CODE = {
     "LOGS_NOT_FOUND": "빌드 로그를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
     "QUEUE_CLAIM_FAILED": "빌드 큐에서 빌드를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
     "DOCKER_BUILD_FAILED": "이미지 빌드 단계에서 문제가 발생했어요. Dockerfile 과 의존성 설정을 확인해 주세요.",
-    "PREVIEW_PROVISION_FAILED": "컨테이너 테스트 환경 준비에 실패했어요. 앱이 실제로 듣는 포트와 health endpoint 를 확인해 주세요.",
+    "CONTAINER_TEST_FAILED": "컨테이너 테스트 환경 준비에 실패했어요. 앱이 실제로 듣는 포트와 health endpoint 를 확인해 주세요.",
     "DEPLOYMENT_FAILED": "외부 배포 단계에 실패했어요. 배포 대상 시스템의 연결 상태와 인증 정보를 확인해 주세요.",
     "ACTIVE_BUILD_EXISTS": "같은 앱에 진행 중인 빌드가 있어요. 기존 빌드가 끝나면 다시 시도해 주세요.",
     "UNKNOWN_ERROR": "내부 오류가 발생했어요. 잠시 후 다시 시도하거나 운영자에게 문의해 주세요.",

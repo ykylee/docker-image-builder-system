@@ -115,10 +115,10 @@ func TestRunContainerSkeletonMode(t *testing.T) {
 	if status.HostPort != 38124 {
 		t.Errorf("expected default host port 38124 in skeleton mode, got %d", status.HostPort)
 	}
-	if status.Host != "preview.local" {
-		t.Errorf("expected host=preview.local, got %s", status.Host)
+	if status.Host != "container-test.local" {
+		t.Errorf("expected host=container-test.local, got %s", status.Host)
 	}
-	if status.RuntimeURL != "http://preview.local:38124/" {
+	if status.RuntimeURL != "http://container-test.local:38124/" {
 		t.Errorf("unexpected runtime URL: %s", status.RuntimeURL)
 	}
 	if !status.Running {
@@ -131,7 +131,7 @@ func TestWaitForHealthSkeletonMode(t *testing.T) {
 	client := NewClient()
 	client.runMode = "skeleton"
 
-	status := &ContainerStatus{Host: "preview.local", HostPort: 38124, RuntimeURL: "http://preview.local:38124/"}
+	status := &ContainerStatus{Host: "container-test.local", HostPort: 38124, RuntimeURL: "http://container-test.local:38124/"}
 	out, err := client.WaitForHealth(context.Background(), status, time.Second)
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)

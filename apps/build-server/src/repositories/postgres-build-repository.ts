@@ -56,6 +56,7 @@ import type {
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
   ContainerTestDetails,
+  PhaseFailureDetails,
   StartContainerTestResult,
   ReportDeploymentResult,
   ReportContainerTestResult,
@@ -407,7 +408,11 @@ export class PostgresBuildRepository implements BuildRepository {
     });
   }
 
-  async updatePhase(buildId: string, phase: string): Promise<UpdatePhaseResult> {
+  async updatePhase(
+    buildId: string,
+    phase: string,
+    failure?: PhaseFailureDetails
+  ): Promise<UpdatePhaseResult> {
     const [row] = await this.db
       .select()
       .from(buildRequestTable)
@@ -446,12 +451,25 @@ export class PostgresBuildRepository implements BuildRepository {
       timestamp.toISOString()
     );
 
+    // TASK-162: FAILED phase 는 실패 이유를 함께 적는다. 이전에는 이 두
+    // 컬럼을 쓰는 곳이 없어 모든 실패 빌드의 `lastError` 가 null 이었다.
+    // FAILED 가 아닌 phase 로 전이하면 (재시도 등) 이전 오류를 지운다.
+    const failureColumns =
+      phase === "FAILED"
+        ? {
+            lastErrorCode: failure?.errorCode ?? "UNKNOWN_ERROR",
+            lastErrorMessage:
+              failure?.errorMessage ?? `Build failed during phase ${row.phase}.`
+          }
+        : { lastErrorCode: null, lastErrorMessage: null };
+
     const [updated] = await this.db
       .update(buildRequestTable)
       .set({
         phase: phase as BuildPhase,
         status: nextStatus,
         phaseHistory: nextPhaseHistory,
+        ...failureColumns,
         updatedAt: timestamp
       })
       .where(eq(buildRequestTable.id, buildId))
@@ -603,6 +621,17 @@ export class PostgresBuildRepository implements BuildRepository {
         timestamp.toISOString()
       );
 
+      // TASK-162: 컨테이너 테스트 실패도 build-level lastError 로 노출한다
+      // (memory 저장소와 동일 semantics). build_test.error_code 에는 아래에서
+      // 같은 값을 적는다.
+      const testFailureColumns =
+        status === "FAILED"
+          ? {
+              lastErrorCode: details?.errorCode ?? "CONTAINER_TEST_FAILED",
+              lastErrorMessage: details?.errorMessage ?? "Container test failed."
+            }
+          : {};
+
       const [updated] = await tx
         .update(buildRequestTable)
         .set({
@@ -610,6 +639,7 @@ export class PostgresBuildRepository implements BuildRepository {
           status: nextStatus,
           runtimeUrl: nextRuntimeUrl,
           phaseHistory: nextPhaseHistory,
+          ...testFailureColumns,
           updatedAt: timestamp
         })
         .where(eq(buildRequestTable.id, buildId))
@@ -634,8 +664,16 @@ export class PostgresBuildRepository implements BuildRepository {
           portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
           stabilityWindowPassed:
             details?.stabilityWindowPassed ?? null,
-          errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
-          errorMessage: status === "FAILED" ? "Container test failed." : null,
+          // TASK-162: 계약에 없던 `TEST_DEPLOYMENT_FAILED` 하드코딩 제거.
+          // runner 가 준 이유를 그대로 쓰고, 없으면 canonical 기본값.
+          errorCode:
+            status === "FAILED"
+              ? details?.errorCode ?? "CONTAINER_TEST_FAILED"
+              : null,
+          errorMessage:
+            status === "FAILED"
+              ? details?.errorMessage ?? "Container test failed."
+              : null,
           createdAt: timestamp,
           startedAt: timestamp,
           finishedAt: status === "SUCCESS" || status === "FAILED" ? timestamp : null,
@@ -654,8 +692,14 @@ export class PostgresBuildRepository implements BuildRepository {
             portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
             stabilityWindowPassed:
               details?.stabilityWindowPassed ?? null,
-            errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
-            errorMessage: status === "FAILED" ? "Container test failed." : null,
+            errorCode:
+              status === "FAILED"
+                ? details?.errorCode ?? "CONTAINER_TEST_FAILED"
+                : null,
+            errorMessage:
+              status === "FAILED"
+                ? details?.errorMessage ?? "Container test failed."
+                : null,
             finishedAt: status === "SUCCESS" || status === "FAILED" ? timestamp : null,
             updatedAt: timestamp
           }

@@ -91,7 +91,7 @@ func TestHTTPBuildControlClient_ReportPhase_OK(t *testing.T) {
 		if r.URL.Path != expectedPath {
 			t.Errorf("expected path %s, got %s", expectedPath, r.URL.Path)
 		}
-		var body phaseRequestBody
+		var body PhaseReport
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("failed to decode body: %v", err)
 		}
@@ -107,7 +107,7 @@ func TestHTTPBuildControlClient_ReportPhase_OK(t *testing.T) {
 	defer srv.Close()
 
 	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
-	err := c.ReportPhase(context.Background(), "b-42", contract.PhaseDockerBuildStarted, "runner-1")
+	err := c.ReportPhase(context.Background(), "b-42", PhaseReport{Phase: contract.PhaseDockerBuildStarted, RunnerID: "runner-1"})
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
@@ -121,7 +121,7 @@ func TestHTTPBuildControlClient_ReportPhase_400(t *testing.T) {
 	defer srv.Close()
 
 	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
-	err := c.ReportPhase(context.Background(), "b-1", "NOPE", "r")
+	err := c.ReportPhase(context.Background(), "b-1", PhaseReport{Phase: "NOPE", RunnerID: "r"})
 	if err == nil {
 		t.Fatal("expected error on 400, got nil")
 	}
@@ -133,7 +133,7 @@ func TestNoopBuildControlClient(t *testing.T) {
 	if err != nil || resp != nil {
 		t.Errorf("noop claim should return nil/nil, got resp=%v err=%v", resp, err)
 	}
-	if err := c.ReportPhase(context.Background(), "b", "p", "r"); err != nil {
+	if err := c.ReportPhase(context.Background(), "b", PhaseReport{Phase: "p", RunnerID: "r"}); err != nil {
 		t.Errorf("noop report should return nil, got %v", err)
 	}
 }

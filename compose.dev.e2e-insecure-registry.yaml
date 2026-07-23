@@ -88,7 +88,7 @@ services:
       # 들어가려면 targetRef 에 그 path 까지 포함.
       RUNNER_DEPLOY_TARGET_REF: localhost:5000/docker-image-builder-system/cli
       RUNNER_STOP_CONTAINER_ON_DONE: "true"
-      PREVIEW_INTERNAL_PORT: "8080"
+      RUNNER_INTERNAL_PORT: "8080"
       RUNNER_HEALTHCHECK_PATH: /
       RUNNER_HEALTHCHECK_TIMEOUT_SECONDS: "60"
       RUNNER_DEPLOY_PUSH_TIMEOUT_SECONDS: "60"

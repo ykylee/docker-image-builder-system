@@ -20,7 +20,7 @@ import (
 // - DownloadSource: GET /builds/:buildId/source (TASK-066)
 type BuildControlClient interface {
 	ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error)
-	ReportPhase(ctx context.Context, buildID, phase, runnerID string) error
+	ReportPhase(ctx context.Context, buildID string, report PhaseReport) error
 	StartContainerTest(ctx context.Context, buildID string, req StartContainerTestRequest) error
 	ReportContainerTestResult(ctx context.Context, buildID string, req ContainerTestResultRequest) error
 	ReportDeployment(ctx context.Context, buildID string, req DeploymentReportRequest) error
@@ -71,9 +71,16 @@ type buildSummaryBody struct {
 	UpdatedAt       string `json:"updatedAt"`
 }
 
-type phaseRequestBody struct {
-	Phase    string `json:"phase"`
-	RunnerID string `json:"runnerId"`
+// PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
+// ErrorMessage 를 추가했다 — 이전에는 채널 자체가 없어 runner 가 어느
+// 단계에서 왜 실패했는지 호스트에 전달할 방법이 없었고, 그 결과 모든 실패
+// 빌드의 `lastError` 가 null 이었다. FAILED 가 아닌 phase 에서는 두 필드가
+// 비어 있고 `omitempty` 로 전송에서 빠진다.
+type PhaseReport struct {
+	Phase        string `json:"phase"`
+	RunnerID     string `json:"runnerId"`
+	ErrorCode    string `json:"errorCode,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
 }
 
 // HTTPBuildControlClient 는 Host Server 와 HTTP 로 통신하는 client.
@@ -135,8 +142,8 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 	}, nil
 }
 
-func (c *HTTPBuildControlClient) ReportPhase(ctx context.Context, buildID, phase, runnerID string) error {
-	body, _ := json.Marshal(phaseRequestBody{Phase: phase, RunnerID: runnerID})
+func (c *HTTPBuildControlClient) ReportPhase(ctx context.Context, buildID string, report PhaseReport) error {
+	body, _ := json.Marshal(report)
 	url := fmt.Sprintf("%s/builds/%s/phase", c.baseURL, buildID)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
@@ -155,7 +162,7 @@ func (c *HTTPBuildControlClient) ReportPhase(ctx context.Context, buildID, phase
 	}
 
 	raw, _ := io.ReadAll(res.Body)
-	return fmt.Errorf("report phase failed: buildID=%s phase=%s status=%d body=%s", buildID, phase, res.StatusCode, string(raw))
+	return fmt.Errorf("report phase failed: buildID=%s phase=%s status=%d body=%s", buildID, report.Phase, res.StatusCode, string(raw))
 }
 
 // NoopBuildControlClient 는 테스트 / dry-run 용. 모든 호출이 no-op.
@@ -171,7 +178,7 @@ func (c *NoopBuildControlClient) ClaimNextBuild(context.Context) (*ClaimedBuildR
 	return nil, nil
 }
 
-func (c *NoopBuildControlClient) ReportPhase(context.Context, string, string, string) error {
+func (c *NoopBuildControlClient) ReportPhase(context.Context, string, PhaseReport) error {
 	return nil
 }
 
@@ -276,15 +283,21 @@ func (c *HTTPBuildControlClient) StartContainerTest(ctx context.Context, buildID
 // canonical ExecutionStatus ("IN_PROGRESS" / "SUCCESS" / "FAILED") 로 실어
 // 보낸다.
 type ContainerTestResultRequest struct {
-	Status                string `json:"status"`
-	RuntimeURL            string `json:"runtimeUrl"`
-	Host                  string `json:"host"`
+	Status string `json:"status"`
+	// TASK-162: 실패 보고에는 런타임 정보가 없다. 계약이 runtimeUrl 에
+	// `.url()`, host 에 `.min(1)` 을 걸어두어 빈 문자열을 보내면 400 이
+	// 되므로 두 필드는 반드시 omitempty 여야 한다.
+	RuntimeURL            string `json:"runtimeUrl,omitempty"`
+	Host                  string `json:"host,omitempty"`
 	HostPort              int    `json:"hostPort"`
 	ContainerRef          string `json:"containerRef,omitempty"`
 	HealthCheckPassed     bool   `json:"healthCheckPassed"`
 	PortOpen              bool   `json:"portOpen"`
 	StabilityWindowPassed bool   `json:"stabilityWindowPassed"`
-	RunnerID              string `json:"runnerId"`
+	// TASK-162: status=FAILED 일 때의 실패 이유.
+	ErrorCode    string `json:"errorCode,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+	RunnerID     string `json:"runnerId"`
 }
 
 type DeploymentReportRequest struct {

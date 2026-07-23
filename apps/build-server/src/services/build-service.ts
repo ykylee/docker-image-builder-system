@@ -21,6 +21,7 @@ import type {
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
   ContainerTestDetails,
+  PhaseFailureDetails,
   StoreSourceArchiveResult,
   StoreSourceChunkResult
 } from "../repositories/build-repository.js";
@@ -233,9 +234,10 @@ export class BuildService {
   async reportPhase(
     buildId: string,
     phase: string,
-    runnerId?: string
+    runnerId?: string,
+    failure?: PhaseFailureDetails
   ): Promise<ReportPhaseOutcome> {
-    const result = await this.repository.updatePhase(buildId, phase);
+    const result = await this.repository.updatePhase(buildId, phase, failure);
     // TASK-069: terminal phase 진입 시 runner registry 의 counter + currentBuildId
     // 를 갱신한다. INVALID_TRANSITION result 라도 registry 는 best-effort 로
     // 갱신 (runner 가 잘못된 phase 를 한 번 더 보내더라도 counter 가 정직하게

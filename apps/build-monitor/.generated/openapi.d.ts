@@ -831,7 +831,7 @@ export interface components {
         /** @description Standard error shape returned with 4xx/5xx responses. */
         BuildError: {
             /** @enum {string} */
-            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "PREVIEW_PROVISION_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
             message: string;
         };
         /** @description One field-level validation failure. Mirrors a zod issue narrowed to the fields the API contract guarantees. */
@@ -1088,13 +1088,16 @@ export interface components {
             /** @enum {string|null} */
             reason: "NO_BUILD_AVAILABLE" | "ACTIVE_BUILD_EXISTS" | "QUEUE_CLAIM_FAILED" | "RUNNER_DISABLED" | "RUNNER_ID_REQUIRED" | null;
         };
-        /** @description Runner phase report payload (PKG-005). */
+        /** @description Runner phase report payload (PKG-005). FAILED phase 는 errorCode/errorMessage 로 실패 이유를 함께 보고한다 (TASK-162). */
         PhaseUpdateRequest: {
             /** @enum {string} */
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             runnerId: string;
             /** Format: date-time */
             occurredAt?: string;
+            /** @enum {string} */
+            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            errorMessage?: string;
         };
         /** @description POST /builds/:buildId/container-test/start payload (Runner → Host). 컨테이너 테스트 시작을 알린다. preview-era 의 ttlMinutes 는 canonical 모델에 대응 개념이 없어 제거됐다. */
         ContainerTestStartRequest: {
@@ -1113,6 +1116,9 @@ export interface components {
             healthCheckPassed?: boolean;
             portOpen?: boolean;
             stabilityWindowPassed?: boolean;
+            /** @enum {string} */
+            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            errorMessage?: string;
             runnerId: string;
         };
         /** @description Source archive reference uploaded by the Skill before build request. */

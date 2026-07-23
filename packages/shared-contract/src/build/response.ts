@@ -340,13 +340,21 @@ export const claimResponseSchema = z
 
 export type ClaimResponse = z.infer<typeof claimResponseSchema>;
 
+// TASK-162 (P2-M3): FAILED phase 가 **이유를 나를 수 있게** errorCode /
+// errorMessage 를 추가한다. 이전에는 채널 자체가 없어 runner 가 어느 단계에서
+// 왜 실패했는지 서버에 전달할 방법이 없었고, 그 결과 `build_request` 의
+// `last_error_code` / `last_error_message` 가 **한 번도 기록되지 않았다** —
+// 모든 실패 빌드가 `lastError: null` 이었다. 두 필드는 FAILED 가 아닌 phase
+// 에서는 의미가 없으므로 optional 이다.
 export const phaseUpdateRequestSchema = z
   .object({
     phase: z.enum(buildPhases),
     runnerId: z.string().min(1),
-    occurredAt: z.string().datetime().optional()
+    occurredAt: z.string().datetime().optional(),
+    errorCode: z.enum(errorCodes).optional(),
+    errorMessage: z.string().min(1).optional()
   })
-  .meta({ id: "PhaseUpdateRequest", description: "Runner phase report payload (PKG-005)." });
+  .meta({ id: "PhaseUpdateRequest", description: "Runner phase report payload (PKG-005). FAILED phase 는 errorCode/errorMessage 로 실패 이유를 함께 보고한다 (TASK-162)." });
 
 export type PhaseUpdateRequest = z.infer<typeof phaseUpdateRequestSchema>;
 
@@ -390,6 +398,11 @@ export const containerTestResultRequestSchema = z
     healthCheckPassed: z.boolean().optional(),
     portOpen: z.boolean().optional(),
     stabilityWindowPassed: z.boolean().optional(),
+    // TASK-162: status=FAILED 일 때 실패 이유. 이전에는 서버가 계약에 없는
+    // 문자열 `TEST_DEPLOYMENT_FAILED` 와 고정 문구를 하드코딩해 runner 가
+    // 아는 실제 원인을 버렸다.
+    errorCode: z.enum(errorCodes).optional(),
+    errorMessage: z.string().min(1).optional(),
     runnerId: z.string().min(1)
   })
   .meta({

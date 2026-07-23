@@ -11,6 +11,7 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   DeploymentReportRequest,
+  ErrorCode,
   RunnerStatus,
 } from "@docker-image-builder-system/shared-contract";
 
@@ -102,6 +103,12 @@ export type ReportDeploymentResult =
       kind: "not_found";
     };
 
+// TASK-162 (P2-M3): FAILED phase 보고에 실려 오는 실패 이유.
+export type PhaseFailureDetails = {
+  errorCode?: ErrorCode;
+  errorMessage?: string;
+};
+
 export type ContainerTestDetails = {
   runtimeUrl?: string;
   host?: string;
@@ -110,6 +117,11 @@ export type ContainerTestDetails = {
   healthCheckPassed?: boolean;
   portOpen?: boolean;
   stabilityWindowPassed?: boolean;
+  // TASK-162: status=FAILED 일 때의 실패 이유. 이전에는 postgres 저장소가
+  // 계약에 없는 `TEST_DEPLOYMENT_FAILED` 를 하드코딩했고 memory 저장소는
+  // 아예 기록하지 않아 backend 별로 동작이 갈렸다.
+  errorCode?: ErrorCode;
+  errorMessage?: string;
 };
 
 // TASK-066: source archive storage. The Skill uploads the raw archive
@@ -301,7 +313,14 @@ export interface BuildRepository {
   getBuild(buildId: string): Promise<BuildStatusResponse | null>;
   getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null>;
   claimNextBuild(): Promise<ClaimNextBuildResult>;
-  updatePhase(buildId: string, phase: string): Promise<UpdatePhaseResult>;
+  // TASK-162 (P2-M3): FAILED phase 는 실패 이유를 함께 받는다. 이전에는
+  // 채널이 없어 `build_request.last_error_code/message` 가 한 번도 기록되지
+  // 않았고 모든 실패 빌드의 `lastError` 가 null 이었다.
+  updatePhase(
+    buildId: string,
+    phase: string,
+    failure?: PhaseFailureDetails
+  ): Promise<UpdatePhaseResult>;
   startContainerTest(
     buildId: string,
     internalPort: number

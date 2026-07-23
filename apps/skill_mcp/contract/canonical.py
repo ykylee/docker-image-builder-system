@@ -153,7 +153,11 @@ BUILD_PHASES: frozenset[str] = frozenset({
 
 # Canonical error codes. Mirrors packages/shared-contract/src/build/errors.ts
 # `errorCodes`. 9 values (TASK-062 added DEPLOYMENT_FAILED to parallel the
-# existing PREVIEW_PROVISION_FAILED at the deployment step).
+# container test failure code).
+#
+# TASK-162 (P2-M3): PREVIEW_PROVISION_FAILED -> CONTAINER_TEST_FAILED.
+# preview-era naming removed; the code denotes a container test failure
+# (container start / healthcheck / port). Skill 문구 재설계는 P2-M4 범위.
 ERROR_CODES: frozenset[str] = frozenset({
     "ACTIVE_BUILD_EXISTS",
     "INVALID_REQUEST",
@@ -161,7 +165,7 @@ ERROR_CODES: frozenset[str] = frozenset({
     "LOGS_NOT_FOUND",
     "QUEUE_CLAIM_FAILED",
     "DOCKER_BUILD_FAILED",
-    "PREVIEW_PROVISION_FAILED",
+    "CONTAINER_TEST_FAILED",
     "DEPLOYMENT_FAILED",
     "UNKNOWN_ERROR",
 })

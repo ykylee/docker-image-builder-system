@@ -30,7 +30,7 @@
 #      semantic 은 build → run → healthcheck → REPORT_CONTAINER_TEST_PASSED 까지가 본질.
 #    - RUNNER_STOP_CONTAINER_ON_DONE=true — build 완료 직후 container 자동 stop.
 #      e2e 의 [5] 단계가 "container 가 cleanup 됐는지" 를 검증할 수 있게 함.
-#    - PREVIEW_INTERNAL_PORT=8080    — busybox httpd 가 listen 하는 port.
+#    - RUNNER_INTERNAL_PORT=8080    — busybox httpd 가 listen 하는 port.
 #    - RUNNER_HEALTHCHECK_PATH=/     — busybox httpd 가 GET / 에서 index.html 을
 #      serve 하므로 curl http://127.0.0.1:8080/ 가 200 OK.
 #    - RUNNER_HEALTHCHECK_TIMEOUT_SECONDS=60 — busybox image pull (cold) +
@@ -69,7 +69,7 @@ services:
       RUNNER_DOCKER_BUILD_MODE: cli
       RUNNER_DOCKER_RUN_MODE: cli
       RUNNER_DEPLOY_MODE: skeleton
-      PREVIEW_INTERNAL_PORT: "8080"
+      RUNNER_INTERNAL_PORT: "8080"
       RUNNER_HEALTHCHECK_PATH: /
       RUNNER_HEALTHCHECK_TIMEOUT_SECONDS: "60"
       # e2e 종료 시 container 가 host 에 남지 않도록 자동 cleanup.

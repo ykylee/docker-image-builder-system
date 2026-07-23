@@ -81,7 +81,7 @@ class AssemblyTests(unittest.TestCase):
     def test_test_stage_failure(self):
         r = core.shape({
             "stage": "TEST",
-            "error": {"code": "PREVIEW_PROVISION_FAILED", "message": "..."},
+            "error": {"code": "CONTAINER_TEST_FAILED", "message": "..."},
             "nextAction": "FIX_PORT",
         })
         self.assertTrue(r.ok)
@@ -125,7 +125,7 @@ class ErrorCodeMappingTests(unittest.TestCase):
         ("LOGS_NOT_FOUND", "RETRY", "로그"),
         ("QUEUE_CLAIM_FAILED", "RETRY", "빌드 큐"),
         ("DOCKER_BUILD_FAILED", "FIX_DOCKERFILE", "이미지"),
-        ("PREVIEW_PROVISION_FAILED", "FIX_PORT", "준비"),
+        ("CONTAINER_TEST_FAILED", "FIX_PORT", "준비"),
         ("DEPLOYMENT_FAILED", "CONTACT_OPERATOR", "외부 배포"),
         ("ACTIVE_BUILD_EXISTS", "WAIT", "진행 중"),
         ("UNKNOWN_ERROR", "CONTACT_OPERATOR", "내부 오류"),
@@ -194,7 +194,7 @@ class LegacyCompatTests(unittest.TestCase):
         r = core.shape({
             "failure": {
                 "source": "preview",
-                "errorCode": "PREVIEW_PROVISION_FAILED",
+                "errorCode": "CONTAINER_TEST_FAILED",
                 "nextAction": "FIX_PORT",
             },
         })
@@ -205,7 +205,7 @@ class LegacyCompatTests(unittest.TestCase):
         r = core.shape({
             "failure": {
                 "source": "preview",
-                "errorCode": "PREVIEW_PROVISION_FAILED",
+                "errorCode": "CONTAINER_TEST_FAILED",
                 "nextAction": "OPEN_PREVIEW",  # legacy value
             },
         })
@@ -221,7 +221,7 @@ class LegacyCompatTests(unittest.TestCase):
             },
             "previewFailure": {
                 "source": "preview",
-                "errorCode": "PREVIEW_PROVISION_FAILED",
+                "errorCode": "CONTAINER_TEST_FAILED",
                 "nextAction": "FIX_PORT",
             },
         })

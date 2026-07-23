@@ -148,7 +148,9 @@ export async function registerBuildRoutes(
     const result = await buildService.reportPhase(
       paramsResult.data.buildId,
       payload.phase,
-      payload.runnerId
+      payload.runnerId,
+      // TASK-162: FAILED phase 가 실은 실패 이유를 나른다.
+      { errorCode: payload.errorCode, errorMessage: payload.errorMessage }
     );
     if (result.kind === "not_found") {
       return reply.status(404).send(notFoundBody("Build not found."));
@@ -230,7 +232,9 @@ export async function registerBuildRoutes(
         containerRef: payload.containerRef,
         healthCheckPassed: payload.healthCheckPassed,
         portOpen: payload.portOpen,
-        stabilityWindowPassed: payload.stabilityWindowPassed
+        stabilityWindowPassed: payload.stabilityWindowPassed,
+        errorCode: payload.errorCode,
+        errorMessage: payload.errorMessage
       }
     );
     if (result.kind === "not_found") {

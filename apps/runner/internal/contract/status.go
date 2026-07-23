@@ -4,23 +4,23 @@ package contract
 // `packages/shared-contract/src/build/status.ts` `canonicalBuildStatuses`.
 // 12 values aligned with the SDLC docs:
 //
-//   build (PREPARING_SOURCE / BUILDING / BUILD_SUCCESS) ->
-//   container test (TESTING / TEST_SUCCESS) ->
-//   external deployment (DEPLOYING / DEPLOY_SUCCESS) ->
-//   terminal (COMPLETED / FAILED / CANCELLED).
+//	build (PREPARING_SOURCE / BUILDING / BUILD_SUCCESS) ->
+//	container test (TESTING / TEST_SUCCESS) ->
+//	external deployment (DEPLOYING / DEPLOY_SUCCESS) ->
+//	terminal (COMPLETED / FAILED / CANCELLED).
 const (
-	StatusReceived           = "RECEIVED"
-	StatusQueued             = "QUEUED"
-	StatusPreparingSource    = "PREPARING_SOURCE"
-	StatusBuilding           = "BUILDING"
-	StatusBuildSuccess       = "BUILD_SUCCESS"
-	StatusTesting            = "TESTING"
-	StatusTestSuccess        = "TEST_SUCCESS"
-	StatusDeploying          = "DEPLOYING"
-	StatusDeploySuccess      = "DEPLOY_SUCCESS"
-	StatusCompleted          = "COMPLETED"
-	StatusFailed             = "FAILED"
-	StatusCancelled          = "CANCELLED"
+	StatusReceived        = "RECEIVED"
+	StatusQueued          = "QUEUED"
+	StatusPreparingSource = "PREPARING_SOURCE"
+	StatusBuilding        = "BUILDING"
+	StatusBuildSuccess    = "BUILD_SUCCESS"
+	StatusTesting         = "TESTING"
+	StatusTestSuccess     = "TEST_SUCCESS"
+	StatusDeploying       = "DEPLOYING"
+	StatusDeploySuccess   = "DEPLOY_SUCCESS"
+	StatusCompleted       = "COMPLETED"
+	StatusFailed          = "FAILED"
+	StatusCancelled       = "CANCELLED"
 )
 
 // CanonicalBuildStatuses is the canonical 12-value list. Mirrors

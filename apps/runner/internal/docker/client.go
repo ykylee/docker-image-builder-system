@@ -29,13 +29,13 @@ const (
 // 38124 고정). InternalPort 는 container 안에서 서비스가 listening 하는
 // port. HealthcheckPath 는 healthcheck HTTP GET 의 path (보통 "/").
 type ContainerRunOptions struct {
-	ImageTag            string
-	ContainerName       string
-	HostPort            int
-	InternalPort        int
-	HealthcheckPath     string
-	HealthcheckTimeout  time.Duration
-	StabilityWindow     time.Duration
+	ImageTag           string
+	ContainerName      string
+	HostPort           int
+	InternalPort       int
+	HealthcheckPath    string
+	HealthcheckTimeout time.Duration
+	StabilityWindow    time.Duration
 	// HealthcheckScheme 은 "http" (default) 또는 "https". 컨테이너
 	// 가 TLS terminate 할 때만 사용. healthcheck 가 단순 TCP port
 	// open probe 면 HealthcheckPath 는 무시된다.
@@ -46,7 +46,7 @@ type ContainerRunOptions struct {
 
 // ContainerStatus 는 RunContainer + WaitForHealth 가 채워서 돌려주는
 // container lifecycle snapshot. BuildService.ProcessClaim 은 이 값을
-// 그대로 ReportPreviewReady 의 입력으로 사용한다.
+// 그대로 ReportContainerTestResult 의 입력으로 사용한다.
 type ContainerStatus struct {
 	ContainerRef          string
 	ImageTag              string
@@ -75,7 +75,7 @@ type Client struct {
 	// 실제 docker invocation 을 갈아끼울 수 있게 한다. default 는
 	// exec.CommandContext(dockerBin, ...). tests 에서 fake command runner
 	// 로 교체할 수 있다.
-	runContainerCmd func(ctx context.Context, args ...string) error
+	runContainerCmd  func(ctx context.Context, args ...string) error
 	stopContainerCmd func(ctx context.Context, args ...string) error
 	// runDockerInspectCmd 는 RunContainer 의 host port auto-assign readback
 	// path 의 `docker inspect` 호출을 갈아끼울 수 있게 한다. 동일하게 default
@@ -85,15 +85,15 @@ type Client struct {
 }
 
 type buildManifest struct {
-	BuildID         string `json:"buildId"`
-	GeneratedAt     string `json:"generatedAt"`
-	BuildMode       string `json:"buildMode"`
-	WorkspaceDir    string `json:"workspaceDir"`
+	BuildID      string `json:"buildId"`
+	GeneratedAt  string `json:"generatedAt"`
+	BuildMode    string `json:"buildMode"`
+	WorkspaceDir string `json:"workspaceDir"`
 	// SourceDir is the user-supplied build context extracted by
 	// `internal/source.Fetcher` (TASK-066). The Dockerfile and any
 	// other build inputs live under this directory.
-	SourceDir       string `json:"sourceDir"`
-	Dockerfile      string `json:"dockerfilePath"`
+	SourceDir  string `json:"sourceDir"`
+	Dockerfile string `json:"dockerfilePath"`
 	// DockerfileEntry is the `BuildRequest.dockerfilePath` value
 	// (e.g. "Dockerfile" or "docker/Dockerfile.prod"). Captured
 	// alongside the absolute `Dockerfile` so a dry-run manifest
@@ -321,10 +321,10 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 		return &ContainerStatus{
 			ContainerRef:          opts.ContainerName,
 			ImageTag:              opts.ImageTag,
-			Host:                  "preview.local",
+			Host:                  "container-test.local",
 			HostPort:              hostPort,
 			InternalPort:          opts.InternalPort,
-			RuntimeURL:            fmt.Sprintf("%s://preview.local:%d%s", opts.HealthcheckScheme, hostPort, opts.HealthcheckPath),
+			RuntimeURL:            fmt.Sprintf("%s://container-test.local:%d%s", opts.HealthcheckScheme, hostPort, opts.HealthcheckPath),
 			Running:               true,
 			HealthCheckPassed:     true,
 			PortOpen:              true,
@@ -354,7 +354,7 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 	// inspect 실패 (docker daemon race / inspect format mismatch / 빈 응답)
 	// 시 status.HostPort == 0 으로 그대로 반환한다 — caller (BuildService) 가
 	// 그대로 ReportPreviewReady 에 :0 URL 을 흘려보내면 downstream 에서 잘못된
-	// previewUrl 이 노출되므로, BuildService 가 HostPort=0 으로 빌드할 때는
+	// runtimeUrl 이 노출되므로, BuildService 가 HostPort=0 으로 빌드할 때는
 	// pickFreePort 로 OS ephemeral port 를 미리 잡아 host 포트로 명시적으로
 	// 넘기는 편이 안전하다. 그 경로는 후속 TASK 의 port-collision retry 정책과
 	// 함께 도입 예정 (현재는 docker auto-assign + best-effort inspect).

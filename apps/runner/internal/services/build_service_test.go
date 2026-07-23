@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"sync"
 	"testing"
 
@@ -17,14 +18,15 @@ import (
 
 // fakeClient 는 테스트용 hostclient.
 type fakeClient struct {
-	mu          sync.Mutex
-	phases      []string
-	buildID     string
-	runnerID    string
-	reportErr   error
-	started     []hostclient.StartContainerTestRequest
-	testResults []hostclient.ContainerTestResultRequest
-	deployments []hostclient.DeploymentReportRequest
+	mu           sync.Mutex
+	phases       []string
+	phaseReports []hostclient.PhaseReport
+	buildID      string
+	runnerID     string
+	reportErr    error
+	started      []hostclient.StartContainerTestRequest
+	testResults  []hostclient.ContainerTestResultRequest
+	deployments  []hostclient.DeploymentReportRequest
 }
 
 func (f *fakeClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedBuildResponse, error) {
@@ -37,15 +39,16 @@ func (f *fakeClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedBui
 	}, nil
 }
 
-func (f *fakeClient) ReportPhase(ctx context.Context, buildID, phase, runnerID string) error {
+func (f *fakeClient) ReportPhase(ctx context.Context, buildID string, report hostclient.PhaseReport) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.reportErr != nil {
 		return f.reportErr
 	}
-	f.phases = append(f.phases, phase)
+	f.phases = append(f.phases, report.Phase)
+	f.phaseReports = append(f.phaseReports, report)
 	f.buildID = buildID
-	f.runnerID = runnerID
+	f.runnerID = report.RunnerID
 	return nil
 }
 
@@ -197,10 +200,10 @@ func TestProcessClaim_PassesContainerStatusFromRunContainer(t *testing.T) {
 	if req.HostPort != 38124 {
 		t.Errorf("expected hostPort=38124, got %d", req.HostPort)
 	}
-	if req.Host != "preview.local" {
-		t.Errorf("expected host=preview.local, got %s", req.Host)
+	if req.Host != "container-test.local" {
+		t.Errorf("expected host=container-test.local, got %s", req.Host)
 	}
-	expectedRuntimeURL := "http://preview.local:38124/"
+	expectedRuntimeURL := "http://container-test.local:38124/"
 	if req.RuntimeURL != expectedRuntimeURL {
 		t.Errorf("expected runtimeURL=%s, got %s", expectedRuntimeURL, req.RuntimeURL)
 	}
@@ -252,5 +255,126 @@ func TestProcessClaim_StopContainerOnDoneDefer(t *testing.T) {
 	}
 	if stopCalls != 1 {
 		t.Errorf("expected exactly 1 stop container call, got %d", stopCalls)
+	}
+}
+
+// TASK-162 (P2-M3): 컨테이너 테스트가 실패하면 runner 는 두 가지를 모두
+// 보고해야 한다 — ① `test` 블록을 FAILED 로 닫고 ② phase FAILED 를 canonical
+// errorCode(CONTAINER_TEST_FAILED)와 함께 보고. 이전에는 phase FAILED 만
+// 보냈고 이유도 없어서, 호스트에서 build 는 FAILED 인데 test.status 는
+// IN_PROGRESS 로 남고 lastError 는 null 이었다.
+func TestProcessClaim_ContainerTestFailure_ReportsResultAndErrorCode(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
+	t.Setenv("RUNNER_DOCKER_BUILD_MODE", "skeleton")
+	t.Setenv("RUNNER_DOCKER_RUN_MODE", "cli")
+	t.Setenv("RUNNER_HEALTHCHECK_TIMEOUT_SECONDS", "1")
+
+	// health probe 가 향할 곳에 아무도 없도록 즉시 닫은 listener 의 port 를
+	// 쓴다 — healthcheck 는 timeout 으로 반드시 실패한다.
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	deadPort := ln.Addr().(*net.TCPAddr).Port
+	_ = ln.Close()
+
+	fc := &fakeClient{buildID: "b-fail"}
+	dockerClient := docker.NewClient()
+	dockerClient.SetRunContainerCmdForTest(func(ctx context.Context, args ...string) error {
+		return nil
+	})
+	var stopCalls int
+	dockerClient.SetStopContainerCmdForTest(func(ctx context.Context, args ...string) error {
+		stopCalls++
+		return nil
+	})
+
+	svc := NewBuildService(fc, dockerClient, nil, "r-fail").WithHostPort(deadPort)
+	if err := svc.ProcessClaim(context.Background(), &queue.ClaimedBuild{BuildID: "b-fail"}); err == nil {
+		t.Fatal("expected container test failure to surface as an error")
+	}
+
+	// ① test 블록이 FAILED 로 닫혔는가
+	if len(fc.testResults) != 1 {
+		t.Fatalf("expected 1 container test result report, got %d", len(fc.testResults))
+	}
+	result := fc.testResults[0]
+	if result.Status != contract.ExecutionStatusFailed {
+		t.Errorf("expected container test status FAILED, got %s", result.Status)
+	}
+	if result.ErrorCode != contract.ErrorCodeContainerTestFailed {
+		t.Errorf("expected errorCode CONTAINER_TEST_FAILED, got %s", result.ErrorCode)
+	}
+	if result.ErrorMessage == "" {
+		t.Error("expected a non-empty error message on the failed container test")
+	}
+	// 실패 보고에는 런타임 정보가 없어야 한다 (계약이 runtimeUrl 에 .url(),
+	// host 에 .min(1) 을 걸어두어 빈 문자열은 400 이 된다 — omitempty 로 아예
+	// 전송되지 않아야 한다).
+	if result.RuntimeURL != "" || result.Host != "" {
+		t.Errorf("expected no runtime info on a failed report, got url=%q host=%q", result.RuntimeURL, result.Host)
+	}
+
+	// ② phase FAILED 가 이유와 함께 보고됐는가
+	var failed *hostclient.PhaseReport
+	for i := range fc.phaseReports {
+		if fc.phaseReports[i].Phase == contract.PhaseFailed {
+			failed = &fc.phaseReports[i]
+		}
+	}
+	if failed == nil {
+		t.Fatalf("expected a FAILED phase report, got phases=%v", fc.phases)
+	}
+	if failed.ErrorCode != contract.ErrorCodeContainerTestFailed {
+		t.Errorf("expected FAILED phase errorCode CONTAINER_TEST_FAILED, got %q", failed.ErrorCode)
+	}
+	if failed.ErrorMessage == "" {
+		t.Error("expected a non-empty error message on the FAILED phase report")
+	}
+
+	// healthcheck 실패 시 컨테이너는 정리되어야 한다.
+	if stopCalls != 1 {
+		t.Errorf("expected exactly 1 stop container call after healthcheck failure, got %d", stopCalls)
+	}
+}
+
+// TASK-162: docker build 실패는 canonical DOCKER_BUILD_FAILED 로 보고한다.
+// 개명 전까지 이 코드를 emit 하는 곳이 하나도 없었다.
+func TestProcessClaim_BuildFailure_ReportsDockerBuildFailed(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("RUNNER_WORKSPACE_ROOT", tmp)
+	t.Setenv("RUNNER_DOCKER_BUILD_MODE", "cli")
+	// cli mode 의 `docker build` 가 확실히 실패하도록 존재하지 않는 바이너리를
+	// 가리킨다 — docker daemon 없이도 결정적으로 실패한다.
+	t.Setenv("RUNNER_DOCKER_BIN", filepath.Join(tmp, "no-such-docker"))
+
+	fc := &fakeClient{buildID: "b-build"}
+	dockerClient := docker.NewClient()
+
+	svc := NewBuildService(fc, dockerClient, nil, "r-build")
+	if err := svc.ProcessClaim(context.Background(), &queue.ClaimedBuild{BuildID: "b-build"}); err == nil {
+		t.Fatal("expected build failure to surface as an error")
+	}
+
+	// 빌드 단계 실패이므로 컨테이너 테스트는 시작조차 하지 않는다.
+	if len(fc.started) != 0 {
+		t.Errorf("expected no container test start on a build failure, got %d", len(fc.started))
+	}
+	if len(fc.testResults) != 0 {
+		t.Errorf("expected no container test result on a build failure, got %d", len(fc.testResults))
+	}
+
+	var failed *hostclient.PhaseReport
+	for i := range fc.phaseReports {
+		if fc.phaseReports[i].Phase == contract.PhaseFailed {
+			failed = &fc.phaseReports[i]
+		}
+	}
+	if failed == nil {
+		t.Fatalf("expected a FAILED phase report, got phases=%v", fc.phases)
+	}
+	if failed.ErrorCode != contract.ErrorCodeDockerBuildFailed {
+		t.Errorf("expected errorCode DOCKER_BUILD_FAILED, got %q", failed.ErrorCode)
 	}
 }

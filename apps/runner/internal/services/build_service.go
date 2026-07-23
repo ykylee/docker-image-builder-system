@@ -22,9 +22,9 @@ type BuildService struct {
 	fetcher        *source.Fetcher
 	deployer       *deploy.Client
 	runnerID       string
-	internalPort   int    // default 8080, env override PREVIEW_INTERNAL_PORT
+	internalPort   int    // default 8080, env override RUNNER_INTERNAL_PORT
 	dockerfilePath string // default "Dockerfile", env override RUNNER_DOCKERFILE_PATH
-	// hostPort 는 ReportPreviewReady 가 노출할 container 의 host port.
+	// hostPort 는 컨테이너 테스트 결과가 노출할 container 의 host port.
 	// 0 이면 RunContainer 가 cli mode 에서 OS 가 알려주는 ephemeral
 	// port 를 잡는다 (default). test 는 BuildService.WithHostPort 로
 	// fake health server 의 port 를 명시적으로 주입해 probe 결과를
@@ -37,16 +37,19 @@ type BuildService struct {
 	// BuildRequest 의 optional 필드로 정식 승격.
 	healthcheckPath    string
 	healthcheckTimeout time.Duration
-	// stopContainerOnDone 가 true 면 ReportPreviewReady 가 끝난 뒤
+	// stopContainerOnDone 가 true 면 컨테이너 테스트 결과 보고가 끝난 뒤
 	// container 를 stop + remove 한다. 1차 PR 은 false 가 기본 —
-	// preview URL 이 test deployment 동안 살아있어야 하므로. e2e
+	// 런타임 URL 이 컨테이너 테스트 동안 살아있어야 하므로. e2e
 	// script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 검증.
 	stopContainerOnDone bool
 }
 
 func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *docker.Client, fetcher *source.Fetcher, runnerID string) *BuildService {
 	port := 8080
-	if v := os.Getenv("PREVIEW_INTERNAL_PORT"); v != "" {
+	// TASK-162 (P2-M3): preview-era env 이름 PREVIEW_INTERNAL_PORT 를
+	// RUNNER_INTERNAL_PORT 로 개명. 나머지 runner env 가 전부 RUNNER_ 접두사를
+	// 쓰는데 이것만 예외였다.
+	if v := os.Getenv("RUNNER_INTERNAL_PORT"); v != "" {
 		var n int
 		if _, err := fmt.Sscanf(v, "%d", &n); err == nil && n > 0 {
 			port = n
@@ -83,10 +86,19 @@ func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *doc
 	}
 }
 
-// ProcessClaim: claim → SOURCE_PREPARED →
-// source.Fetcher.Fetch (TASK-066) → DOCKER_BUILD_STARTED →
-// docker.BuildImage → DOCKER_BUILD_COMPLETED → queueTestDeployment →
-// CONTAINER_TEST_PASSED → DEPLOYMENT_STARTED/COMPLETED → COMPLETED.
+// ProcessClaim 은 claim 된 build 하나를 canonical 실행 순서대로 처리한다:
+//
+//	claim → source prepare → docker build → container test → deploy → finalize
+//
+// TASK-162 (P2-M3): 그 순서를 **코드 구조로** 표현한다. 이전에는 200줄 단일
+// 함수에 여섯 단계가 섞여 있었고, 실패 처리도 단계마다 손으로 복사된
+// `reportPhase(FAILED)` 한 줄이라 **어느 단계에서 왜 실패했는지가 호스트에
+// 전혀 전달되지 않았다**(모든 실패 빌드의 `lastError` 가 null 이었다).
+//
+// 이제 각 단계는 실패 시 canonical errorCode 를 실은 `*stageFailure` 를
+// 돌려주고, `fail` 이 그것을 호스트에 보고한다. 컨테이너 테스트 단계의
+// 실패는 phase FAILED 뿐 아니라 **`test` 블록도 FAILED 로 닫는다** — 이전엔
+// 닫지 않아 실패한 빌드의 컨테이너 테스트가 영원히 IN_PROGRESS 로 남았다.
 //
 // 모든 phase / status / errorCode string 은 `apps/runner/internal/contract`
 // canonical 상수를 통해 emit — drift structural 차단.
@@ -98,100 +110,168 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 	buildID := claim.BuildID
 	log.Printf("runner %s processing build %s", s.runnerID, buildID)
 
-	// Source archive is fetched via the Host Server API
-	// (`GET /builds/:buildId/source`, TASK-066). The previous
-	// `PrepareSource` marker-file call has been removed — the real
-	// bytes are now part of the build's working state. The fetcher
-	// also reports the SOURCE_PREPARED phase implicitly by leaving
-	// the source tree ready before `docker.BuildImage` runs.
+	sourceDir, failure := s.prepareSource(ctx, buildID)
+	if failure != nil {
+		return s.fail(ctx, buildID, failure)
+	}
+
+	if failure := s.buildImage(ctx, buildID, sourceDir); failure != nil {
+		return s.fail(ctx, buildID, failure)
+	}
+
+	containerStatus, failure := s.runContainerTest(ctx, buildID)
+	if failure != nil {
+		return s.fail(ctx, buildID, failure)
+	}
+
+	if failure := s.deployImage(ctx, buildID, containerStatus); failure != nil {
+		return s.fail(ctx, buildID, failure)
+	}
+
+	if err := s.reportPhase(ctx, buildID, contract.PhaseCompleted); err != nil {
+		return err
+	}
+
+	log.Printf("runner %s completed build %s", s.runnerID, buildID)
+	return nil
+}
+
+// stageFailure 는 한 단계의 실패를 canonical errorCode 와 함께 나른다.
+// containerTest 가 true 면 `fail` 이 phase 보고에 더해 컨테이너 테스트
+// 결과도 FAILED 로 닫는다.
+type stageFailure struct {
+	errorCode     string
+	err           error
+	containerTest bool
+	// containerRef 가 비어있지 않으면 `fail` 이 정리(stop)까지 책임진다.
+	containerRef string
+}
+
+func (f *stageFailure) Error() string { return f.err.Error() }
+
+// fail 은 실패를 호스트에 **이유와 함께** 보고하고 그 error 를 반환한다.
+// 보고 자체가 실패해도 원래 실패 원인을 덮지 않는다 — 원인 유실이 훨씬
+// 나쁘기 때문에 보고 오류는 로그로만 남긴다.
+func (s *BuildService) fail(ctx context.Context, buildID string, f *stageFailure) error {
+	if f.containerRef != "" {
+		_ = s.docker.StopContainer(context.Background(), f.containerRef)
+	}
+
+	if f.containerTest {
+		// 컨테이너 테스트 단계의 실패는 `test` 블록도 닫아야 한다. 이걸
+		// 안 하면 build 는 FAILED 인데 test.status 는 IN_PROGRESS 로 남아
+		// 두 값이 모순된다.
+		if err := s.hostClient.ReportContainerTestResult(ctx, buildID, hostclient.ContainerTestResultRequest{
+			Status:       contract.ExecutionStatusFailed,
+			ErrorCode:    f.errorCode,
+			ErrorMessage: f.err.Error(),
+			RunnerID:     s.runnerID,
+		}); err != nil {
+			log.Printf("runner %s container test failure report failed: buildID=%s err=%v", s.runnerID, buildID, err)
+		}
+	}
+
+	if err := s.hostClient.ReportPhase(ctx, buildID, hostclient.PhaseReport{
+		Phase:        contract.PhaseFailed,
+		RunnerID:     s.runnerID,
+		ErrorCode:    f.errorCode,
+		ErrorMessage: f.err.Error(),
+	}); err != nil {
+		log.Printf("runner %s failure phase report failed: buildID=%s err=%v", s.runnerID, buildID, err)
+	}
+
+	log.Printf("runner %s build failed: buildID=%s errorCode=%s err=%v", s.runnerID, buildID, f.errorCode, f.err)
+	return f.err
+}
+
+// prepareSource — claim 직후 단계. 호스트에서 source archive 를 받아
+// (`GET /builds/:buildId/source`, TASK-066) SHA-256 을 검증하고 per-build
+// workspace 에 풀어 놓는다. 반환값은 `docker build` 의 context 디렉터리.
+func (s *BuildService) prepareSource(ctx context.Context, buildID string) (string, *stageFailure) {
 	if err := s.reportPhase(ctx, buildID, contract.PhaseSourcePrepared); err != nil {
-		return err
+		// phase 보고 실패는 호스트와의 통신 문제다 — 실패 보고를 또 시도해봐야
+		// 같은 이유로 실패한다. 그대로 올려보낸다.
+		return "", &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
 
-	// Fetch the source archive bytes, verify the SHA-256 against
-	// the response header, and extract the tar.gz into the
-	// per-build workspace. A failure here is terminal — the
-	// `phase: FAILED` report is folded into the build_service's
-	// post-failure path below.
-	var sourceDir string
-	if s.fetcher != nil {
-		extracted, err := s.fetcher.Fetch(ctx, buildID)
-		if err != nil {
-			_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-			return fmt.Errorf("runner %s: fetch source: %w", s.runnerID, err)
-		}
-		sourceDir = extracted.SourceDir
-		log.Printf("runner %s fetched source: buildID=%s archiveBytes=%d sourceDir=%s checksum=%s", s.runnerID, buildID, extracted.SizeBytes, sourceDir, extracted.Checksum)
-	} else {
-		// No fetcher wired (e.g. unit tests that exercise only
-		// the phase reporting path). Fall back to the
-		// `PrepareSource` skeleton so a downstream caller can
-		// still observe a deterministic workspace layout. The
-		// fallback also writes a default `Dockerfile` into the
-		// source dir so `BuildImage` can resolve it — without
-		// this the tests would observe a `Dockerfile not found`
-		// error from `BuildImage`. The default Dockerfile is
-		// the same scratch + manifest copy that the pre-TASK-066
-		// `BuildImage` synthesised inline.
-		if err := s.docker.PrepareSource(ctx, buildID); err != nil {
-			_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-			return err
-		}
-		sourceDir = fmt.Sprintf("%s/src", s.docker.WorkspaceDir(buildID))
-		// The fallback Dockerfile is intentionally minimal (no
-		// COPY) because `BuildImage` writes the build manifest
-		// to `<workspaceDir>/build-manifest.json`, NOT inside
-		// `sourceDir` — so a `COPY build-manifest.json ...`
-		// directive would fail the real `docker build` step
-		// (this only fires when `buildMode=cli`). `FROM scratch`
-		// alone is a valid no-op Dockerfile.
-		if err := os.WriteFile(
-			filepath.Join(sourceDir, s.dockerfilePath),
-			[]byte("FROM scratch\n"),
-			0o644,
-		); err != nil {
-			_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-			return fmt.Errorf("runner %s: write fallback Dockerfile: %w", s.runnerID, err)
-		}
+	if s.fetcher == nil {
+		return s.prepareSourceFallback(ctx, buildID)
 	}
 
+	extracted, err := s.fetcher.Fetch(ctx, buildID)
+	if err != nil {
+		return "", &stageFailure{
+			errorCode: contract.ErrorCodeUnknownError,
+			err:       fmt.Errorf("runner %s: fetch source: %w", s.runnerID, err),
+		}
+	}
+	log.Printf("runner %s fetched source: buildID=%s archiveBytes=%d sourceDir=%s checksum=%s",
+		s.runnerID, buildID, extracted.SizeBytes, extracted.SourceDir, extracted.Checksum)
+	return extracted.SourceDir, nil
+}
+
+// prepareSourceFallback — fetcher 가 wire 되지 않은 경우(phase 보고 경로만
+// 검증하는 단위 테스트)의 결정적 workspace. `PrepareSource` 는 디렉터리
+// 골격만 만들고, 여기서 최소 Dockerfile 을 심어 `BuildImage` 가 resolve 할
+// 수 있게 한다.
+//
+// fallback Dockerfile 이 의도적으로 최소(`FROM scratch`, COPY 없음)인 이유:
+// `BuildImage` 는 build manifest 를 `<workspaceDir>/build-manifest.json` 에
+// 쓰지 sourceDir 안에 쓰지 않는다. 그래서 `COPY build-manifest.json ...` 은
+// 실제 `docker build`(buildMode=cli)에서 실패한다.
+func (s *BuildService) prepareSourceFallback(ctx context.Context, buildID string) (string, *stageFailure) {
+	if err := s.docker.PrepareSource(ctx, buildID); err != nil {
+		return "", &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
+	}
+	sourceDir := fmt.Sprintf("%s/src", s.docker.WorkspaceDir(buildID))
+	if err := os.WriteFile(
+		filepath.Join(sourceDir, s.dockerfilePath),
+		[]byte("FROM scratch\n"),
+		0o644,
+	); err != nil {
+		return "", &stageFailure{
+			errorCode: contract.ErrorCodeUnknownError,
+			err:       fmt.Errorf("runner %s: write fallback Dockerfile: %w", s.runnerID, err),
+		}
+	}
+	return sourceDir, nil
+}
+
+// buildImage — docker build 단계. 실패는 canonical DOCKER_BUILD_FAILED 로
+// 보고한다 (TASK-162 이전에는 이 코드를 emit 하는 곳이 없었다).
+func (s *BuildService) buildImage(ctx context.Context, buildID, sourceDir string) *stageFailure {
 	if err := s.reportPhase(ctx, buildID, contract.PhaseDockerBuildStarted); err != nil {
-		return err
+		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
 
 	if err := s.docker.BuildImage(ctx, buildID, sourceDir, s.dockerfilePath); err != nil {
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return err
+		return &stageFailure{errorCode: contract.ErrorCodeDockerBuildFailed, err: err}
 	}
 
 	if err := s.reportPhase(ctx, buildID, contract.PhaseDockerBuildCompleted); err != nil {
-		return err
+		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
+	return nil
+}
 
-	// PKG-006: start the container test with internalPort
+// runContainerTest — 컨테이너 테스트 단계. 빌드된 이미지를 실제로 띄우고
+// HTTP healthcheck / TCP port open 이 안정될 때까지 polling 한 뒤, 결과를
+// canonical `test` 블록에 보고한다.
+//
+// hostPort=0 으로 두면 RunContainer 가 cli mode 일 때 OS 가 알려주는
+// ephemeral port 를 잡고, skeleton mode 일 때는 38124 fallback 을 쓴다.
+// BuildService 는 그 결정에 개입하지 않아 두 mode 사이의 일관성을 유지한다.
+func (s *BuildService) runContainerTest(ctx context.Context, buildID string) (*docker.ContainerStatus, *stageFailure) {
 	if err := s.hostClient.StartContainerTest(ctx, buildID, hostclient.StartContainerTestRequest{
 		InternalPort: s.internalPort,
 		RunnerID:     s.runnerID,
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return err
+		return nil, &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
 
-	// TASK-067: real container run + healthcheck. StartContainerTest 가
-	// 받아들여진 직후 BuildImage 가 만든 image 로 docker container 를 띄우고
-	// HTTP healthcheck / TCP port open 이 안정될 때까지 polling 한다.
-	// 성공 시 ContainerStatus 의 runtimeUrl / host / hostPort / containerRef
-	// 를 그대로 ReportContainerTestResult 에 전달한다 — mock 값 (preview.local,
-	// 38124, container-<id>) 대신 진짜 binding 정보를 노출한다.
-	//
-	// hostPort=0 으로 두면 RunContainer 가 cli mode 일 때 OS 가 알려주는
-	// ephemeral port 를 잡아 그걸 사용하고, skeleton mode 일 때는 기존
-	// 38124 fallback 을 그대로 사용한다. BuildService 는 그 결정에
-	// 개입하지 않아 두 mode 사이의 일관성을 유지한다.
-	containerName := fmt.Sprintf("container-%s", buildID)
 	runOpts := docker.ContainerRunOptions{
 		ImageTag:           s.docker.ImageTagFor(buildID),
-		ContainerName:      containerName,
+		ContainerName:      fmt.Sprintf("container-%s", buildID),
 		HostPort:           s.hostPortOverride,
 		InternalPort:       s.internalPort,
 		HealthcheckPath:    s.healthcheckPath,
@@ -201,26 +281,21 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 
 	containerStatus, err := s.docker.RunContainer(ctx, runOpts)
 	if err != nil {
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return fmt.Errorf("runner %s: run container: %w", s.runnerID, err)
+		return nil, &stageFailure{
+			errorCode:     contract.ErrorCodeContainerTestFailed,
+			err:           fmt.Errorf("runner %s: run container: %w", s.runnerID, err),
+			containerTest: true,
+		}
 	}
 
 	if _, err := s.docker.WaitForHealth(ctx, containerStatus, s.healthcheckTimeout); err != nil {
-		// healthcheck 실패는 terminal — container stop 후 FAILED 보고.
-		_ = s.docker.StopContainer(context.Background(), containerStatus.ContainerRef)
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return fmt.Errorf("runner %s: container healthcheck: %w", s.runnerID, err)
-	}
-
-	// 1차 PR scope: container 가 CONTAINER_TEST_PASSED 동안 살아있어야 하므로
-	// 자동 stop 안 함. e2e script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로
-	// 켜고 cleanup 검증.
-	if s.stopContainerOnDone {
-		defer func() {
-			if err := s.docker.StopContainer(context.Background(), containerStatus.ContainerRef); err != nil {
-				log.Printf("runner %s stop container failed: %v", s.runnerID, err)
-			}
-		}()
+		// healthcheck 실패는 terminal — `fail` 이 container stop 까지 처리한다.
+		return nil, &stageFailure{
+			errorCode:     contract.ErrorCodeContainerTestFailed,
+			err:           fmt.Errorf("runner %s: container healthcheck: %w", s.runnerID, err),
+			containerTest: true,
+			containerRef:  containerStatus.ContainerRef,
+		}
 	}
 
 	if err := s.hostClient.ReportContainerTestResult(ctx, buildID, hostclient.ContainerTestResultRequest{
@@ -236,8 +311,34 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		StabilityWindowPassed: containerStatus.StabilityWindowPassed,
 		RunnerID:              s.runnerID,
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return err
+		return nil, &stageFailure{
+			errorCode:    contract.ErrorCodeUnknownError,
+			err:          err,
+			containerRef: containerStatus.ContainerRef,
+		}
+	}
+
+	return containerStatus, nil
+}
+
+// deployImage — 외부 배포 단계. cli mode 의 adapter 는 local SourceImage
+// (`docker-image-builder-system/<buildMode>:<buildID>`) 를 registry 에
+// push 한다. skeleton mode 는 SourceImage 가 local docker daemon 에 없을 수
+// 있어 opts.SourceImage 를 비워두고 skeleton 동작을 탄다 (workspace 에
+// deploy-result.json 만 emit).
+func (s *BuildService) deployImage(
+	ctx context.Context,
+	buildID string,
+	containerStatus *docker.ContainerStatus,
+) *stageFailure {
+	// 컨테이너는 컨테이너 테스트가 끝난 뒤 정리한다. e2e script 가
+	// RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 cleanup 을 검증한다.
+	if s.stopContainerOnDone {
+		defer func() {
+			if err := s.docker.StopContainer(context.Background(), containerStatus.ContainerRef); err != nil {
+				log.Printf("runner %s stop container failed: %v", s.runnerID, err)
+			}
+		}()
 	}
 
 	if err := s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
@@ -248,16 +349,9 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 			"deliveryMode": "POLLING",
 		},
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return err
+		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
 
-	// TASK-068: cli mode 의 deploy adapter 는 local SourceImage
-	// (`docker-image-builder-system/<buildMode>:<buildID>`) 를
-	// registry 에 push 한다. skeleton mode 는 SourceImage 가 local
-	// docker daemon 에 없을 수 있어 opts.SourceImage 를 비워두고
-	// 그대로 skeleton 동작을 탄다 (기존과 동일 — workspace 에
-	// deploy-result.json 만 emit).
 	deployResult, err := s.deployer.Deploy(ctx, buildID, deploy.DeployOptions{
 		SourceImage: containerStatus.ImageTag,
 	})
@@ -269,8 +363,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 			ErrorMessage: err.Error(),
 			RunnerID:     s.runnerID,
 		})
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return err
+		return &stageFailure{errorCode: contract.ErrorCodeDeploymentFailed, err: err}
 	}
 
 	if err := s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
@@ -281,20 +374,16 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		RunnerID:            s.runnerID,
 		ResponsePayloadJSON: deployResult.ResponsePayloadJSON,
 	}); err != nil {
-		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
-		return err
+		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
-
-	if err := s.reportPhase(ctx, buildID, contract.PhaseCompleted); err != nil {
-		return err
-	}
-
-	log.Printf("runner %s completed build %s", s.runnerID, buildID)
 	return nil
 }
 
 func (s *BuildService) reportPhase(ctx context.Context, buildID, phase string) error {
-	if err := s.hostClient.ReportPhase(ctx, buildID, phase, s.runnerID); err != nil {
+	if err := s.hostClient.ReportPhase(ctx, buildID, hostclient.PhaseReport{
+		Phase:    phase,
+		RunnerID: s.runnerID,
+	}); err != nil {
 		log.Printf("runner %s phase report failed: buildID=%s phase=%s err=%v", s.runnerID, buildID, phase, err)
 		return err
 	}

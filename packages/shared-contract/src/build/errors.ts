@@ -1,5 +1,14 @@
 import { z } from "zod";
 
+// TASK-162 (P2-M3): preview-era 이름의 canonical 개명이 이 목록에 있다 —
+// 구 `PREVIEW_PROVISION_FAILED` → `CONTAINER_TEST_FAILED`. 이 코드는
+// **컨테이너 테스트 단계의 실패**(컨테이너 기동 실패 / healthcheck 미통과 /
+// port 미개방)를 가리킨다. 개명 전까지 emit 하는 곳이 하나도 없었다 —
+// runner 가 실패 시 phase FAILED 만 보내고 이유를 버렸기 때문이다.
+//
+// 주의: 아래 배열 **안에는 canonical 값 외의 UPPER_SNAKE 토큰을 쓰지 말 것.**
+// contract-drift-checker 가 배열 본문을 토큰 단위로 훑어 enum 을 복원하므로,
+// 주석에 적힌 옛 코드 이름조차 "TS 에만 있는 여분 값" 으로 잡힌다.
 export const errorCodes = [
   "ACTIVE_BUILD_EXISTS",
   "INVALID_REQUEST",
@@ -7,10 +16,10 @@ export const errorCodes = [
   "LOGS_NOT_FOUND",
   "QUEUE_CLAIM_FAILED",
   "DOCKER_BUILD_FAILED",
-  "PREVIEW_PROVISION_FAILED",
+  "CONTAINER_TEST_FAILED",
   // TASK-062: deployment adapter failure surfaced by Runner during the
-  // external deployment phase. Parallel to PREVIEW_PROVISION_FAILED
-  // (test environment provisioning) but at the deployment step.
+  // external deployment phase. Parallel to the container test failure code
+  // but at the deployment step.
   "DEPLOYMENT_FAILED",
   "UNKNOWN_ERROR"
 ] as const;

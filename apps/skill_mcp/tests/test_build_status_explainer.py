@@ -163,7 +163,7 @@ class FailedTerminalTests(unittest.TestCase):
             _payload(
                 **{
                     "build": {"status": "FAILED"},
-                    "lastError": {"code": "PREVIEW_PROVISION_FAILED", "message": "..."},
+                    "lastError": {"code": "CONTAINER_TEST_FAILED", "message": "..."},
                 },
             )
         )

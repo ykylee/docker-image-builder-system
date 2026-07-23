@@ -3,7 +3,7 @@
 - 문서 목적: Phase 2 의 축·범위·마일스톤·완료 기준을 하나의 기준으로 정의한다. Phase 1 종료(v0.2.0/v0.2.1) 이후의 개발 방향 단일 출처.
 - 범위: 컨셉 근거(원 설계 대비 격차 실측), 마일스톤 P2-M1~M5, 순서와 완료 기준, 리스크
 - 대상 독자: 프로젝트 리드, 각 계층 구현자, AI agent
-- 상태: draft (**P2-M1 · P2-M2 완료** 반영)
+- 상태: draft (**P2-M1 · P2-M2 · P2-M3 완료** 반영)
 - 최종 수정일: 2026-07-23
 - 진입 baseline: **v0.2.1** (2026-07-23)
 - 관련 문서: [Phase 1 회고](./PHASE-1-RETROSPECTIVE.md), [Step 15 로드맵](./sdlc/15-refactoring-roadmap-and-milestones.md), [CHANGELOG](../CHANGELOG.md)
@@ -106,6 +106,21 @@ Step 15 의 M1~M5 잔여분을 Phase 2 기준으로 재정의한다.
 - **대상**: `apps/runner` (28)
 - **내용**: `claim → source prepare → build → container test → deploy → finalize` 순서 명문화. 컨테이너 테스트 결과를 `build_test` 에 first-class 로 보고.
 - **완료 기준**: happy path + failed path 의 phase/error 일관성 / go test 통과 / **실이미지 e2e(production-semantic) PASS**.
+
+> **진행: P2-M3 완료 (TASK-162).** 실측에서 **실패 경로 결함 3건**이 드러났고 그게
+> 이 마일스톤의 중심이 됐다: ① `last_error_code`/`last_error_message` 를 쓰는
+> 코드가 **어디에도 없어** 모든 실패 빌드의 `lastError` 가 null 이었다(계약에
+> errorCode 채널 자체가 없었다) ② runner 가 컨테이너 테스트 실패 시 `test`
+> 블록을 닫지 않아 `build=FAILED / test=IN_PROGRESS` 로 상태가 자기모순
+> ③ postgres 가 계약에 없는 `TEST_DEPLOYMENT_FAILED` 를 하드코딩하고 memory 는
+> 아예 기록하지 않아 backend 별 동작이 갈렸다.
+> 해소: `phaseUpdateRequest`/`containerTestResultRequest` 에 errorCode·errorMessage
+> 신설 · 양 저장소가 실제로 기록(FAILED 이탈 시 소거) · `ProcessClaim` 을 단계
+> 함수로 분리해 각 단계가 canonical 코드를 실어 보고 · `PREVIEW_PROVISION_FAILED`
+> → **`CONTAINER_TEST_FAILED`** 3-way 개명 · `DOCKER_BUILD_FAILED` 최초 emit ·
+> preview-era 이름(`PREVIEW_INTERNAL_PORT`, skeleton host `preview.local`) 정리.
+> 회귀 가드 6건 추가(음성 검증 완료). 상세는
+> [빌드 실패 보고 경로](operations/build-failure-reporting-2026-07-23.md).
 
 ### P2-M4 — 소비자 정렬
 - **대상**: `apps/build-monitor/react` (50) + `apps/skill_mcp` (77)

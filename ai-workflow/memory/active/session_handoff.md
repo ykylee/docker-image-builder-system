@@ -6,6 +6,43 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 158→159: **P2-M3 완료 — Runner 정렬 + 실패 보고 경로 결함 3건 해소 (TASK-162)**).
+
+  ## 착수 실측이 바꾼 마일스톤의 중심
+  P2-M3 은 원래 "실행 순서 명문화" 가 주 내용이었으나, 실측에서 **실패 경로 결함 3건**이 드러나 그게 중심이 됐다.
+
+  | # | 결함 | 증상 |
+  |---|---|---|
+  | ① | `last_error_code`/`last_error_message` 를 **쓰는 코드가 어디에도 없음** | 모든 실패 빌드의 `lastError` 가 null — 운영자도 skill_mcp 도 이유를 볼 수 없었다 |
+  | ② | runner 가 컨테이너 테스트 실패 시 `test` 블록을 닫지 않음 | `build=FAILED` 인데 `test=IN_PROGRESS` 로 자기모순. P2-M2 가 만든 FAILED 경로가 dead path 였다 |
+  | ③ | postgres 가 계약에 없는 `TEST_DEPLOYMENT_FAILED` 하드코딩, memory 는 아예 미기록 | backend 별 동작 분기 (Phase 2 원칙 위반) |
+
+  ①의 근본 원인은 계약이었다 — `PhaseUpdateRequest` 에 실패 이유를 실을 **채널 자체가 없었다**.
+
+  ## 해소
+  - **계약**: `phaseUpdateRequestSchema` / `containerTestResultRequestSchema` 에 `errorCode`(canonical enum) + `errorMessage` optional 신설.
+  - **계약**: `PREVIEW_PROVISION_FAILED` → **`CONTAINER_TEST_FAILED`** 3-way 개명(TS·Go·Python + skill_mcp 매핑).
+  - **서버**: `updatePhase(id, phase, failure?)` 가 FAILED 면 기록하고 **FAILED 이탈 시 소거**. `reportContainerTestResult` 의 하드코딩 제거 → runner 코드 우선, 없으면 `CONTAINER_TEST_FAILED`. memory·postgres 동일 semantics.
+  - **Runner**: `ProcessClaim` 200줄 단일 함수를 canonical 순서 그대로 단계 함수로 분리(`prepareSource` → `buildImage` → `runContainerTest` → `deployImage` → finalize). 각 단계가 `*stageFailure` 에 canonical 코드를 실어 돌려주고 단일 `fail()` 이 보고 + 컨테이너 정리까지 책임. 보고 실패가 원래 원인을 덮지 않는다.
+  - **최초 emit**: `DOCKER_BUILD_FAILED` / `CONTAINER_TEST_FAILED` — 그전까지 계약에만 있던 값이었다.
+  - **preview-era 이름**: env `PREVIEW_INTERNAL_PORT`→`RUNNER_INTERNAL_PORT`(compose 2종 + PROJECT_PROFILE 동반), skeleton host `preview.local`→`container-test.local`, `ReportPhase(ctx,id,phase,runner)` → `ReportPhase(ctx,id,PhaseReport{...})`.
+
+  ## 걸린 함정 2건 (재발 주의)
+  1. **실패 payload 의 `omitempty`** — 실패 보고에는 런타임 정보가 없는데 계약이 `runtimeUrl` 에 `.url()`, `host` 에 `.min(1)` 을 걸어둬서, Go 구조체에 `omitempty` 가 없으면 빈 문자열이 나가 **400** 이 된다. 회귀 테스트가 직접 단언한다.
+  2. **enum 배열 안 주석이 drift 로 잡힌다** — TS `errorCodes` 배열 **안** 주석에 옛 코드명을 적었더니 `contract-drift-checker` 가 그 토큰을 열거값으로 복원해 "TS 에만 있는 여분 값" 으로 판정했다(pytest 1 FAIL). 설명은 배열 밖에 쓴다 — 주의를 `errors.ts` 상단에 박아뒀다.
+
+  ## 검증
+  TS 5 clean / build-server **182**(178+4) / build-monitor **273** / go **8 pkg**(회귀 2건 추가) / skill_mcp **222** / OpenAPI paths 14·components 40 / **e2e 13/13**.
+  - **음성 검증**: 개선 전 동작으로 되돌리면 runner 2건·build-server 2건이 실제로 FAIL 한다(가짜 가드 아님).
+  - **postgres 실DB**: `POST /phase {FAILED, errorCode}` → `last_error_code` 컬럼에 실제 기록됨을 psql 로 확인.
+
+  ## 다음은 P2-M4 (소비자 정렬)
+  `apps/build-monitor/react` + `apps/skill_mcp`. 이번엔 canonical enum 개명에 따른 **키 정렬만** 했고 skill_mcp 의 실패 문구·이름(`preview_readiness_checker` 등) 재설계는 손대지 않았다. UI 는 새로 생긴 `lastError` 를 실제로 표시할 수 있게 됐다 — 그전까지는 항상 null 이라 표시할 것이 없었다.
+
+  ## 남긴 것
+  **실패 경로 e2e 가 없다.** 현 13종은 전부 happy path 다. 실패한 빌드가 `lastError` 와 `test.status=FAILED` 를 노출하는지 실컨테이너로 보는 e2e 는 P2-M5 의 신규 e2e 와 함께 검토한다. 지금은 단위 회귀 가드 + 실DB 확인으로 덮는다.
+
+  workflow meta sync (state 200→201, handoff doc 158→159, work_backlog 116→117) 같은 commit.
 - Updated: 2026-07-23 (rev 157→158: **P2-M2 완료 — 서버 정렬 + 컨테이너 테스트 엔드포인트 재설계 (TASK-161)**).
 
   ## 엔드포인트 4종 → 2종

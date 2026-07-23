@@ -9,17 +9,17 @@ package contract
 // `SOURCE_PREPARED → DOCKER_BUILD_STARTED → ...` 순으로 emit 하는 phase 가
 // 바로 이 enum 이다.
 const (
-	PhaseRequestAccepted       = "REQUEST_ACCEPTED"
-	PhaseQueueClaimed          = "QUEUE_CLAIMED"
-	PhaseSourcePrepared        = "SOURCE_PREPARED"
-	PhaseDockerBuildStarted    = "DOCKER_BUILD_STARTED"
-	PhaseDockerBuildCompleted  = "DOCKER_BUILD_COMPLETED"
-	PhaseContainerTestStarted         = "CONTAINER_TEST_STARTED"
-	PhaseContainerTestPassed          = "CONTAINER_TEST_PASSED"
-	PhaseDeploymentStarted     = "DEPLOYMENT_STARTED"
-	PhaseDeploymentCompleted   = "DEPLOYMENT_COMPLETED"
-	PhaseCompleted             = "COMPLETED"
-	PhaseFailed                = "FAILED"
+	PhaseRequestAccepted      = "REQUEST_ACCEPTED"
+	PhaseQueueClaimed         = "QUEUE_CLAIMED"
+	PhaseSourcePrepared       = "SOURCE_PREPARED"
+	PhaseDockerBuildStarted   = "DOCKER_BUILD_STARTED"
+	PhaseDockerBuildCompleted = "DOCKER_BUILD_COMPLETED"
+	PhaseContainerTestStarted = "CONTAINER_TEST_STARTED"
+	PhaseContainerTestPassed  = "CONTAINER_TEST_PASSED"
+	PhaseDeploymentStarted    = "DEPLOYMENT_STARTED"
+	PhaseDeploymentCompleted  = "DEPLOYMENT_COMPLETED"
+	PhaseCompleted            = "COMPLETED"
+	PhaseFailed               = "FAILED"
 )
 
 // BuildPhases — canonical 11-phase list. Mirrors

@@ -35,6 +35,7 @@ import type {
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
   ContainerTestDetails,
+  PhaseFailureDetails,
   StartContainerTestResult,
   ReportDeploymentResult,
   ReportContainerTestResult,
@@ -293,7 +294,11 @@ export function createMemoryBuildRepository(): BuildRepository {
       };
     },
 
-    async updatePhase(buildId: string, phase: string): Promise<UpdatePhaseResult> {
+    async updatePhase(
+      buildId: string,
+      phase: string,
+      failure?: PhaseFailureDetails
+    ): Promise<UpdatePhaseResult> {
       const build = builds.get(buildId);
       if (!build) {
         return { kind: "not_found" };
@@ -355,6 +360,16 @@ export function createMemoryBuildRepository(): BuildRepository {
         status: nextStatus,
         updatedAt: timestamp
       };
+      // TASK-162: postgres 저장소와 동일 semantics — FAILED 는 실패 이유를
+      // 남기고, FAILED 가 아닌 phase 로 전이하면 이전 오류를 지운다.
+      build.lastError =
+        phase === "FAILED"
+          ? {
+              code: failure?.errorCode ?? "UNKNOWN_ERROR",
+              message:
+                failure?.errorMessage ?? `Build failed during phase ${prevPhase}.`
+            }
+          : null;
       build.currentPhaseStartedAt = isTerminal ? null : timestamp;
       builds.set(buildId, build);
 
@@ -493,6 +508,15 @@ export function createMemoryBuildRepository(): BuildRepository {
         status: nextStatus,
         updatedAt: timestamp
       };
+      // TASK-162: 컨테이너 테스트 실패도 build-level lastError 로 노출한다.
+      // postgres 는 build_test.error_code 컬럼에 같은 값을 적는다.
+      build.lastError =
+        status === "FAILED"
+          ? {
+              code: details?.errorCode ?? "CONTAINER_TEST_FAILED",
+              message: details?.errorMessage ?? "Container test failed."
+            }
+          : build.lastError;
       builds.set(buildId, build);
 
       const log: BuildLogEntry = {

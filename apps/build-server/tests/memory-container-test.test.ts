@@ -153,3 +153,58 @@ describe("MemoryBuildRepository: reportDeploymentResult", () => {
     assert.equal(result.response.resultDelivery.mode, "POLLING");
   });
 });
+
+// TASK-162 (P2-M3): 실패 이유가 실제로 기록되는지. 이전에는 `updatePhase` 가
+// `last_error_code`/`last_error_message` 를 **한 번도 쓰지 않아** 모든 실패
+// 빌드의 `lastError` 가 null 이었다 — 운영자도 skill_mcp 도 이유를 볼 수 없었다.
+describe("MemoryBuildRepository: failure reason recording (TASK-162)", () => {
+  it("records the reported errorCode/message on a FAILED phase", async () => {
+    const { repo, buildId } = await setupBuildAtCompletedPhase();
+    const result = await repo.updatePhase(buildId, "FAILED", {
+      errorCode: "DOCKER_BUILD_FAILED",
+      errorMessage: "docker build exited 1"
+    });
+    assert.equal(result.kind, "ok");
+    if (result.kind !== "ok") return;
+    assert.equal(result.response.build.status, "FAILED");
+    assert.deepEqual(result.response.lastError, {
+      code: "DOCKER_BUILD_FAILED",
+      message: "docker build exited 1"
+    });
+  });
+
+  it("falls back to UNKNOWN_ERROR when a FAILED phase carries no reason", async () => {
+    const { repo, buildId } = await setupBuildAtCompletedPhase();
+    const result = await repo.updatePhase(buildId, "FAILED");
+    assert.equal(result.kind, "ok");
+    if (result.kind !== "ok") return;
+    assert.equal(result.response.lastError?.code, "UNKNOWN_ERROR");
+    assert.ok(result.response.lastError?.message);
+  });
+
+  it("records CONTAINER_TEST_FAILED when the container test fails", async () => {
+    const { repo, buildId } = await setupBuildAtCompletedPhase();
+    await repo.startContainerTest(buildId, 8080);
+    const result = await repo.reportContainerTestResult(buildId, "FAILED", {
+      errorCode: "CONTAINER_TEST_FAILED",
+      errorMessage: "container healthcheck timed out"
+    });
+    assert.equal(result.kind, "ok");
+    if (result.kind !== "ok") return;
+    // build 는 FAILED 이고 test 블록도 FAILED 로 닫혀야 한다 — 둘이 어긋나면
+    // (test 가 IN_PROGRESS 로 남으면) 상태가 자기모순이다.
+    assert.equal(result.response.build.status, "FAILED");
+    assert.equal(result.response.test.status, "FAILED");
+    assert.equal(result.response.lastError?.code, "CONTAINER_TEST_FAILED");
+    assert.equal(result.response.lastError?.message, "container healthcheck timed out");
+  });
+
+  it("clears a recorded error when the build moves off FAILED", async () => {
+    const { repo, buildId } = await setupBuildAtCompletedPhase();
+    await repo.updatePhase(buildId, "FAILED", { errorCode: "DOCKER_BUILD_FAILED" });
+    const result = await repo.updatePhase(buildId, "COMPLETED");
+    assert.equal(result.kind, "ok");
+    if (result.kind !== "ok") return;
+    assert.equal(result.response.lastError, null);
+  });
+});
