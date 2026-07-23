@@ -6,6 +6,35 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 150→151: **v0.2.1 릴리스 태깅 — Phase 1 후속 패치**).
+
+  TASK-153/154/155 를 묶어 patch release `v0.2.1` 로 태깅했다. `v0.2.0` 봉인 직후 **실이미지 e2e 를 처음 돌리며 드러난 프로덕션 결함 2건**을 담은 릴리스다.
+
+  ## 릴리스 산출물
+  - 5 package.json `0.2.0` → **`0.2.1`** 통일 bump (runner 는 Go module — git tag 로 관리)
+  - **annotated git tag `v0.2.1`** (+ origin push)
+  - `CHANGELOG.md` — §2 v0.2.1 신규 + 섹션 재번호(2~8) + Release model/history + baseline 표 v0.2.1 기준(build-server 178→181, e2e 13종)
+  - `docs/RELEASE_NOTES-2026-07-23.md` 신규 (7 섹션 — 요약 / 수정된 결함 / e2e 인프라 / 검증 / 업그레이드 안내 / 운영자 검증 순서 / follow-up)
+
+  ## 릴리스 범위 (v0.2.0..HEAD, 5 commits)
+  `c170082` TASK-153 이미지 빌드 회귀 + 실이미지 e2e 검증 / `e0f2c81` TASK-154 dual vite config 통일 + e2e 전수 / `f4e6010` TASK-155 chunked claim 제품 결함 / `615c013` TASK-155 죽은 trap + flaky 단언 / `dbe508c` 봉인 + meta sync.
+
+  ## 운영 주의 (RELEASE_NOTES §5)
+  - DB migration 변경 0 / API 계약 변경 0.
+  - **claim 자격 확장은 "더 많은 build 가 claim 되는" 방향** — 업그레이드 직후 그동안 QUEUED 로 멈춰 있던 chunked build 들이 일제히 claim 되기 시작한다. 운영 중이라면 대기 build 수를 먼저 확인할 것.
+  - 빌드 명령 변경: `--config vite.react.config.ts` 제거(단일 `vite.config.ts`). CI/로컬 스크립트가 참조하면 수정 필요.
+  - 신규 선택 env: `DIBS_POSTGRES_HOST_PORT` (로컬 native postgres 가 5432 점유 시 compose 포트 override).
+
+  ## baseline
+  frontend **277** / build-server **181** / runner go **8 pkg** / TS 5 clean / e2e **13/13** / 초기 index js gzip 134.64KB·css 24.08KB.
+
+  ## 환경 (부수 작업)
+  docker 정리 누적 **약 54GB 회수** — 이미지 302개/54.43GB → 36개/2.36GB, 볼륨 42개/1.70GB → 0, 컨테이너 26 → 2(grafana/prometheus만). devhub 자산 전량 삭제(사용자 지시, DB 볼륨 포함 — 복구 불가). **빌드 캐시(1.09GB)는 사용자 지시로 보존**. grafana/prometheus 는 bind mount(`/opt/monitoring/*`) 라 무영향 — 실측 확인.
+
+  ## 다음
+  Phase 2 진입 대기. 최우선 후보 = **e2e·visual baseline 의 CI/nightly 통합** (v0.2.1 의 결함 2건 모두 "e2e 를 안 돌리면 잠복" 실증).
+
+  workflow meta sync (state purpose_digest_rev 192→193, handoff_rev 114→115, handoff doc 150→151, work_backlog 108→109) 같은 commit.
 - Updated: 2026-07-23 (rev 149→150: **TASK-154 + TASK-155 봉인 — dual vite config 통일 / e2e 13/13 전수 PASS / chunked claim 제품 결함 해소**).
 
   사용자 요청 2건("dual vite config 통일", "나머지 e2e 변종 전수 실행")을 수행했고, 그 과정에서 **제품 결함 1건 + e2e 인프라 결함 12건**을 발견·수정했다.

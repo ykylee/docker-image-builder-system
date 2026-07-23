@@ -3,24 +3,66 @@
 - 문서 목적: 본 프로젝트의 release version 별 누적 변경 + 운영 가이드 인덱스 + 회귀 baseline 종합
 - 범위: SemVer 정책, version 별 TASK 1-line 요약, 운영 가이드 인덱스, 회귀 baseline, follow-up 후보
 - 대상 독자: 운영자, release reviewer, AI agent, 프로젝트 온보딩 담당자
-- 상태: stable (TASK-123 신규 / v0.2.0 갱신)
-- 최종 수정일: 2026-07-22
-- 관련 문서: [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md), [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md), [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md), [Project Profile](./docs/PROJECT_PROFILE.md)
+- 상태: stable (TASK-123 신규 / v0.2.1 갱신)
+- 최종 수정일: 2026-07-23
+- 관련 문서: [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md), [Release Notes 2026-07-23](./docs/RELEASE_NOTES-2026-07-23.md), [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md), [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md), [Project Profile](./docs/PROJECT_PROFILE.md)
 
 ## 1. Release model
 
 본 프로젝트는 **SemVer (Semantic Versioning)** 정책을 따르며 단일 release stream (main branch only) 으로 운영합니다.
 
-- **MAJOR.MINOR.PATCH** — `v0.2.0` 형식
-- **현재 release**: `v0.2.0` (2026-07-22, **Phase 1 완료 baseline**)
+- **MAJOR.MINOR.PATCH** — `v0.2.1` 형식
+- **현재 release**: `v0.2.1` (2026-07-23, Phase 1 후속 패치)
 - **release history**:
+  - `v0.2.1` (2026-07-23) — Phase 1 후속 패치. 이미지 빌드 회귀 + chunked claim 제품 결함 수정 + e2e 13/13 전수 PASS.
   - `v0.2.0` (2026-07-22) — Phase 1 완료 baseline. React 19 + Astryx 프론트엔드 정식 도입 + 운영 가드 2계층 + 서버-프론트 계약 경화.
   - `v0.1.0` (2026-07-20, `53adb75`) — 백엔드/운영 성숙도 baseline. source archive scale-out + RFC 7233 + Postgres 동등성 + e2e.
-- **5 package.json 통일 정책**: `apps/build-server` / `apps/build-monitor` / `packages/shared-contract` / `packages/shared-config` / `packages/db` 의 version field 가 모두 동일하게 유지되어야 함. `apps/runner` 는 Go module 이라 version field 없이 git tag 로 버전 관리. 본 release 시점 5/5 `0.2.0` 으로 통일.
+- **5 package.json 통일 정책**: `apps/build-server` / `apps/build-monitor` / `packages/shared-contract` / `packages/shared-config` / `packages/db` 의 version field 가 모두 동일하게 유지되어야 함. `apps/runner` 는 Go module 이라 version field 없이 git tag 로 버전 관리. 본 release 시점 5/5 `0.2.1` 로 통일.
 - **release staging anchor**: 각 version 의 tagged commit 이 운영 환경의 release staging 의 단일 anchor.
 - **standard_ai_workflow kit 의 version (`ai-workflow/workflow_kit/pyproject.toml`) 은 별도 stream** — 본 저장소가 의존하는 표준 워크플로우 키트의 자체 versioning 이며 본 프로젝트 release 와 무관 (TASK-121 정책).
 
-## 2. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
+## 2. v0.2.1 (2026-07-23) — Phase 1 후속 패치
+
+`v0.2.0` 태깅 직후 **실이미지 빌드 e2e 를 처음 돌리면서** 드러난 결함들을 수정한 patch release. 코드 델타 = **TASK-153 ~ TASK-155** (5 commits).
+
+| # | TASK | 의도 (1-line) | commit |
+|---|------|---------------|--------|
+| 1 | TASK-153 | build-monitor 이미지 빌드 회귀 수정 + 실이미지 e2e 검증 | `c170082` |
+| 2 | TASK-154 | dual vite config 통일 + e2e 변종 전수 실행 (스크립트 결함 8건 + compose 포트) | `e0f2c81` |
+| 3 | TASK-155 | **chunked 업로드 build 가 claim 되지 않던 제품 결함** 수정 + 회귀 가드 3건 | `f4e6010` |
+| 4 | TASK-155 | multi-runner e2e 의 죽은 cleanup trap + flaky 분배 단언 수정 | `615c013` |
+| 5 | — | TASK-154/155 봉인 + workflow meta sync | `dbe508c` |
+
+### 2.1 제품 영향 (운영자 주목)
+
+**`claimNextBuild` 의 source-gate 가 chunked 업로드를 인식하지 못했다.** TASK-080 의 게이트는 legacy 단일행 `build_source` 로 inner join 해 claim 자격을 판정하는데, TASK-106 의 chunked 업로드는 **첫 chunk 에서 그 legacy row 를 삭제**하고 `build_source_chunk` 에 기록한다. 그 결과 **chunked 경로로 소스를 올린 build 는 runner 가 영원히 claim 하지 못하고 QUEUED 로 정체**했다.
+
+- 영향 범위: `POST /builds/:buildId/source/chunk` 로 소스를 업로드하는 모든 build. 단일 shot(`POST .../source`)은 영향 없음.
+- 수정: 자격을 `(legacy row 존재) OR (chunk >= 1건 AND 누적 size >= 선언 total)` 로 확장 (postgres / memory 양쪽).
+- 회귀 가드 3건 신규 → build-server **178 → 181**.
+
+**루트 `Dockerfile` 의 build-monitor 빌드가 깨져 있었다** (TASK-153). `vite build`(config 미지정)가 확장자 우선순위로 Svelte 잔재 config 를 잡아 이미지 빌드가 실패했다. React 이관 후 실이미지 e2e 를 한 번도 안 돌려 `v0.2.0` 까지 잠복. → TASK-154 에서 단일 canonical `vite.config.ts` 로 통일해 구조적으로 재발 차단.
+
+### 2.2 검증 — e2e 13/13 PASS
+
+```
+LOCAL    source-archive / -postgres / chunked / chunked-postgres / single-port      (5)
+COMPOSE  production-semantic / -postgres / multi-runner / -postgres /
+         -chunked-postgres / insecure-registry                                      (6)
+RUNNER   container-run / deploy-push                                                (2)
+```
+실제 `docker build`(busybox+httpd) → `docker run` → preview HTTP 200 → 10 phase → container cleanup 경로 포함.
+
+회귀 baseline: frontend vitest **277** / build-server **181** / runner go **8 pkg** / TS 5 packages clean / vite build 초기 index js gzip 134.64KB · css 24.08KB.
+
+### 2.3 Breaking / 마이그레이션
+
+- DB migration 변경 **0** (0001~0006 유지).
+- API 계약 변경 **0**. claim 자격 확장은 **더 많은 build 가 claim 되는 방향**이라 기존 동작을 깨지 않는다.
+- 빌드 명령 변경: `apps/build-monitor` 는 이제 플래그 없는 `vite` / `vite build` 를 쓴다(`--config vite.react.config.ts` 불필요). `vite.react.config.ts` / 루트 `index.html` / `svelte.config.js` 삭제됨.
+- 신규 env(선택): `DIBS_POSTGRES_HOST_PORT` — 로컬 native PostgreSQL 이 5432 를 점유한 환경에서 compose postgres 호스트 포트를 바꿀 때 사용.
+
+## 3. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
 
 본 release 는 **Phase 1 (초기 시스템 구축 국면) 을 종결**하는 baseline anchor 다. `v0.1.0` (tagged `53adb75`) 이후의 코드 델타 = **TASK-124 ~ TASK-152** 를 한 자리에 누적한다. 전체 Phase 1 서사(백엔드 + runner + 프론트엔드 + 디자인 시스템 + 운영 가드)는 [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) 참조.
 
@@ -73,7 +115,7 @@
 
 누적 운영 가이드 **37종** (v0.1.0 32종 + 5종 신규).
 
-## 3. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
+## 4. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
 
 `v0.1.0` 은 source archive scale-out + RFC 7233 Content-Range + Postgres 동등성 + e2e 를 봉인한 14 TASK (TASK-102~114 + TASK-122) 를 누적한다. 전체 상세는 [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md).
 
@@ -94,14 +136,14 @@
 | 13 | TASK-114 | 종합 RELEASE_NOTES + 운영 가이드 인덱스 (10 섹션) | `d19038a` |
 | 14 | TASK-122 | untracked 52종 잔재 정리 (.gitignore 보강) | `53adb75` |
 
-## 4. 회귀 baseline 종합 (TASK-088 → v0.2.0)
+## 5. 회귀 baseline 종합 (TASK-088 → v0.2.1)
 
 Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-07-08) 대비 누적 변화:
 
-| 항목 | TASK-088 baseline | v0.1.0 | **v0.2.0** | delta (088→020) |
+| 항목 | TASK-088 baseline | v0.1.0 | **v0.2.1** | delta |
 |------|-------------------|--------|-----------|-------|
 | vitest (build-monitor) | 7 | 130 | **277** | +270 |
-| build-server (node:test) | 113 | 164 | **178** | +65 |
+| build-server (node:test) | 113 | 164 | **181** (v0.2.1) | +68 |
 | runner (`go test ./...`) | 7 pkg | 7 pkg | **8 pkg** | +1 |
 | TS `tsc --noEmit` (5 pkg) | clean | clean | **clean** | 0 |
 | vite build:react (gzip js, 초기 index) | n/a | 99.01 KB | **134.64 KB** | — |
@@ -115,7 +157,7 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 
 > **v0.2.0 초기 번들**: index js gzip 134.64 KB (AppShell 셸 + Astryx atomic 포함) / css gzip 24.08 KB. 라우트 지연 로드(TASK-139)로 BuildDetail(gzip 38.53) / buildColumns(9.85) / RegisterRunnerModal(5.74) 등은 필요 시 로드. 손 CSS 2,323 → 1,956줄.
 
-## 5. follow-up 후보 (Phase 2 진입 대기)
+## 6. follow-up 후보 (Phase 2 진입 대기)
 
 | # | 후보 | scope | reference |
 |---|------|-------|-----------|
@@ -128,19 +170,19 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 | 7 | git tag 다음 version (v0.2.1 / v0.3.0) | (후속) | Phase 2 |
 | 8 | **e2e·visual baseline 의 CI/nightly 통합 (최우선)** | 회귀 재발 방지 | TASK-153/155 follow-up |
 
-> **TASK-154/155 (2026-07-23, post-tag 패치)**: dual vite config 통일(TASK-153 회귀의 구조적 원인 제거) + e2e 변종 **13/13 전수 PASS**. 그 과정에서 제품 결함 1건 발견·수정 — `claimNextBuild` 의 source-gate 가 legacy `build_source` 로만 판정해 **chunked 로 업로드된 build 가 영원히 claim 되지 않던** 결함(회귀 가드 3건, build-server 178→181). 실이미지 빌드 경로와 chunked claim 둘 다 "e2e 를 안 돌리면 잠복한다"가 실증돼 §8 이 최우선 후보가 됐다. v0.2.1 후보.
+> **TASK-154/155 (2026-07-23, post-tag 패치)**: dual vite config 통일(TASK-153 회귀의 구조적 원인 제거) + e2e 변종 **13/13 전수 PASS**. 그 과정에서 제품 결함 1건 발견·수정 — `claimNextBuild` 의 source-gate 가 legacy `build_source` 로만 판정해 **chunked 로 업로드된 build 가 영원히 claim 되지 않던** 결함(회귀 가드 3건, build-server 178→181). 실이미지 빌드 경로와 chunked claim 둘 다 "e2e 를 안 돌리면 잠복한다"가 실증돼 §6-8 이 최우선 후보가 됐다. v0.2.1 후보.
 
 > ~~실이미지 빌드 e2e 검증~~ — **TASK-153 (2026-07-23) 에서 해소** (Dockerfile 회귀 수정 + `e2e-production-semantic.sh` ALL PASS).
 
-## 6. 다음 release 가이드
+## 7. 다음 release 가이드
 
-- `v0.2.1` — patch (회귀 baseline 변경 0 + 운영 가이드 신규 1~2 종)
+- `v0.2.2` — patch (회귀 baseline 변경 0 + 운영 가이드 신규 1~2 종)
 - `v0.3.0` — minor (Phase 2 신규 기능 / 외부 스토리지 / 알림 자동화 등 변경 표면 큼)
 - `v1.0.0` — major (breaking change 또는 정식 GA; 실이미지 빌드 e2e 미검증 등 미결 존재로 진입 전)
 
 운영자 release staging 검증 순서(5 phase)는 [`docs/operations/release-checklist-2026-07-20.md`](./docs/operations/release-checklist-2026-07-20.md) 참조.
 
-## 7. 관련 문서
+## 8. 관련 문서
 
 - [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) — Phase 1 전체 범위·성과·회귀 baseline·미결·교훈
 - [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md) — v0.2.0 종합 리뷰
