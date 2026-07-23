@@ -6,6 +6,28 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 153→154: **TASK-157 runner e2e hard assertion 화 봉인**).
+
+  TASK-156 이 한계로 기록한 "runner 그룹 신호 약함"을 해소했다. P2-M1 진입 전 정지작업.
+
+  ## soft 단언이 가리고 있던 실제 결함 3건
+  1. **존재하지 않는 CLI 인터페이스** — e2e 가 `--host`/`--id` 를 넘겼지만 **runner 는 CLI 플래그를 파싱하지 않는다**(`cmd/runner/main.go` 에 flag 처리 없음). 설정은 env(`HOST_SERVER_BASE_URL` 기본 `127.0.0.1:3000` / `RUNNER_ID` 기본 `runner-default`). 인자가 조용히 무시돼 runner 가 엉뚱한 host 로 붙고 claim 이 영구 실패했다.
+  2. **통과 불가능한 픽스처** — Dockerfile 에 **서버를 띄우는 CMD 가 없었다**. busybox 기본 CMD 는 `sh` 라 즉시 종료 → 8080 에 아무것도 없음 → healthcheck 필연 timeout.
+  3. **대기 예산 부족 + racy 판정** — 30s 는 build+run+healthcheck 에 부족했고, `RUNNER_STOP_CONTAINER_ON_DONE=true` 라 성공해도 컨테이너가 지워져 `docker ps` 기반 판정이 경주였다.
+
+  ## 수정
+  env 기반 호출로 교체 / 검증된 픽스처(`e2e-production-semantic` 의 busybox httpd + permissive `A:*`)로 교체 / 판정을 **canonical `test`(ContainerTestResult)** 기준 hard fail 로 전환(기존엔 응답 top-level 에 없는 legacy `testDeployment` 를 읽었다) / deploy-push 는 **registry tag 도달**을 hard assert / `E2E_LOG_DIR`·`E2E_KEEP_LOGS` 로 진단성 확보.
+
+  ## 검증
+  `phase=COMPLETED / test.status=SUCCESS / containerRunning=True / healthCheckPassed=True`, deploy-push registry tags 에 buildId 노출. **음성 검증**: `runner-bin` 제거 시 **exit=1**(강화 전엔 vacuous PASS), 복원 시 exit=0. 전체 **e2e 13/13 PASS (294s)** — runner 그룹 97s→15s (이제 timeout 을 기다리지 않고 실제 성공).
+
+  ## P2-M1 에 중요한 부수 발견
+  `buildStatusResponseSchema` 에 **canonical 필드 `test`(ContainerTestResult) / `deploy`(DeploymentResult) / `resultDelivery` 가 이미 optional 로 존재**하고, runner 가 `test` 를 실제로 채운다(실측). 즉 **P2-M1 은 신규 구축이 아니라 legacy 표면 제거 + phase 이름 정렬**에 가깝다 — 컨셉 문서의 추정보다 진척이 앞서 있다.
+
+  ## 다음
+  **P2-M1 착수** — preview-era 심볼 정리 + `CONTAINER_TEST_*` 1급 승격. 진입 전 결정: deprecated alias 유지 기간.
+
+  workflow meta sync (state purpose_digest_rev 195→196, handoff_rev 117→118, backlog index·latest +1, task_count 62→63, handoff doc 153→154, work_backlog 111→112) 같은 commit.
 - Updated: 2026-07-23 (rev 152→153: **Phase 2 개발 컨셉 확정**).
 
   Phase 1(v0.2.0/v0.2.1) 종료 후 Phase 2 의 축을 정했다. 결과물 = `docs/PHASE-2-CONCEPT.md`.

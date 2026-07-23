@@ -14,7 +14,7 @@
 # 그룹:
 #   local    로컬 프로세스 기반 5종 (build-server 를 dist 로 부팅)
 #   compose  docker compose 기반 6종 (실이미지 build/run 포함)
-#   runner   runner 바이너리 기반 2종 (**smoke** — §주의 참고)
+#   runner   runner 바이너리 기반 2종 (TASK-157 로 hard assertion 화)
 #   all      위 전부 (default)
 #
 # 사용:
@@ -28,12 +28,15 @@
 #   2 — 사용법 오류
 #   3 — 전제 미충족 (docker 미가용 / 빌드 산출물 부재 / postgres 미가용)
 #
-# 주의 — runner 그룹의 신호 강도:
-#   `apps/runner/scripts/e2e-{container-run,deploy-push}.sh` 는 이름 그대로
-#   **smoke** 다. 내부적으로 "container not running" / "hostPort not
-#   populated" 여도 경고만 찍고 PASS 로 끝난다. 즉 이 그룹의 PASS 는
-#   "plumbing 이 살아있다" 수준의 신호이지 컨테이너 기동 보증이 아니다.
-#   회귀 검출의 주력은 local / compose 그룹이다.
+# runner 그룹의 신호 강도 (TASK-157 로 개선됨):
+#   과거에는 "container not running" / "hostPort not populated" 여도 경고만
+#   찍고 PASS 하는 smoke 였다. TASK-157 에서 hard assertion 으로 전환했다:
+#     - container-run: 컨테이너 기동 관측 + canonical `test` 결과
+#       (status/containerRunning/healthCheckPassed) + phase 도달을 hard assert
+#     - deploy-push:   registry 에 build tag 가 실제로 도달했는지 hard assert
+#   같은 작업에서 근본 원인 3건도 고쳤다 — runner 가 CLI 플래그를 파싱하지
+#   않는데 e2e 가 `--host`/`--id` 를 넘겨 기본 host 로 붙던 것, 픽스처에
+#   서버 CMD 가 없어 컨테이너가 즉시 죽던 것, 대기 예산 부족.
 
 set -uo pipefail
 
@@ -191,7 +194,7 @@ run_group() {
 START=$SECONDS
 [[ "$GROUP" == "all" || "$GROUP" == "local"   ]] && run_group "LOCAL"   "${LOCAL_E2E[@]}"
 [[ "$GROUP" == "all" || "$GROUP" == "compose" ]] && run_group "COMPOSE" "${COMPOSE_E2E[@]}"
-[[ "$GROUP" == "all" || "$GROUP" == "runner"  ]] && run_group "RUNNER (smoke)" "${RUNNER_E2E[@]}"
+[[ "$GROUP" == "all" || "$GROUP" == "runner"  ]] && run_group "RUNNER" "${RUNNER_E2E[@]}"
 
 # 잔재 정리 — 실패로 중단된 스크립트가 compose 스택을 남길 수 있다.
 docker rm -f $(docker ps -aq --filter "name=dibs-") >/dev/null 2>&1 || true

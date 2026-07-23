@@ -53,7 +53,13 @@ REGISTRY_HOST="127.0.0.1:${REGISTRY_PORT}"
 REGISTRY_NAME="dibs-test-registry"
 TEST_IMAGE_REPO="${REGISTRY_HOST}/task-068-e2e"
 
-TMP="$(mktemp -d)"
+# TASK-157: 진단 가능성 — E2E_KEEP_LOGS=1 이면 로그 디렉터리를 지우지 않고,
+# E2E_LOG_DIR 로 위치를 고정할 수 있다. 기본 동작(임시 디렉터리 + 정리)은 불변.
+if [[ -n "${E2E_LOG_DIR:-}" ]]; then
+  TMP="${E2E_LOG_DIR}"; mkdir -p "$TMP"; E2E_KEEP_LOGS=1
+else
+  TMP="$(mktemp -d)"
+fi
 SOURCE_TAR="${TMP}/source.tar.gz"
 RUNNER_LOG="${TMP}/runner.log"
 SERVER_LOG="${TMP}/server.log"
@@ -76,7 +82,11 @@ cleanup() {
   for img in $(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null | grep "^${TEST_IMAGE_REPO}" || true); do
     docker rmi -f "${img}" >/dev/null 2>&1 || true
   done
-  rm -rf "${TMP}"
+  if [[ "${E2E_KEEP_LOGS:-0}" == "1" ]]; then
+    echo "  (로그 보존: ${TMP})"
+  else
+    rm -rf "${TMP}"
+  fi
 }
 trap cleanup EXIT
 
@@ -178,11 +188,26 @@ else
   RUN_MODE="skeleton"
 fi
 
-cat > "${TMP}/Dockerfile" <<EOF
+# TASK-157: 픽스처를 실제로 통과 가능한 것으로 교체 (container-run e2e 와 동일).
+# 기존엔 서버를 띄우는 CMD 가 없어 컨테이너가 즉시 죽었다. busybox httpd 는
+# 기본이 Basic Auth 라 permissive rule(`A:*`) 이 필요하다.
+if [[ "${RUN_MODE}" == "cli" ]]; then
+  cat > "${TMP}/Dockerfile" <<'DOCKERFILE_EOF'
+FROM busybox:1.36
+RUN mkdir -p /www \
+ && printf 'ok\n' > /www/index.html \
+ && printf 'A:*\n' > /etc/httpd.conf
+EXPOSE 8080
+HEALTHCHECK CMD wget -qO- http://127.0.0.1:8080/ || exit 1
+CMD ["httpd", "-f", "-v", "-p", "8080", "-h", "/www", "-c", "/etc/httpd.conf"]
+DOCKERFILE_EOF
+else
+  cat > "${TMP}/Dockerfile" <<EOF
 ${IMAGE_FROM}
 EXPOSE 8080
 ${HEALTH_CMD}
 EOF
+fi
 
 mkdir -p "${TMP}/ctx"
 cp "${TMP}/Dockerfile" "${TMP}/ctx/Dockerfile"
@@ -215,6 +240,11 @@ curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source" \
 echo "[6/8] runner boot (build=${BUILD_MODE}, run=${RUN_MODE}, deploy=cli)"
 CONTAINER_NAME="container-${BUILD_ID}"
 RUNNER_WORKSPACE_ROOT="${TMP}/workspace" \
+# TASK-157: runner 는 CLI 플래그를 파싱하지 않는다 (cmd/runner/main.go 에 flag
+# 처리가 없다). 설정은 전부 env 로 받는다 — internal/config 의
+# HOST_SERVER_BASE_URL(기본 http://127.0.0.1:3000) / RUNNER_ID(기본 runner-default).
+# 기존 `--host` / `--id` 인자는 **조용히 무시**되어 runner 가 기본 host 로 붙었고,
+# claim 이 계속 실패해 컨테이너가 뜨지 않았다. 그런데도 e2e 는 경고만 찍고 PASS 했다.
 RUNNER_DOCKER_RUN_MODE="${RUN_MODE}" \
 RUNNER_DOCKER_BUILD_MODE="${BUILD_MODE}" \
 RUNNER_DEPLOY_MODE=cli \
@@ -225,9 +255,9 @@ RUNNER_STOP_CONTAINER_ON_DONE=true \
 RUNNER_HEALTHCHECK_TIMEOUT_SECONDS=30 \
 RUNNER_DOCKERFILE_PATH=Dockerfile \
 PORT_FOR_INTERNAL=8080 \
+HOST_SERVER_BASE_URL="${BASE}" \
+RUNNER_ID="e2e-runner-${BUILD_ID}" \
   "${REPO_ROOT}/apps/runner/bin/runner-bin" \
-  --host "${BASE}" \
-  --id "e2e-runner-${BUILD_ID}" \
   > "${RUNNER_LOG}" 2>&1 &
 RUNNER_PID=$!
 
@@ -256,15 +286,23 @@ done
 echo "[7/8] registry tag verification"
 TAGS_RESP="$(curl -fsS "http://${REGISTRY_HOST}/v2/task-068-e2e/tags/list" 2>/dev/null || echo "")"
 echo "  tags response: ${TAGS_RESP}"
-if echo "${TAGS_RESP}" | grep -q "\"${BUILD_ID}\""; then
+# TASK-157: 이 e2e 의 존재 이유가 "push 가 실제로 레지스트리에 도달했는가"
+# 이므로 hard assertion 으로 전환. 카탈로그 인덱스 지연 가능성은 짧은
+# 재시도로 흡수하고, 그래도 없으면 실패시킨다.
+TAG_FOUND=0
+for _ in $(seq 1 10); do
+  if echo "${TAGS_RESP}" | grep -q "\"${BUILD_ID}\""; then TAG_FOUND=1; break; fi
+  sleep 1
+  TAGS_RESP="$(curl -fsS "http://${REGISTRY_HOST}/v2/task-068-e2e/tags/list" 2>/dev/null || echo "")"
+done
+if [[ "${TAG_FOUND}" -eq 1 ]]; then
   green "  ✓ tag ${BUILD_ID} present in registry"
 else
-  if [[ "${PUSH_OBSERVED}" -eq 1 ]]; then
-    yellow "  ! DEPLOYMENT_COMPLETED was reported but registry tag query did not find ${BUILD_ID}"
-    yellow "    (this can happen if registry catalog index is not yet consistent)"
-  else
-    yellow "  ! build did not reach DEPLOYMENT_COMPLETED — push likely skipped."
-  fi
+  red "  ✗ registry 에 tag ${BUILD_ID} 가 없습니다 — deploy push 가 실제로 이뤄지지 않았습니다."
+  echo "    DEPLOYMENT_COMPLETED 관측 여부: ${PUSH_OBSERVED}"
+  echo "    tags response: ${TAGS_RESP}"
+  echo "    runner log tail:"; tail -n 20 "${RUNNER_LOG}" | sed 's/^/      /'
+  exit 1
 fi
 
 # 8) Cleanup: runner stop + container/registry 제거
@@ -278,6 +316,6 @@ docker rm -f "${REGISTRY_NAME}" >/dev/null 2>&1 || true
 green "  ✓ cleanup complete"
 
 echo
-green "e2e deploy-push smoke: PASS"
+green "e2e deploy-push: PASS (registry 에 build tag 도달을 hard assert)"
 echo "  runner log: ${RUNNER_LOG}"
 echo "  server log: ${SERVER_LOG}"

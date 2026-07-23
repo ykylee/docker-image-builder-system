@@ -1,6 +1,7 @@
 # e2e + 시각 QA 의 CI/nightly 통합 (TASK-156)
 
 - 문서 목적: e2e 13종과 build-monitor 시각 QA 를 nightly / main push / 수동 트리거로 자동 실행하는 구성 — wrapper 스크립트, 워크플로, baseline 정책, 한계.
+- 갱신: TASK-157 (runner e2e hard assertion 화) 반영
 - 범위: `scripts/run-e2e-suite.sh` / `scripts/run-visual-check.sh` / `.github/workflows/nightly-e2e.yml` + 기존 CI 워크플로와의 역할 분담
 - 대상 독자: 개발자, AI agent, 운영자
 - 상태: stable
@@ -40,7 +41,7 @@ e2e 는 B층 가드와 달리 **호스트에서 `docker compose` 를 직접 구�
 |---|---|---|---|
 | `local` | 5 | build-server 를 dist 로 부팅 (source-archive ×2 / chunked ×2 / single-port) | 강 |
 | `compose` | 6 | docker compose 스택 (production-semantic ×2 / multi-runner ×3 / insecure-registry) — **실이미지 build/run 포함** | 강 |
-| `runner` | 2 | runner 바이너리 기반 (container-run / deploy-push) | **약 — §6 참고** |
+| `runner` | 2 | runner 바이너리 기반 (container-run / deploy-push) | 강 (TASK-157 hard assertion) |
 | `all` | 13 | 위 전부 (default) | |
 
 ### 3.2 wrapper 가 책임지는 것
@@ -62,7 +63,8 @@ bash scripts/run-e2e-suite.sh --group local --stop-on-fail
 
 종료 코드: `0` 전부 PASS / `1` 1건 이상 FAIL / `2` 사용법 / `3` 전제 미충족.
 
-실측 소요(로컬, 2026-07-23): **13종 388초** — local 19s + compose 272s + runner 97s.
+실측 소요(로컬, 2026-07-23): **13종 294초** — local 19s + compose 260s + runner 15s.
+(TASK-157 이전엔 388초였다. runner 그룹이 97s → 15s 로 줄어든 것은 이제 healthcheck timeout 을 기다리지 않고 **실제로 성공**하기 때문이다.)
 
 ## 4. `scripts/run-visual-check.sh`
 
@@ -94,25 +96,32 @@ TASK-152 의 baseline PNG 는 binary 라 `.gitignore` 로 git 에서 제외돼 �
 - 캡처한 PNG 는 **artifact 로 업로드**(보존 14일) — 사람이 눈으로 확인 가능.
 - LFS 정책이 정해지면 워크플로의 visual 스텝에 `--baseline` 을 붙이면 끝.
 
-## 6. 한계 — runner 그룹의 신호가 약하다
+## 6. runner 그룹 — TASK-157 로 hard assertion 화 (해소됨)
 
-`apps/runner/scripts/e2e-{container-run,deploy-push}.sh` 는 이름 그대로 **smoke** 다. 내부적으로
+작성 당시 `apps/runner/scripts/e2e-{container-run,deploy-push}.sh` 는 이름 그대로 **smoke** 여서 컨테이너가 안 떠도 경고만 찍고 PASS 했다. **TASK-157 에서 해소**했다.
 
-```
-[5/7] docker ps confirmation
-  ! container not running — healthcheck may have failed; ...
-[6/7] Build Server state readback
-  ! testDeployment.hostPort not yet populated ...
-e2e container-run smoke: PASS
-```
+### 6.0 드러난 근본 원인 3건
 
-처럼 **컨테이너가 안 떠도 경고만 찍고 PASS** 한다. 즉 이 그룹의 PASS 는 "plumbing 이 살아있다" 수준의 신호이지 컨테이너 기동 보증이 아니다.
+soft assertion 이 가리고 있던 실제 결함:
 
-- 회귀 검출의 주력은 `local` / `compose` 그룹이다. 실제 컨테이너 기동·HTTP 200·10 phase 검증은 `compose` 그룹의 `e2e-production-semantic*.sh` 가 담당한다.
-- 더 나쁜 것은 **`runner-bin` 이 없으면 runner 가 아예 안 뜨는데도 PASS** 한다는 점이다. wrapper 가 `go build` 를 대신 해주는 이유가 이것이다.
-- **후속 후보**: 이 두 스크립트의 단언을 강화(컨테이너 기동/hostPort 를 hard fail 로)하거나, smoke 임을 이름/문서에 더 분명히 하는 것.
+1. **존재하지 않는 CLI 인터페이스** — e2e 가 `--host` / `--id` 를 넘겼지만 runner 는 **CLI 플래그를 파싱하지 않는다**(`cmd/runner/main.go` 에 flag 처리 없음). 설정은 전부 env(`HOST_SERVER_BASE_URL` / `RUNNER_ID`)로 받는다. 인자가 조용히 무시되어 runner 가 기본 host(`127.0.0.1:3000`)로 붙었고 claim 이 영원히 실패했다.
+2. **통과 불가능한 픽스처** — Dockerfile 이 `FROM busybox` + `EXPOSE` + `HEALTHCHECK` 뿐이고 **서버를 띄우는 CMD 가 없었다**. busybox 기본 CMD 는 `sh` 라 즉시 종료 → 8080 에 아무것도 없음 → healthcheck 필연 timeout. `e2e-production-semantic.sh` 의 검증된 픽스처(busybox httpd + permissive `A:*` access rule)로 교체했다.
+3. **대기 예산 부족 + racy 판정** — 30s 는 image build(busybox pull 포함)+run+healthcheck 에 부족했고, `RUNNER_STOP_CONTAINER_ON_DONE=true` 라 성공해도 컨테이너가 곧 지워져 `docker ps` 기반 판정 자체가 경주였다.
 
-### 6.1 그 외 한계
+### 6.1 강화된 단언
+
+- **container-run**: 컨테이너 기동 관측(폴링 중 1회 이상) + Build Server 가 기록한 **canonical `test` 결과**(`status` / `containerRunning` / `healthCheckPassed`) + phase 가 컨테이너 테스트 단계 도달 — 모두 hard fail.
+  - 판정을 `testDeployment`(legacy preview-era, 응답 top-level 에 없음) → `test`(ContainerTestResult) 로 교체.
+- **deploy-push**: **registry 에 build tag 가 실제로 도달했는지** hard assert (카탈로그 인덱스 지연은 10회 재시도로 흡수).
+- **진단성**: `E2E_LOG_DIR` / `E2E_KEEP_LOGS=1` 로 실패 시 runner/server 로그를 보존할 수 있다(기존엔 trap 이 삭제).
+
+### 6.2 음성 검증
+
+`runner-bin` 을 치우고 돌리면 **exit=1** 로 실패한다(강화 전에는 vacuous PASS). 복원하면 exit=0. 즉 단언이 실제로 문다.
+
+실측: 강화 후 `phase=COMPLETED / test.status=SUCCESS / containerRunning=True / healthCheckPassed=True`, deploy-push 는 registry tags 에 buildId 노출 확인.
+
+### 6.3 그 외 한계
 
 - **모달 픽셀 diff 는 흔들린다.** 실측에서 `admin-runners/dark-modal.png` 이 ratio 0.0017 (> 0.001) 로 초과했다. Dialog 의 애니메이션/합성 타이밍 때문으로 보인다. baseline diff 를 켤 때는 모달에 별도 threshold 를 주거나 제외하는 것을 검토할 것.
 - **호스트 포트 충돌**: GHA 의 postgres service 가 5432 를 점유하므로 compose 의 postgres 는 `DIBS_POSTGRES_HOST_PORT=15432` 로 옮겨 publish 한다(TASK-154 의 override). 로컬에 native postgres 가 있는 개발 환경도 동일.
