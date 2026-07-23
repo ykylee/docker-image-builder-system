@@ -3,14 +3,18 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/hostclient"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/queue"
@@ -376,5 +380,162 @@ func TestProcessClaim_BuildFailure_ReportsDockerBuildFailed(t *testing.T) {
 	}
 	if failed.ErrorCode != contract.ErrorCodeDockerBuildFailed {
 		t.Errorf("expected errorCode DOCKER_BUILD_FAILED, got %q", failed.ErrorCode)
+	}
+}
+
+// =============================================================================
+// TASK-162 (P2-M3 후속): k8s adapter 통합 테스트.
+// =============================================================================
+
+// lastDeployment 는 fc.deployments 의 마지막 entry 를 반환한다.
+// BuildService 는 IN_PROGRESS(컨테이너 테스트 직후) + SUCCESS(배포 종료)
+// 의 2 회 ReportDeployment 를 호출하므로, 최종 SUCCESS 응답은 마지막
+// entry. k8s 결과가 활성화되면 마지막 entry 가 docker registry + k8s 의
+// merged response 다.
+func lastDeployment(fc *fakeClient) hostclient.DeploymentReportRequest {
+	fc.mu.Lock()
+	defer fc.mu.Unlock()
+	return fc.deployments[len(fc.deployments)-1]
+}
+
+type fakeK8sDeployer struct {
+	cluster   string
+	namespace string
+	manifest  string
+	result    *deploy.K8sResult
+	err       error
+	calls     []deploy.K8sDeployOptions
+}
+
+func (f *fakeK8sDeployer) Deploy(ctx context.Context, opts deploy.K8sDeployOptions) (*deploy.K8sResult, error) {
+	f.calls = append(f.calls, opts)
+	if f.err != nil {
+		return nil, f.err
+	}
+	if f.result != nil {
+		return f.result, nil
+	}
+	return &deploy.K8sResult{
+		Cluster:    opts.Cluster,
+		Namespace:  opts.Namespace,
+		TargetType: "K8S",
+		Manifest:   opts.Manifest,
+		ResultRef:  fmt.Sprintf("noop://%s/%s/%s", opts.Cluster, opts.Namespace, opts.BuildID),
+		AppliedAt:  time.Now().UTC(),
+	}, nil
+}
+
+func (f *fakeK8sDeployer) Apply(ctx context.Context, opts deploy.K8sApplyOptions) (*deploy.K8sResult, error) {
+	return &deploy.K8sResult{ResultRef: "noop://apply"}, nil
+}
+
+func (f *fakeK8sDeployer) Cleanup(ctx context.Context, opts deploy.K8sCleanupOptions) error {
+	return nil
+}
+
+func TestBuildService_WithK8sDeployer_NilByDefault(t *testing.T) {
+	fc := &fakeClient{buildID: "b-1"}
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
+	if svc.k8sDeployer != nil {
+		t.Errorf("k8sDeployer should be nil by default (skeleton 단계)")
+	}
+}
+
+func TestBuildService_WithK8sDeployer_Setter(t *testing.T) {
+	fc := &fakeClient{buildID: "b-1"}
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
+	d := &fakeK8sDeployer{}
+	got := svc.WithK8sDeployer(d)
+	if got != svc {
+		t.Errorf("WithK8sDeployer should return *BuildService for chaining")
+	}
+	if svc.k8sDeployer == nil {
+		t.Errorf("k8sDeployer not set after WithK8sDeployer")
+	}
+}
+
+func TestBuildService_K8sDeployer_MergedIntoReportDeployment(t *testing.T) {
+	fc := &fakeClient{buildID: "b-1"}
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1").WithHostPort(38124)
+	d := &fakeK8sDeployer{cluster: "kind-p2-m5", namespace: "builds", manifest: "deploy/base.yaml"}
+	svc.WithK8sDeployer(d)
+	t.Setenv("RUNNER_K8S_CLUSTER", "kind-p2-m5")
+	t.Setenv("RUNNER_K8S_NAMESPACE", "builds")
+	t.Setenv("RUNNER_K8S_MANIFEST", "deploy/base.yaml")
+
+	if err := svc.ProcessClaim(context.Background(), &queue.ClaimedBuild{BuildID: "b-1", AppName: "todo-app"}); err != nil {
+		t.Fatalf("ProcessClaim: %v", err)
+	}
+
+	if len(d.calls) != 1 {
+		t.Fatalf("expected 1 k8s Deploy call, got %d", len(d.calls))
+	}
+	kOpts := d.calls[0]
+	if kOpts.Cluster != "kind-p2-m5" || kOpts.Namespace != "builds" || kOpts.BuildID != "b-1" {
+		t.Errorf("k8s options: %+v", kOpts)
+	}
+
+	dr := lastDeployment(fc)
+	if dr.Status != contract.ExecutionStatusSuccess {
+		t.Errorf("Status = %s, want SUCCESS", dr.Status)
+	}
+	if !strings.Contains(dr.TargetType, "K8S") {
+		t.Errorf("TargetType = %s, want to contain K8S", dr.TargetType)
+	}
+	if dr.ResponsePayloadJSON == nil {
+		t.Fatalf("ResponsePayloadJSON nil")
+	}
+	k8sSection, ok := dr.ResponsePayloadJSON["k8s"].(map[string]any)
+	if !ok {
+		t.Fatalf("ResponsePayloadJSON.k8s not map: %+v", dr.ResponsePayloadJSON)
+	}
+	if k8sSection["cluster"] != "kind-p2-m5" {
+		t.Errorf("k8s.cluster = %v", k8sSection["cluster"])
+	}
+}
+
+func TestBuildService_K8sDeployer_Failure_ReportsFAILED(t *testing.T) {
+	fc := &fakeClient{buildID: "b-1"}
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1").WithHostPort(38124)
+	d := &fakeK8sDeployer{err: errors.New("k8s boom")}
+	svc.WithK8sDeployer(d)
+
+	err := svc.ProcessClaim(context.Background(), &queue.ClaimedBuild{BuildID: "b-1", AppName: "todo-app"})
+	if err == nil {
+		t.Fatalf("expected error from k8s failure")
+	}
+	if !strings.Contains(err.Error(), "k8s boom") {
+		t.Errorf("error = %v, want to contain k8s boom", err)
+	}
+
+	dr := lastDeployment(fc)
+	if dr.Status != contract.ExecutionStatusFailed {
+		t.Errorf("Status = %s, want FAILED", dr.Status)
+	}
+	if dr.TargetType != "K8S" {
+		t.Errorf("TargetType = %s, want K8S", dr.TargetType)
+	}
+}
+
+func TestBuildService_K8sDeployer_NilSkipsK8sPath(t *testing.T) {
+	fc := &fakeClient{buildID: "b-1"}
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1").WithHostPort(38124)
+	// k8sDeployer 미설정 — 기존 docker registry 만 동작
+
+	if err := svc.ProcessClaim(context.Background(), &queue.ClaimedBuild{BuildID: "b-1", AppName: "todo-app"}); err != nil {
+		t.Fatalf("ProcessClaim: %v", err)
+	}
+
+	dr := lastDeployment(fc)
+	if dr.Status != contract.ExecutionStatusSuccess {
+		t.Errorf("Status = %s, want SUCCESS", dr.Status)
+	}
+	if strings.Contains(dr.TargetType, "K8S") {
+		t.Errorf("TargetType = %s, should not contain K8S when k8s nil", dr.TargetType)
+	}
+	if dr.ResponsePayloadJSON != nil {
+		if _, hasK8s := dr.ResponsePayloadJSON["k8s"]; hasK8s {
+			t.Errorf("ResponsePayloadJSON.k8s should not be set when k8s nil")
+		}
 	}
 }

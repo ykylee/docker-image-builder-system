@@ -20,6 +20,15 @@ type Config struct {
 	// 로 propagate 되어 이후 모든 docker CLI invocation (`docker tag` /
 	// `docker push`) 이 그 dir 의 config.json 을 사용한다.
 	RegistryConfigDir string
+	// TASK-162 (P2-M3) + 사용자 결정 (2026-07-23): k8s adapter 1호 도입.
+	// K8sMode 가 "k8s" 면 k8s adapter 를 활성화. "" / "noop" / "skeleton"
+	// 이면 비활성 (기존 deploy.Client 만). K8sCluster / K8sNamespace /
+	// K8sManifest 는 adapter 의 입력. P2-M5 의 실제 구현체까지 skeleton
+	// 단계.
+	K8sMode      string
+	K8sCluster   string
+	K8sNamespace string
+	K8sManifest  string
 }
 
 func Load() Config {
@@ -28,6 +37,10 @@ func Load() Config {
 		HostServerBaseURL: parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
 		RunnerID:          parseString("RUNNER_ID", "runner-default"),
 		RegistryConfigDir: parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
+		K8sMode:           parseString("RUNNER_K8S_MODE", ""),
+		K8sCluster:        parseString("RUNNER_K8S_CLUSTER", ""),
+		K8sNamespace:      parseString("RUNNER_K8S_NAMESPACE", ""),
+		K8sManifest:       parseString("RUNNER_K8S_MANIFEST", ""),
 	}
 }
 
