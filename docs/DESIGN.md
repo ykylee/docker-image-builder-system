@@ -166,11 +166,15 @@ z:
   단일 출처 (`withOwner` flag 로 5열 / 4열 분기).
 - **Predictability**: 같은 phase / status 는 같은 색·같은 위치
   (좌측 status pill, 우측 updated time). StatusPill 배지 정책
-  (TASK-141): **주의가 필요한 상태만 배지** — warning: PREPARING_SOURCE /
-  BUILDING, info: TESTING / DEPLOYING / CLAIMED / TEST_READY / PROVISIONING
-  / PREVIEW_*, error: FAILED / DISABLED, 정상 종료/대기는 평문
-  (RECEIVED / QUEUED / *_SUCCESS / COMPLETED / CANCELLED / EXPIRED /
-  ACTIVE).
+  (TASK-141, **P2-M1 (TASK-159) 로 status 정렬**): **주의가 필요한
+  상태만 배지** — warning: PREPARING_SOURCE / BUILDING, info: TESTING /
+  DEPLOYING / PROVISIONING / CONTAINER_TEST_STARTED, error: FAILED /
+  DISABLED, 정상 종료·대기는 평문 (RECEIVED / QUEUED / *_SUCCESS /
+  COMPLETED / CANCELLED / EXPIRED / ACTIVE). canonical phase 표기 전체
+  목록은 [`docs/PHASE-2-CONCEPT.md` §P2-M1](./PHASE-2-CONCEPT.md#p2-m1--계약-청산-contract-reset-완결)
+  참조 — `CLAIMED` / `TEST_READY` / `PREVIEW_*` 같은 preview-era status
+  와 `PREVIEW_QUEUED` / `PREVIEW_READY` phase 는 v0.2.1 이후 cycle
+  (TASK-158/159/160) 에서 canonical 로 대체됐다.
 - **Theme toggle**: header 우측 sun/moon 아이콘. localStorage `theme`
   영속화. `themeStore` (Zustand) 가 `<Theme>` 컴포넌트에 명시 전달
   (mode='system' 미사용 — TASK-136 결정).

@@ -27,11 +27,30 @@
 
 | # | TASK | 의도 (1-line) | commit |
 |---|------|---------------|--------|
-| 1 | TASK-153 | build-monitor 이미지 빌드 회귀 수정 + 실이미지 e2e 검증 | `c170082` |
+| 1 | TASK-153 | build-monitor 이미지 빌드 회귀 수정 + 실이미지 빌드 e2e 검증 | `c170082` |
 | 2 | TASK-154 | dual vite config 통일 + e2e 변종 전수 실행 (스크립트 결함 8건 + compose 포트) | `e0f2c81` |
 | 3 | TASK-155 | **chunked 업로드 build 가 claim 되지 않던 제품 결함** 수정 + 회귀 가드 3건 | `f4e6010` |
 | 4 | TASK-155 | multi-runner e2e 의 죽은 cleanup trap + flaky 분배 단언 수정 | `615c013` |
 | 5 | — | TASK-154/155 봉인 + workflow meta sync | `dbe508c` |
+| 6 | TASK-156 | e2e·visual CI/nightly 통합 (`run-e2e-suite.sh` + `run-visual-check.sh` + `nightly-e2e.yml`) | `abd4bcc` |
+| 7 | TASK-157 | runner e2e 2종 soft 단언을 hard assertion 으로 전환 (잠복 결함 3건 발견·수정) | `c012599` |
+
+> 위 6·7번 항목은 v0.2.1 의 *반응형 보강* 으로, 운영자 업그레이드 시 별도 액션이 필요 없다. 그러나 회귀 검출 능력이 한 단계 올라가 다음 release 의 결함을 더 빨리 잡는다.
+
+### 2.1a 동일 release cycle 의 후속 refactor (TASK-158~160, P2-M1)
+
+v0.2.1 태깅과 같은 날 진행된 **Phase 2 컨셉 정렬 작업**. release number 가 같으므로 운영자에게 보이는 표면 변화는 없지만, **코드/스키마 정합성 측면에서는 v0.2.1 의 진짜 범위** 다. 자세한 컨셉은 [`docs/PHASE-2-CONCEPT.md`](./docs/PHASE-2-CONCEPT.md) §P2-M1 참조.
+
+| # | TASK | 의도 (1-line) | commit |
+|---|------|---------------|--------|
+| 1 | TASK-158 | phase 이름 `PREVIEW_QUEUED/READY` → `CONTAINER_TEST_STARTED/PASSED` (3-way canonical, 18 파일 44 출현) | `c7fe701` |
+| 2 | TASK-159 | legacy status 정의 제거 — `CLAIMED→PREPARING_SOURCE`, `TEST_READY→TEST_SUCCESS` (TS/Go/Python 3계층, 정확 매칭으로 과매칭 회피) | `76b4d1b` |
+| 3 | TASK-160 | legacy 응답 필드 제거 (`previewStatus` / `previewTtlMinutes`) + **DB 컬럼 2종 drop (migration 0007)** + dead `TestDeployment` 스키마 제거 | `060cc0b` |
+
+운영자 영향:
+- **DB migration `0007` 신규** — `build_request.preview_status` · `build_request.preview_ttl_minutes` 컬럼 drop. 자동 적용되지만 마이그레이션 정책은 기존과 동일.
+- 응답 필드 2종 제거 — `buildSummary.previewStatus` / `buildRequest.previewTtlMinutes`. 외부 소비자가 모니터 UI 외에 있었는지 자체 점검 필요 (본 프로젝트 내부 consumer = 빌드 모니터 1개, 영향 0).
+- API 계약: `BuildSummary.test`(ContainerTestResult) 가 canonical. `previewUrl` 은 **컨테이너 런타임 URL 캐리어** 라 일단 유지(P2-M2 에서 `runtimeUrl` 로 정렬).
 
 ### 2.1 제품 영향 (운영자 주목)
 

@@ -6,6 +6,22 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 157→158: **Doc-sync — v0.2.1 의 진짜 범위(TASK-156~160/P2-M1)를 운영자/사용자가 볼 수 있도록 문서 동기화**).
+
+  ## 동기화 대상 4건
+  1. **`CHANGELOG.md` §2** — v0.2.1 표에 TASK-156/157 행 추가 + 신규 §2.1a "동일 release cycle 의 후속 refactor (TASK-158~160, P2-M1)" 절 신설. 운영자 영향(migration 0007 / 응답 필드 2종 제거 / API 계약 정렬) 명시.
+  2. **`docs/RELEASE_NOTES-2026-07-23.md` §8** — TASK-156 e2e·visual CI / TASK-157 runner e2e hard assertion / TASK-158~160 P2-M1 5건의 의도·변경·검증·follow-up 을 v0.2.1 직후 후속 작업으로 통합.
+  3. **`docs/DESIGN.md` §2 Predictability** — StatusPill 배지 정책 표에서 legacy status(`CLAIMED` / `TEST_READY` / `PREVIEW_*`) 제거 후 canonical(`PREPARING_SOURCE` / `CONTAINER_TEST_STARTED`) 로 정렬 + `PHASE-2-CONCEPT.md` §P2-M1 cross-reference.
+  4. **`docs/PHASE-2-CONCEPT.md` §8 진입 전 결정 대기** — 시점 명시(2026-07-23, P2-M1 완료 / P2-M2 진입 직전) + 결정별 *(미정)* / *(결정됨)* 표기.
+
+  ## 검증
+  `scripts/check-doc-integrity.sh` staged 검사 **PASS**(4건 모두 통과). 회귀 baseline / 코드 / SQL / schema / migration / version / git tag 변경 0 — docs only.
+
+  ## 의도적으로 손대지 않은 곳
+  `PROJECT_PROFILE.md`(state.json SSOT 정합), `Step 15 로드맵`(historical 사료), `Phase 1 회고`(Phase 1 종료 시점 회고라 TASK-158 이후 미포함), SDLC 결정 문서들(P2-M2 에서 재검토 후 정정).
+
+  workflow meta sync (state purpose_digest_rev 199→200, handoff_rev 121→122, task_count 66→67, work_backlog 115→116) 같은 commit.
+
 - Updated: 2026-07-23 (rev 156→157: **P2-M1 완료 — Step 3 legacy 응답 필드 + DB 컬럼 제거 (TASK-160)**).
 
   ## 제거한 것

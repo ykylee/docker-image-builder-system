@@ -130,10 +130,12 @@ P2-M1 계약  →  P2-M2 서버  →  P2-M3 runner  →  P2-M4 소비자  →  P
 
 ## 8. 진입 전 결정 대기
 
-1. **외부 배포 adapter 의 1호 대상** — compose / k8s / remote host(ssh) / 기존 레지스트리 push 확장 중 무엇인가.
-2. **결과 전달 채널** — webhook / Slack / Nextcloud Tasks(기존 후보) 중 무엇을 1호로.
-3. ~~**deprecated alias 유지 기간**~~ — **결정됨(2026-07-23)**: 외부 소비자가 없으므로 **즉시 제거**(유예 없음).
-4. **visual baseline 의 외부 LFS 정책** (Phase 1 이월) — P2-M4 의 시각 회귀 판정 강도에 영향.
+> 시점: 2026-07-23 (P2-M1 완료, P2-M2 진입 직전)
+
+1. **외부 배포 adapter 의 1호 대상** — compose / k8s / remote host(ssh) / 기존 레지스트리 push 확장 중 무엇인가. *(미정 — P2-M5 진입 전 결정)*
+2. **결과 전달 채널** — webhook / Slack / Nextcloud Tasks(기존 후보) 중 무엇을 1호로. *(미정 — P2-M5 진입 전 결정)*
+3. ~~**deprecated alias 유지 기간**~~ — **결정됨(2026-07-23, TASK-159/160)**: 외부 소비자가 없으므로 **즉시 제거**(유예 없음). P2-M1 적용 사례.
+4. **visual baseline 의 외부 LFS 정책** (Phase 1 이월) — P2-M4 의 시각 회귀 판정 강도에 영향. *(미정)*
 
 ## 9. Phase 2 완료 판정
 
