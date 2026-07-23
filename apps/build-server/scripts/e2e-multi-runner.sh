@@ -306,10 +306,16 @@ if total_claimed != 5:
     print(f"  ✗ buildsClaimed total != 5 ({total_claimed}) — duplicate or missing claims")
     sys.exit(1)
 runners_with_work = sum(1 for r in runners if r['buildsClaimed'] >= 1)
+# TASK-155: 분배(몇 대가 실제로 claim 했는가)는 **보장되는 속성이 아니다**.
+# 서버는 active_build_exists 게이트로 동시 1건만 처리하므로, build 회전이
+# runner poll 주기(5s)보다 빠르면 한 대가 연속으로 이기는 것이 정상이다.
+# 실측: 동일 코드로 run1 = 2대(1+4), run2 = 1대(5) — 타이밍 의존.
+# 따라서 경고로만 남기고 실패시키지 않는다. 하드 불변식은 위의
+# `total_claimed == 5` (중복/누락 claim 없음) 와 전건 terminal 도달이다.
 if runners_with_work < 2:
-    print(f"  ⚠ only {runners_with_work} runner(s) claimed any builds — multi-runner benefit marginal")
-    sys.exit(1)
-print(f"  ✓ {runners_with_work}/3 runners actively claimed builds — multi-runner distribution confirmed")
+    print(f"  ⚠ only {runners_with_work} runner(s) claimed any builds — 분배는 타이밍 의존이라 실패로 보지 않음")
+else:
+    print(f"  ✓ {runners_with_work}/3 runners actively claimed builds — multi-runner distribution confirmed")
 PY
 if [[ $? -ne 0 ]]; then
   exit 1

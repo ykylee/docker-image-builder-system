@@ -89,6 +89,8 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 green "  ✓ compose up (project=${COMPOSE_PROJECT}, STRICT_CONTENT_RANGE=true)"
+# TASK-155: trap 의 게이트 변수가 미할당이라 cleanup 이 안 돌던 문제 수정.
+COMPOSE_PID=1
 
 # [1/7] postgres + build-server healthy 대기 (TASK-082 의 §[1/8] + §[2/8] 정합).
 echo

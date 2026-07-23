@@ -88,6 +88,12 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 green "  ✓ compose up"
+# TASK-155: cleanup trap 은 COMPOSE_PID 가 설정돼 있을 때만 down -v 를 돈다.
+# 이 변수는 원래 **어디에서도 할당되지 않아** trap 이 죽은 코드였고, 실패
+# 시 compose 스택 + postgres 볼륨이 그대로 남았다. 본 스크립트는 고정
+# project name 을 쓰므로 남은 볼륨을 다음 런이 재사용해 runner 레지스트리의
+# buildsClaimed 가 누적되고 "buildsClaimed total != 5" 로 오탐했다.
+COMPOSE_PID=1
 
 # postgres healthy 대기 — applyMigrations 가 가능하려면 postgres 가 먼저
 # healthy 여야 한다. start_period 5s + retries 10 → 약 30-60초.
@@ -314,10 +320,16 @@ if total_claimed != 5:
     print(f"  ✗ buildsClaimed total != 5 ({total_claimed}) — duplicate or missing claims")
     sys.exit(1)
 runners_with_work = sum(1 for r in runners if r['buildsClaimed'] >= 1)
+# TASK-155: 분배(몇 대가 실제로 claim 했는가)는 **보장되는 속성이 아니다**.
+# 서버는 active_build_exists 게이트로 동시 1건만 처리하므로, build 회전이
+# runner poll 주기(5s)보다 빠르면 한 대가 연속으로 이기는 것이 정상이다.
+# 실측: 동일 코드로 run1 = 2대(1+4), run2 = 1대(5) — 타이밍 의존.
+# 따라서 경고로만 남기고 실패시키지 않는다. 하드 불변식은 위의
+# `total_claimed == 5` (중복/누락 claim 없음) 와 전건 terminal 도달이다.
 if runners_with_work < 2:
-    print(f"  ⚠ only {runners_with_work} runner(s) claimed any builds — multi-runner benefit marginal")
-    sys.exit(1)
-print(f"  ✓ {runners_with_work}/3 runners actively claimed builds — multi-runner distribution confirmed")
+    print(f"  ⚠ only {runners_with_work} runner(s) claimed any builds — 분배는 타이밍 의존이라 실패로 보지 않음")
+else:
+    print(f"  ✓ {runners_with_work}/3 runners actively claimed builds — multi-runner distribution confirmed")
 PY
 if [[ $? -ne 0 ]]; then
   exit 1
