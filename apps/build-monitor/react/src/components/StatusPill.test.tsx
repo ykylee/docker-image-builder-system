@@ -38,8 +38,7 @@ describe("StatusPill — a11y 계약 (배지/평문 무관)", () => {
     "DEPLOYING",
     "FAILED",
     "CANCELLED",
-    "CLAIMED",
-    "TEST_READY",
+    "TEST_SUCCESS",
     "PROVISIONING",
     "CONTAINER_TEST_STARTED",
     "CONTAINER_TEST_PASSED",
@@ -61,8 +60,8 @@ describe("StatusPill — 배지 정책", () => {
     ["BUILDING", "warning"],
     ["TESTING", "info"],
     ["DEPLOYING", "info"],
-    ["CLAIMED", "info"],
-    ["TEST_READY", "info"],
+    // TASK-159: legacy CLAIMED(info) 는 PREPARING_SOURCE(warning) 로 병합,
+    // legacy TEST_READY(info) 는 TEST_SUCCESS 가 되어 정책상 평문이다.
     ["PROVISIONING", "info"],
     ["CONTAINER_TEST_STARTED", "info"],
     ["CONTAINER_TEST_PASSED", "info"],
@@ -96,7 +95,7 @@ describe("StatusPill — 배지 정책", () => {
     const all = [
       "RECEIVED", "QUEUED", "PREPARING_SOURCE", "BUILDING", "BUILD_SUCCESS",
       "TEST_SUCCESS", "DEPLOY_SUCCESS", "COMPLETED", "TESTING", "DEPLOYING",
-      "FAILED", "CANCELLED", "CLAIMED", "TEST_READY", "PROVISIONING",
+      "FAILED", "CANCELLED", "PROVISIONING",
       "CONTAINER_TEST_STARTED", "CONTAINER_TEST_PASSED", "EXPIRED", "ACTIVE", "DISABLED"
     ];
     expect(all.map(attentionVariantFor).filter((v) => v === "success")).toEqual([]);

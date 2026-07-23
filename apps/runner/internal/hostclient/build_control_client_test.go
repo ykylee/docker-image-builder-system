@@ -27,7 +27,7 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 				"build": map[string]any{
 					"buildId":         "b-1",
 					"appName":         "todo-app",
-					"status":          contract.StatusLegacyClaimed,
+					"status":          contract.StatusPreparingSource,
 					"phase":           contract.PhaseQueueClaimed,
 					"lifecycleStatus": contract.StatusPreparingSource,
 					"updatedAt":       "2026-07-03T00:00:00Z",
@@ -191,7 +191,7 @@ func TestHTTPBuildControlClient_ReportPreviewReady_OK(t *testing.T) {
 			t.Errorf("expected all test result booleans true, got %+v", body)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"build":{"buildId":"b-200","status":contract.StatusLegacyTestReady,"phase":contract.PhaseContainerTestPassed,"lifecycleStatus":contract.StatusTestSuccess}}`))
+		_, _ = w.Write([]byte(`{"build":{"buildId":"b-200","status":contract.StatusTestSuccess,"phase":contract.PhaseContainerTestPassed,"lifecycleStatus":contract.StatusTestSuccess}}`))
 	}))
 	defer srv.Close()
 

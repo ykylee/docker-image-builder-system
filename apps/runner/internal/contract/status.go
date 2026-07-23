@@ -41,25 +41,14 @@ var CanonicalBuildStatuses = []string{
 	StatusCancelled,
 }
 
-// Legacy adapter statuses. Mirrors `legacyBuildStatuses` (TS) /
-// `apps.skill_mcp.contract.canonical.LEGACY_BUILD_STATUSES`. Build Server
-// 가 migration 기간 동안 여전히 emit 할 수 있는 shim 상태 — Runner 가
-// 입력으로 받을 수는 있지만 출력으로는 절대 emit 하면 안 된다.
-const (
-	StatusLegacyClaimed  = "CLAIMED"
-	StatusLegacyTestReady = "TEST_READY"
-)
+// TASK-159 (P2-M1 Step 2): legacy adapter status 제거.
+//   CLAIMED    → StatusPreparingSource
+//   TEST_READY → StatusTestSuccess
+// 외부 소비자가 없어 alias 유예 없이 즉시 제거. 이제 AllBuildStatuses 는
+// canonical 과 동일하다 (TS `buildStatuses` / Python `BUILD_STATUSES` 정합).
 
-// LegacyBuildStatuses — 2 값.
-var LegacyBuildStatuses = []string{
-	StatusLegacyClaimed,
-	StatusLegacyTestReady,
-}
-
-// AllBuildStatuses — canonical 12 + legacy 2 = 14.
-// Runner 가 claim 응답 / GET /builds/:id 등에서 받을 수 있는 모든 status
-// 값의 union. Host Server 가 emit 하는 public union 과 정합.
-var AllBuildStatuses = append(append([]string{}, CanonicalBuildStatuses...), LegacyBuildStatuses...)
+// AllBuildStatuses — canonical 12.
+var AllBuildStatuses = append([]string{}, CanonicalBuildStatuses...)
 
 // Generic step/result status used by BuildStatusResponse.lifecycle /
 // .image / .test / .deploy / .resultDelivery blocks. Mirrors

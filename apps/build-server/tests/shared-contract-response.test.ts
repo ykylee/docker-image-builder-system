@@ -12,7 +12,7 @@ describe("shared-contract response migration shims (TASK-052)", () => {
       build: {
         buildId: "11111111-1111-4111-8111-111111111111",
         appName: "todo-app",
-        status: "TEST_READY",
+        status: "TEST_SUCCESS",
         phase: "CONTAINER_TEST_PASSED",
         previewStatus: "READY",
         previewUrl: "http://preview.local/todo-app",
@@ -29,7 +29,7 @@ describe("shared-contract response migration shims (TASK-052)", () => {
       }
     });
 
-    assert.equal(parsed.build.status, "TEST_READY");
+    assert.equal(parsed.build.status, "TEST_SUCCESS");
     assert.equal(parsed.lifecycle, undefined);
     assert.equal(parsed.test, undefined);
   });

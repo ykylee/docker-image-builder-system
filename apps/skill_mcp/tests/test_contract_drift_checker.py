@@ -514,7 +514,7 @@ class RealRepoTests(unittest.TestCase):
         r = core.check_drift({}, repo_root=self.repo_root)
         # 현재 시점에서:
         # - canonical §4 buildStatuses 는 14종 (RECEIVED, QUEUED, ..., CANCELLED, VALIDATING 포함 legacy 잔재).
-        # - TS buildStatuses 는 canonicalBuildStatuses(12) + legacyBuildStatuses(2 CLAIMED, TEST_READY) = 14종.
+        # - TASK-159(P2-M1 Step 2) 이후 TS buildStatuses = canonicalBuildStatuses(12). legacy 2종 제거됨.
         # - canonical-only: VALIDATING (legacy 잔재), TS-only: CLAIMED, TEST_READY.
         # - TASK-061 부터 Python-side 검사가 추가됨: skillBuildStatuses (CANONICAL_BUILD_STATUSES 12)
         #   가 TS canonicalBuildStatuses 와 1:1 매칭 → drift 0. ERROR_CODES 도 1:1 → 0.
@@ -523,7 +523,6 @@ class RealRepoTests(unittest.TestCase):
         canonical_only_build = {d.value for d in r.drift_items if d.enum == "buildStatuses" and d.kind == "missing_in_code"}
         ts_only_build = {d.value for d in r.drift_items if d.enum == "buildStatuses" and d.kind == "extra_in_code"}
         canonical_only_combined = "VALIDATING" in canonical_only_build
-        ts_only_combined = "CLAIMED" in ts_only_build and "TEST_READY" in ts_only_build
         clean_sync = r.summary.by_enum.get("buildStatuses", {}).get("missing", 1) == 0 and \
                      r.summary.by_enum.get("buildStatuses", {}).get("extra", 1) == 0
         self.assertTrue(
@@ -539,16 +538,16 @@ class RealRepoTests(unittest.TestCase):
             "buildStatuses", "previewStatuses", "buildPhases", "errorCodes",
             "buildRequestFields",
             "skillBuildStatuses", "executionStatuses", "skillPhases", "skillErrorCodes",
-            # Go bridge (TASK-062)
-            "goBuildStatuses", "goLegacyBuildStatuses",
+            # Go bridge (TASK-062; TASK-159 로 goLegacyBuildStatuses 제거)
+            "goBuildStatuses",
             "goExecutionStatuses", "goBuildPhases", "goErrorCodes",
         ):
             self.assertIn(k, r.summary.by_enum)
 
-        # TASK-062: Go ↔ TS sync 5종 모두 0 drift 여야 한다
+        # TASK-062: Go ↔ TS sync 4종 모두 0 drift 여야 한다 (legacy 제거 후)
         # (Python TEST-061 의 4종에 더해 Go 5종 모두 검증).
         for k in (
-            "goBuildStatuses", "goLegacyBuildStatuses",
+            "goBuildStatuses",
             "goExecutionStatuses", "goBuildPhases", "goErrorCodes",
         ):
             stats = r.summary.by_enum[k]

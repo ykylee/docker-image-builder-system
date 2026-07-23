@@ -99,7 +99,7 @@ describe("MemoryBuildRepository: claimNextBuild", () => {
     const result = await repo.claimNextBuild();
     assert.equal(result.kind, "claimed");
     if (result.kind !== "claimed") return;
-    assert.equal(result.response.build.status, "CLAIMED");
+    assert.equal(result.response.build.status, "PREPARING_SOURCE");
     assert.equal(result.response.build.phase, "QUEUE_CLAIMED");
   });
 
@@ -114,7 +114,7 @@ describe("MemoryBuildRepository: claimNextBuild", () => {
     const result = await repo.claimNextBuild();
     assert.equal(result.kind, "active_build_exists");
     if (result.kind !== "active_build_exists") return;
-    assert.equal(result.build.build.status, "CLAIMED");
+    assert.equal(result.build.build.status, "PREPARING_SOURCE");
   });
 
   it("appends QUEUE_CLAIMED log entry on claim", async () => {
@@ -175,7 +175,7 @@ describe("MemoryBuildRepository: claimNextBuild source gate (TASK-080)", () => {
     assert.equal(result.kind, "claimed");
     if (result.kind !== "claimed") return;
     assert.equal(result.response.build.buildId, buildId);
-    assert.equal(result.response.build.status, "CLAIMED");
+    assert.equal(result.response.build.status, "PREPARING_SOURCE");
   });
 
   it("skips source-less builds while claiming source-ready ones in mixed queue", async () => {
@@ -759,7 +759,7 @@ describe("MemoryBuildRepository: claimNextBuild — chunked source gate (TASK-15
     assert.equal(result.kind, "claimed");
     if (result.kind !== "claimed") return;
     assert.equal(result.response.build.buildId, buildId);
-    assert.equal(result.response.build.status, "CLAIMED");
+    assert.equal(result.response.build.status, "PREPARING_SOURCE");
     assert.equal(result.response.build.phase, "QUEUE_CLAIMED");
   });
 

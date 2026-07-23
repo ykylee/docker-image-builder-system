@@ -61,12 +61,6 @@ GO_CANONICAL_MAP: dict[str, tuple[str, str, str, str]] = {
         "status.ts",
         "goBuildStatuses",
     ),
-    "statusLegacy": (
-        "status.go",
-        "legacyBuildStatuses",
-        "status.ts",
-        "goLegacyBuildStatuses",
-    ),
     "executionStatuses": (
         "status.go",
         "executionStatuses",
@@ -771,7 +765,7 @@ def check_drift(input_data: Any, *, repo_root: Path | None = None) -> DriftRepor
                 )
             elif group_key == "statusLegacy":
                 wanted_idents = (
-                    "StatusLegacyClaimed", "StatusLegacyTestReady",
+                    "StatusPreparingSource", "StatusTestSuccess",
                 )
             elif group_key == "executionStatuses":
                 wanted_idents = (

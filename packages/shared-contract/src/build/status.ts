@@ -17,20 +17,12 @@ export const canonicalBuildStatuses = [
 
 export type CanonicalBuildStatus = (typeof canonicalBuildStatuses)[number];
 
-// Legacy adapter statuses still emitted by the current preview-era
-// implementation. These remain in the public union until TASK-054/060
-// finish the server and consumer migration.
-export const legacyBuildStatuses = [
-  "CLAIMED",
-  "TEST_READY"
-] as const;
-
-export type LegacyBuildStatus = (typeof legacyBuildStatuses)[number];
-
-export const buildStatuses = [
-  ...canonicalBuildStatuses,
-  ...legacyBuildStatuses
-] as const;
+// TASK-159 (P2-M1 Step 2): legacy adapter status 제거.
+//   CLAIMED   → PREPARING_SOURCE  (runner 가 claim 후 source 준비 중)
+//   TEST_READY → TEST_SUCCESS     (컨테이너 테스트 통과)
+// 외부 소비자가 없어 alias 유예 없이 즉시 제거했다. 이제 buildStatuses 는
+// canonical 과 동일하다.
+export const buildStatuses = canonicalBuildStatuses;
 
 export type BuildStatus = (typeof buildStatuses)[number];
 

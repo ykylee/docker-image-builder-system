@@ -6,6 +6,28 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 155→156: **P2-M1 Step 2 봉인 — legacy status 제거 (TASK-159)**).
+
+  `legacyBuildStatuses`(CLAIMED, TEST_READY) / `previewStatuses` 정의를 **TS·Go·Python 3계층에서 삭제**하고 사용처를 canonical 로 치환했다 — `CLAIMED → PREPARING_SOURCE`, `TEST_READY → TEST_SUCCESS`.
+
+  ## 과매칭 회피 (Phase 1 교훈 적용)
+  `QUEUE_CLAIMED` phase 가 `CLAIMED` 를 **부분문자열로 포함**한다. 그래서 따옴표를 포함한 **정확 매칭**(`"CLAIMED"`)만 치환했고, 치환 후 `QUEUE_PREPARING_SOURCE` 같은 오염이 0 임을 확인했다.
+
+  ## 부수 발견 — StatusPill 배지 정책 충돌
+  rename 으로 `CLAIMED`(info)가 기존 `PREPARING_SOURCE`(warning)와 병합되고 `TEST_READY`(info)가 `TEST_SUCCESS` 가 되면서, 테스트가 **자기모순**에 빠졌다(같은 status 가 warning/info 양쪽에, `TEST_SUCCESS` 가 배지/평문 양쪽에). 컴포넌트에 이미 문서화돼 있던 정책 — **`*_SUCCESS` 는 평문**("성공은 기대되는 결과이므로 강조할 이유가 없다", TASK-141) — 에 맞춰 legacy 유래 항목을 제거해 해소했다.
+
+  ## skill_mcp 정리
+  `LEGACY_BUILD_STATUSES` export/참조 제거 / `contract_drift_checker` 의 `statusLegacy` 그룹 제거 / 의미를 잃은 `LegacyCompatTests` 4종 삭제.
+
+  ## 검증
+  TS 5 clean / build-server **181** / build-monitor **274** / go **8 pkg** / skill_mcp **222** / **e2e 13/13 PASS (313s)**. openapi 재생성 후 legacy 잔존 0.
+
+  ## 다음 — Step 3
+  legacy 응답 필드 제거(`previewStatus`/`previewUrl`/`previewTtlMinutes`/`TestDeployment`) + **DB migration 0007**.
+  - **주의**: `build_request.preview_status` 가 **NOT NULL** 이라 응답 필드 제거와 migration 을 **동시에** 해야 한다.
+  - **설계 근거**: `buildTestResult` 는 canonical `buildTest` 가 있으면 그것을 쓰고 없으면 legacy 로 폴백한다. memory/postgres **양쪽 모두 build_test 를 채우므로** 폴백 제거가 안전하다(실측 `test.healthCheckPassed=True` 는 canonical 분기에서만 나오는 값이다).
+
+  workflow meta sync (state 197→198, handoff_rev 119→120, handoff doc 155→156, work_backlog 113→114) 같은 commit.
 - Updated: 2026-07-23 (rev 154→155: **P2-M1 Step 1 봉인 — phase 이름 변경 (TASK-158)**).
 
   Phase 2 첫 실작업. `PREVIEW_QUEUED`/`PREVIEW_READY` → **`CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`**.

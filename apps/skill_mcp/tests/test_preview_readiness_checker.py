@@ -86,7 +86,7 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(r.card.next_action, "WAIT")
 
     def test_claimed_is_preparing(self):
-        r = core.check_readiness({"build": {"status": "CLAIMED"}})
+        r = core.check_readiness({"build": {"status": "PREPARING_SOURCE"}})
         self.assertEqual(r.readiness_state, "PREPARING")
 
     def test_building_with_phase_preparing(self):
@@ -96,7 +96,7 @@ class ClassificationTests(unittest.TestCase):
         self.assertEqual(r.readiness_state, "PREPARING")
 
     def test_test_ready_no_test_deployment(self):
-        r = core.check_readiness({"build": {"status": "TEST_READY"}})
+        r = core.check_readiness({"build": {"status": "TEST_SUCCESS"}})
         self.assertEqual(r.readiness_state, "STARTING")
 
     def test_completed_no_test_deployment_unknown(self):
@@ -115,21 +115,21 @@ class ClassificationTests(unittest.TestCase):
 
     def test_preview_queued_is_waiting(self):
         r = core.check_readiness({
-            "build": {"status": "TEST_READY"},
+            "build": {"status": "TEST_SUCCESS"},
             "testDeployment": {"status": "QUEUED"},
         })
         self.assertEqual(r.readiness_state, "WAITING_FOR_SLOT")
 
     def test_preview_provisioning_is_starting(self):
         r = core.check_readiness({
-            "build": {"status": "TEST_READY"},
+            "build": {"status": "TEST_SUCCESS"},
             "testDeployment": {"status": "PROVISIONING"},
         })
         self.assertEqual(r.readiness_state, "STARTING")
 
     def test_preview_reserved_is_starting(self):
         r = core.check_readiness({
-            "build": {"status": "TEST_READY"},
+            "build": {"status": "TEST_SUCCESS"},
             "testDeployment": {"status": "RESERVED"},
         })
         self.assertEqual(r.readiness_state, "STARTING")
@@ -166,7 +166,7 @@ class ClassificationTests(unittest.TestCase):
 
     def test_preview_failed_is_degraded(self):
         r = core.check_readiness({
-            "build": {"status": "TEST_READY"},
+            "build": {"status": "TEST_SUCCESS"},
             "testDeployment": {"status": "FAILED"},
         })
         self.assertEqual(r.readiness_state, "DEGRADED")
@@ -233,9 +233,9 @@ class CardContentTests(unittest.TestCase):
     def test_all_states_have_card(self):
         cases = [
             {"build": {"status": "QUEUED"}},
-            {"build": {"status": "CLAIMED"}},
+            {"build": {"status": "PREPARING_SOURCE"}},
             {"build": {"status": "BUILDING"}},
-            {"build": {"status": "TEST_READY"}},
+            {"build": {"status": "TEST_SUCCESS"}},
             {"build": {"status": "FAILED"}},
             {"build": {"status": "CANCELLED"}},
             {"build": {"status": "COMPLETED"}},

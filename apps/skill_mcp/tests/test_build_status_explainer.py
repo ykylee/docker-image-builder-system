@@ -49,25 +49,6 @@ def _payload(**overrides):
     return base
 
 
-def _legacy_payload(**overrides):
-    """Build a legacy preview-era payload (forward-compat input).
-
-    Skill still accepts legacy keys to keep integrators working during
-    the migration window. These tests stay aligned with that guarantee.
-    """
-    base = {
-        "buildId": "b-1",
-        "userId": "u-1",
-        "appName": "demo-app",
-        "status": "BUILDING",
-        "currentPhase": "DOCKER_BUILDING",
-        "testDeployment": {"status": "STARTING"},
-        "error": None,
-    }
-    base.update(overrides)
-    return base
-
-
 class CanonicalPayloadTests(unittest.TestCase):
     """Canonical BuildStatusResponse payload path (lifecycle/image/test/deploy)."""
 
@@ -223,42 +204,11 @@ class FailedTerminalTests(unittest.TestCase):
         self.assertIsNone(r.explanation["error_summary"])
 
 
-class LegacyCompatTests(unittest.TestCase):
-    """Legacy preview-era payload path. Forward-compat shims must still work."""
-
-    def test_legacy_status_in_flight_yields_wait(self) -> None:
-        r = explain(_legacy_payload())
-        self.assertTrue(r.ok)
-        self.assertEqual(r.explanation["next_action"], "WAIT")
-
-    def test_legacy_test_ready_with_ready_yields_open_deployment_alias(self) -> None:
-        # TEST_READY (legacy) 는 canonical TEST_SUCCESS 로 forward-mapped 되어도
-        # OPEN_DEPLOYMENT 는 아직 emit 하지 않는다 — TEST_SUCCESS 이므로 WAIT.
-        # legacy `previewUrl` 도 user 메시지에 노출되어야 한다.
-        r = explain(
-            _legacy_payload(
-                status="TEST_READY",
-                testDeployment={"status": "READY", "previewUrl": "https://preview.example.com/x"},
-            )
-        )
-        self.assertEqual(r.explanation["next_action"], "WAIT")
-        self.assertIn("https://preview.example.com/x", r.explanation["user"])
-
-    def test_legacy_completed_with_expired_preview_yields_retry(self) -> None:
-        r = explain(
-            _legacy_payload(
-                status="COMPLETED",
-                testDeployment={"status": "EXPIRED"},
-            )
-        )
-        self.assertEqual(r.explanation["next_action"], "RETRY")
-        self.assertTrue(r.explanation["is_terminal"])
-
-    def test_legacy_test_deployment_invalid_type_errors(self) -> None:
-        r = explain(_legacy_payload(testDeployment="not a dict"))
-        self.assertFalse(r.ok)
-        self.assertTrue(any(e["field"] == "testDeployment" for e in r.errors))
-
+# TASK-159/160 (P2-M1 Step 2/3): LegacyCompatTests 제거.
+# legacy status(CLAIMED/TEST_READY) 와 legacy preview 필드
+# (testDeployment/previewUrl/previewStatus) 가 계약에서 사라졌으므로
+# 그 forward-compat 을 검증하던 4 테스트는 더 이상 의미가 없다.
+# canonical 경로 검증은 이 파일의 나머지 테스트가 담당한다.
 
 class InputValidationTests(unittest.TestCase):
     def test_invalid_root_type(self) -> None:

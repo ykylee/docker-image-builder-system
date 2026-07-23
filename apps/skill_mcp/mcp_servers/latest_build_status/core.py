@@ -62,8 +62,8 @@ _ACTIVE_BUILD_STATUSES: frozenset[str] = frozenset(
         "DEPLOYING",
         "DEPLOY_SUCCESS",
         # legacy adapter statuses (forward-compat shim during migration window)
-        "CLAIMED",
-        "TEST_READY",
+        "PREPARING_SOURCE",
+        "TEST_SUCCESS",
     }
 )
 
@@ -79,7 +79,7 @@ _TERMINAL_BUILD_STATUSES: frozenset[str] = frozenset(
 # build.status 값 중 active / terminal 어느 쪽에도 못 들어가는 경우 canonical
 # 이 아닌 다른 status 로 정렬 fallback. canonical + legacy 합집합.
 _CANONICAL_OR_LEGACY_STATUSES: frozenset[str] = frozenset(
-    C.CANONICAL_BUILD_STATUSES | C.LEGACY_BUILD_STATUSES
+    C.CANONICAL_BUILD_STATUSES
 )
 
 # Backend 가 아직도 legacy preview-era 필드 (`testDeployment`, raw `error`) 를

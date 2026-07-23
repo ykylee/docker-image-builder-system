@@ -76,7 +76,7 @@ describe("MemoryBuildRepository: reportPreviewStatus", () => {
     assert.equal(result.kind, "ok");
     if (result.kind !== "ok") return;
     assert.equal(result.response.build.phase, "CONTAINER_TEST_PASSED");
-    assert.equal(result.response.build.status, "TEST_READY");
+    assert.equal(result.response.build.status, "TEST_SUCCESS");
     assert.equal(result.testDeployment.previewUrl, "http://preview.local/x");
     assert.equal(result.response.test.status, "SUCCESS");
     assert.equal(result.response.test.healthCheckPassed, true);

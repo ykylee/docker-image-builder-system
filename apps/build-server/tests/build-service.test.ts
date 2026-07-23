@@ -74,7 +74,7 @@ describe("BuildService: claimNextBuild", () => {
     const result = await service.claimNextBuild();
     assert.equal(result.claimed, true);
     assert.equal(result.reason, null);
-    assert.equal(result.build?.build.status, "CLAIMED");
+    assert.equal(result.build?.build.status, "PREPARING_SOURCE");
     assert.equal(result.build?.build.phase, "QUEUE_CLAIMED");
   });
 
@@ -88,7 +88,7 @@ describe("BuildService: claimNextBuild", () => {
     const second = await service.claimNextBuild();
     assert.equal(second.claimed, false);
     assert.equal(second.reason, "ACTIVE_BUILD_EXISTS");
-    assert.equal(second.build?.build.status, "CLAIMED");
+    assert.equal(second.build?.build.status, "PREPARING_SOURCE");
   });
 });
 

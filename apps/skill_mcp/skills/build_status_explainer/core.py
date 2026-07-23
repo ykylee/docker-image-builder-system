@@ -42,7 +42,6 @@ TERMINAL_BUILD_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 # preview-era STATUSES. We accept them as input but never produce them in
 # the user-facing explanation output — they get mapped into canonical
 # terminal/in-flight states below.
-LEGACY_BUILD_STATUSES = C.LEGACY_BUILD_STATUSES
 LEGACY_PREVIEW_STATUSES = C.LEGACY_PREVIEW_STATUSES
 
 
@@ -294,7 +293,7 @@ def explain(input_data: Any) -> Explanation:
         status = input_data.get("status")
     if status is None:
         errors.append(_err("MISSING_FIELD", "status", "status is required"))
-    elif status not in BUILD_STATUSES and status not in LEGACY_BUILD_STATUSES:
+    elif status not in BUILD_STATUSES:
         warnings.append(_err(
             "UNKNOWN_ENUM", "status", f"unknown build status: {status!r}",
         ))
@@ -361,8 +360,8 @@ def explain(input_data: Any) -> Explanation:
     # CLAIMED ↔ QUEUED (서버가 빌드를 잡았고 큐에 남아있음), 나머지 그대로.
     canonical_status = (
         status if status in BUILD_STATUSES else (
-            "TEST_SUCCESS" if status == "TEST_READY" else
-            "QUEUED" if status == "CLAIMED" else
+            "TEST_SUCCESS" if status == "TEST_SUCCESS" else
+            "QUEUED" if status == "PREPARING_SOURCE" else
             status
         )
     )
@@ -431,7 +430,7 @@ def explain(input_data: Any) -> Explanation:
 
     # 최종: 알려지지 않은 status 는 ok=false, next_action=NONE.
     ok = len(errors) == 0
-    if status and status not in BUILD_STATUSES and status not in LEGACY_BUILD_STATUSES:
+    if status and status not in BUILD_STATUSES:
         next_action = "NONE"
         ok = False
     if next_action not in NEXT_ACTIONS:

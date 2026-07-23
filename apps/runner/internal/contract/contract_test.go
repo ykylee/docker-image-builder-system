@@ -11,11 +11,9 @@ func TestCanonicalStatusCount(t *testing.T) {
 	if got, want := len(CanonicalBuildStatuses), 12; got != want {
 		t.Errorf("CanonicalBuildStatuses size = %d, want %d (TS+Python mirror must match)", got, want)
 	}
-	if got, want := len(LegacyBuildStatuses), 2; got != want {
-		t.Errorf("LegacyBuildStatuses size = %d, want %d", got, want)
-	}
-	if got, want := len(AllBuildStatuses), 14; got != want {
-		t.Errorf("AllBuildStatuses size = %d, want %d (12+2)", got, want)
+	// TASK-159: legacy status 제거 후 All == Canonical.
+	if got, want := len(AllBuildStatuses), 12; got != want {
+		t.Errorf("AllBuildStatuses size = %d, want %d (canonical only)", got, want)
 	}
 }
 
@@ -52,7 +50,6 @@ func TestCanonicalValuesAreUnique(t *testing.T) {
 		}
 	}
 	check("CanonicalBuildStatuses", CanonicalBuildStatuses)
-	check("LegacyBuildStatuses", LegacyBuildStatuses)
 	check("BuildPhases", BuildPhases)
 	check("ErrorCodes", ErrorCodes)
 }
@@ -71,7 +68,6 @@ func TestCanonicalValuesAreUpperSnake(t *testing.T) {
 		}
 	}
 	check("CanonicalBuildStatuses", CanonicalBuildStatuses)
-	check("LegacyBuildStatuses", LegacyBuildStatuses)
 	check("BuildPhases", BuildPhases)
 	check("ErrorCodes", ErrorCodes)
 }
@@ -95,18 +91,6 @@ func isUpperSnake(s string) bool {
 // TestLegacyBuildStatusEmittedInCanonical 는 canonical 12 statuses 안에
 // legacy adapter 2 종이 **없음** 을 보장한다. Build Server 가 migration
 // 기간에만 emit 하는 shim 이므로 canonical lifecycle set 에 섞이면 안 된다.
-func TestLegacyBuildStatusEmittedInCanonical(t *testing.T) {
-	canonicalSet := make(map[string]struct{}, len(CanonicalBuildStatuses))
-	for _, v := range CanonicalBuildStatuses {
-		canonicalSet[v] = struct{}{}
-	}
-	for _, v := range LegacyBuildStatuses {
-		if _, in := canonicalSet[v]; in {
-			t.Errorf("legacy %q must NOT appear in CanonicalBuildStatuses", v)
-		}
-	}
-}
-
 // TestStatusConstLookup 은 각 const 가 빌드 status 값을 정확히 들고 있는지 확인.
 // 새 항목이 추가됐는데 const 선언을 빠뜨리는 함정을 잡는다.
 func TestStatusConstLookup(t *testing.T) {

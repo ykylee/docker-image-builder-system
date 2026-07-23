@@ -35,7 +35,6 @@ READINESS_STATES = C.READINESS_STATES
 NEXT_ACTIONS = C.NEXT_ACTIONS
 EXECUTION_STATUSES = C.EXECUTION_STATUSES
 CANONICAL_BUILD_STATUSES = C.CANONICAL_BUILD_STATUSES
-LEGACY_BUILD_STATUSES = C.LEGACY_BUILD_STATUSES
 BUILD_PHASES = C.BUILD_PHASES
 LEGACY_PREVIEW_STATUSES = C.LEGACY_PREVIEW_STATUSES
 
@@ -254,9 +253,9 @@ def _classify(
         return "PREPARING"
 
     # legacy build status forward-mapped.
-    if build_status in ("TEST_READY",):
+    if build_status in ("TEST_SUCCESS",):
         return "STARTING"
-    if build_status in ("CLAIMED",):
+    if build_status in ("PREPARING_SOURCE",):
         return "PREPARING"
     if build_status == "COMPLETED":
         # canonical build done 이지만 test/deploy 가 아직 안 왔거나 unknown.
@@ -380,7 +379,7 @@ def check_readiness(input_data: Any) -> ReadinessResult:
         build_id = None
 
     # build.status 가 canonical / legacy 어느 쪽에도 없으면 warning.
-    if build.get("status") not in CANONICAL_BUILD_STATUSES and build.get("status") not in LEGACY_BUILD_STATUSES:
+    if build.get("status") not in CANONICAL_BUILD_STATUSES:
         warnings.append(_err(
             "UNKNOWN_ENUM", "build.status",
             f"unknown build.status: {build.get('status')!r}",

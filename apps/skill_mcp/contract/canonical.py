@@ -51,20 +51,14 @@ EXECUTION_STATUSES: frozenset[str] = frozenset({
     "SKIPPED",
 })
 
-# Legacy adapter statuses still emitted by the current build-server
-# during the migration window. Mirrors `legacyBuildStatuses` in
-# status.ts. Skills should accept these as inputs but never produce
-# them in user-facing messages — they map into canonical terminal
-# states instead.
-LEGACY_BUILD_STATUSES: frozenset[str] = frozenset({
-    "CLAIMED",
-    "TEST_READY",
-})
+# TASK-159 (P2-M1 Step 2): legacy adapter status 제거.
+#   CLAIMED    → PREPARING_SOURCE
+#   TEST_READY → TEST_SUCCESS
+# 외부 소비자가 없어 alias 유예 없이 즉시 제거했다. 이제 public union 은
+# canonical 과 동일하다 (TS `buildStatuses` / Go `AllBuildStatuses` 정합).
 
 # Public union: what skills accept as a `build.status` input.
-PUBLIC_BUILD_STATUSES: frozenset[str] = frozenset(
-    CANONICAL_BUILD_STATUSES | LEGACY_BUILD_STATUSES
-)
+PUBLIC_BUILD_STATUSES: frozenset[str] = frozenset(CANONICAL_BUILD_STATUSES)
 
 # Legacy preview/test-deployment states. The TS contract (`previewStatuses`
 # in status.ts) lists 6 values; the Python migration shim keeps 3 additional

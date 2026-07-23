@@ -115,7 +115,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       const activeBuild = [...builds.values()].find((entry) => {
         return (
           entry.summary.appName === input.appName &&
-          ["QUEUED", "CLAIMED", "BUILDING", "TEST_READY"].includes(entry.summary.status)
+          ["QUEUED", "PREPARING_SOURCE", "BUILDING", "TEST_SUCCESS"].includes(entry.summary.status)
         );
       });
 
@@ -226,7 +226,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       });
 
       const active = queueOrder.find((entry) =>
-        ["CLAIMED", "BUILDING", "TEST_READY"].includes(entry.summary.status)
+        ["PREPARING_SOURCE", "BUILDING", "TEST_SUCCESS"].includes(entry.summary.status)
       );
       if (active) {
         return {
@@ -285,7 +285,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       const timestamp = nowIsoString();
       next.summary = {
         ...enrichBuildSummary(next.summary),
-        status: "CLAIMED",
+        status: "PREPARING_SOURCE",
         phase: "QUEUE_CLAIMED",
         updatedAt: timestamp
       };
@@ -418,8 +418,8 @@ export function createMemoryBuildRepository(): BuildRepository {
       }
 
       // only allow queue when build is in DOCKER_BUILD_COMPLETED or TEST_READY state
-      if (!["DOCKER_BUILD_COMPLETED", "TEST_READY"].includes(build.summary.phase) &&
-          !["BUILDING", "TEST_READY"].includes(build.summary.status)) {
+      if (!["DOCKER_BUILD_COMPLETED", "TEST_SUCCESS"].includes(build.summary.phase) &&
+          !["BUILDING", "TEST_SUCCESS"].includes(build.summary.status)) {
         return {
           kind: "invalid_state",
           reason: `cannot queue preview from phase=${build.summary.phase} status=${build.summary.status}`
@@ -539,7 +539,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         nextStatus = "BUILDING"; // still building until ready
       } else if (status === "READY") {
         nextPhase = "CONTAINER_TEST_PASSED";
-        nextStatus = "TEST_READY";
+        nextStatus = "TEST_SUCCESS";
       } else if (status === "FAILED") {
         nextPhase = "FAILED";
         nextStatus = "FAILED";

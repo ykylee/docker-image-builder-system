@@ -11,7 +11,7 @@ export interface paths {
             parameters: {
                 query?: {
                     /** @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all. */
-                    status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
+                    status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
                     /** @description Optional owner filter. Matches BuildRequest.requestedBy (canonical owner identity, same as IDENTITY_MODEL userId). Omitted = all. */
                     requestedBy?: string;
                     /** @description Maximum number of summaries to return. Server cap is 200. Default 50. */
@@ -595,7 +595,7 @@ export interface paths {
             parameters: {
                 query?: {
                     /** @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all. */
-                    status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
+                    status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
                     /** @description Admin-only optional owner filter. Omitted = every owner. Caller id must be in ADMIN_IDS. */
                     requestedBy?: string;
                     /** @description Maximum number of summaries to return. Server cap is 200. Default 50. */
@@ -948,7 +948,7 @@ export interface components {
              * @description Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility.
              * @enum {string}
              */
-            status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
+            status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @enum {string} */
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
@@ -1053,7 +1053,7 @@ export interface components {
              * @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all.
              * @enum {string}
              */
-            status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
+            status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @description Optional owner filter. Matches BuildRequest.requestedBy (canonical owner identity, same as IDENTITY_MODEL userId). Omitted = all. */
             requestedBy?: string;
             /**
@@ -1255,7 +1255,7 @@ export interface components {
              * @description Optional status filter. Accepts the canonical lifecycle statuses plus the temporary legacy adapter statuses still emitted by the preview-era implementation. Omitted = all.
              * @enum {string}
              */
-            status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
+            status?: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @description Admin-only optional owner filter. Omitted = every owner. Caller id must be in ADMIN_IDS. */
             requestedBy?: string;
             /**
@@ -1288,7 +1288,7 @@ export interface components {
              * @description Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility.
              * @enum {string}
              */
-            status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
+            status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @enum {string} */
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**

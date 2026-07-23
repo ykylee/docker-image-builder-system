@@ -76,7 +76,7 @@ import {
   enrichBuildSummary
 } from "./build-status-response.js";
 
-const activeBuildStatuses: BuildStatus[] = ["QUEUED", "CLAIMED", "BUILDING", "TEST_READY"];
+const activeBuildStatuses: BuildStatus[] = ["QUEUED", "PREPARING_SOURCE", "BUILDING", "TEST_SUCCESS"];
 
 type BuildRequestRow = typeof buildRequestTable.$inferSelect;
 type BuildLogRow = typeof buildLogTable.$inferSelect;
@@ -323,7 +323,7 @@ export class PostgresBuildRepository implements BuildRepository {
       const [activeRow] = await tx
         .select()
         .from(buildRequestTable)
-        .where(inArray(buildRequestTable.status, ["CLAIMED", "BUILDING", "TEST_READY"] as BuildStatus[]))
+        .where(inArray(buildRequestTable.status, ["PREPARING_SOURCE", "BUILDING", "TEST_SUCCESS"] as BuildStatus[]))
         .orderBy(asc(buildRequestTable.createdAt))
         .limit(1);
 
@@ -394,7 +394,7 @@ export class PostgresBuildRepository implements BuildRepository {
       const [updated] = await tx
         .update(buildRequestTable)
         .set({
-          status: "CLAIMED",
+          status: "PREPARING_SOURCE",
           phase: "QUEUE_CLAIMED",
           phaseHistory: nextPhaseHistory,
           updatedAt: timestamp
@@ -510,8 +510,8 @@ export class PostgresBuildRepository implements BuildRepository {
       return { kind: "not_found" };
     }
 
-    if (!["BUILDING", "TEST_READY"].includes(row.status as string) &&
-        !["DOCKER_BUILD_COMPLETED", "TEST_READY"].includes(row.phase as string)) {
+    if (!["BUILDING", "TEST_SUCCESS"].includes(row.status as string) &&
+        !["DOCKER_BUILD_COMPLETED", "TEST_SUCCESS"].includes(row.phase as string)) {
       return {
         kind: "invalid_state",
         reason: `cannot queue preview from phase=${row.phase} status=${row.status}`
@@ -621,7 +621,7 @@ export class PostgresBuildRepository implements BuildRepository {
         nextStatus = "BUILDING";
       } else if (status === "READY") {
         nextPhase = "CONTAINER_TEST_PASSED";
-        nextStatus = "TEST_READY";
+        nextStatus = "TEST_SUCCESS";
       } else if (status === "FAILED") {
         nextPhase = "FAILED";
         nextStatus = "FAILED";

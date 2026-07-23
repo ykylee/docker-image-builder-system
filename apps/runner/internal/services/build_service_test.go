@@ -32,7 +32,7 @@ func (f *fakeClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedBui
 		BuildID:         f.buildID,
 		AppName:         "todo-app",
 		Phase:           contract.PhaseQueueClaimed,
-		Status:          contract.StatusLegacyClaimed,
+		Status:          contract.StatusPreparingSource,
 		LifecycleStatus: contract.StatusPreparingSource,
 	}, nil
 }

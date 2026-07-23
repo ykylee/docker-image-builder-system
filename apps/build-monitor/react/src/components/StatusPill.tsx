@@ -41,8 +41,10 @@ const ATTENTION_VARIANT: Readonly<Record<string, BadgeVariant>> = {
   BUILDING: "warning",
   TESTING: "info",
   DEPLOYING: "info",
-  CLAIMED: "info",
-  TEST_READY: "info",
+  // TASK-159 (P2-M1 Step 2): legacy status 제거.
+  //   CLAIMED    → PREPARING_SOURCE 로 병합 (위의 warning 이 그 자리를 대신한다)
+  //   TEST_READY → TEST_SUCCESS 가 됐고, 본 정책상 `*_SUCCESS` 는 **평문**이다
+  //                ("성공은 기대되는 결과이므로 강조할 이유가 없다") — 배지에서 뺀다.
   PROVISIONING: "info",
   CONTAINER_TEST_STARTED: "info",
   CONTAINER_TEST_PASSED: "info",

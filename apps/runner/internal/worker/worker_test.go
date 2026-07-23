@@ -27,7 +27,7 @@ func (c *tickerClient) ClaimNextBuild(ctx context.Context) (*hostclient.ClaimedB
 			BuildID:         c.buildID,
 			AppName:         "todo-app",
 			Phase:           contract.PhaseQueueClaimed,
-			Status:          contract.StatusLegacyClaimed,
+			Status:          contract.StatusPreparingSource,
 			LifecycleStatus: contract.StatusPreparingSource,
 		}, nil
 	}
