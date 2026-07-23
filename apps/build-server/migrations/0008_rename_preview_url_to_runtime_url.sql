@@ -1,0 +1,34 @@
+-- 0008_rename_preview_url_to_runtime_url.sql
+--
+-- TASK-161 (P2-M2 완전 봉인): preview-era 컬럼의 canonical rename.
+--
+-- 배경:
+--   0007 이 preview_status / preview_ttl_minutes 컬럼을 drop 하면서
+--   preview_url 은 "컨테이너 런타임 URL 을 나르는 유일 필드" 라 남겼다
+--   (스키마 주석: "Canonical 이름(`runtime_url`)으로의 정렬은
+--   test-deployment 엔드포인트 재설계와 결합돼 있어 P2-M2 에서 함께
+--   처리한다"). 본 migration 이 그 후속.
+--
+-- 처리:
+--   build_request.preview_url → build_request.runtime_url 컬럼 rename.
+--   데이터 보존 (단순 ALTER TABLE ... RENAME COLUMN). 시점에
+--   runtime_url 값을 가진 row 는 그 값을 그대로 유지.
+--
+-- 본 컬럼은 응답 표면의 BuildSummary.runtimeUrl 의 source 가 된다. 동일
+-- 값이 build_test.runtime_url 에도 기록되지만 (runner 가 보고), 양쪽은
+-- live-write vs runner-side-cache 로 의미가 다르다. 본 컬럼은
+-- canonical container-test 의 authoritative reference.
+--
+-- 안전성:
+--   * read 측 — `apps/build-server/src/repositories/postgres-build-repository.ts`
+--     의 `runtimeUrl: row.previewUrl` 매핑은 본 commit 에서
+--     `runtimeUrl: row.runtimeUrl` 로 정렬됨.
+--   * write 측 — 동일 파일의 `previewUrl: ...` insert/update 는
+--     `runtimeUrl: ...` 로 정렬됨 (컬럼명 정합).
+--   * 응답/검증 — runtimeUrl 의 canonical 흡수는 Sub-commit A+B 에서
+--     이미 완료.
+--   되돌리려면 0008_down 에 해당하는 RENAME COLUMN 이 필요하나, 본
+--   프로젝트는 forward-only migration 정책이라 별도 down 스크립트를
+--   두지 않는다.
+
+ALTER TABLE build_request RENAME COLUMN preview_url TO runtime_url;

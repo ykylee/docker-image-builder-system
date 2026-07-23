@@ -22,9 +22,12 @@ export const buildRequestTable = pgTable("build_request", {
   entrypointPath: text("entrypoint_path").notNull(),
   dockerfilePath: text("dockerfile_path").notNull(),
   metadata: jsonb("metadata").$type<Record<string, string>>().notNull(),
-  // Legacy preview-era runtime URL. Canonical runtime/deploy refs will move
-  // into build_test.runtime_url / deployment_attempt.result_ref.
-  previewUrl: text("preview_url"),
+  // Canonical runtime URL — the container-under-test reference (TASK-161
+  // P2-M2 완전 봉인). 0008 migration 이 preview_url → runtime_url 컬럼
+  // rename 을 수행해 응답 표면(BuildSummary.runtimeUrl) 의 source 가 된다.
+  // build_test.runtime_url 도 동일 값을 들고 있으나 (runner 가 보고),
+  // 본 컬럼은 build_request 의 authoritative reference 다.
+  runtimeUrl: text("runtime_url"),
   lastErrorCode: text("last_error_code"),
   lastErrorMessage: text("last_error_message"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),

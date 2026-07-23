@@ -88,7 +88,9 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     appName: row.appName,
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
-    runtimeUrl: row.previewUrl,
+    // TASK-161 (P2-M2 완전 봉인): build_request.runtime_url 컬럼(0008
+    // migration 으로 preview_url → runtime_url rename).
+    runtimeUrl: row.runtimeUrl,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });
@@ -152,7 +154,9 @@ function mapBuildTestRowToDeployment(
 
   return {
     status: mapped,
-    runtimeUrl: testRow?.runtimeUrl ?? buildRow.previewUrl,
+    // build_test.runtime_url 이 canonical, build_request.runtime_url 는
+    // authoritative reference. 응답의 `runtimeUrl` 은 build_test 우선.
+    runtimeUrl: testRow?.runtimeUrl ?? buildRow.runtimeUrl,
     host: testRow?.host ?? null,
     hostPort: testRow?.hostPort ?? null,
     internalPort: testRow?.internalPort ?? null,
@@ -262,10 +266,10 @@ export class PostgresBuildRepository implements BuildRepository {
           entrypointPath: input.entrypointPath,
           dockerfilePath: input.dockerfilePath,
           metadata: input.metadata,
-          // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): DB 컬럼명
-          // `preview_url` 은 TASK-160 의 shim 으로 보존됐고 응답에서만
-          // `runtimeUrl` 로 매핑된다. 다음 migration 에서 컬럼 drop 예정.
-          previewUrl: null,
+          // TASK-161 (P2-M2 완전 봉인, migration 0008): build_request
+          // 의 컬럼명 `preview_url` → `runtime_url` rename. 응답 표면의
+          // BuildSummary.runtimeUrl 이 본 컬럼을 source 로 한다.
+          runtimeUrl: null,
           lastErrorCode: null,
           lastErrorMessage: null,
           createdAt: timestamp,
@@ -553,7 +557,7 @@ export class PostgresBuildRepository implements BuildRepository {
       .update(buildRequestTable)
       .set({
         phase: "CONTAINER_TEST_STARTED",
-        previewUrl: null,
+        runtimeUrl: null,
         phaseHistory: nextPhaseHistory,
         updatedAt: timestamp
       })
@@ -649,7 +653,7 @@ export class PostgresBuildRepository implements BuildRepository {
         nextStatus = "FAILED";
       }
 
-      const nextRuntimeUrl = details?.runtimeUrl ?? row.previewUrl;
+      const nextRuntimeUrl = details?.runtimeUrl ?? row.runtimeUrl;
       const nextPhaseHistory = advancePhaseHistory(
         (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
         row.phase as BuildPhase,
@@ -662,7 +666,7 @@ export class PostgresBuildRepository implements BuildRepository {
         .set({
           phase: nextPhase,
           status: nextStatus,
-          previewUrl: nextRuntimeUrl,
+          runtimeUrl: nextRuntimeUrl,
           phaseHistory: nextPhaseHistory,
           updatedAt: timestamp
         })
