@@ -33,7 +33,6 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
     databaseUrl: "",
     buildRepositoryBackend: "memory",
     dbAutoBootstrap: false,
-    previewTtlMinutes: 60,
     runnerPollIntervalMs: 1_000,
     buildTimeoutSeconds: 600,
     corsOrigin: "*",

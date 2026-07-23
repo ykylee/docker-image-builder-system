@@ -16,10 +16,8 @@ import {
   errorBody,
   notFoundBody,
   phaseUpdateRequestSchema,
-  testDeploymentQueueRequestSchema,
-  testDeploymentQueueResponseSchema,
-  testDeploymentReadyRequestSchema,
-  testDeploymentStatusRequestSchema,
+  containerTestStartRequestSchema,
+  containerTestResultRequestSchema,
   validationErrorBody
 } from "@docker-image-builder-system/shared-contract";
 
@@ -166,8 +164,11 @@ export async function registerBuildRoutes(
     return reply.status(200).send(result.response);
   });
 
-  // POST /builds/:buildId/preview - queue a test deployment
-  app.post("/builds/:buildId/preview", async (request, reply) => {
+  // POST /builds/:buildId/container-test/start — 컨테이너 테스트 시작
+  // (TASK-161 / P2-M2). 구 `POST /builds/:buildId/preview` 의 canonical 이름.
+  // preview-era 의 `ttlMinutes` 는 제거됐다 — 테스트 컨테이너의 수명은
+  // runner 가 결과 보고 시점에 정리하지, 호스트가 TTL 로 만료시키지 않는다.
+  app.post("/builds/:buildId/container-test/start", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       return reply.status(400).send(
@@ -175,32 +176,34 @@ export async function registerBuildRoutes(
       );
     }
     const body = request.body ?? {};
-    const payloadResult = testDeploymentQueueRequestSchema.safeParse(body);
+    const payloadResult = containerTestStartRequestSchema.safeParse(body);
     if (!payloadResult.success) {
       return reply.status(400).send(
-        validationErrorBody("Invalid preview queue payload", payloadResult.error.issues)
+        validationErrorBody("Invalid container test start payload", payloadResult.error.issues)
       );
     }
     const payload = payloadResult.data;
-    const result = await buildService.queueTestDeployment(
+    const result = await buildService.startContainerTest(
       paramsResult.data.buildId,
-      payload.internalPort,
-      payload.ttlMinutes
+      payload.internalPort
     );
     if (result.kind === "not_found") {
       return reply.status(404).send(notFoundBody("Build not found."));
     }
     if (result.kind === "invalid_state") {
       return reply.status(409).send(
-        errorBody("Build is not in a queueable state", { reason: result.reason })
+        errorBody("Build is not in a container-testable state", { reason: result.reason })
       );
     }
-    const body2 = testDeploymentQueueResponseSchema.parse(result.response);
-    return reply.status(202).send(body2);
+    return reply.status(202).send(result.response);
   });
 
-  // POST /builds/:buildId/test-deployment/ready - report preview ready
-  app.post("/builds/:buildId/test-deployment/ready", async (request, reply) => {
+  // POST /builds/:buildId/container-test/result — 컨테이너 테스트 결과 보고
+  // (TASK-161 / P2-M2). 구 `test-deployment/ready` + `test-deployment/status`
+  // 두 엔드포인트를 하나로 흡수했다. 상태는 preview-era 의
+  // PROVISIONING/READY/EXPIRED 가 아니라 canonical ExecutionStatus
+  // (IN_PROGRESS / SUCCESS / FAILED) 를 그대로 받는다.
+  app.post("/builds/:buildId/container-test/result", async (request, reply) => {
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       return reply.status(400).send(
@@ -208,51 +211,27 @@ export async function registerBuildRoutes(
       );
     }
     const body = request.body ?? {};
-    const payloadResult = testDeploymentReadyRequestSchema.safeParse(body);
+    const payloadResult = containerTestResultRequestSchema.safeParse(body);
     if (!payloadResult.success) {
       return reply.status(400).send(
-        validationErrorBody("Invalid preview ready payload", payloadResult.error.issues)
+        validationErrorBody("Invalid container test result payload", payloadResult.error.issues)
       );
     }
     const payload = payloadResult.data;
-    const result = await buildService.reportPreviewStatus(
+    const result = await buildService.reportContainerTestResult(
       paramsResult.data.buildId,
-      "READY",
+      payload.status,
       {
-        previewUrl: payload.previewUrl,
-        host: payload.host,
-        hostPort: payload.hostPort,
+        // 계약상 nullable(=명시적 미상)이지만 저장소 계층은 optional 만
+        // 받는다. null 과 미제공은 동일하게 "기존 값 유지" 로 취급한다.
+        runtimeUrl: payload.runtimeUrl ?? undefined,
+        host: payload.host ?? undefined,
+        hostPort: payload.hostPort ?? undefined,
         containerRef: payload.containerRef,
         healthCheckPassed: payload.healthCheckPassed,
         portOpen: payload.portOpen,
         stabilityWindowPassed: payload.stabilityWindowPassed
       }
-    );
-    if (result.kind === "not_found") {
-      return reply.status(404).send(notFoundBody("Build not found."));
-    }
-    return reply.status(200).send(result.response);
-  });
-
-  // POST /builds/:buildId/test-deployment/status - report general preview status (PROVISIONING/FAILED/EXPIRED)
-  app.post("/builds/:buildId/test-deployment/status", async (request, reply) => {
-    const paramsResult = buildIdParamsSchema.safeParse(request.params);
-    if (!paramsResult.success) {
-      return reply.status(400).send(
-        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
-      );
-    }
-    const body = request.body ?? {};
-    const payloadResult = testDeploymentStatusRequestSchema.safeParse(body);
-    if (!payloadResult.success) {
-      return reply.status(400).send(
-        validationErrorBody("Invalid preview status payload", payloadResult.error.issues)
-      );
-    }
-    const payload = payloadResult.data;
-    const result = await buildService.reportPreviewStatus(
-      paramsResult.data.buildId,
-      payload.status
     );
     if (result.kind === "not_found") {
       return reply.status(404).send(notFoundBody("Build not found."));
@@ -282,24 +261,6 @@ export async function registerBuildRoutes(
       return reply.status(404).send(notFoundBody("Build not found."));
     }
     return reply.status(200).send(result.response);
-  });
-
-  // GET /builds/:buildId/test-deployment - read current test deployment
-  app.get("/builds/:buildId/test-deployment", async (request, reply) => {
-    const paramsResult = buildIdParamsSchema.safeParse(request.params);
-    if (!paramsResult.success) {
-      return reply.status(400).send(
-        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
-      );
-    }
-    const result = await buildService.getTestDeployment(paramsResult.data.buildId);
-    if (result.kind === "not_found") {
-      return reply.status(404).send(notFoundBody("Build not found."));
-    }
-    if (result.kind === "not_requested") {
-      return reply.status(404).send(notFoundBody("Test deployment not requested."));
-    }
-    return reply.status(200).send({ testDeployment: result.testDeployment });
   });
 
   // POST /builds/:buildId/source — upload the raw source archive bytes

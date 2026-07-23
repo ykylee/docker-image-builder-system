@@ -119,8 +119,7 @@ POST_BODY=$(cat <<JSON
     "sizeBytes": 12345
   },
   "entrypointPath": "src/index.ts",
-  "dockerfilePath": "Dockerfile",
-  "previewTtlMinutes": 30
+  "dockerfilePath": "Dockerfile"
 }
 JSON
 )

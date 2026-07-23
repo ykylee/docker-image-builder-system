@@ -73,7 +73,20 @@ export DOCKER_SOCKET_GID
 export ADMIN_IDS="${ADMIN_IDS:-admin}"
 # 로컬에 native PostgreSQL 이 5432 를 점유한 개발 환경에서 compose postgres
 # 가 bind 실패하지 않도록 (TASK-154). CI 는 보통 비어 있어 그대로 5432.
-export DIBS_POSTGRES_HOST_PORT="${DIBS_POSTGRES_HOST_PORT:-5432}"
+#
+# TASK-161: 이 의도가 기본값 5432 로 구현돼 있지 않아 compose postgres 3종이
+# `failed to bind host port 0.0.0.0:5432/tcp: address already in use` 로
+# 죽었다. 5432 가 이미 열려 있으면 (= local 그룹이 쓰는 native postgres)
+# compose 쪽은 15432 로 비켜준다. 호출자가 명시하면 그 값을 존중한다.
+if [[ -z "${DIBS_POSTGRES_HOST_PORT:-}" ]]; then
+  if (exec 3<>/dev/tcp/127.0.0.1/5432) 2>/dev/null; then
+    exec 3<&- 3>&-
+    DIBS_POSTGRES_HOST_PORT=15432
+  else
+    DIBS_POSTGRES_HOST_PORT=5432
+  fi
+fi
+export DIBS_POSTGRES_HOST_PORT
 # 로컬 postgres 기반 e2e 의 접속 정보.
 export PGPORT="${PGPORT:-5432}"
 export PG_SUPERUSER="${PG_SUPERUSER:-postgres}"
@@ -89,6 +102,7 @@ if [[ -z "$DOCKER_SOCKET_GID" ]]; then
   err "DOCKER_SOCKET_GID 를 구할 수 없습니다 (getent group docker 실패)."; exit 3
 fi
 ok "DOCKER_SOCKET_GID=$DOCKER_SOCKET_GID"
+ok "DIBS_POSTGRES_HOST_PORT=$DIBS_POSTGRES_HOST_PORT (compose postgres 의 host publish 포트)"
 
 need_build_artifacts=0
 [[ "$GROUP" == "all" || "$GROUP" == "local" || "$GROUP" == "runner" ]] && need_build_artifacts=1

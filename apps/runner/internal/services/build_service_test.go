@@ -22,8 +22,8 @@ type fakeClient struct {
 	buildID     string
 	runnerID    string
 	reportErr   error
-	queued      []hostclient.QueueTestDeploymentRequest
-	previewReady []hostclient.PreviewReadyRequest
+	started     []hostclient.StartContainerTestRequest
+	testResults []hostclient.ContainerTestResultRequest
 	deployments []hostclient.DeploymentReportRequest
 }
 
@@ -49,17 +49,17 @@ func (f *fakeClient) ReportPhase(ctx context.Context, buildID, phase, runnerID s
 	return nil
 }
 
-func (f *fakeClient) QueueTestDeployment(ctx context.Context, buildID string, req hostclient.QueueTestDeploymentRequest) error {
+func (f *fakeClient) StartContainerTest(ctx context.Context, buildID string, req hostclient.StartContainerTestRequest) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.queued = append(f.queued, req)
+	f.started = append(f.started, req)
 	return nil
 }
 
-func (f *fakeClient) ReportPreviewReady(ctx context.Context, buildID string, req hostclient.PreviewReadyRequest) error {
+func (f *fakeClient) ReportContainerTestResult(ctx context.Context, buildID string, req hostclient.ContainerTestResultRequest) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.previewReady = append(f.previewReady, req)
+	f.testResults = append(f.testResults, req)
 	return nil
 }
 
@@ -128,31 +128,34 @@ func TestProcessClaim_PhaseReportError_Propagates(t *testing.T) {
 	}
 }
 
-
-func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
+func TestProcessClaim_StartsAndReportsContainerTestResult(t *testing.T) {
 	fc := &fakeClient{buildID: "b-1"}
 	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
 	claim := &queue.ClaimedBuild{BuildID: "b-1"}
 	if err := svc.ProcessClaim(context.Background(), claim); err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-	if len(fc.queued) != 1 {
-		t.Errorf("expected 1 queue call, got %d", len(fc.queued))
+	if len(fc.started) != 1 {
+		t.Errorf("expected 1 container test start call, got %d", len(fc.started))
 	}
-	if fc.queued[0].InternalPort != 8080 {
-		t.Errorf("expected internalPort 8080, got %d", fc.queued[0].InternalPort)
+	if fc.started[0].InternalPort != 8080 {
+		t.Errorf("expected internalPort 8080, got %d", fc.started[0].InternalPort)
 	}
-	if len(fc.previewReady) != 1 {
-		t.Errorf("expected 1 preview ready call, got %d", len(fc.previewReady))
+	if len(fc.testResults) != 1 {
+		t.Errorf("expected 1 container test result call, got %d", len(fc.testResults))
 	}
-	if fc.previewReady[0].HostPort != 38124 {
-		t.Errorf("expected hostPort 38124, got %d", fc.previewReady[0].HostPort)
+	// TASK-161: 결과 보고는 canonical ExecutionStatus 를 실어야 한다.
+	if fc.testResults[0].Status != contract.ExecutionStatusSuccess {
+		t.Errorf("expected container test status SUCCESS, got %s", fc.testResults[0].Status)
 	}
-	if fc.previewReady[0].ContainerRef != "container-b-1" {
-		t.Errorf("expected containerRef container-b-1, got %s", fc.previewReady[0].ContainerRef)
+	if fc.testResults[0].HostPort != 38124 {
+		t.Errorf("expected hostPort 38124, got %d", fc.testResults[0].HostPort)
 	}
-	if !fc.previewReady[0].HealthCheckPassed || !fc.previewReady[0].PortOpen || !fc.previewReady[0].StabilityWindowPassed {
-		t.Errorf("expected preview ready booleans true, got %+v", fc.previewReady[0])
+	if fc.testResults[0].ContainerRef != "container-b-1" {
+		t.Errorf("expected containerRef container-b-1, got %s", fc.testResults[0].ContainerRef)
+	}
+	if !fc.testResults[0].HealthCheckPassed || !fc.testResults[0].PortOpen || !fc.testResults[0].StabilityWindowPassed {
+		t.Errorf("expected container test booleans true, got %+v", fc.testResults[0])
 	}
 	if len(fc.deployments) != 2 {
 		t.Fatalf("expected 2 deployment reports, got %d", len(fc.deployments))
@@ -166,8 +169,8 @@ func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
 }
 
 // TASK-067: BuildService 가 docker.Client.RunContainer 의 ContainerStatus
-// 값을 그대로 ReportPreviewReady 의 입력으로 사용해야 한다. 새 docker
-// Client (skeleton mode) 를 명시적으로 wire-up 해서 ReportPreviewReady 에
+// 값을 그대로 ReportContainerTestResult 의 입력으로 사용해야 한다. 새 docker
+// Client (skeleton mode) 를 명시적으로 wire-up 해서 결과 보고에
 // 들어간 host / hostPort / runtimeUrl / containerRef 가 ContainerStatus 의
 // 그것과 일치하는지 확인.
 func TestProcessClaim_PassesContainerStatusFromRunContainer(t *testing.T) {
@@ -180,10 +183,10 @@ func TestProcessClaim_PassesContainerStatusFromRunContainer(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if len(fc.previewReady) != 1 {
-		t.Fatalf("expected 1 preview ready call, got %d", len(fc.previewReady))
+	if len(fc.testResults) != 1 {
+		t.Fatalf("expected 1 container test result call, got %d", len(fc.testResults))
 	}
-	req := fc.previewReady[0]
+	req := fc.testResults[0]
 
 	// BuildService 가 RunContainer(skeleton) 의 결과를 그대로 전달했는지 확인.
 	// skeleton mode 의 default HostPort 는 38124 이고 containerRef 는
@@ -198,8 +201,8 @@ func TestProcessClaim_PassesContainerStatusFromRunContainer(t *testing.T) {
 		t.Errorf("expected host=preview.local, got %s", req.Host)
 	}
 	expectedRuntimeURL := "http://preview.local:38124/"
-	if req.PreviewURL != expectedRuntimeURL {
-		t.Errorf("expected previewURL=%s, got %s", expectedRuntimeURL, req.PreviewURL)
+	if req.RuntimeURL != expectedRuntimeURL {
+		t.Errorf("expected runtimeURL=%s, got %s", expectedRuntimeURL, req.RuntimeURL)
 	}
 	if !req.HealthCheckPassed || !req.PortOpen || !req.StabilityWindowPassed {
 		t.Errorf("expected all health flags true, got %+v", req)

@@ -6,7 +6,6 @@ import {
   buildStatuses,
   canonicalBuildStatuses,
   executionStatuses,
-  previewStatuses
 } from "./status.js";
 
 // All exported schemas carry a `.meta({ id, description })` so that
@@ -41,13 +40,12 @@ export const buildSummarySchema = z
     }),
     phase: z.enum(buildPhases),
     // TASK-160 (P2-M1 Step 3): `previewStatus` shim 제거. canonical `test`
-    // 블록(ContainerTestResult.status)이 이 역할을 완전히 대신한다.
-    // `previewUrl` 은 **실제 런타임 URL 을 나르는 유일한 필드**라 남긴다 —
-    // canonical 이름(`runtimeUrl`, build_test 컬럼명)으로의 정렬은
-    // test-deployment 엔드포인트 재설계와 결합돼 있어 P2-M2 에서 함께 한다.
-    previewUrl: z.string().url().nullable().meta({
+    // 블록이 컨테이너 테스트 상태의 단일 출처다.
+    // TASK-161 (P2-M2): `previewUrl` → `runtimeUrl` 로 최종 개명 완료.
+    // 이 필드는 실제 런타임 URL 을 나르는 유일한 요약 필드다.
+    runtimeUrl: z.string().url().nullable().meta({
       description:
-        "Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign."
+        "Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다."
     }),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
@@ -352,54 +350,42 @@ export const phaseUpdateRequestSchema = z
 
 export type PhaseUpdateRequest = z.infer<typeof phaseUpdateRequestSchema>;
 
-// testDeployment minimal schema (canonical doc §9)
-export const testDeploymentSchema = z
-  .object({
-    status: z.enum(previewStatuses),
-    previewUrl: z.string().url().nullable(),
-    host: z.string().nullable(),
-    hostPort: z.int().nonnegative().nullable(),
-    internalPort: z.int().positive().nullable(),
-    expiresAt: z.string().datetime().nullable(),
-    updatedAt: z.string().datetime()
-  })
-  .meta({
-    id: "TestDeployment",
-    description:
-      "Legacy preview/test-deployment state. Kept as a migration shim until the Build Server and Runner switch to the canonical container-test and deployment result blocks."
-  });
+// ---------------------------------------------------------------------------
+// Container test (TASK-161 / P2-M2)
+// ---------------------------------------------------------------------------
+//
+// preview-era 의 `TestDeployment` 일가를 canonical 컨테이너 테스트 계약으로
+// 교체한다. 상태값은 `previewStatuses`(PROVISIONING/READY/EXPIRED …) 가 아니라
+// 다른 lifecycle 블록과 같은 `executionStatuses` 를 쓴다 — 한 시스템에 두 개의
+// 상태 어휘가 공존하던 것이 preview-era 잔재의 핵심이었다.
+//
+// 엔드포인트도 함께 정리했다:
+//   POST /builds/:buildId/preview                  → /container-test/start
+//   POST /builds/:buildId/test-deployment/ready    → /container-test/result
+//   POST /builds/:buildId/test-deployment/status   → result 로 흡수 (제거)
+//   GET  /builds/:buildId/test-deployment          → 제거 (소비자 0,
+//        canonical `test` 블록이 GET /builds/:buildId 에서 같은 정보를 준다)
 
-export type TestDeployment = z.infer<typeof testDeploymentSchema>;
-
-export const testDeploymentQueueRequestSchema = z
+export const containerTestStartRequestSchema = z
   .object({
     internalPort: z.int().positive(),
-    ttlMinutes: z.int().positive().default(60),
     runnerId: z.string().min(1)
   })
   .meta({
-    id: "TestDeploymentQueueRequest",
-    description: "POST /builds/:buildId/preview payload (Runner → Host)."
+    id: "ContainerTestStartRequest",
+    description:
+      "POST /builds/:buildId/container-test/start payload (Runner → Host). 컨테이너 테스트 시작을 알린다. preview-era 의 ttlMinutes 는 canonical 모델에 대응 개념이 없어 제거됐다."
   });
 
-export type TestDeploymentQueueRequest = z.infer<typeof testDeploymentQueueRequestSchema>;
+export type ContainerTestStartRequest = z.infer<typeof containerTestStartRequestSchema>;
 
-export const testDeploymentQueueResponseSchema = z
+export const containerTestResultRequestSchema = z
   .object({
-    testDeployment: testDeploymentSchema
-  })
-  .meta({
-    id: "TestDeploymentQueueResponse",
-    description: "POST /builds/:buildId/preview response (HTTP 202)."
-  });
-
-export type TestDeploymentQueueResponse = z.infer<typeof testDeploymentQueueResponseSchema>;
-
-export const testDeploymentReadyRequestSchema = z
-  .object({
-    previewUrl: z.string().url(),
-    host: z.string().min(1),
-    hostPort: z.int().nonnegative(),
+    // IN_PROGRESS / SUCCESS / FAILED — 다른 lifecycle 블록과 같은 어휘.
+    status: z.enum(["IN_PROGRESS", "SUCCESS", "FAILED"]),
+    runtimeUrl: z.string().url().nullable().optional(),
+    host: z.string().min(1).nullable().optional(),
+    hostPort: z.int().nonnegative().nullable().optional(),
     containerRef: z.string().min(1).optional(),
     healthCheckPassed: z.boolean().optional(),
     portOpen: z.boolean().optional(),
@@ -407,25 +393,12 @@ export const testDeploymentReadyRequestSchema = z
     runnerId: z.string().min(1)
   })
   .meta({
-    id: "TestDeploymentReadyRequest",
+    id: "ContainerTestResultRequest",
     description:
-      "POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals."
+      "POST /builds/:buildId/container-test/result payload (Runner → Host). 진행/성공/실패를 하나의 엔드포인트로 보고한다 (구 ready + status 통합)."
   });
 
-export type TestDeploymentReadyRequest = z.infer<typeof testDeploymentReadyRequestSchema>;
-
-export const testDeploymentStatusRequestSchema = z
-  .object({
-    status: z.enum(["PROVISIONING", "READY", "FAILED", "EXPIRED"]),
-    runnerId: z.string().min(1)
-  })
-  .meta({
-    id: "TestDeploymentStatusRequest",
-    description: "POST /builds/:buildId/test-deployment/status payload (Runner → Host, PROVISIONING/FAILED/EXPIRED)."
-  });
-
-export type TestDeploymentStatusRequest = z.infer<typeof testDeploymentStatusRequestSchema>;
-
+export type ContainerTestResultRequest = z.infer<typeof containerTestResultRequestSchema>;
 
 export const buildListResponseSchema = z
   .object({

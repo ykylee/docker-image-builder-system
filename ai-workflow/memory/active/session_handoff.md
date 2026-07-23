@@ -6,6 +6,39 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 157→158: **P2-M2 완료 — 서버 정렬 + 컨테이너 테스트 엔드포인트 재설계 (TASK-161)**).
+
+  ## 엔드포인트 4종 → 2종
+  | 이전 | 이후 |
+  |---|---|
+  | `POST /builds/:id/preview` | `POST /builds/:id/container-test/start` (`ttlMinutes` 제거) |
+  | `POST .../test-deployment/ready` | `POST /builds/:id/container-test/result` |
+  | `POST .../test-deployment/status` | 위로 흡수 — **제거** |
+  | `GET .../test-deployment` | **제거** (소비자 0, canonical `test` 와 중복) |
+
+  두 엔드포인트 모두 응답이 canonical `BuildStatusResponse` 로 통일됐다 (202 / 200). 제거 2종은 런타임 소비자가 0 임을 먼저 확인하고 진행했다 — runner 가 실제로 부르던 건 `preview` 와 `test-deployment/ready` 둘뿐이다.
+
+  ## 핵심 — 왕복 변환 어댑터 제거
+  runner 가 `READY`/`PROVISIONING`/`FAILED`/`EXPIRED`(previewStatuses)를 보내면 서버가 `executionToPreviewStatus` 로 **매번 ExecutionStatus 로 역매핑해 `build_test` 에 저장**하고 있었다. preview 어휘는 컨테이너 테스트에 쓰이지도 않는 상태(`EXPIRED`)를 포함했고 표현력 이득이 없었다. 이제 runner 가 `IN_PROGRESS`/`SUCCESS`/`FAILED` 를 그대로 보낸다.
+
+  ## 함께 정리한 것
+  `previewUrl` → `runtimeUrl` (**migration 0008**, forward-only RENAME) / `TestDeployment` DTO 일가 / `mapPreviewStatusToExecutionStatus` / 저장소·서비스 메서드 개명(`startContainerTest`, `reportContainerTestResult`) / Go runner `hostclient` 동시 정렬 / OpenAPI tag `Test Deployment` → `Container Test` / 테스트 파일 `memory-preview.test.ts` → `memory-container-test.test.ts`.
+
+  ## 되풀이된 함정 (3번째)
+  계약을 바꾸면 **shared-contract·db·build-server dist 를 먼저 재빌드**해야 서버가 부팅되고, 그래야 `.generated/openapi.d.ts` 를 재생성할 수 있다. 안 하면 `SyntaxError: does not provide an export named ...` 로 서버가 죽는다. 절차는 운영 문서 §5.1 에 박아뒀다.
+
+  ## 부수 발견
+  - e2e 2종(`e2e-production-semantic{,-postgres}.sh`)이 응답의 `build.previewUrl` 을 읽고 있었다 — 그대로 뒀으면 필드 소멸 후 **빈 문자열을 받고 경고만 찍은 뒤 PASS**(가짜 통과)했을 것. `runtimeUrl` 로 정렬.
+  - **신규 backlog**: `scripts/migrate.ts --dry-run` 이 항상 `would apply: (none)` 을 출력한다. `applyMigrations(dryRun)` 이 `applied: []` 를 반환하는데 CLI 가 그걸 `would apply:` 라벨로 찍기 때문. 실제 계획은 같은 출력의 `pending:` 줄에 있다. 오해 소지가 있는 출력이라 수정 대상.
+
+  ## 검증
+  TS 5 clean / build-server **178** / build-monitor **273** / go **8 pkg** / OpenAPI paths 14 · components 40 / migration 0008 적용 후 `build_request.runtime_url` 확인 / e2e 13/13.
+  `e2e-production-semantic.sh` 가 새 계약으로 10 phase + `runtimeUrl well-formed` + healthcheck 통과를 실증한다.
+
+  ## 다음은 P2-M3 (Runner 정렬)
+  hostclient 는 이번에 함께 정렬했으므로 남은 건 `apps/runner` 내부의 실행 순서 명문화(`claim → source prepare → build → container test → deploy → finalize`)와 실패 경로의 phase/error 일관성이다. skeleton mode 의 `preview.local` 기본 host 이름도 그때 함께 정리 대상.
+
+  workflow meta sync (state 199→200, handoff doc 157→158, work_backlog 115→116) 같은 commit.
 - Updated: 2026-07-23 (rev 156→157: **P2-M1 완료 — Step 3 legacy 응답 필드 + DB 컬럼 제거 (TASK-160)**).
 
   ## 제거한 것

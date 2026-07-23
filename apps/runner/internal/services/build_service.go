@@ -22,7 +22,7 @@ type BuildService struct {
 	fetcher        *source.Fetcher
 	deployer       *deploy.Client
 	runnerID       string
-	internalPort   int // default 8080, env override PREVIEW_INTERNAL_PORT
+	internalPort   int    // default 8080, env override PREVIEW_INTERNAL_PORT
 	dockerfilePath string // default "Dockerfile", env override RUNNER_DOCKERFILE_PATH
 	// hostPort 는 ReportPreviewReady 가 노출할 container 의 host port.
 	// 0 이면 RunContainer 가 cli mode 에서 OS 가 알려주는 ephemeral
@@ -168,21 +168,20 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return err
 	}
 
-	// PKG-006: queue test deployment with internalPort
-	if err := s.hostClient.QueueTestDeployment(ctx, buildID, hostclient.QueueTestDeploymentRequest{
+	// PKG-006: start the container test with internalPort
+	if err := s.hostClient.StartContainerTest(ctx, buildID, hostclient.StartContainerTestRequest{
 		InternalPort: s.internalPort,
-		TtlMinutes:   60,
 		RunnerID:     s.runnerID,
 	}); err != nil {
 		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
 	}
 
-	// TASK-067: real container run + healthcheck. queueTestDeployment 가
+	// TASK-067: real container run + healthcheck. StartContainerTest 가
 	// 받아들여진 직후 BuildImage 가 만든 image 로 docker container 를 띄우고
 	// HTTP healthcheck / TCP port open 이 안정될 때까지 polling 한다.
 	// 성공 시 ContainerStatus 의 runtimeUrl / host / hostPort / containerRef
-	// 를 그대로 ReportPreviewReady 에 전달한다 — mock 값 (preview.local,
+	// 를 그대로 ReportContainerTestResult 에 전달한다 — mock 값 (preview.local,
 	// 38124, container-<id>) 대신 진짜 binding 정보를 노출한다.
 	//
 	// hostPort=0 으로 두면 RunContainer 가 cli mode 일 때 OS 가 알려주는
@@ -224,8 +223,11 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		}()
 	}
 
-	if err := s.hostClient.ReportPreviewReady(ctx, buildID, hostclient.PreviewReadyRequest{
-		PreviewURL:            containerStatus.RuntimeURL,
+	if err := s.hostClient.ReportContainerTestResult(ctx, buildID, hostclient.ContainerTestResultRequest{
+		// 여기까지 왔다는 것은 RunContainer + WaitForHealth 가 모두 통과했다는
+		// 뜻이므로 canonical SUCCESS 다 (TASK-161).
+		Status:                contract.ExecutionStatusSuccess,
+		RuntimeURL:            containerStatus.RuntimeURL,
 		Host:                  containerStatus.Host,
 		HostPort:              containerStatus.HostPort,
 		ContainerRef:          containerStatus.ContainerRef,

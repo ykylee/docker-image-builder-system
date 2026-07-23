@@ -25,10 +25,10 @@ export const openapiTags = {
     description:
       "Endpoints consumed by the Go Runner process to claim queued builds and report build phases (PKG-005)."
   },
-  TestDeployment: {
-    name: "Test Deployment",
+  ContainerTest: {
+    name: "Container Test",
     description:
-      "Preview service queue and readiness endpoints. Consumed by the Go Runner to schedule, mark ready, and update preview service status (PKG-006)."
+      "Container test start/result endpoints. Consumed by the Go Runner to start the built image as a container and report the canonical test outcome (PKG-006). TASK-161 에서 preview-era 의 Test Deployment 그룹을 대체했다."
   },
   Deployment: {
     name: "Deployment",

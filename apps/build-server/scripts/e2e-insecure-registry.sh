@@ -285,8 +285,7 @@ EOF
         \"sizeBytes\": ${per_bytes}
       },
       \"entrypointPath\": \"src/index.ts\",
-      \"dockerfilePath\": \"Dockerfile\",
-      \"previewTtlMinutes\": 60
+      \"dockerfilePath\": \"Dockerfile\"
     }" 2>&1)"
   build_id="$(printf '%s' "${enq}" | python3 -c 'import json,sys
 try:

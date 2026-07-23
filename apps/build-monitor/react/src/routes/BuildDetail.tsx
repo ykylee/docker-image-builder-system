@@ -188,11 +188,11 @@ export function BuildDetail(): ReactElement {
             <dd className="mono">{build.test?.status ?? "NOT_STARTED"}</dd>
           </div>
           {/* TASK-160: deprecated "Legacy preview" 섹션을 제거하면서 런타임 URL 을
-              canonical 블록으로 옮겼다. 필드명 previewUrl → runtimeUrl 정렬은
-              test-deployment 엔드포인트 재설계(P2-M2)와 함께 간다. */}
+              canonical 블록으로 옮겼다. TASK-161 (P2-M2) 에서 필드명도
+              previewUrl → runtimeUrl 로 정렬 완료. */}
           <div>
             <dt>Runtime URL</dt>
-            <dd className="mono">{build.build.previewUrl ?? "—"}</dd>
+            <dd className="mono">{build.build.runtimeUrl ?? "—"}</dd>
           </div>
           <div>
             <dt>Container running</dt>

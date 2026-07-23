@@ -18,7 +18,6 @@ import type {
   DeploymentReportRequest,
   ExecutionStatus,
   SourceArchive,
-  TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
 import { nowIsoString } from "../lib/time.js";
@@ -35,11 +34,10 @@ import type {
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
-  GetTestDeploymentResult,
-  PreviewStatusDetails,
-  QueueTestDeploymentResult,
+  ContainerTestDetails,
+  StartContainerTestResult,
   ReportDeploymentResult,
-  ReportPreviewStatusResult,
+  ReportContainerTestResult,
   StoreSourceArchiveResult,
   StoreSourceChunkResult,
   UpdatePhaseResult
@@ -64,7 +62,6 @@ type StoredBuild = {
   sourceArchive: SourceArchive;
   lastError: BuildError | null;
   logs: BuildLogEntry[];
-  testDeployment: TestDeployment | null;
   buildTest: BuildTestSnapshot | null;
   deploymentAttempt: DeploymentAttemptSnapshot | null;
   // phase lifecycle timeline (TASK-050). 매 phase transition 마다
@@ -92,17 +89,6 @@ type StoredRunner = {
 };
 const runners = new Map<string, StoredRunner>();
 
-function emptyTestDeployment(updatedAt: string): TestDeployment {
-  return {
-    status: "NOT_REQUESTED",
-    previewUrl: null,
-    host: null,
-    hostPort: null,
-    internalPort: null,
-    expiresAt: null,
-    updatedAt
-  };
-}
 
 export function createMemoryBuildRepository(): BuildRepository {
   const builds = new Map<string, StoredBuild>();
@@ -140,7 +126,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         appName: input.appName,
         status: "QUEUED",
         phase: "REQUEST_ACCEPTED",
-        previewUrl: null,
+        runtimeUrl: null,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -162,7 +148,6 @@ export function createMemoryBuildRepository(): BuildRepository {
         sourceArchive: input.sourceArchive,
         lastError: null,
         logs: [logEntry],
-        testDeployment: null,
         buildTest: null,
         deploymentAttempt: null,
         phaseHistory: [],
@@ -181,7 +166,6 @@ export function createMemoryBuildRepository(): BuildRepository {
             phase: "REQUEST_ACCEPTED",
             startedAt: timestamp
           },
-          testDeployment: null,
           buildTest: null,
           deploymentAttempt: null
         })
@@ -198,7 +182,6 @@ export function createMemoryBuildRepository(): BuildRepository {
         summary: build.summary,
         lastError: build.lastError,
         ...toPhaseTimeline(build),
-        testDeployment: build.testDeployment,
         buildTest: build.buildTest,
         deploymentAttempt: build.deploymentAttempt
       });
@@ -234,7 +217,6 @@ export function createMemoryBuildRepository(): BuildRepository {
             summary: active.summary,
             lastError: active.lastError,
             ...toPhaseTimeline(active),
-            testDeployment: active.testDeployment,
             buildTest: active.buildTest,
             deploymentAttempt: active.deploymentAttempt
           })
@@ -305,7 +287,6 @@ export function createMemoryBuildRepository(): BuildRepository {
           summary: next.summary,
           lastError: next.lastError,
           ...toPhaseTimeline(next),
-          testDeployment: next.testDeployment,
           buildTest: next.buildTest,
           deploymentAttempt: next.deploymentAttempt
         })
@@ -326,7 +307,6 @@ export function createMemoryBuildRepository(): BuildRepository {
             summary: build.summary,
             lastError: build.lastError,
             ...toPhaseTimeline(build),
-            testDeployment: build.testDeployment,
             buildTest: build.buildTest,
             deploymentAttempt: build.deploymentAttempt
           })
@@ -399,50 +379,36 @@ export function createMemoryBuildRepository(): BuildRepository {
                 phase: build.summary.phase,
                 startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
           },
-          testDeployment: build.testDeployment,
           buildTest: build.buildTest,
           deploymentAttempt: build.deploymentAttempt
         })
       };
     },
 
-    async queueTestDeployment(
+    async startContainerTest(
       buildId: string,
-      internalPort: number,
-      ttlMinutes: number
-    ): Promise<QueueTestDeploymentResult> {
+      internalPort: number
+    ): Promise<StartContainerTestResult> {
       const build = builds.get(buildId);
       if (!build) {
         return { kind: "not_found" };
       }
 
-      // only allow queue when build is in DOCKER_BUILD_COMPLETED or TEST_READY state
       if (!["DOCKER_BUILD_COMPLETED", "TEST_SUCCESS"].includes(build.summary.phase) &&
           !["BUILDING", "TEST_SUCCESS"].includes(build.summary.status)) {
         return {
           kind: "invalid_state",
-          reason: `cannot queue preview from phase=${build.summary.phase} status=${build.summary.status}`
+          reason: `cannot start container test from phase=${build.summary.phase} status=${build.summary.status}`
         };
       }
 
       const timestamp = nowIsoString();
-      const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
-
-      const testDeployment: TestDeployment = {
-        status: "QUEUED",
-        previewUrl: null,
-        host: null,
-        hostPort: null,
-        internalPort,
-        expiresAt,
-        updatedAt: timestamp
-      };
       // TASK-050: CONTAINER_TEST_STARTED 진입 시 직전 phase 의 completedAt 기록.
       const prevPhase6 = build.summary.phase;
       if (prevPhase6 !== "CONTAINER_TEST_STARTED") {
         build.phaseHistory.push({ phase: prevPhase6, completedAt: timestamp });
       }
-      build.testDeployment = testDeployment;
+      // TASK-161: canonical build_test 만 기록한다 (구 TestDeployment 저장 제거).
       build.buildTest = {
         status: "IN_PROGRESS",
         containerRef: null,
@@ -454,7 +420,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       build.summary = {
         ...enrichBuildSummary(build.summary),
         phase: "CONTAINER_TEST_STARTED",
-        previewUrl: null,
+        runtimeUrl: null,
         updatedAt: timestamp
       };
       build.currentPhaseStartedAt = timestamp;
@@ -464,97 +430,65 @@ export function createMemoryBuildRepository(): BuildRepository {
         id: randomUUID(),
         buildId,
         phase: "CONTAINER_TEST_STARTED",
-        message: `Preview queued: internalPort=${internalPort} ttlMinutes=${ttlMinutes}`,
+        message: `Container test started: internalPort=${internalPort}`,
         createdAt: timestamp
       };
       build.logs.push(log);
 
       return {
-        kind: "queued",
+        kind: "started",
         response: buildStatusResponseFromState({
           summary: build.summary,
           lastError: build.lastError,
           ...toPhaseTimeline(build),
-          testDeployment,
           buildTest: build.buildTest,
           deploymentAttempt: build.deploymentAttempt
-        }),
-        testDeployment
+        })
       };
     },
 
-    async reportPreviewStatus(
+    async reportContainerTestResult(
       buildId: string,
-      status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
-      details?: PreviewStatusDetails
-    ): Promise<ReportPreviewStatusResult> {
+      status: "IN_PROGRESS" | "SUCCESS" | "FAILED",
+      details?: ContainerTestDetails
+    ): Promise<ReportContainerTestResult> {
       const build = builds.get(buildId);
       if (!build) {
         return { kind: "not_found" };
       }
 
-      if (!build.testDeployment) {
-        build.testDeployment = emptyTestDeployment(nowIsoString());
-      }
-
       const timestamp = nowIsoString();
-      const prev = build.testDeployment;
-      const next: TestDeployment = {
-        ...prev,
-        status,
-        previewUrl: details?.previewUrl ?? prev.previewUrl,
-        host: details?.host ?? prev.host,
-        hostPort: details?.hostPort ?? prev.hostPort,
-        updatedAt: timestamp
-      };
-      build.testDeployment = next;
-
-      const nextBuildTestStatus: ExecutionStatus =
-        status === "READY" || status === "EXPIRED"
-          ? "SUCCESS"
-          : status === "FAILED"
-            ? "FAILED"
-            : "IN_PROGRESS";
+      // TASK-161: canonical build_test 단일 기록. 구 TestDeployment 저장과
+      // previewStatus→executionStatus 이중 매핑이 사라졌다.
+      const runtimeUrl = details?.runtimeUrl ?? build.buildTest?.runtimeUrl ?? null;
       build.buildTest = {
-        status: nextBuildTestStatus,
+        status,
         containerRef: details?.containerRef ?? build.buildTest?.containerRef ?? null,
-        runtimeUrl: next.previewUrl,
+        runtimeUrl,
         healthCheckPassed:
           details?.healthCheckPassed ?? build.buildTest?.healthCheckPassed ?? null,
         portOpen: details?.portOpen ?? build.buildTest?.portOpen ?? null,
         stabilityWindowPassed:
-          details?.stabilityWindowPassed ??
-          (status === "EXPIRED"
-            ? true
-            : build.buildTest?.stabilityWindowPassed ?? null)
+          details?.stabilityWindowPassed ?? build.buildTest?.stabilityWindowPassed ?? null
       };
 
-      // map previewStatus -> build.phase/status
+      // ExecutionStatus → build phase/status
       let nextPhase = build.summary.phase;
       let nextStatus = build.summary.status;
-      if (status === "PROVISIONING") {
+      if (status === "IN_PROGRESS") {
         nextPhase = "CONTAINER_TEST_STARTED";
-        nextStatus = "BUILDING"; // still building until ready
-      } else if (status === "READY") {
+        nextStatus = "BUILDING";
+      } else if (status === "SUCCESS") {
         nextPhase = "CONTAINER_TEST_PASSED";
         nextStatus = "TEST_SUCCESS";
-      } else if (status === "FAILED") {
+      } else {
         nextPhase = "FAILED";
         nextStatus = "FAILED";
-      } else if (status === "EXPIRED") {
-        // Preview TTL elapsed but the container itself ran to completion; the
-        // build stays at its current phase/status (typically CONTAINER_TEST_PASSED /
-        // TEST_READY) so the operator can decide whether to run another
-        // deployment cycle or to mark the build COMPLETED. We do NOT push
-        // the prior phase into phaseHistory because the preview state
-        // transition is orthogonal to the build lifecycle.
-        nextPhase = build.summary.phase;
-        nextStatus = build.summary.status;
       }
 
       build.summary = {
         ...enrichBuildSummary(build.summary),
-        previewUrl: next.previewUrl,
+        runtimeUrl,
         phase: nextPhase as BuildPhase,
         status: nextStatus,
         updatedAt: timestamp
@@ -565,7 +499,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         id: randomUUID(),
         buildId,
         phase: nextPhase as BuildPhase,
-        message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
+        message: `Container test: ${status}` + (runtimeUrl ? ` url=${runtimeUrl}` : ""),
         createdAt: timestamp
       };
       build.logs.push(log);
@@ -576,11 +510,9 @@ export function createMemoryBuildRepository(): BuildRepository {
           summary: build.summary,
           lastError: build.lastError,
           ...toPhaseTimeline(build),
-          testDeployment: next,
           buildTest: build.buildTest,
           deploymentAttempt: build.deploymentAttempt
-        }),
-        testDeployment: next
+        })
       };
     },
 
@@ -653,24 +585,12 @@ export function createMemoryBuildRepository(): BuildRepository {
           summary: build.summary,
           lastError: build.lastError,
           ...toPhaseTimeline(build),
-          testDeployment: build.testDeployment,
           buildTest: build.buildTest,
           deploymentAttempt: build.deploymentAttempt
         })
       };
     },
 
-    async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> {
-      const build = builds.get(buildId);
-      if (!build) {
-        return { kind: "not_found" };
-      }
-      if (!build.testDeployment) {
-        return { kind: "not_requested" };
-      }
-      return { kind: "found", testDeployment: build.testDeployment };
-    }
-,
     async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
       // Build summaries 를 (1) status filter, (2) requestedBy filter,
       // (3) cursor skip, (4) createdAt desc 정렬, (5) limit 적용. cursor 는

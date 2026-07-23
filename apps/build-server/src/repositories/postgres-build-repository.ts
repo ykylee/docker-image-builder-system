@@ -45,7 +45,6 @@ import type {
   ErrorCode,
   ExecutionStatus,
   RunnerStatus,
-  TestDeployment
 } from "@docker-image-builder-system/shared-contract";
 
 import type {
@@ -56,11 +55,10 @@ import type {
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
-  GetTestDeploymentResult,
-  PreviewStatusDetails,
-  QueueTestDeploymentResult,
+  ContainerTestDetails,
+  StartContainerTestResult,
   ReportDeploymentResult,
-  ReportPreviewStatusResult,
+  ReportContainerTestResult,
   StoreSourceArchiveResult,
   StoreSourceChunkResult,
   UpdatePhaseResult
@@ -89,7 +87,7 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     appName: row.appName,
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
-    previewUrl: row.previewUrl,
+    runtimeUrl: row.runtimeUrl,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });
@@ -121,44 +119,10 @@ function mapBuildTestRowToSnapshot(row: BuildTestRow | null | undefined): BuildT
   };
 }
 
-// TASK-160 (P2-M1 Step 3): legacy `preview_status` 컬럼이 사라졌으므로
-// TestDeployment 응답의 status 를 canonical `build_test.status`
-// (ExecutionStatus) 에서 유도한다. TestDeployment 자체(그리고 이 매핑)는
-// test-deployment 엔드포인트를 재설계하는 P2-M2 에서 제거된다.
-function executionToPreviewStatus(
-  status: ExecutionStatus | null | undefined
-): TestDeployment["status"] | null {
-  switch (status) {
-    case "IN_PROGRESS":
-      return "PROVISIONING";
-    case "SUCCESS":
-      return "READY";
-    case "FAILED":
-      return "FAILED";
-    default:
-      return null; // NOT_STARTED / SKIPPED / 없음 → 아직 요청되지 않음
-  }
-}
+// TASK-161 (P2-M2): P2-M1 이 임시로 뒀던 canonical→legacy 어댑터
+// (executionToPreviewStatus / mapBuildTestRowToDeployment) 를 예정대로 제거했다.
+// TestDeployment 응답 자체가 사라졌으므로 매핑할 대상이 없다.
 
-function mapBuildTestRowToDeployment(
-  buildRow: BuildRequestRow,
-  testRow: BuildTestRow | null | undefined
-): TestDeployment | null {
-  const mapped = executionToPreviewStatus(testRow?.status as ExecutionStatus | undefined);
-  if (!mapped) {
-    return null;
-  }
-
-  return {
-    status: mapped,
-    previewUrl: testRow?.runtimeUrl ?? buildRow.previewUrl,
-    host: testRow?.host ?? null,
-    hostPort: testRow?.hostPort ?? null,
-    internalPort: testRow?.internalPort ?? null,
-    expiresAt: null,
-    updatedAt: buildRow.updatedAt.toISOString()
-  };
-}
 
 function mapDeploymentAttemptRowToSnapshot(
   row: DeploymentAttemptRow | null | undefined
@@ -186,7 +150,6 @@ function toBuildStatusResponse(
     summary,
     lastError: mapBuildRowToLastError(row),
     ...toPhaseTimeline(summary, row.phaseHistory),
-    testDeployment: mapBuildTestRowToDeployment(row, buildTestRow),
     buildTest: mapBuildTestRowToSnapshot(buildTestRow),
     deploymentAttempt: mapDeploymentAttemptRowToSnapshot(deploymentAttemptRow)
   });
@@ -261,7 +224,7 @@ export class PostgresBuildRepository implements BuildRepository {
           entrypointPath: input.entrypointPath,
           dockerfilePath: input.dockerfilePath,
           metadata: input.metadata,
-          previewUrl: null,
+          runtimeUrl: null,
           lastErrorCode: null,
           lastErrorMessage: null,
           createdAt: timestamp,
@@ -512,11 +475,10 @@ export class PostgresBuildRepository implements BuildRepository {
     };
   }
 
-  async queueTestDeployment(
+  async startContainerTest(
     buildId: string,
-    internalPort: number,
-    ttlMinutes: number
-  ): Promise<QueueTestDeploymentResult> {
+    internalPort: number
+  ): Promise<StartContainerTestResult> {
     const [row] = await this.db
       .select()
       .from(buildRequestTable)
@@ -531,12 +493,11 @@ export class PostgresBuildRepository implements BuildRepository {
         !["DOCKER_BUILD_COMPLETED", "TEST_SUCCESS"].includes(row.phase as string)) {
       return {
         kind: "invalid_state",
-        reason: `cannot queue preview from phase=${row.phase} status=${row.status}`
+        reason: `cannot start container test from phase=${row.phase} status=${row.status}`
       };
     }
 
     const timestamp = new Date();
-    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000);
 
     const nextPhaseHistory = advancePhaseHistory(
       (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
@@ -549,7 +510,7 @@ export class PostgresBuildRepository implements BuildRepository {
       .update(buildRequestTable)
       .set({
         phase: "CONTAINER_TEST_STARTED",
-        previewUrl: null,
+        runtimeUrl: null,
         phaseHistory: nextPhaseHistory,
         updatedAt: timestamp
       })
@@ -587,32 +548,21 @@ export class PostgresBuildRepository implements BuildRepository {
       id: randomUUID(),
       buildId,
       phase: "CONTAINER_TEST_STARTED",
-      message: `Preview queued: internalPort=${internalPort} ttlMinutes=${ttlMinutes}`,
+      message: `Container test started: internalPort=${internalPort}`,
       createdAt: timestamp
     });
 
-    const testDeployment: TestDeployment = {
-      status: "QUEUED",
-      previewUrl: null,
-      host: null,
-      hostPort: null,
-      internalPort,
-      expiresAt: expiresAt.toISOString(),
-      updatedAt: timestamp.toISOString()
-    };
-
     return {
-      kind: "queued",
-      response: toBuildStatusResponse(updated),
-      testDeployment
+      kind: "started",
+      response: toBuildStatusResponse(updated)
     };
   }
 
-  async reportPreviewStatus(
+  async reportContainerTestResult(
     buildId: string,
-    status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
-    details?: PreviewStatusDetails
-  ): Promise<ReportPreviewStatusResult> {
+    status: "IN_PROGRESS" | "SUCCESS" | "FAILED",
+    details?: ContainerTestDetails
+  ): Promise<ReportContainerTestResult> {
     const timestamp = new Date();
     // Wrap build_request update + build_test upsert + build_log insert in a
     // single transaction so that partial failures do not leave the build in a
@@ -632,18 +582,20 @@ export class PostgresBuildRepository implements BuildRepository {
       let nextPhase: BuildPhase = row.phase as BuildPhase;
       let nextStatus: BuildStatus = row.status as BuildStatus;
 
-      if (status === "PROVISIONING") {
+      // TASK-161: status 가 곧 ExecutionStatus 라 preview→execution 이중
+      // 매핑이 사라졌다.
+      if (status === "IN_PROGRESS") {
         nextPhase = "CONTAINER_TEST_STARTED";
         nextStatus = "BUILDING";
-      } else if (status === "READY") {
+      } else if (status === "SUCCESS") {
         nextPhase = "CONTAINER_TEST_PASSED";
         nextStatus = "TEST_SUCCESS";
-      } else if (status === "FAILED") {
+      } else {
         nextPhase = "FAILED";
         nextStatus = "FAILED";
       }
 
-      const nextPreviewUrl = details?.previewUrl ?? row.previewUrl;
+      const nextRuntimeUrl = details?.runtimeUrl ?? row.runtimeUrl;
       const nextPhaseHistory = advancePhaseHistory(
         (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
         row.phase as BuildPhase,
@@ -656,7 +608,7 @@ export class PostgresBuildRepository implements BuildRepository {
         .set({
           phase: nextPhase,
           status: nextStatus,
-          previewUrl: nextPreviewUrl,
+          runtimeUrl: nextRuntimeUrl,
           phaseHistory: nextPhaseHistory,
           updatedAt: timestamp
         })
@@ -672,49 +624,39 @@ export class PostgresBuildRepository implements BuildRepository {
         .values({
           id: randomUUID(),
           buildId,
-          status:
-            status === "READY"
-              ? "SUCCESS"
-              : status === "FAILED"
-                ? "FAILED"
-                : "IN_PROGRESS",
+          status,
           host: details?.host ?? null,
           hostPort: details?.hostPort ?? null,
           containerRef: details?.containerRef ?? null,
-          runtimeUrl: nextPreviewUrl,
+          runtimeUrl: nextRuntimeUrl,
           healthCheckPassed:
             details?.healthCheckPassed ?? (status === "FAILED" ? false : null),
           portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
           stabilityWindowPassed:
-            details?.stabilityWindowPassed ?? (status === "EXPIRED" ? true : null),
+            details?.stabilityWindowPassed ?? null,
           errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
-          errorMessage: status === "FAILED" ? "Preview/test deployment failed." : null,
+          errorMessage: status === "FAILED" ? "Container test failed." : null,
           createdAt: timestamp,
           startedAt: timestamp,
-          finishedAt: status === "READY" || status === "FAILED" ? timestamp : null,
+          finishedAt: status === "SUCCESS" || status === "FAILED" ? timestamp : null,
           updatedAt: timestamp
         })
         .onConflictDoUpdate({
           target: buildTestTable.buildId,
           set: {
-            status:
-              status === "READY"
-                ? "SUCCESS"
-                : status === "FAILED"
-                  ? "FAILED"
-                  : "IN_PROGRESS",
+            status,
             host: details?.host ?? null,
             hostPort: details?.hostPort ?? null,
             containerRef: details?.containerRef ?? null,
-            runtimeUrl: nextPreviewUrl,
+            runtimeUrl: nextRuntimeUrl,
             healthCheckPassed:
               details?.healthCheckPassed ?? (status === "FAILED" ? false : null),
             portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
             stabilityWindowPassed:
-              details?.stabilityWindowPassed ?? (status === "EXPIRED" ? true : null),
+              details?.stabilityWindowPassed ?? null,
             errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
-            errorMessage: status === "FAILED" ? "Preview/test deployment failed." : null,
-            finishedAt: status === "READY" || status === "FAILED" ? timestamp : null,
+            errorMessage: status === "FAILED" ? "Container test failed." : null,
+            finishedAt: status === "SUCCESS" || status === "FAILED" ? timestamp : null,
             updatedAt: timestamp
           }
         });
@@ -723,7 +665,7 @@ export class PostgresBuildRepository implements BuildRepository {
         id: randomUUID(),
         buildId,
         phase: nextPhase,
-        message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
+        message: `Container test: ${status}` + (nextRuntimeUrl ? ` url=${nextRuntimeUrl}` : ""),
         createdAt: timestamp
       });
 
@@ -733,20 +675,9 @@ export class PostgresBuildRepository implements BuildRepository {
         .where(eq(buildTestTable.buildId, buildId))
         .limit(1);
 
-      const testDeployment: TestDeployment = {
-        status,
-        previewUrl: nextPreviewUrl,
-        host: details?.host ?? null,
-        hostPort: details?.hostPort ?? null,
-        internalPort: buildTestRow?.internalPort ?? null,
-        expiresAt: null,
-        updatedAt: timestamp.toISOString()
-      };
-
       return {
         kind: "ok",
-        response: toBuildStatusResponse(updated, buildTestRow),
-        testDeployment
+        response: toBuildStatusResponse(updated, buildTestRow)
       } as const;
     });
   }
@@ -875,47 +806,6 @@ export class PostgresBuildRepository implements BuildRepository {
         )
       } as const;
     });
-  }
-
-  async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> {
-    // Left join build_test so the legacy TestDeployment response exposes the
-    // same host / hostPort / internalPort / runtimeUrl as the canonical
-    // ContainerTestResult block returned by getBuild. Without the join the
-    // runner-side host info recorded in build_test would be invisible here.
-    const [row] = await this.db
-      .select({
-        previewUrl: buildRequestTable.previewUrl,
-        buildTestStatus: buildTestTable.status,
-        updatedAt: buildRequestTable.updatedAt,
-        buildTestHost: buildTestTable.host,
-        buildTestHostPort: buildTestTable.hostPort,
-        buildTestInternalPort: buildTestTable.internalPort,
-        buildTestRuntimeUrl: buildTestTable.runtimeUrl
-      })
-      .from(buildRequestTable)
-      .leftJoin(buildTestTable, eq(buildTestTable.buildId, buildRequestTable.id))
-      .where(eq(buildRequestTable.id, buildId))
-      .limit(1);
-
-    if (!row) {
-      return { kind: "not_found" };
-    }
-    const mappedStatus = executionToPreviewStatus(row.buildTestStatus as ExecutionStatus | null);
-    if (!mappedStatus) {
-      return { kind: "not_requested" };
-    }
-
-    const testDeployment: TestDeployment = {
-      status: mappedStatus,
-      previewUrl: row.buildTestRuntimeUrl ?? row.previewUrl,
-      host: row.buildTestHost ?? null,
-      hostPort: row.buildTestHostPort ?? null,
-      internalPort: row.buildTestInternalPort ?? null,
-      expiresAt: null,
-      updatedAt: row.updatedAt.toISOString()
-    };
-
-    return { kind: "found", testDeployment };
   }
 
   async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {

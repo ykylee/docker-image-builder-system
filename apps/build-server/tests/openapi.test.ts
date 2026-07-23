@@ -21,10 +21,10 @@ describe("openapi document", () => {
     assert.deepEqual(tagNames, [
       "Admin",
       "Builds",
+      "Container Test",
       "Deployment",
       "Health",
-      "Runner Claim",
-      "Test Deployment"
+      "Runner Claim"
     ]);
 
     // unique path keys. 같은 path (/builds) 에 GET + POST 가 merge 됨.
@@ -39,14 +39,12 @@ describe("openapi document", () => {
       "/builds",
       "/builds/claim",
       "/builds/{buildId}",
+      "/builds/{buildId}/container-test/result",
+      "/builds/{buildId}/container-test/start",
       "/builds/{buildId}/deployment",
       "/builds/{buildId}/logs",
       "/builds/{buildId}/phase",
-      "/builds/{buildId}/preview",
       "/builds/{buildId}/source",
-      "/builds/{buildId}/test-deployment",
-      "/builds/{buildId}/test-deployment/ready",
-      "/builds/{buildId}/test-deployment/status",
       "/health"
     ]);
 
@@ -67,8 +65,12 @@ describe("openapi document", () => {
       "ClaimRequest schema must be registered"
     );
     assert.ok(
-      schemaKeys.includes("TestDeployment"),
-      "TestDeployment schema must be registered"
+      schemaKeys.includes("ContainerTestStartRequest"),
+      "ContainerTestStartRequest schema must be registered"
+    );
+    assert.ok(
+      schemaKeys.includes("ContainerTestResultRequest"),
+      "ContainerTestResultRequest schema must be registered"
     );
     assert.ok(
       schemaKeys.includes("DeploymentReportRequest"),

@@ -84,7 +84,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Fetch current status, phases, and preview info for a build. */
+        /** @description Fetch current status, phases, and canonical build/test/deploy blocks for a build. */
         get: {
             parameters: {
                 query?: never;
@@ -235,7 +235,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builds/{buildId}/preview": {
+    "/builds/{buildId}/container-test/start": {
         parameters: {
             query?: never;
             header?: never;
@@ -244,7 +244,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Queue a test deployment once the build reaches DOCKER_BUILD_COMPLETED. */
+        /** @description Start the container test once the image build completes (TASK-161: was POST /builds/{buildId}/preview). */
         post: {
             parameters: {
                 query?: never;
@@ -256,17 +256,17 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["TestDeploymentQueueRequest"];
+                    "application/json": components["schemas"]["ContainerTestStartRequest"];
                 };
             };
             responses: {
-                /** @description Preview queued. */
+                /** @description Container test started. Response carries the canonical BuildStatusResponse. */
                 202: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["TestDeploymentQueueResponse"];
+                        "application/json": components["schemas"]["BuildStatusResponse"];
                     };
                 };
             };
@@ -277,7 +277,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/builds/{buildId}/test-deployment/ready": {
+    "/builds/{buildId}/container-test/result": {
         parameters: {
             query?: never;
             header?: never;
@@ -286,7 +286,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Runner reports the preview is reachable. */
+        /** @description Runner reports container test progress/result (TASK-161: absorbs the former test-deployment/ready and test-deployment/status endpoints). */
         post: {
             parameters: {
                 query?: never;
@@ -298,56 +298,18 @@ export interface paths {
             };
             requestBody?: {
                 content: {
-                    "application/json": components["schemas"]["TestDeploymentReadyRequest"];
+                    "application/json": components["schemas"]["ContainerTestResultRequest"];
                 };
             };
             responses: {
-                /** @description Preview marked ready. */
+                /** @description Container test result recorded. Response carries the canonical BuildStatusResponse with the just-updated `test` block. */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/builds/{buildId}/test-deployment/status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Runner reports general preview status (PROVISIONING, FAILED, EXPIRED). */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    buildId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: {
-                content: {
-                    "application/json": components["schemas"]["TestDeploymentStatusRequest"];
-                };
-            };
-            responses: {
-                /** @description Status recorded. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
+                    content: {
+                        "application/json": components["schemas"]["BuildStatusResponse"];
                     };
-                    content?: never;
                 };
             };
         };
@@ -393,44 +355,6 @@ export interface paths {
                 };
             };
         };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/builds/{buildId}/test-deployment": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Fetch the current test deployment record for a build (if any). */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    buildId: string;
-                };
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Test deployment present. */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["TestDeployment"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -953,9 +877,9 @@ export interface components {
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * Format: uri
-             * @description Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign.
+             * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.
              */
-            previewUrl: string | null;
+            runtimeUrl: string | null;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -1172,47 +1096,23 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
         };
-        /** @description Legacy preview/test-deployment state. Kept as a migration shim until the Build Server and Runner switch to the canonical container-test and deployment result blocks. */
-        TestDeployment: {
-            /** @enum {string} */
-            status: "NOT_REQUESTED" | "QUEUED" | "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
-            /** Format: uri */
-            previewUrl: string | null;
-            host: string | null;
-            hostPort: number | null;
-            internalPort: number | null;
-            /** Format: date-time */
-            expiresAt: string | null;
-            /** Format: date-time */
-            updatedAt: string;
-        };
-        /** @description POST /builds/:buildId/preview payload (Runner → Host). */
-        TestDeploymentQueueRequest: {
+        /** @description POST /builds/:buildId/container-test/start payload (Runner → Host). 컨테이너 테스트 시작을 알린다. preview-era 의 ttlMinutes 는 canonical 모델에 대응 개념이 없어 제거됐다. */
+        ContainerTestStartRequest: {
             internalPort: number;
-            /** @default 60 */
-            ttlMinutes: number;
             runnerId: string;
         };
-        /** @description POST /builds/:buildId/preview response (HTTP 202). */
-        TestDeploymentQueueResponse: {
-            testDeployment: components["schemas"]["TestDeployment"];
-        };
-        /** @description POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals. */
-        TestDeploymentReadyRequest: {
+        /** @description POST /builds/:buildId/container-test/result payload (Runner → Host). 진행/성공/실패를 하나의 엔드포인트로 보고한다 (구 ready + status 통합). */
+        ContainerTestResultRequest: {
+            /** @enum {string} */
+            status: "IN_PROGRESS" | "SUCCESS" | "FAILED";
             /** Format: uri */
-            previewUrl: string;
-            host: string;
-            hostPort: number;
+            runtimeUrl?: string | null;
+            host?: string | null;
+            hostPort?: number | null;
             containerRef?: string;
             healthCheckPassed?: boolean;
             portOpen?: boolean;
             stabilityWindowPassed?: boolean;
-            runnerId: string;
-        };
-        /** @description POST /builds/:buildId/test-deployment/status payload (Runner → Host, PROVISIONING/FAILED/EXPIRED). */
-        TestDeploymentStatusRequest: {
-            /** @enum {string} */
-            status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
             runnerId: string;
         };
         /** @description Source archive reference uploaded by the Skill before build request. */
@@ -1286,9 +1186,9 @@ export interface components {
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * Format: uri
-             * @description Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign.
+             * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.
              */
-            previewUrl: string | null;
+            runtimeUrl: string | null;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}

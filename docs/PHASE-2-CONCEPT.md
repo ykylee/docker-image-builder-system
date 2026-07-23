@@ -3,7 +3,7 @@
 - 문서 목적: Phase 2 의 축·범위·마일스톤·완료 기준을 하나의 기준으로 정의한다. Phase 1 종료(v0.2.0/v0.2.1) 이후의 개발 방향 단일 출처.
 - 범위: 컨셉 근거(원 설계 대비 격차 실측), 마일스톤 P2-M1~M5, 순서와 완료 기준, 리스크
 - 대상 독자: 프로젝트 리드, 각 계층 구현자, AI agent
-- 상태: draft (**P2-M1 완료** 반영)
+- 상태: draft (**P2-M1 · P2-M2 완료** 반영)
 - 최종 수정일: 2026-07-23
 - 진입 baseline: **v0.2.1** (2026-07-23)
 - 관련 문서: [Phase 1 회고](./PHASE-1-RETROSPECTIVE.md), [Step 15 로드맵](./sdlc/15-refactoring-roadmap-and-milestones.md), [CHANGELOG](../CHANGELOG.md)
@@ -90,6 +90,17 @@ Step 15 의 M1~M5 잔여분을 Phase 2 기준으로 재정의한다.
 - **대상**: `apps/build-server/src` (117) + `packages/db` (12)
 - **내용**: repository(memory/postgres 양쪽 동일 semantics) / service / routes / OpenAPI 재정렬. `build_request` 의 legacy preview 컬럼 제거 migration **0007**.
 - **완료 기준**: memory·postgres 양 backend smoke 통과 / OpenAPI 재생성 / **e2e local+compose 11종 PASS** / migration up 검증.
+
+> **진행: P2-M2 완료 (TASK-161).** 엔드포인트 4종을 2종으로 재설계했다 —
+> `POST /builds/:id/preview` → `POST /builds/:id/container-test/start`,
+> `POST .../test-deployment/ready` + `POST .../test-deployment/status` →
+> `POST /builds/:id/container-test/result` (ExecutionStatus 기반 통합),
+> `GET .../test-deployment` **제거**(소비자 0, canonical `test` 블록과 중복).
+> 함께: `previewUrl`→`runtimeUrl` (migration **0008**) · `TestDeployment` DTO
+> 일가 제거 · 임시 어댑터 `executionToPreviewStatus` 제거 · 저장소/서비스
+> 메서드 개명(`startContainerTest` / `reportContainerTestResult`) · Go runner
+> hostclient 동시 정렬. 상세는
+> [컨테이너 테스트 엔드포인트 재설계](operations/container-test-endpoints-2026-07-23.md).
 
 ### P2-M3 — Runner 정렬
 - **대상**: `apps/runner` (28)

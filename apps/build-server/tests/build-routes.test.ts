@@ -222,7 +222,7 @@ describe("POST /builds/:buildId/phase", () => {
   });
 });
 
-describe("POST /builds/:buildId/preview", () => {
+describe("POST /builds/:buildId/container-test/start", () => {
   async function setupCompletedBuild() {
     const repo = createMemoryBuildRepository();
     const service = new BuildService(repo);
@@ -237,15 +237,15 @@ describe("POST /builds/:buildId/preview", () => {
     return { repo, service, buildId };
   }
 
-  it("returns 202 with queued testDeployment", async () => {
+  it("returns 202 with the canonical build status response", async () => {
     const { repo, service } = { ...(await setupCompletedBuild()) };
     const app = Fastify({ logger: false });
     await registerBuildRoutes(app, service);
     // x-not-existing is non-UUID so it fails zod and returns 400; not_found (404) is tested via unknown UUID below.
     const res = await app.inject({
       method: "POST",
-      url: "/builds/x-not-existing/preview",
-      payload: { internalPort: 8080, ttlMinutes: 30, runnerId: "r-1" }
+      url: "/builds/x-not-existing/container-test/start",
+      payload: { internalPort: 8080, runnerId: "r-1" }
     });
     assert.equal(res.statusCode, 400);
     await app.close();
@@ -256,12 +256,15 @@ describe("POST /builds/:buildId/preview", () => {
     await registerBuildRoutes(app2, fresh.service);
     const res2 = await app2.inject({
       method: "POST",
-      url: `/builds/${fresh.buildId}/preview`,
-      payload: { internalPort: 8080, ttlMinutes: 30, runnerId: "r-1" }
+      url: `/builds/${fresh.buildId}/container-test/start`,
+      payload: { internalPort: 8080, runnerId: "r-1" }
     });
     assert.equal(res2.statusCode, 202);
     const body = res2.json();
-    assert.equal(body.testDeployment.status, "QUEUED");
+    // TASK-161: 응답이 canonical BuildStatusResponse 로 통일됐다.
+    assert.equal(body.build.buildId, fresh.buildId);
+    assert.equal(body.build.phase, "CONTAINER_TEST_STARTED");
+    assert.equal(body.test.status, "IN_PROGRESS");
     await app2.close();
   });
 
@@ -271,16 +274,16 @@ describe("POST /builds/:buildId/preview", () => {
     await registerBuildRoutes(app, service);
     const res = await app.inject({
       method: "POST",
-      url: "/builds/00000000-0000-0000-0000-000000000000/preview",
-      payload: { ttlMinutes: 30, runnerId: "r-1" }
+      url: "/builds/00000000-0000-0000-0000-000000000000/container-test/start",
+      payload: { runnerId: "r-1" }
     });
     assert.equal(res.statusCode, 400);
     await app.close();
   });
 });
 
-describe("POST /builds/:buildId/test-deployment/ready", () => {
-  it("returns 200 after queue with updated status READY", async () => {
+describe("POST /builds/:buildId/container-test/result", () => {
+  it("returns 200 after start with SUCCESS recorded in the canonical test block", async () => {
     const { service, buildId } = await (async () => {
       const repo = createMemoryBuildRepository();
       const svc = new BuildService(repo);
@@ -292,17 +295,18 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
       await svc.reportPhase(id, "SOURCE_PREPARED");
       await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
       await svc.reportPhase(id, "DOCKER_BUILD_COMPLETED");
-      await svc.queueTestDeployment(id, 8080, 30);
+      await svc.startContainerTest(id, 8080);
       return { service: svc, buildId: id };
     })();
     const app = Fastify({ logger: false });
     await registerBuildRoutes(app, service);
     const res = await app.inject({
       method: "POST",
-      url: `/builds/${buildId}/test-deployment/ready`,
+      url: `/builds/${buildId}/container-test/result`,
       payload: {
-        previewUrl: "http://preview.local/x",
-        host: "preview.local",
+        status: "SUCCESS",
+        runtimeUrl: "http://127.0.0.1:38124/",
+        host: "127.0.0.1",
         hostPort: 38124,
         containerRef: "container-b-1",
         healthCheckPassed: true,
@@ -315,7 +319,7 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
     const body = res.json();
     assert.equal(body.build.status, "TEST_SUCCESS");
     assert.equal(body.build.phase, "CONTAINER_TEST_PASSED");
-    assert.equal(body.build.previewUrl, "http://preview.local/x");
+    assert.equal(body.build.runtimeUrl, "http://127.0.0.1:38124/");
     assert.equal(body.build.lifecycleStatus, "TEST_SUCCESS");
     assert.equal(body.lifecycle.status, "TEST_SUCCESS");
     assert.equal(body.test.status, "SUCCESS");
@@ -342,10 +346,10 @@ describe("POST /builds/:buildId/deployment", () => {
       await svc.reportPhase(id, "SOURCE_PREPARED");
       await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
       await svc.reportPhase(id, "DOCKER_BUILD_COMPLETED");
-      await svc.queueTestDeployment(id, 8080, 30);
-      await svc.reportPreviewStatus(id, "READY", {
-        previewUrl: "http://preview.local/x",
-        host: "preview.local",
+      await svc.startContainerTest(id, 8080);
+      await svc.reportContainerTestResult(id, "SUCCESS", {
+        runtimeUrl: "http://127.0.0.1:38124/",
+        host: "127.0.0.1",
         hostPort: 38124,
         healthCheckPassed: true,
         portOpen: true,
@@ -381,48 +385,6 @@ describe("POST /builds/:buildId/deployment", () => {
     assert.equal(body.deploy.resultRef, "registry.example.com/todo-app:build-1");
     assert.equal(body.resultDelivery.mode, "POLLING");
     assert.equal(body.resultDelivery.status, "IN_PROGRESS");
-    await app.close();
-  });
-});
-
-describe("GET /builds/:buildId/test-deployment", () => {
-  it("returns 404 when no preview requested", async () => {
-    const repo = createMemoryBuildRepository();
-    const service = new BuildService(repo);
-    const create = await service.createBuild(baseBody);
-    if (!("accepted" in create) || !create.accepted) throw new Error("setup");
-    const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
-    const res = await app.inject({
-      method: "GET",
-      url: `/builds/${create.build.buildId}/test-deployment`
-    });
-    assert.equal(res.statusCode, 404);
-    await app.close();
-  });
-
-  it("returns 200 with testDeployment after queue", async () => {
-    const repo = createMemoryBuildRepository();
-    const service = new BuildService(repo);
-    const { buildId: id } = await seedBuildWithSource(service, {
-      appName: baseBody.appName,
-      requestedBy: baseBody.requestedBy
-    });
-    await service.claimNextBuild();
-    await service.reportPhase(id, "DOCKER_BUILD_STARTED");
-    await service.reportPhase(id, "DOCKER_BUILD_COMPLETED");
-    await service.queueTestDeployment(id, 8080, 30);
-
-    const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
-    const res = await app.inject({
-      method: "GET",
-      url: `/builds/${id}/test-deployment`
-    });
-    assert.equal(res.statusCode, 200);
-    const body = res.json();
-    assert.equal(body.testDeployment.status, "QUEUED");
-    assert.equal(body.testDeployment.internalPort, 8080);
     await app.close();
   });
 });

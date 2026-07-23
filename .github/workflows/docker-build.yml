@@ -149,8 +149,7 @@ jobs:
             \"appName\": \"$APP\",
             \"sourceArchive\": {\"objectKey\": \"ref://github.com/example/repo\", \"checksumSha256\": \"0000000000000000000000000000000000000000000000000000000000000000\", \"sizeBytes\": 12345},
             \"entrypointPath\": \"src/index.ts\",
-            \"dockerfilePath\": \"Dockerfile\",
-            \"previewTtlMinutes\": 30
+            \"dockerfilePath\": \"Dockerfile\"
           }")
           BUILD_ID=$(echo "$RESP" | python3 -c "import json,sys; print(json.load(sys.stdin)['build']['buildId'])")
           echo "  buildId: $BUILD_ID"

@@ -38,17 +38,6 @@ export const executionStatuses = [
 
 export type ExecutionStatus = (typeof executionStatuses)[number];
 
-// Legacy preview/test-deployment states kept for compatibility until the
-// Build Server routes and Build Monitor move to the new build/test/deploy
-// contract. Prefer the nested `test`, `deploy`, and `resultDelivery`
-// response blocks for new code.
-export const previewStatuses = [
-  "NOT_REQUESTED",
-  "QUEUED",
-  "PROVISIONING",
-  "READY",
-  "FAILED",
-  "EXPIRED"
-] as const;
-
-export type PreviewStatus = (typeof previewStatuses)[number];
+// TASK-161 (P2-M2): `previewStatuses` 제거. 컨테이너 테스트/배포/결과 전달
+// 블록이 모두 `executionStatuses` 하나를 쓰면서 preview-era 의 두 번째 상태
+// 어휘가 사라졌다.

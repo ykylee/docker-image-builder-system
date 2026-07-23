@@ -62,7 +62,7 @@ const sample = (
   status,
   lifecycleStatus,
   phase: "REQUEST_ACCEPTED" as const,
-  previewUrl: null,
+  runtimeUrl: null,
   createdAt: "2026-07-03T00:00:00.000Z",
   updatedAt: "2026-07-03T00:00:00.000Z"
 });

@@ -12,8 +12,6 @@ import type {
   ClaimResponse,
   DeploymentReportRequest,
   RunnerStatus,
-  TestDeployment,
-  TestDeploymentQueueResponse
 } from "@docker-image-builder-system/shared-contract";
 
 import type {
@@ -22,7 +20,7 @@ import type {
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
-  PreviewStatusDetails,
+  ContainerTestDetails,
   StoreSourceArchiveResult,
   StoreSourceChunkResult
 } from "../repositories/build-repository.js";
@@ -32,22 +30,19 @@ export type ReportPhaseOutcome =
   | { kind: "not_found" }
   | { kind: "invalid_transition"; fromPhase: string; toPhase: string };
 
-export type QueuePreviewOutcome =
-  | { kind: "ok"; response: TestDeploymentQueueResponse }
+// TASK-161 (P2-M2): 컨테이너 테스트 outcome 은 canonical BuildStatusResponse
+// 하나만 돌려준다. 구 TestDeployment payload 는 `test` 블록과 중복이었다.
+export type StartContainerTestOutcome =
+  | { kind: "ok"; response: BuildStatusResponse }
   | { kind: "not_found" }
   | { kind: "invalid_state"; reason: string };
 
-export type ReportPreviewOutcome =
-  | { kind: "ok"; response: BuildStatusResponse; testDeployment: TestDeployment }
+export type ReportContainerTestOutcome =
+  | { kind: "ok"; response: BuildStatusResponse }
   | { kind: "not_found" };
 
 export type ReportDeploymentOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
-  | { kind: "not_found" };
-
-export type GetTestDeploymentOutcome =
-  | { kind: "found"; testDeployment: TestDeployment }
-  | { kind: "not_requested" }
   | { kind: "not_found" };
 
 export class BuildService {
@@ -261,15 +256,13 @@ export class BuildService {
     return result;
   }
 
-  async queueTestDeployment(
+  async startContainerTest(
     buildId: string,
-    internalPort: number,
-    ttlMinutes: number
-  ): Promise<QueuePreviewOutcome> {
-    const result = await this.repository.queueTestDeployment(
+    internalPort: number
+  ): Promise<StartContainerTestOutcome> {
+    const result = await this.repository.startContainerTest(
       buildId,
-      internalPort,
-      ttlMinutes
+      internalPort
     );
     if (result.kind === "not_found") {
       return { kind: "not_found" };
@@ -279,23 +272,22 @@ export class BuildService {
     }
     return {
       kind: "ok",
-      response: { testDeployment: result.testDeployment }
+      response: result.response
     };
   }
 
-  async reportPreviewStatus(
+  async reportContainerTestResult(
     buildId: string,
-    status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
-    details?: PreviewStatusDetails
-  ): Promise<ReportPreviewOutcome> {
-    const result = await this.repository.reportPreviewStatus(buildId, status, details);
+    status: "IN_PROGRESS" | "SUCCESS" | "FAILED",
+    details?: ContainerTestDetails
+  ): Promise<ReportContainerTestOutcome> {
+    const result = await this.repository.reportContainerTestResult(buildId, status, details);
     if (result.kind === "not_found") {
       return { kind: "not_found" };
     }
     return {
       kind: "ok",
-      response: result.response,
-      testDeployment: result.testDeployment
+      response: result.response
     };
   }
 
@@ -304,10 +296,6 @@ export class BuildService {
     input: DeploymentReportRequest
   ): Promise<ReportDeploymentOutcome> {
     return this.repository.reportDeploymentResult(buildId, input);
-  }
-
-  async getTestDeployment(buildId: string): Promise<GetTestDeploymentOutcome> {
-    return this.repository.getTestDeployment(buildId);
   }
 
   async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {

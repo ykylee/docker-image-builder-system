@@ -48,11 +48,8 @@ import {
   deploymentResultSchema,
   phaseUpdateRequestSchema,
   resultDeliverySchema,
-  testDeploymentSchema,
-  testDeploymentQueueRequestSchema,
-  testDeploymentQueueResponseSchema,
-  testDeploymentReadyRequestSchema,
-  testDeploymentStatusRequestSchema,
+  containerTestStartRequestSchema,
+  containerTestResultRequestSchema,
   sourceArchiveSchema,
   sourceArchiveUploadResponseSchema,
   buildRequestSchema,
@@ -91,11 +88,8 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "ClaimRequest", schema: claimRequestSchema },
   { id: "ClaimResponse", schema: claimResponseSchema },
   { id: "PhaseUpdateRequest", schema: phaseUpdateRequestSchema },
-  { id: "TestDeployment", schema: testDeploymentSchema },
-  { id: "TestDeploymentQueueRequest", schema: testDeploymentQueueRequestSchema },
-  { id: "TestDeploymentQueueResponse", schema: testDeploymentQueueResponseSchema },
-  { id: "TestDeploymentReadyRequest", schema: testDeploymentReadyRequestSchema },
-  { id: "TestDeploymentStatusRequest", schema: testDeploymentStatusRequestSchema },
+  { id: "ContainerTestStartRequest", schema: containerTestStartRequestSchema },
+  { id: "ContainerTestResultRequest", schema: containerTestResultRequestSchema },
   { id: "SourceArchive", schema: sourceArchiveSchema },
   { id: "SourceArchiveUploadResponse", schema: sourceArchiveUploadResponseSchema },
   { id: "BuildRequest", schema: buildRequestSchema },
@@ -176,7 +170,7 @@ registry.registerPath({
 registry.registerPath({
   method: "get",
   path: "/builds/{buildId}",
-  description: "Fetch current status, phases, and preview info for a build.",
+  description: "Fetch current status, phases, and canonical build/test/deploy blocks for a build.",
   tags: ["Builds"],
   request: { params: z.object({ buildId: z.string().uuid() }) },
   responses: { 200: { description: "Build status.", content: { "application/json": { schema: buildStatusResponseSchema } } } }
@@ -207,27 +201,29 @@ registry.registerPath({
 });
 registry.registerPath({
   method: "post",
-  path: "/builds/{buildId}/preview",
-  description: "Queue a test deployment once the build reaches DOCKER_BUILD_COMPLETED.",
-  tags: ["Test Deployment"],
-  request: { params: z.object({ buildId: z.string().uuid() }), body: { content: { "application/json": { schema: testDeploymentQueueRequestSchema } } } },
-  responses: { 202: { description: "Preview queued.", content: { "application/json": { schema: testDeploymentQueueResponseSchema } } } }
+  path: "/builds/{buildId}/container-test/start",
+  description: "Start the container test once the image build completes (TASK-161: was POST /builds/{buildId}/preview).",
+  tags: ["Container Test"],
+  request: { params: z.object({ buildId: z.string().uuid() }), body: { content: { "application/json": { schema: containerTestStartRequestSchema } } } },
+  responses: {
+    202: {
+      description: "Container test started. Response carries the canonical BuildStatusResponse.",
+      content: { "application/json": { schema: buildStatusResponseSchema } }
+    }
+  }
 });
 registry.registerPath({
   method: "post",
-  path: "/builds/{buildId}/test-deployment/ready",
-  description: "Runner reports the preview is reachable.",
-  tags: ["Test Deployment"],
-  request: { params: z.object({ buildId: z.string().uuid() }), body: { content: { "application/json": { schema: testDeploymentReadyRequestSchema } } } },
-  responses: { 200: { description: "Preview marked ready." } }
-});
-registry.registerPath({
-  method: "post",
-  path: "/builds/{buildId}/test-deployment/status",
-  description: "Runner reports general preview status (PROVISIONING, FAILED, EXPIRED).",
-  tags: ["Test Deployment"],
-  request: { params: z.object({ buildId: z.string().uuid() }), body: { content: { "application/json": { schema: testDeploymentStatusRequestSchema } } } },
-  responses: { 200: { description: "Status recorded." } }
+  path: "/builds/{buildId}/container-test/result",
+  description: "Runner reports container test progress/result (TASK-161: absorbs the former test-deployment/ready and test-deployment/status endpoints).",
+  tags: ["Container Test"],
+  request: { params: z.object({ buildId: z.string().uuid() }), body: { content: { "application/json": { schema: containerTestResultRequestSchema } } } },
+  responses: {
+    200: {
+      description: "Container test result recorded. Response carries the canonical BuildStatusResponse with the just-updated `test` block.",
+      content: { "application/json": { schema: buildStatusResponseSchema } }
+    }
+  }
 });
 registry.registerPath({
   method: "post",
@@ -241,14 +237,6 @@ registry.registerPath({
       content: { "application/json": { schema: buildStatusResponseSchema } }
     }
   }
-});
-registry.registerPath({
-  method: "get",
-  path: "/builds/{buildId}/test-deployment",
-  description: "Fetch the current test deployment record for a build (if any).",
-  tags: ["Test Deployment"],
-  request: { params: z.object({ buildId: z.string().uuid() }) },
-  responses: { 200: { description: "Test deployment present.", content: { "application/json": { schema: testDeploymentSchema } } } }
 });
 // TASK-066: source archive upload/download. The Skill uploads the
 // raw archive bytes via POST after POST /builds has recorded the
@@ -455,7 +443,7 @@ export function getOpenApiDocument(): unknown {
       title: "Docker Image Builder — Build Server API",
       version: "0.1.0",
       description:
-        "HTTP contract exposed by the Build Server (PKG-001~PKG-006). The Go Runner consumes the Runner Claim and Test Deployment tag groups; the Skill layer consumes the Builds group. Generated from zod schemas in @docker-image-builder-system/shared-contract."
+        "HTTP contract exposed by the Build Server (PKG-001~PKG-006). The Go Runner consumes the Runner Claim and Container Test tag groups; the Skill layer consumes the Builds group. Generated from zod schemas in @docker-image-builder-system/shared-contract."
     },
     tags: Object.values(openapiTags).map((tag) => ({
       name: tag.name,

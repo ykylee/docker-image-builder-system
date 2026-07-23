@@ -14,15 +14,15 @@ import (
 // BuildControlClient 는 Host Server 의 build control endpoint 들을 호출한다.
 // - ClaimNextBuild: POST /builds/claim
 // - ReportPhase: POST /builds/:buildId/phase
-// - QueueTestDeployment: POST /builds/:buildId/preview
-// - ReportPreviewReady: POST /builds/:buildId/test-deployment/ready
+// - StartContainerTest: POST /builds/:buildId/container-test/start
+// - ReportContainerTestResult: POST /builds/:buildId/container-test/result
 // - ReportDeployment: POST /builds/:buildId/deployment
 // - DownloadSource: GET /builds/:buildId/source (TASK-066)
 type BuildControlClient interface {
 	ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error)
 	ReportPhase(ctx context.Context, buildID, phase, runnerID string) error
-	QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error
-	ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error
+	StartContainerTest(ctx context.Context, buildID string, req StartContainerTestRequest) error
+	ReportContainerTestResult(ctx context.Context, buildID string, req ContainerTestResultRequest) error
 	ReportDeployment(ctx context.Context, buildID string, req DeploymentReportRequest) error
 	// DownloadSource fetches the raw source archive bytes for `buildID`
 	// (TASK-066). Returns the body bytes, the SHA-256 reported by the
@@ -47,7 +47,7 @@ type ClaimedBuildResponse struct {
 }
 
 type claimResponseBody struct {
-	Claimed bool                    `json:"claimed"`
+	Claimed bool                     `json:"claimed"`
 	Build   *buildStatusResponseBody `json:"build"`
 	// Reason is omitted from the wire when empty so the server-side zod
 	// `z.enum([...]).nullable()` does not reject a successful no-op
@@ -78,16 +78,16 @@ type phaseRequestBody struct {
 
 // HTTPBuildControlClient 는 Host Server 와 HTTP 로 통신하는 client.
 type HTTPBuildControlClient struct {
-	baseURL string
+	baseURL  string
 	runnerID string
-	http    *http.Client
+	http     *http.Client
 }
 
 func NewHTTPBuildControlClient(baseURL, runnerID string) *HTTPBuildControlClient {
 	return &HTTPBuildControlClient{
-		baseURL: baseURL,
+		baseURL:  baseURL,
 		runnerID: runnerID,
-		http:    &http.Client{Timeout: 10 * time.Second},
+		http:     &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
@@ -175,11 +175,11 @@ func (c *NoopBuildControlClient) ReportPhase(context.Context, string, string, st
 	return nil
 }
 
-func (c *NoopBuildControlClient) QueueTestDeployment(context.Context, string, QueueTestDeploymentRequest) error {
+func (c *NoopBuildControlClient) StartContainerTest(context.Context, string, StartContainerTestRequest) error {
 	return nil
 }
 
-func (c *NoopBuildControlClient) ReportPreviewReady(context.Context, string, PreviewReadyRequest) error {
+func (c *NoopBuildControlClient) ReportContainerTestResult(context.Context, string, ContainerTestResultRequest) error {
 	return nil
 }
 
@@ -239,16 +239,18 @@ func (c *HTTPBuildControlClient) DownloadSource(ctx context.Context, buildID str
 	return body, checksum, size, nil
 }
 
-// QueueTestDeployment: POST /builds/:buildId/preview
-type QueueTestDeploymentRequest struct {
+// StartContainerTest: POST /builds/:buildId/container-test/start
+// TASK-161 (P2-M2): 구 `QueueTestDeployment` (POST /builds/:buildId/preview).
+// preview-era 의 `ttlMinutes` 는 계약에서 제거됐다 — 테스트 컨테이너의 수명은
+// runner 가 결과 보고 시점에 직접 정리한다.
+type StartContainerTestRequest struct {
 	InternalPort int    `json:"internalPort"`
-	TtlMinutes   int    `json:"ttlMinutes"`
 	RunnerID     string `json:"runnerId"`
 }
 
-func (c *HTTPBuildControlClient) QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error {
+func (c *HTTPBuildControlClient) StartContainerTest(ctx context.Context, buildID string, req StartContainerTestRequest) error {
 	body, _ := json.Marshal(req)
-	url := fmt.Sprintf("%s/builds/%s/preview", c.baseURL, buildID)
+	url := fmt.Sprintf("%s/builds/%s/container-test/start", c.baseURL, buildID)
 	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -265,12 +267,17 @@ func (c *HTTPBuildControlClient) QueueTestDeployment(ctx context.Context, buildI
 		return nil
 	}
 	raw, _ := io.ReadAll(res.Body)
-	return fmt.Errorf("queue preview failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
+	return fmt.Errorf("start container test failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
 }
 
-// ReportPreviewReady: POST /builds/:buildId/test-deployment/ready
-type PreviewReadyRequest struct {
-	PreviewURL            string `json:"previewUrl"`
+// ReportContainerTestResult: POST /builds/:buildId/container-test/result
+// TASK-161 (P2-M2): 구 `ReportPreviewReady` (POST .../test-deployment/ready).
+// 호스트가 ready/status 두 엔드포인트를 하나로 흡수했으므로 상태를
+// canonical ExecutionStatus ("IN_PROGRESS" / "SUCCESS" / "FAILED") 로 실어
+// 보낸다.
+type ContainerTestResultRequest struct {
+	Status                string `json:"status"`
+	RuntimeURL            string `json:"runtimeUrl"`
 	Host                  string `json:"host"`
 	HostPort              int    `json:"hostPort"`
 	ContainerRef          string `json:"containerRef,omitempty"`
@@ -291,9 +298,9 @@ type DeploymentReportRequest struct {
 	ResponsePayloadJSON map[string]any `json:"responsePayloadJson,omitempty"`
 }
 
-func (c *HTTPBuildControlClient) ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error {
+func (c *HTTPBuildControlClient) ReportContainerTestResult(ctx context.Context, buildID string, req ContainerTestResultRequest) error {
 	body, _ := json.Marshal(req)
-	url := fmt.Sprintf("%s/builds/%s/test-deployment/ready", c.baseURL, buildID)
+	url := fmt.Sprintf("%s/builds/%s/container-test/result", c.baseURL, buildID)
 	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -310,7 +317,7 @@ func (c *HTTPBuildControlClient) ReportPreviewReady(ctx context.Context, buildID
 		return nil
 	}
 	raw, _ := io.ReadAll(res.Body)
-	return fmt.Errorf("report preview ready failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
+	return fmt.Errorf("report container test result failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
 }
 
 func (c *HTTPBuildControlClient) ReportDeployment(ctx context.Context, buildID string, req DeploymentReportRequest) error {

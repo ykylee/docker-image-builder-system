@@ -71,7 +71,7 @@ const acceptedResponse = (appName: string) => ({
     status: "QUEUED" as const,
     lifecycleStatus: "REQUEST_ACCEPTED" as const,
     phase: "REQUEST_ACCEPTED" as const,
-    previewUrl: null,
+    runtimeUrl: null,
     createdAt: "2026-07-18T00:00:00.000Z",
     updatedAt: "2026-07-18T00:00:00.000Z"
   }
@@ -87,7 +87,7 @@ const duplicateResponse = (appName: string) => ({
     status: "QUEUED" as const,
     lifecycleStatus: "REQUEST_ACCEPTED" as const,
     phase: "REQUEST_ACCEPTED" as const,
-    previewUrl: null,
+    runtimeUrl: null,
     createdAt: "2026-07-18T00:00:00.000Z",
     updatedAt: "2026-07-18T00:00:00.000Z"
   }

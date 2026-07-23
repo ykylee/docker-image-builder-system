@@ -23,7 +23,7 @@
 #   [3] POST /builds + POST /builds/:id/source + claim
 #   [4] Runner 기동 (RUNNER_DOCKER_RUN_MODE=cli) → container 띄움
 #   [5] container 가 `docker ps` 에 살아있는지 + host port 가 listening
-#   [6] Build Server 측 `GET /builds/:id` 가 testDeployment +
+#   [6] Build Server 측 `GET /builds/:id` 가 canonical `test` 블록 +
 #       hostPort / runtimeUrl 을 노출
 #   [7] cleanup: Runner stop → docker rm -f <container>
 #
@@ -158,7 +158,7 @@ echo "[3/7] POST /builds + source upload"
 APP_NAME="task-067-e2e-$(date +%s)"
 BUILD_RESP="$(curl -fsS -X POST "${BASE}/builds" \
   -H 'Content-Type: application/json' \
-  -d "{\"appName\":\"${APP_NAME}\",\"requestedBy\":\"e2e-runner\",\"sourceArchive\":{\"objectKey\":\"hello-archive\",\"checksumSha256\":\"${SHA}\",\"sizeBytes\":${SIZE}},\"entrypointPath\":\"/\",\"dockerfilePath\":\"Dockerfile\",\"previewTtlMinutes\":60,\"metadata\":{}}")"
+  -d "{\"appName\":\"${APP_NAME}\",\"requestedBy\":\"e2e-runner\",\"sourceArchive\":{\"objectKey\":\"hello-archive\",\"checksumSha256\":\"${SHA}\",\"sizeBytes\":${SIZE}},\"entrypointPath\":\"/\",\"dockerfilePath\":\"Dockerfile\",\"metadata\":{}}")"
 BUILD_ID="$(echo "${BUILD_RESP}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["build"]["buildId"])')"
 echo "  build_id=${BUILD_ID}"
 
@@ -236,8 +236,6 @@ if [[ "${CONTAINER_SEEN}" != "1" ]]; then
 fi
 green "  ✓ 컨테이너 기동 관측됨 (${CONTAINER_NAME})"
 
-# 6) Build Server 측 status 에 testDeployment.hostPort + runtimeUrl 이
-# 노출되었는지 확인.
 # 6) Build Server 가 기록한 **canonical** 결과 검증 — TASK-157 hard assertion.
 #    기존 구현은 응답의 top-level `testDeployment` 를 읽었으나 그 필드는
 #    `buildStatusResponse` 에 없다(legacy preview-era 모양). canonical 은

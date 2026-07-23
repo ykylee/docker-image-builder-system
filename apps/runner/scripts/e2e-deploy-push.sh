@@ -222,7 +222,7 @@ echo "[5/8] POST /builds + source upload"
 APP_NAME="task-068-e2e-$(date +%s)"
 BUILD_RESP="$(curl -fsS -X POST "${BASE}/builds" \
   -H 'Content-Type: application/json' \
-  -d "{\"appName\":\"${APP_NAME}\",\"requestedBy\":\"e2e-runner\",\"sourceArchive\":{\"objectKey\":\"hello-archive\",\"checksumSha256\":\"${SHA}\",\"sizeBytes\":${SIZE}},\"entrypointPath\":\"/\",\"dockerfilePath\":\"Dockerfile\",\"previewTtlMinutes\":60,\"metadata\":{}}")"
+  -d "{\"appName\":\"${APP_NAME}\",\"requestedBy\":\"e2e-runner\",\"sourceArchive\":{\"objectKey\":\"hello-archive\",\"checksumSha256\":\"${SHA}\",\"sizeBytes\":${SIZE}},\"entrypointPath\":\"/\",\"dockerfilePath\":\"Dockerfile\",\"metadata\":{}}")"
 BUILD_ID="$(echo "${BUILD_RESP}" | python3 -c 'import json,sys; print(json.load(sys.stdin)["build"]["buildId"])')"
 echo "  build_id=${BUILD_ID}"
 

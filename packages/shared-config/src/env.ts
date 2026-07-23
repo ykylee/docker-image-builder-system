@@ -5,7 +5,6 @@ import {
   DEFAULT_BUILD_TIMEOUT_SECONDS,
   DEFAULT_BUILD_REPOSITORY_BACKEND,
   DEFAULT_CORS_ORIGIN,
-  DEFAULT_PREVIEW_TTL_MINUTES,
   DEFAULT_RUNNER_POLL_INTERVAL_MS,
   parseAdminIds
 } from "./constants.js";
@@ -18,7 +17,6 @@ export const runtimeEnvSchema = z.object({
     .enum(["memory", "postgres"])
     .default(DEFAULT_BUILD_REPOSITORY_BACKEND),
   DB_AUTO_BOOTSTRAP: z.coerce.boolean().default(true),
-  PREVIEW_TTL_MINUTES: z.coerce.number().int().positive().default(DEFAULT_PREVIEW_TTL_MINUTES),
   RUNNER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(DEFAULT_RUNNER_POLL_INTERVAL_MS),
   BUILD_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(DEFAULT_BUILD_TIMEOUT_SECONDS),
   CORS_ORIGIN: z

@@ -210,8 +210,7 @@ ENQ="$(curl -fsS -X POST "${BASE}/builds" \
       \"sizeBytes\": ${SRC_BYTES}
     },
     \"entrypointPath\": \"src/index.ts\",
-    \"dockerfilePath\": \"Dockerfile\",
-    \"previewTtlMinutes\": 60
+    \"dockerfilePath\": \"Dockerfile\"
   }" 2>&1)"
 BUILD_ID="$(printf '%s' "${ENQ}" | python3 -c 'import json,sys
 try:
@@ -337,19 +336,19 @@ print(f"  ✓ all 10 phases present (postgres backend)")
 PY
 
 STATUS_JSON="$(curl -fsS "${BASE}/builds/${BUILD_ID}" 2>/dev/null || true)"
-PREVIEW_URL="$(printf '%s' "${STATUS_JSON}" | python3 -c 'import json,sys
+RUNTIME_URL="$(printf '%s' "${STATUS_JSON}" | python3 -c 'import json,sys
 try:
-  print(json.loads(sys.stdin.read())["build"].get("previewUrl","") or "")
+  print(json.loads(sys.stdin.read())["build"].get("runtimeUrl","") or "")
 except Exception:
   pass
 ' 2>/dev/null || true)"
-if [[ -z "${PREVIEW_URL}" ]]; then
-  yellow "  ⚠ previewUrl empty — host network + healthcheck race 가능"
+if [[ -z "${RUNTIME_URL}" ]]; then
+  yellow "  ⚠ runtimeUrl empty — host network + healthcheck race 가능"
 else
-  if printf '%s' "${PREVIEW_URL}" | grep -qE '^http://127\.0\.0\.1:[0-9]+/'; then
-    green "  ✓ previewUrl well-formed: ${PREVIEW_URL}"
+  if printf '%s' "${RUNTIME_URL}" | grep -qE '^http://127\.0\.0\.1:[0-9]+/'; then
+    green "  ✓ runtimeUrl well-formed: ${RUNTIME_URL}"
   else
-    red "  ✗ previewUrl 형식이 기대치와 다름: ${PREVIEW_URL}"
+    red "  ✗ runtimeUrl 형식이 기대치와 다름: ${RUNTIME_URL}"
     exit 1
   fi
 fi

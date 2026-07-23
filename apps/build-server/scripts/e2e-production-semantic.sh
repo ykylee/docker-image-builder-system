@@ -229,8 +229,7 @@ ENQ="$(curl -fsS -X POST "${BASE}/builds" \
       \"sizeBytes\": ${SRC_BYTES}
     },
     \"entrypointPath\": \"src/index.ts\",
-    \"dockerfilePath\": \"Dockerfile\",
-    \"previewTtlMinutes\": 60
+    \"dockerfilePath\": \"Dockerfile\"
   }" 2>&1)"
 BUILD_ID="$(printf '%s' "${ENQ}" | python3 -c 'import json,sys
 try:
@@ -353,26 +352,26 @@ if missing:
 print(f"  ✓ all 10 phases present: {', '.join(expected)}")
 PY
 
-# previewUrl 검증 — COMPLETED 직후 stopContainerOnDone 의 defer 가 발화하기
-# 전에 previewUrl 을 추출해 한 번이라도 200 OK 응답을 받았는지 확인.
-# 실제 container 가 응답했는지 와 별개로, previewUrl 자체가 well-formed
+# runtimeUrl 검증 — COMPLETED 직후 stopContainerOnDone 의 defer 가 발화하기
+# 전에 runtimeUrl 을 추출해 한 번이라도 200 OK 응답을 받았는지 확인.
+# 실제 container 가 응답했는지 와 별개로, runtimeUrl 자체가 well-formed
 # (127.0.0.1:<hostPort>/) 한지를 검증.
 STATUS_JSON="$(curl -fsS "${BASE}/builds/${BUILD_ID}" 2>/dev/null || true)"
-PREVIEW_URL="$(printf '%s' "${STATUS_JSON}" | python3 -c 'import json,sys
+RUNTIME_URL="$(printf '%s' "${STATUS_JSON}" | python3 -c 'import json,sys
 try:
-  print(json.loads(sys.stdin.read())["build"].get("previewUrl","") or "")
+  print(json.loads(sys.stdin.read())["build"].get("runtimeUrl","") or "")
 except Exception:
   pass
 ' 2>/dev/null || true)"
-if [[ -z "${PREVIEW_URL}" ]]; then
-  yellow "  ⚠ previewUrl empty — runner 가 response 를 capture 하지 못함"
+if [[ -z "${RUNTIME_URL}" ]]; then
+  yellow "  ⚠ runtimeUrl empty — runner 가 response 를 capture 하지 못함"
   yellow "    (stopContainerOnDone 의 defer 가 너무 빨리 발화했을 가능성)"
 else
   # preview URL 의 host:port 형식만 검증. 실제 curl 은 container 가 stop 된
   # 직후면 200 OK 가 아닐 수 있어 optional — 로그의 CONTAINER_TEST_PASSED 가 통과했다면
   # container healthcheck 자체가 200 OK 였음을 의미.
-  if printf '%s' "${PREVIEW_URL}" | grep -qE '^http://127\.0\.0\.1:[0-9]+/'; then
-    green "  ✓ previewUrl well-formed: ${PREVIEW_URL}"
+  if printf '%s' "${RUNTIME_URL}" | grep -qE '^http://127\.0\.0\.1:[0-9]+/'; then
+    green "  ✓ runtimeUrl well-formed: ${RUNTIME_URL}"
     # healthcheck 자체가 200 OK 였다는 BuildStatusResponse.test.healthCheckPassed
     # / test.stabilityWindowPassed 가 검증한다. runner 의 WaitForHealth 가 이
     # 값을 ReportPreviewReady 의 입력으로 흘려 Build Service 가 그대로 저장하므로
@@ -391,7 +390,7 @@ except Exception:
       yellow "  ⚠ healthcheck flag 확인 불가 — raw: ${HEALTHCHECK_PASSED}"
     fi
   else
-    red "  ✗ previewUrl 형식이 기대치와 다름: ${PREVIEW_URL}"
+    red "  ✗ runtimeUrl 형식이 기대치와 다름: ${RUNTIME_URL}"
     exit 1
   fi
 fi
@@ -423,5 +422,5 @@ green "TASK-085 production-semantic 검증: ALL PASS"
 green "=========================================="
 echo "  build COMPLETED in 1 runner (busybox:1.36 + httpd)"
 echo "  10/10 phases present"
-echo "  previewUrl well-formed (127.0.0.1:<hostPort>/)"
+echo "  runtimeUrl well-formed (127.0.0.1:<hostPort>/)"
 echo "  container auto-cleaned after completion"

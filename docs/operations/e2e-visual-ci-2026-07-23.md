@@ -1,7 +1,7 @@
 # e2e + 시각 QA 의 CI/nightly 통합 (TASK-156)
 
 - 문서 목적: e2e 13종과 build-monitor 시각 QA 를 nightly / main push / 수동 트리거로 자동 실행하는 구성 — wrapper 스크립트, 워크플로, baseline 정책, 한계.
-- 갱신: TASK-157 (runner e2e hard assertion 화) 반영
+- 갱신: TASK-157 (runner e2e hard assertion 화) · TASK-161 (compose postgres 포트 자동 회피) 반영
 - 범위: `scripts/run-e2e-suite.sh` / `scripts/run-visual-check.sh` / `.github/workflows/nightly-e2e.yml` + 기존 CI 워크플로와의 역할 분담
 - 대상 독자: 개발자, AI agent, 운영자
 - 상태: stable
@@ -46,7 +46,7 @@ e2e 는 B층 가드와 달리 **호스트에서 `docker compose` 를 직접 구�
 
 ### 3.2 wrapper 가 책임지는 것
 
-- **env 정규화** — `DOCKER_SOCKET_GID`(getent 자동 유도) / `ADMIN_IDS` / `PGPORT` / `DIBS_POSTGRES_HOST_PORT` / `DATABASE_URL`.
+- **env 정규화** — `DOCKER_SOCKET_GID`(getent 자동 유도) / `ADMIN_IDS` / `PGPORT` / `DIBS_POSTGRES_HOST_PORT`(**5432 점유 감지 시 15432 자동 회피** — TASK-161) / `DATABASE_URL`.
 - **전제 점검** — docker daemon, build-server dist, dist-react, postgres 접속. 부족하면 exit 3 으로 조기 실패(무의미한 e2e 실행 방지).
 - **`docker_image_builder` DB 자동 생성** — 없으면 만든다.
 - **`runner-bin` 자동 빌드** — 없으면 `go build` 한다. **이게 없으면 runner e2e 가 가짜 PASS 가 되기 때문**(§6).
@@ -124,7 +124,8 @@ soft assertion 이 가리고 있던 실제 결함:
 ### 6.3 그 외 한계
 
 - **모달 픽셀 diff 는 흔들린다.** 실측에서 `admin-runners/dark-modal.png` 이 ratio 0.0017 (> 0.001) 로 초과했다. Dialog 의 애니메이션/합성 타이밍 때문으로 보인다. baseline diff 를 켤 때는 모달에 별도 threshold 를 주거나 제외하는 것을 검토할 것.
-- **호스트 포트 충돌**: GHA 의 postgres service 가 5432 를 점유하므로 compose 의 postgres 는 `DIBS_POSTGRES_HOST_PORT=15432` 로 옮겨 publish 한다(TASK-154 의 override). 로컬에 native postgres 가 있는 개발 환경도 동일.
+- **호스트 포트 충돌**: GHA 의 postgres service 가 5432 를 점유하므로 compose 의 postgres 는 `DIBS_POSTGRES_HOST_PORT=15432` 로 옮겨 publish 한다(TASK-154 의 override). 워크플로는 이 값을 명시적으로 지정한다.
+  - **TASK-161 수정**: wrapper 의 기본값이 `5432` 라 **로컬 native postgres 가 있는 개발 환경에서 compose postgres 3종이 `address already in use` 로 죽었다** — 주석에 적힌 의도("native postgres 가 5432 를 점유해도 bind 실패하지 않도록")가 구현돼 있지 않았다. 이제 wrapper 가 5432 점유를 감지하면 15432 로 자동 회피한다(호출자가 명시하면 그 값 우선). 전제 점검 단계에서 선택된 포트를 출력한다.
 - **비용**: nightly + 관련 경로 main push + 수동만 돌고 PR 에는 붙지 않는다 → PR 시간 영향 0.
 
 ## 7. 실패 시 대응
