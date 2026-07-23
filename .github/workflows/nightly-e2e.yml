@@ -1,0 +1,214 @@
+# =============================================================================
+#  docker-image-builder-system — Nightly e2e + Visual QA
+# =============================================================================
+#  TASK-156: e2e 13종 + build-monitor 시각 QA 를 nightly / main push / 수동
+#  트리거로 돌린다.
+#
+#  왜 필요한가 (v0.2.1 의 실증):
+#    - 루트 Dockerfile 의 build-monitor 빌드가 깨진 채 v0.2.0 까지 잠복했다.
+#      실이미지 e2e 를 한 번 돌리자 즉시 드러났다 (TASK-153).
+#    - chunked 업로드로 올린 build 가 runner 에게 **영원히 claim 되지 않던**
+#      제품 결함도 e2e 를 돌려서야 드러났다 (TASK-155). 그 e2e 는 `--build`
+#      가 없어 오래된 이미지만 검증하고 있었다.
+#    두 사례 모두 "단위 테스트·PR 가드가 green 이어도 프로덕션 경로는 별개"
+#    라는 같은 결의 사각지대다. e2e 를 nightly 에 고정해 자동 검출한다.
+#
+#  기존 워크플로와의 역할 분담:
+#    docker-build.yml   PR + main push — 정적 가드 + 이미지 build/smoke (빠름)
+#    nightly-b-layer    nightly 03:00 UTC — 실브라우저 가드(대비/CSS 유출)
+#    nightly-e2e (본)   nightly 04:00 UTC — e2e 13종 + 시각 QA (느림, 도커 실사용)
+#
+#  visual 잡의 baseline 정책:
+#    TASK-152 의 baseline PNG 는 binary 라 .gitignore 로 git 에서 제외돼
+#    있고 외부 LFS 동기화 정책이 미결이다. 그래서 CI 는 **baseline 없이도
+#    유효한 구조 검증**(라우트 셋 완전성 / 0 byte / dark≠light / modal≠base)
+#    을 기본으로 돌리고, PNG 는 artifact 로 올려 사람이 볼 수 있게 한다.
+#    LFS 정책이 정해지면 run-visual-check.sh --baseline 으로 픽셀 diff 를
+#    켜면 된다.
+# =============================================================================
+
+name: nightly-e2e
+
+on:
+  schedule:
+    # nightly-b-layer(03:00 UTC) 와 1시간 띄워 도커 자원 경합을 피한다.
+    - cron: "0 4 * * *"
+  push:
+    branches: [main]
+    paths:
+      - 'apps/build-server/scripts/e2e-*.sh'
+      - 'apps/runner/scripts/e2e-*.sh'
+      - 'apps/build-server/src/**'
+      - 'apps/runner/**'
+      - 'apps/build-monitor/react/**'
+      - 'apps/build-monitor/vite.config.ts'
+      - 'apps/build-monitor/tests/visual/**'
+      - 'packages/**'
+      - 'scripts/run-e2e-suite.sh'
+      - 'scripts/run-visual-check.sh'
+      - 'compose.dev*.yaml'
+      - 'Dockerfile'
+      - 'apps/runner/Dockerfile'
+      - '.github/workflows/nightly-e2e.yml'
+  workflow_dispatch:
+    inputs:
+      group:
+        description: "e2e 그룹"
+        required: true
+        type: choice
+        default: "all"
+        options: [all, local, compose, runner]
+      run_visual:
+        description: "시각 QA 도 실행"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: "10.15.0"
+  NODE_VERSION: "20"
+  GO_VERSION: "1.22"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # e2e 13종 — 호스트에서 docker compose 를 직접 구동하므로 guard container
+  # 안이 아니라 러너 호스트에서 돈다.
+  # ---------------------------------------------------------------------------
+  e2e:
+    name: e2e / ${{ inputs.group || 'all' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    services:
+      # local 그룹의 postgres 기반 e2e 용. compose 기반 e2e 는 자기 스택의
+      # postgres 를 따로 띄우므로 이 service 와 무관하다.
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install postgres client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build artifacts (e2e 전제)
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json
+          ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json
+          ./node_modules/.bin/tsc -p packages/db/tsconfig.json
+          ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json
+          (cd apps/build-monitor && ./node_modules/.bin/vite build)
+          (cd apps/runner && go build -o bin/runner-bin ./cmd/runner)
+
+      - name: Run e2e suite
+        env:
+          # compose e2e 가 host docker socket 을 runner container 에 물린다.
+          ADMIN_IDS: admin
+          PGPORT: "5432"
+          PG_SUPERUSER: postgres
+          # GHA postgres service 가 host 5432 를 점유하므로 compose 의
+          # postgres 는 다른 포트로 publish 한다 (TASK-154 의 override).
+          DIBS_POSTGRES_HOST_PORT: "15432"
+          E2E_LOG_DIR: ${{ github.workspace }}/.e2e-logs
+          NO_COLOR: "1"
+        run: bash scripts/run-e2e-suite.sh --group "${{ inputs.group || 'all' }}"
+
+      - name: Upload e2e logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-logs-${{ github.run_id }}
+          path: .e2e-logs/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Teardown leftovers
+        if: always()
+        run: |
+          docker rm -f $(docker ps -aq --filter "name=dibs-") 2>/dev/null || true
+          docker volume ls -q | grep -i dibs | xargs -r docker volume rm 2>/dev/null || true
+
+  # ---------------------------------------------------------------------------
+  # 시각 QA — capture + 구조 검증. baseline 픽셀 diff 는 LFS 정책 확정 후.
+  # ---------------------------------------------------------------------------
+  visual:
+    name: visual QA
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ inputs.run_visual != false }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build build-server dist (visual wrapper 전제)
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json
+          ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json
+          ./node_modules/.bin/tsc -p packages/db/tsconfig.json
+          ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json
+
+      - name: Install Chrome
+        # capture.py 는 channel="chrome" 을 쓴다 (playwright 번들 chromium 은
+        # 사내망에서 CDN ETIMEDOUT — TASK-132/133 에서 확립된 방식).
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Install python playwright
+        run: pip install --quiet playwright Pillow
+
+      - name: Run visual check
+        env:
+          NO_COLOR: "1"
+        run: bash scripts/run-visual-check.sh --out "${{ github.workspace }}/.visual/ci"
+
+      - name: Upload visual PNGs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-${{ github.run_id }}
+          path: .visual/ci/
+          retention-days: 14
+          if-no-files-found: warn

@@ -40,3 +40,10 @@ apps/build-monitor/tests/visual/baseline/
 apps/build-monitor/src/**
 apps/build-monitor/vite.config.js
 apps/build-monitor/vite.config.js.map
+
+# TASK-156: runner 빌드 산출물. e2e (apps/runner/scripts/e2e-*.sh) 와
+# scripts/run-e2e-suite.sh 가 `go build -o bin/runner-bin ./cmd/runner` 로
+# 생성한다. .dockerignore 에는 이미 있었으나 .gitignore 에 빠져 있어
+# 9MB 바이너리가 커밋될 뻔했다 (TASK-153 의 vite.config.js 와 정반대
+# 방향의 같은 종류의 사각지대 — 두 ignore 파일은 서로를 대신하지 않는다).
+apps/runner/bin/

@@ -6,6 +6,28 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 151→152: **TASK-156 e2e·visual CI/nightly 통합 봉인**).
+
+  v0.2.1 의 프로덕션 결함 2건이 모두 "e2e 를 안 돌리면 잠복" 이었던 사각지대를 자동 검출로 덮었다.
+
+  ## 산출물 4종
+  1. **`scripts/run-e2e-suite.sh`** — e2e 13종 그룹 실행(`local` 5 / `compose` 6 / `runner` 2 / `all`). env 정규화(`DOCKER_SOCKET_GID` getent 자동 유도 / `ADMIN_IDS` / `PGPORT` / `DIBS_POSTGRES_HOST_PORT` / `DATABASE_URL`) + 전제 점검(부족 시 exit 3 조기 실패) + `docker_image_builder` DB 자동 생성 + **`runner-bin` 자동 `go build`** + 스크립트 간 `dibs-*` 잔재 정리(TASK-155 이름 충돌 방지) + fail-open 요약.
+  2. **`scripts/run-visual-check.sh`** — build-server(memory)+vite 기동 → `capture.py` → **baseline 없이도 유효한 구조 검증 4종**(`capture.py` 의 `ROUTES` 를 단일 출처로 파싱한 라우트 셋 완전성 / 0 byte / dark≠light / modal≠base) + 선택적 `--baseline` 픽셀 diff.
+  3. **`.github/workflows/nightly-e2e.yml`** — cron **04:00 UTC**(b-layer 03:00 과 1h 분리) + main push(14 경로 필터) + `workflow_dispatch`(group, run_visual). e2e 잡: postgres service(trust) + node20/pnpm10.15/go1.22 + 빌드 산출물 준비 → wrapper → 로그 artifact. visual 잡: setup-chrome + pip playwright → wrapper → PNG artifact(14일).
+  4. **`docs/operations/e2e-visual-ci-2026-07-23.md`** — 8 섹션 운영 가이드.
+
+  ## 발견 — runner e2e 2종은 신호가 약하다
+  `e2e-{container-run,deploy-push}.sh` 는 이름 그대로 **smoke**: `! container not running` / `! hostPort not populated` 여도 경고만 찍고 **PASS** 한다. 게다가 **`runner-bin` 이 없으면 runner 가 아예 안 뜨는데도 PASS** 한다(세션 중 실제로 그 상태였다). 즉 기존 "13/13 PASS" 중 이 2종은 plumbing 수준의 신호였다.
+  → wrapper 가 `go build` 를 대신해 가짜 PASS 를 막고, 가이드 §6 에 신호 강도를 명시. **후속 후보**: 두 스크립트의 단언을 hard fail 로 강화.
+
+  ## 한계 기록
+  - **모달 픽셀 diff 흔들림** — 실측 `admin-runners/dark-modal.png` ratio 0.0017 (> 0.001). Dialog 애니메이션/합성 타이밍 추정. baseline diff 를 켤 때 모달은 별도 threshold 또는 제외 검토.
+  - **baseline LFS 정책 미결** — CI 는 구조 검증만. 정책 확정 시 워크플로에 `--baseline` 한 줄 추가로 활성화.
+
+  ## 검증
+  wrapper `--group all` → **13/13 PASS (388s)** (local 19s / compose 272s / runner 97s) / visual 구조 검증 20 PNG 통과 / `--baseline` 경로 실동작 확인 / YAML 3종 파싱 OK / `bash -n` 통과.
+
+  workflow meta sync (state purpose_digest_rev 193→194, handoff_rev 115→116, backlog index·latest +1, task_count 61→62, handoff doc 151→152, work_backlog 109→110) 같은 commit.
 - Updated: 2026-07-23 (rev 150→151: **v0.2.1 릴리스 태깅 — Phase 1 후속 패치**).
 
   TASK-153/154/155 를 묶어 patch release `v0.2.1` 로 태깅했다. `v0.2.0` 봉인 직후 **실이미지 e2e 를 처음 돌리며 드러난 프로덕션 결함 2건**을 담은 릴리스다.
