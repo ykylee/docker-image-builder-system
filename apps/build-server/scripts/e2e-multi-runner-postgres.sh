@@ -80,7 +80,7 @@ trap '
 blue "[0/8] compose up — postgres + build-server + 3 runner"
 docker compose -f compose.dev.yaml -f compose.dev.runner-multi-postgres.yaml \
   --profile postgres \
-  --project-name dibs-multi-runner-pg up -d \
+  --project-name dibs-multi-runner-pg up -d --build \
   >"${TMP}/compose-up.log" 2>&1
 if [[ $? -ne 0 ]]; then
   red "[fatal] docker compose up failed"

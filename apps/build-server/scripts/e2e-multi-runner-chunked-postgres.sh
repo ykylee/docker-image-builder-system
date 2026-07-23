@@ -81,7 +81,7 @@ COMPOSE_PROJECT="dibs-mr-chunked-pg-$$"
 docker compose -f compose.dev.yaml -f compose.dev.runner-multi-postgres.yaml \
   -f compose.dev.multi-runner-chunked-postgres.yaml \
   --profile postgres \
-  --project-name "${COMPOSE_PROJECT}" up -d \
+  --project-name "${COMPOSE_PROJECT}" up -d --build \
   >"${TMP}/compose-up.log" 2>&1
 if [[ $? -ne 0 ]]; then
   red "[fatal] docker compose up failed"
@@ -200,12 +200,17 @@ for i in 0 1 2 3; do
   # 이전 구현은 32 바이트 chunk + 선언 128 이라 cap 이 1 이어서 다중 chunk
   # round 가 전부 409 idx_out_of_range 였고, round 1 은 Content-Range 의
   # end(127) 가 실제 body 길이(32)와 어긋나 400 이었다.
-  if [[ "${i}" -eq 0 || "${i}" -eq 1 ]]; then DECLARED=1024; else DECLARED=4096; fi
+  # semantic A(Content-Range)는 idx = floor(start / 16MiB) 로 유도되므로
+  # e2e 규모(KB 단위)에서는 chunk 를 여러 개 보내도 전부 idx 0 으로
+  # 덮어써진다. 따라서 **다중 chunk 는 semantic B(round 2)만** 가능하고
+  # semantic A(round 1,3)는 전체 범위를 덮는 단일 chunk 로 검증한다.
+  if [[ "${i}" -eq 2 ]]; then DECLARED=4096; else DECLARED=1024; fi
   # 선언 checksum 은 **실제로 업로드될 조립 결과**의 SHA-256 이어야 한다.
   # 이전 구현은 all-zeros 를 선언해 runner 의 source 검증 단계에서 걸려
   # build 가 terminal 로 못 갔다 (다른 e2e 는 size 0 dummy 라 안 드러남).
   if [[ "${i}" -eq 0 ]]; then ASSEMBLED="$(printf 'A%.0s' {1..1024})"
   elif [[ "${i}" -eq 1 ]]; then ASSEMBLED="$(printf 'B%.0s' {1..1024})"
+  elif [[ "${i}" -eq 3 ]]; then ASSEMBLED="$(printf 'D%.0s' {1..1024})"
   else ASSEMBLED="$(printf 'A%.0s' {1..1024})$(printf 'B%.0s' {1..1024})$(printf 'C%.0s' {1..1024})$(printf 'D%.0s' {1..1024})"
   fi
   DECLARED_SHA="$(printf '%s' "${ASSEMBLED}" | shasum -a 256 | awk '{print $1}')"
@@ -277,22 +282,16 @@ except Exception:
       done
       ;;
     3)
-      # 의미 C numeric total + 다중 chunk (Content-Range 가 start offset 명시)
-      for j in 0 1 2 3; do
-        OFFSET=$(( j * 1024 ))
-        LAST=$(( OFFSET + 1023 ))
-        if [[ "${j}" -eq 0 ]]; then BYTES="$(printf 'A%.0s' {1..1024})"
-        elif [[ "${j}" -eq 1 ]]; then BYTES="$(printf 'B%.0s' {1..1024})"
-        elif [[ "${j}" -eq 2 ]]; then BYTES="$(printf 'C%.0s' {1..1024})"
-        else BYTES="$(printf 'D%.0s' {1..1024})"
-        fi
-        SHA="$(printf '%s' "${BYTES}" | shasum -a 256 | awk '{print $1}')"
-        curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source/chunk" \
-          -H 'content-type: application/octet-stream' \
-          -H "x-source-checksum-sha256: ${SHA}" \
-          -H "content-range: bytes ${OFFSET}-${LAST}/4096" \
-          --data-binary "${BYTES}" >/dev/null
-      done
+      # 의미 C numeric total — 전체 범위를 덮는 단일 chunk.
+      # (다중 chunk 는 semantic A 의 idx = floor(start/16MiB) 유도 때문에
+      #  e2e 규모에서 전부 idx 0 으로 붕괴하므로 round 2 의 semantic B 가 담당.)
+      BYTES="$(printf 'D%.0s' {1..1024})"
+      SHA="$(printf '%s' "${BYTES}" | shasum -a 256 | awk '{print $1}')"
+      curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source/chunk" \
+        -H 'content-type: application/octet-stream' \
+        -H "x-source-checksum-sha256: ${SHA}" \
+        -H 'content-range: bytes 0-1023/1024' \
+        --data-binary "${BYTES}" >/dev/null
       ;;
   esac
   green "  ✓ ${APPNAME} → ${BUILD_ID} (round ${i}, multi-format)"

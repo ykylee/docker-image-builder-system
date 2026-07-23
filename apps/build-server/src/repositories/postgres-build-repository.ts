@@ -335,30 +335,53 @@ export class PostgresBuildRepository implements BuildRepository {
         };
       }
 
-      // TASK-080: gate claim on source archive presence. Inner-joining
-      // build_source mirrors the in-memory repo's
-      // `sourceArchives.has(buildId)` check — a build whose source
-      // bytes have not yet been uploaded is not eligible for claim.
-      // Without this, a Runner that claims the build before the
-      // Skill finishes uploading hits a 404 on
-      // `/builds/:id/source` and the build fails immediately. See
+      // TASK-080: gate claim on source archive presence — a build whose
+      // source bytes have not yet been uploaded is not eligible for claim.
+      // Without this, a Runner that claims the build before the Skill
+      // finishes uploading hits a 404 on `/builds/:id/source` and the
+      // build fails immediately. See
       // `docs/operations/dogfood-e2e-2026-07-06.md` §3.2.
-      const [nextRow] = await tx
-        .select({ build: buildRequestTable })
+      //
+      // TASK-154: 원래 구현은 legacy `build_source` 로 inner join 만 했다.
+      // 그런데 TASK-106 의 chunked 업로드는 **첫 chunk 에서 legacy row 를
+      // 삭제**하고 `build_source_chunk` 에 기록하므로, chunked 로 올린
+      // build 는 join 이 비어 **영원히 claim 되지 않았다** (QUEUED 정체).
+      // 이제 자격 = (legacy row 존재) OR (chunk 가 1건 이상이면서 누적
+      // size 가 선언 total 이상 = 업로드 완료).
+      //
+      // `EXISTS(chunk)` 를 AND 로 함께 거는 이유: chunk 0 건이면 SUM 이
+      // NULL → COALESCE 0 이 되어, sizeBytes 0 으로 선언된 build 가
+      // source 없이도 `0 >= 0` 으로 통과해 TASK-080 가드가 뚫린다.
+      const [nextBuild] = await tx
+        .select()
         .from(buildRequestTable)
-        .innerJoin(buildSourceTable, eq(buildSourceTable.buildId, buildRequestTable.id))
-        .where(eq(buildRequestTable.status, "QUEUED"))
+        .where(
+          and(
+            eq(buildRequestTable.status, "QUEUED"),
+            sql`(
+              EXISTS (
+                SELECT 1 FROM build_source s
+                WHERE s.build_id = ${buildRequestTable.id}
+              )
+              OR (
+                EXISTS (
+                  SELECT 1 FROM build_source_chunk c
+                  WHERE c.build_id = ${buildRequestTable.id}
+                )
+                AND COALESCE((
+                  SELECT SUM(c.size_bytes) FROM build_source_chunk c
+                  WHERE c.build_id = ${buildRequestTable.id}
+                ), 0) >= ${buildRequestTable.sourceArchiveSizeBytes}
+              )
+            )`
+          )
+        )
         .orderBy(asc(buildRequestTable.createdAt))
         .limit(1);
 
-      if (!nextRow) {
+      if (!nextBuild) {
         return { kind: "no_build_available" };
       }
-
-      // The inner-joined select projects the build row as `build`
-      // (Task-080 source-gate). Pull it out so the rest of this
-      // block continues to read flat fields from the build row.
-      const nextBuild = nextRow.build;
 
       const timestamp = new Date();
       const nextPhaseHistory = advancePhaseHistory(

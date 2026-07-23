@@ -706,3 +706,87 @@ describe("MemoryBuildRepository: claimNextBuild multi-runner atomic (TASK-081)",
     assert.deepEqual([claimedId, secondId].sort(), [ids[0], ids[1]].sort());
   });
 });
+
+// TASK-154: chunked 업로드 source-gate 회귀 가드.
+//
+// TASK-080 의 source-gate 는 legacy 단일행 저장(`sourceArchives` /
+// postgres `build_source`)의 존재만 봤다. 그런데 TASK-106 의 chunked
+// 업로드는 **첫 chunk 에서 legacy 항목을 삭제**하고 chunk 저장소에만
+// 기록하므로, chunked 로 올린 build 는 자격 판정에서 영원히 탈락해
+// runner 가 claim 하지 못했다 (QUEUED/REQUEST_ACCEPTED 무한 정체).
+// 아래 테스트가 그 회귀를 고정한다.
+describe("MemoryBuildRepository: claimNextBuild — chunked source gate (TASK-154)", () => {
+  // 청크 cap 은 ceil(declaredTotal / 1024) 이므로 2 chunk 를 쓰려면
+  // 선언 total 이 2048 이어야 한다 (1024 × 2).
+  const CHUNK_SIZE = 1024;
+  const TOTAL = CHUNK_SIZE * 2;
+
+  async function seedChunkedBuild(
+    repo: ReturnType<typeof createMemoryBuildRepository>,
+    appName: string,
+    chunksToUpload: number
+  ): Promise<string> {
+    const created = await repo.createBuild({
+      appName,
+      requestedBy: "yklee",
+      sourceArchive: {
+        objectKey: `src/${appName}/archive.tar.gz`,
+        checksumSha256: "f".repeat(64),
+        sizeBytes: TOTAL
+      },
+      entrypointPath: "src/index.ts"
+    });
+    if (created.kind !== "accepted") {
+      throw new Error(`seed failed for ${appName}: ${created.kind}`);
+    }
+    const buildId = created.response.build.buildId;
+    for (let i = 0; i < chunksToUpload; i += 1) {
+      const bytes = new Uint8Array(CHUNK_SIZE).fill(65 + i);
+      const perChunk = createHash("sha256").update(Buffer.from(bytes)).digest("hex");
+      const res = await repo.storeSourceChunk(buildId, bytes, perChunk, TOTAL);
+      if (res.kind !== "ok") {
+        throw new Error(`chunk ${i} upload failed: ${res.kind}`);
+      }
+    }
+    return buildId;
+  }
+
+  it("claims a build whose source was uploaded via the chunked path", async () => {
+    const repo = createMemoryBuildRepository();
+    const buildId = await seedChunkedBuild(repo, "chunked-claimable", 2);
+
+    const result = await repo.claimNextBuild();
+    assert.equal(result.kind, "claimed");
+    if (result.kind !== "claimed") return;
+    assert.equal(result.response.build.buildId, buildId);
+    assert.equal(result.response.build.status, "CLAIMED");
+    assert.equal(result.response.build.phase, "QUEUE_CLAIMED");
+  });
+
+  it("does not claim a build whose chunked upload is still partial", async () => {
+    const repo = createMemoryBuildRepository();
+    // 2 chunk 중 1 개만 업로드 → 누적 1024 < 선언 2048 → 자격 없음.
+    await seedChunkedBuild(repo, "chunked-partial", 1);
+
+    const result = await repo.claimNextBuild();
+    assert.equal(result.kind, "no_build_available");
+  });
+
+  it("still refuses a build with no source bytes at all (TASK-080 가드 보존)", async () => {
+    const repo = createMemoryBuildRepository();
+    const created = await repo.createBuild({
+      appName: "no-source",
+      requestedBy: "yklee",
+      sourceArchive: {
+        objectKey: "src/no-source/archive.tar.gz",
+        checksumSha256: "f".repeat(64),
+        sizeBytes: 0
+      },
+      entrypointPath: "src/index.ts"
+    });
+    assert.equal(created.kind, "accepted");
+
+    const result = await repo.claimNextBuild();
+    assert.equal(result.kind, "no_build_available");
+  });
+});

@@ -253,10 +253,30 @@ export function createMemoryBuildRepository(): BuildRepository {
       // The bytes live in the module-scoped `sourceArchives` Map
       // (keyed by buildId) — its presence mirrors the existence of a
       // row in the postgres `build_source` table.
+      //
+      // TASK-154: chunked 업로드(`sourceArchivesChunked`)는 첫 chunk 에서
+      // legacy `sourceArchives` 항목을 지우므로, legacy Map 만 보면
+      // chunked 로 올린 build 가 **영원히 claim 되지 않는다**. postgres
+      // repo 와 동일하게 (legacy 존재) OR (chunk 1건 이상 + 누적 size 가
+      // 선언 total 이상 = 업로드 완료) 를 자격으로 본다.
+      const hasClaimableSource = (buildId: string): boolean => {
+        if (sourceArchives.has(buildId)) {
+          return true;
+        }
+        const envelope = sourceArchivesChunked.get(buildId);
+        if (!envelope || envelope.chunks.size === 0) {
+          return false;
+        }
+        let cumulative = 0;
+        for (const chunk of envelope.chunks.values()) {
+          cumulative += chunk.sizeBytes;
+        }
+        return cumulative >= envelope.totalSizeBytes;
+      };
       const next = queueOrder.find(
         (entry) =>
           entry.summary.status === "QUEUED" &&
-          sourceArchives.has(entry.summary.buildId)
+          hasClaimableSource(entry.summary.buildId)
       );
       if (!next) {
         return { kind: "no_build_available" };
