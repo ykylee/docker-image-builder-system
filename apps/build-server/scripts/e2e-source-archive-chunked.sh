@@ -25,9 +25,18 @@
 #         upload wiped the legacy row, but DELETE must also clean up
 #         any chunk rows).
 #
-# Requires: a local Postgres at 127.0.0.1:15432 with the
-# `docker_image_builder` database accessible to the `postgres` superuser
-# (mirrors the setup used by `e2e-source-archive-postgres.sh`).
+# Requires: a local Postgres with the `docker_image_builder` database
+# accessible to the `postgres` superuser (mirrors the setup used by
+# `e2e-source-archive-postgres.sh`). 본 스크립트는 이름과 달리 실제로는
+# **postgres backend 로 부팅**한다 ([6/6] 의 chunk row 검증이 psql 을 쓴다).
+# [4/6] 만 memory-style 검증(envelope out-of-range 409)이라 `-postgres`
+# 변종(per-chunk bytea 검증)과 갈린다.
+#
+# 접속 정보는 전부 `DATABASE_URL` 에서 유도한다 (psql 도 동일 URI 사용).
+#   기본값: 로컬 native postgres (127.0.0.1:5432)
+#   compose 매핑(15432) 환경이면:
+#     DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder \
+#       bash apps/build-server/scripts/e2e-source-archive-chunked.sh
 
 set -euo pipefail
 
@@ -49,10 +58,10 @@ else
   COLOR_ERR="err"
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$REPO_ROOT"
 
-DATABASE_URL="${DATABASE_URL:-postgres://memory://test}"
+DATABASE_URL="${DATABASE_URL:-postgres://postgres@127.0.0.1:5432/docker_image_builder}"
 BASE="${BASE:-http://127.0.0.1:3000}"
 
 ARCHIVE_BYTES="${ARCHIVE_BYTES:-512000}"
@@ -86,10 +95,14 @@ if lsof -ti tcp:3000 > /dev/null 2>&1; then
 fi
 
 # Compile (memory baseline tolerates any backend but we want the
-# canonical 4 packages typed before boot).
-TS_OUT=$(./node_modules/.bin/tsc -p packages/{shared-contract,shared-config,db}/tsconfig.json 2>&1) || {
-  err "tsc packages failed: ${TS_OUT}"
-}
+# canonical 4 packages typed before boot). `tsc -p` accepts a single
+# project only — 세 shared package 를 각각 호출한다 (brace 확장으로 -p 에
+# 여러 project 를 넘기면 TS5042).
+for _pkg in shared-contract shared-config db; do
+  TS_OUT=$(./node_modules/.bin/tsc -p "packages/${_pkg}/tsconfig.json" 2>&1) || {
+    err "tsc packages/${_pkg} failed: ${TS_OUT}"
+  }
+done
 TS_OUT=$(./node_modules/.bin/tsc -p apps/build-server/tsconfig.json 2>&1) || {
   err "tsc build-server failed: ${TS_OUT}"
 }
@@ -146,7 +159,7 @@ BUILD_JSON="$(curl -fsS -X POST "$BASE/builds" \
   -H 'content-type: application/json' \
   -d "$(cat <<EOF
 {
-  "appName": "task-106-chunked-postgres",
+  "appName": "task-106-chunked-$$",
   "requestedBy": "alice",
   "sourceArchive": {
     "objectKey": "s3://test/source.bin",
@@ -214,21 +227,65 @@ ok "$NUM_CHUNKS chunks uploaded"
 # [4/6] bytea direct verify — per-chunk bytes + checksum + idx.
 # ---------------------------------------------------------------------------
 
-step "[4/6] memory backend verify — out-of-range upload rejected"
-# The memory backend does not have a psql column to inspect, so
-# instead we sanity-check that the chunked envelope's total-size cap
-# rejects an extra upload beyond the declared total (idem-potent
-# `idx_out_of_range`). This proves the envelope's cumulative size
-# state matches the declared total — if it didn't, a re-upload at
-# idx=NUM_CHUNKS would still succeed.
-extra_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/builds/$BUILD_ID/source/chunk" \
+step "[4/6] envelope verify — out-of-range upload rejected"
+# 이 변종은 per-chunk bytea 검증(-postgres 변종의 [4/6]) 대신 **envelope
+# 의미**를 본다: 선언된 total 을 넘어서는 추가 업로드가 `idx_out_of_range`
+# (409) 로 거부되는지. 누적 size 상태가 선언 total 과 맞지 않으면
+# idx=NUM_CHUNKS 재업로드가 성공해 버린다.
+#
+# 주의: 라우트는 checksum_mismatch(400) 를 idx_out_of_range(409) 보다 먼저
+# 평가한다. 따라서 **실제 body + 그 body 의 진짜 SHA-256** 을 보내야
+# checksum 단계를 통과해 idx 범위 검사에 도달한다. (이전 구현은 가짜
+# 체크섬 64×'a' + `--data-binary` 의 `@` 누락으로 파일 경로 문자열을
+# body 로 보내 항상 400 에 걸렸다.)
+# 가드의 실제 규칙: totalChunks = ceil(declaredTotalSizeBytes / 1024) 이고
+# idx >= totalChunks 일 때만 409. 본 시나리오의 아카이브(512000B)는 cap 이
+# 500 청크라 4 청크만 올리는 메인 흐름으로는 절대 cap 에 닿지 않는다
+# (이전 구현은 "선언 total 을 넘으면 409" 라는 잘못된 전제로 작성돼 있었다).
+# 그래서 **작은 보조 build**(2048B → cap 2)로 가드를 직접 실증한다.
+SMALL_ARCHIVE="$WORK_DIR/small.bin"
+python3 -c "import sys; sys.stdout.buffer.write(bytes(((i*13 + 5) & 0xff) for i in range(2048)))" > "$SMALL_ARCHIVE"
+SMALL_SHA="$(sha256sum "$SMALL_ARCHIVE" | awk '{print $1}')"
+SMALL_JSON="$(curl -fsS -X POST "$BASE/builds" \
+  -H 'content-type: application/json' \
+  -d "$(cat <<EOF
+{
+  "appName": "task-106-chunked-cap-$$",
+  "requestedBy": "alice",
+  "sourceArchive": {
+    "objectKey": "s3://test/small.bin",
+    "checksumSha256": "$SMALL_SHA",
+    "sizeBytes": 2048
+  },
+  "entrypointPath": "src/index.ts",
+  "dockerfilePath": "Dockerfile"
+}
+EOF
+)")" || err "POST /builds (cap probe) failed"
+SMALL_ID="$(printf '%s' "$SMALL_JSON" | python3 -c 'import sys,json; print(json.load(sys.stdin)["build"]["buildId"])')"
+
+split -b 1024 "$SMALL_ARCHIVE" "$WORK_DIR/small."
+small_parts=("$WORK_DIR"/small.*)
+# cap(2) 만큼 정상 업로드 — 각 청크는 자기 자신의 SHA-256 을 헤더로 보낸다
+# (라우트가 checksum_mismatch(400) 를 idx_out_of_range(409) 보다 먼저 평가).
+for sp in "${small_parts[@]:0:2}"; do
+  sp_sha="$(sha256sum "$sp" | awk '{print $1}')"
+  curl -fsS -o /dev/null -X POST "$BASE/builds/$SMALL_ID/source/chunk" \
+    -H 'content-type: application/octet-stream' \
+    -H "X-Source-Checksum-Sha256: $sp_sha" \
+    --data-binary "@$sp" || err "cap probe chunk upload failed"
+done
+# 3번째(idx=2) 는 cap 을 넘어 409 여야 한다.
+extra_part="${small_parts[0]}"
+extra_sha="$(sha256sum "$extra_part" | awk '{print $1}')"
+extra_status=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE/builds/$SMALL_ID/source/chunk" \
   -H 'content-type: application/octet-stream' \
-  -H "X-Source-Checksum-Sha256: $(printf 'a%.0s' {1..64})" \
-  --data-binary "$WORK_DIR/chunk.00") || true
+  -H "X-Source-Checksum-Sha256: $extra_sha" \
+  --data-binary "@$extra_part") || true
 if [ "$extra_status" != "409" ]; then
-  err "expected 409 idx_out_of_range for an upload beyond the declared total, got HTTP $extra_status"
+  err "expected 409 idx_out_of_range at idx=2 (cap=ceil(2048/1024)=2), got HTTP $extra_status"
 fi
-ok "in-memory envelope rejects extras beyond the declared total"
+ok "envelope rejects chunk beyond totalChunks cap (409 idx_out_of_range)"
 
 # ---------------------------------------------------------------------------
 # [5/6] GET /builds/:buildId/source reassembles byte-precise.
@@ -250,7 +307,7 @@ ok "reassembled archive matches declared checksum and size"
 
 step "[6/6] DELETE /builds/$BUILD_ID/source — chunk rows gone"
 curl -fsS -X DELETE "$BASE/builds/$BUILD_ID/source" || err "DELETE /source failed"
-remaining="$(PGPASSWORD=postgres psql -h 127.0.0.1 -p 15432 -U postgres -d docker_image_builder -t -A \
+remaining="$(psql "$DATABASE_URL" -t -A \
   -c "SELECT COUNT(*) FROM build_source_chunk WHERE build_id='$BUILD_ID';")"
 if [ "$remaining" != "0" ]; then
   err "DELETE left $remaining chunk rows for $BUILD_ID"

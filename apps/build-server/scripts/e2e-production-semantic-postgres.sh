@@ -156,7 +156,7 @@ PG_CHECK="$(docker compose -f compose.dev.yaml \
   --profile postgres \
   --project-name "${COMPOSE_PROJECT}" exec -T postgres \
   psql -U dibs -d dibs -t -A -F'|' \
-  -c "SELECT version_num, applied_at FROM schema_migrations ORDER BY version_num;" 2>/dev/null || true)"
+  -c "SELECT version, applied_at FROM schema_migrations ORDER BY version;" || true)"
 APPLIED_COUNT="$(printf '%s' "${PG_CHECK}" | grep -E '^[0-9]{4}\|' | wc -l | tr -d ' ')"
 if [[ "${APPLIED_COUNT}" -lt 5 ]]; then
   red "[fatal] schema_migrations 에 5+ row 가 없어 applyMigrations 가 미완료"

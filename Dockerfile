@@ -59,18 +59,17 @@ COPY docs/ docs/
 #
 # - `tsc` 는 workspace root 의 hoist 된 .bin (`node_modules/.bin/tsc`).
 # - `vite` 는 apps/build-monitor 의 isolated .bin.
-# - `--config vite.react.config.ts` 명시 (= package.json `build` script 와 동일):
-#   React SPA 의 유일한 유효 config. root=react/, entry=react/src/main.tsx,
-#   outDir=dist-react. config 미지정(`vite build`)은 확장자 우선순위(.js>.ts)로
-#   Svelte 잔재 `vite.config.js`(@sveltejs/vite-plugin-svelte 미설치→ERR) 나
-#   half-migrated `vite.config.ts`(루트 index.html→/src/main.ts 미존재→rollup fail)
-#   를 잡아 이미지 빌드가 깨진다. 산출물은 dist-react/ → stage 3 이 dist/ 로 COPY.
+# - `vite build` (= package.json `build` script): TASK-153 통일로 build-monitor
+#   는 단일 canonical `vite.config.ts`(root=react/, outDir=dist-react)만 갖는다.
+#   Svelte 잔재(index.html/svelte.config.js/vite.react.config.ts)는 제거됐고
+#   `vite.config.js` 는 .dockerignore 로 build context 에서도 제외 — plain
+#   `vite build` 가 항상 vite.config.ts 를 잡는다. 산출물 dist-react/ → stage3 COPY.
 RUN pnpm install --frozen-lockfile \
  && ./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json \
  && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json \
  && ./node_modules/.bin/tsc -p packages/db/tsconfig.json \
  && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json \
- && cd apps/build-monitor && ./node_modules/.bin/vite build --config vite.react.config.ts
+ && cd apps/build-monitor && ./node_modules/.bin/vite build
 
 # ---------- stage 2: prod-deps (runtime 전용, prodDeps 만) ----------
 # 별도 stage 로 분리하여 runtime image 에 devDependencies 가 새지 않도록.

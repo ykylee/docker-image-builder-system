@@ -31,9 +31,9 @@ Build Server (memory backend) + build-monitor dev server 를 동시에 띄운다
 BUILD_REPOSITORY_BACKEND=memory \
   ./node_modules/.bin/tsx apps/build-server/src/index.js
 
-# 터미널 2 — frontend dev (TASK-093 + vite.react.config, port 5174)
+# 터미널 2 — frontend dev (단일 vite.config.ts, port 5174 — TASK-153 통일)
 cd apps/build-monitor && ./node_modules/.bin/vite \
-  --config vite.react.config.ts --port 5174 --strictPort
+  --port 5174 --strictPort
 ```
 
 캡쳐 스크립트 실행 (TASK-152 갱신: channel chrome + 현 라우트 셋):

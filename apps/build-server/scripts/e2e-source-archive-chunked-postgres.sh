@@ -25,9 +25,15 @@
 #         upload wiped the legacy row, but DELETE must also clean up
 #         any chunk rows).
 #
-# Requires: a local Postgres at 127.0.0.1:15432 with the
-# `docker_image_builder` database accessible to the `postgres` superuser
-# (mirrors the setup used by `e2e-source-archive-postgres.sh`).
+# Requires: a local Postgres with the `docker_image_builder` database
+# accessible to the `postgres` superuser (mirrors the setup used by
+# `e2e-source-archive-postgres.sh`).
+#
+# 접속 정보는 전부 `DATABASE_URL` 에서 유도한다 (psql 도 동일 URI 사용).
+#   기본값: 로컬 native postgres (127.0.0.1:5432)
+#   compose 매핑(15432) 환경이면:
+#     DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder \
+#       bash apps/build-server/scripts/e2e-source-archive-chunked-postgres.sh
 
 set -euo pipefail
 
@@ -49,10 +55,10 @@ else
   COLOR_ERR="err"
 fi
 
-REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$REPO_ROOT"
 
-DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder}"
+DATABASE_URL="${DATABASE_URL:-postgres://postgres@127.0.0.1:5432/docker_image_builder}"
 BASE="${BASE:-http://127.0.0.1:3000}"
 
 ARCHIVE_BYTES="${ARCHIVE_BYTES:-512000}"
@@ -86,10 +92,14 @@ if lsof -ti tcp:3000 > /dev/null 2>&1; then
 fi
 
 # Compile (memory baseline tolerates any backend but we want the
-# canonical 4 packages typed before boot).
-TS_OUT=$(./node_modules/.bin/tsc -p packages/{shared-contract,shared-config,db}/tsconfig.json 2>&1) || {
-  err "tsc packages failed: ${TS_OUT}"
-}
+# canonical 4 packages typed before boot). `tsc -p` accepts a single
+# project only — 세 shared package 를 각각 호출한다 (brace 확장으로 -p 에
+# 여러 project 를 넘기면 TS5042).
+for _pkg in shared-contract shared-config db; do
+  TS_OUT=$(./node_modules/.bin/tsc -p "packages/${_pkg}/tsconfig.json" 2>&1) || {
+    err "tsc packages/${_pkg} failed: ${TS_OUT}"
+  }
+done
 TS_OUT=$(./node_modules/.bin/tsc -p apps/build-server/tsconfig.json 2>&1) || {
   err "tsc build-server failed: ${TS_OUT}"
 }
@@ -146,7 +156,7 @@ BUILD_JSON="$(curl -fsS -X POST "$BASE/builds" \
   -H 'content-type: application/json' \
   -d "$(cat <<EOF
 {
-  "appName": "task-106-chunked-postgres",
+  "appName": "task-106-chunked-pg-$$",
   "requestedBy": "alice",
   "sourceArchive": {
     "objectKey": "s3://test/source.bin",
@@ -221,7 +231,7 @@ for ((i = 0; i < NUM_CHUNKS; i++)); do
     part="${parts[$i]}"
   fi
   expected_sha="$(sha256sum "$part" | awk '{print $1}')"
-  actual="$(PGPASSWORD=postgres psql -h 127.0.0.1 -p 15432 -U postgres -d docker_image_builder -t -A -F'|' \
+  actual="$(psql "$DATABASE_URL" -t -A -F'|' \
     -c "SELECT encode(sha256(bytes),'hex'), size_bytes FROM build_source_chunk WHERE build_id='$BUILD_ID' AND idx=$i;")" || {
     err "psql query for chunk $i failed"
   }
@@ -254,7 +264,7 @@ ok "reassembled archive matches declared checksum and size"
 
 step "[6/6] DELETE /builds/$BUILD_ID/source — chunk rows gone"
 curl -fsS -X DELETE "$BASE/builds/$BUILD_ID/source" || err "DELETE /source failed"
-remaining="$(PGPASSWORD=postgres psql -h 127.0.0.1 -p 15432 -U postgres -d docker_image_builder -t -A \
+remaining="$(psql "$DATABASE_URL" -t -A \
   -c "SELECT COUNT(*) FROM build_source_chunk WHERE build_id='$BUILD_ID';")"
 if [ "$remaining" != "0" ]; then
   err "DELETE left $remaining chunk rows for $BUILD_ID"

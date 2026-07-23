@@ -192,6 +192,23 @@ declare -a CASE_RESULTS
 
 for i in 0 1 2 3; do
   APPNAME="mr-chunked-pg-${i}-$$"
+  # TASK-154: 서버의 chunk cap 은 ceil(sizeBytes/1024) (개수 기준) 이고
+  # 업로드 완료는 누적 바이트 == 선언 total (바이트 기준) 이다. 두 조건을
+  # 동시에 만족시키려면 chunk 를 1024 바이트로 맞춰야 한다.
+  #   단일 chunk round(0,1) → 선언 1024 (cap 1)
+  #   다중 chunk round(2,3) → 선언 4096 (cap 4, 1024×4)
+  # 이전 구현은 32 바이트 chunk + 선언 128 이라 cap 이 1 이어서 다중 chunk
+  # round 가 전부 409 idx_out_of_range 였고, round 1 은 Content-Range 의
+  # end(127) 가 실제 body 길이(32)와 어긋나 400 이었다.
+  if [[ "${i}" -eq 0 || "${i}" -eq 1 ]]; then DECLARED=1024; else DECLARED=4096; fi
+  # 선언 checksum 은 **실제로 업로드될 조립 결과**의 SHA-256 이어야 한다.
+  # 이전 구현은 all-zeros 를 선언해 runner 의 source 검증 단계에서 걸려
+  # build 가 terminal 로 못 갔다 (다른 e2e 는 size 0 dummy 라 안 드러남).
+  if [[ "${i}" -eq 0 ]]; then ASSEMBLED="$(printf 'A%.0s' {1..1024})"
+  elif [[ "${i}" -eq 1 ]]; then ASSEMBLED="$(printf 'B%.0s' {1..1024})"
+  else ASSEMBLED="$(printf 'A%.0s' {1..1024})$(printf 'B%.0s' {1..1024})$(printf 'C%.0s' {1..1024})$(printf 'D%.0s' {1..1024})"
+  fi
+  DECLARED_SHA="$(printf '%s' "${ASSEMBLED}" | shasum -a 256 | awk '{print $1}')"
   ENQ="$(curl -fsS -X POST "${BASE}/builds" \
     -H 'content-type: application/json' \
     -d "{
@@ -199,8 +216,8 @@ for i in 0 1 2 3; do
       \"requestedBy\": \"yklee\",
       \"sourceArchive\": {
         \"objectKey\": \"src/${APPNAME}/archive.tar.gz\",
-        \"checksumSha256\": \"0000000000000000000000000000000000000000000000000000000000000000\",
-        \"sizeBytes\": 128
+        \"checksumSha256\": \"${DECLARED_SHA}\",
+        \"sizeBytes\": ${DECLARED}
       },
       \"entrypointPath\": \"src/index.ts\"
     }" 2>&1)"
@@ -225,7 +242,7 @@ except Exception:
   case "${i}" in
     0)
       # 의미 B baseline (header 없음) + 단일 chunk
-      BYTES="$(printf 'A%.0s' {1..32})"
+      BYTES="$(printf 'A%.0s' {1..1024})"
       SHA="$(printf '%s' "${BYTES}" | shasum -a 256 | awk '{print $1}')"
       curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source/chunk" \
         -H 'content-type: application/octet-stream' \
@@ -234,23 +251,23 @@ except Exception:
       ;;
     1)
       # 의미 C numeric total + 단일 chunk (Content-Range: bytes 0-127/128)
-      BYTES="$(printf 'B%.0s' {1..32})"
+      BYTES="$(printf 'B%.0s' {1..1024})"
       SHA="$(printf '%s' "${BYTES}" | shasum -a 256 | awk '{print $1}')"
       curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source/chunk" \
         -H 'content-type: application/octet-stream' \
         -H "x-source-checksum-sha256: ${SHA}" \
-        -H 'content-range: bytes 0-127/128' \
+        -H 'content-range: bytes 0-1023/1024' \
         --data-binary "${BYTES}" >/dev/null
       ;;
     2)
       # 의미 B baseline + 다중 chunk (monotonic sequence)
       for j in 0 1 2 3; do
-        OFFSET=$(( j * 32 ))
-        LAST=$(( OFFSET + 31 ))
-        if [[ "${j}" -eq 0 ]]; then BYTES="$(printf 'A%.0s' {1..32})"
-        elif [[ "${j}" -eq 1 ]]; then BYTES="$(printf 'B%.0s' {1..32})"
-        elif [[ "${j}" -eq 2 ]]; then BYTES="$(printf 'C%.0s' {1..32})"
-        else BYTES="$(printf 'D%.0s' {1..32})"
+        OFFSET=$(( j * 1024 ))
+        LAST=$(( OFFSET + 1023 ))
+        if [[ "${j}" -eq 0 ]]; then BYTES="$(printf 'A%.0s' {1..1024})"
+        elif [[ "${j}" -eq 1 ]]; then BYTES="$(printf 'B%.0s' {1..1024})"
+        elif [[ "${j}" -eq 2 ]]; then BYTES="$(printf 'C%.0s' {1..1024})"
+        else BYTES="$(printf 'D%.0s' {1..1024})"
         fi
         SHA="$(printf '%s' "${BYTES}" | shasum -a 256 | awk '{print $1}')"
         curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source/chunk" \
@@ -262,18 +279,18 @@ except Exception:
     3)
       # 의미 C numeric total + 다중 chunk (Content-Range 가 start offset 명시)
       for j in 0 1 2 3; do
-        OFFSET=$(( j * 32 ))
-        LAST=$(( OFFSET + 31 ))
-        if [[ "${j}" -eq 0 ]]; then BYTES="$(printf 'A%.0s' {1..32})"
-        elif [[ "${j}" -eq 1 ]]; then BYTES="$(printf 'B%.0s' {1..32})"
-        elif [[ "${j}" -eq 2 ]]; then BYTES="$(printf 'C%.0s' {1..32})"
-        else BYTES="$(printf 'D%.0s' {1..32})"
+        OFFSET=$(( j * 1024 ))
+        LAST=$(( OFFSET + 1023 ))
+        if [[ "${j}" -eq 0 ]]; then BYTES="$(printf 'A%.0s' {1..1024})"
+        elif [[ "${j}" -eq 1 ]]; then BYTES="$(printf 'B%.0s' {1..1024})"
+        elif [[ "${j}" -eq 2 ]]; then BYTES="$(printf 'C%.0s' {1..1024})"
+        else BYTES="$(printf 'D%.0s' {1..1024})"
         fi
         SHA="$(printf '%s' "${BYTES}" | shasum -a 256 | awk '{print $1}')"
         curl -fsS -X POST "${BASE}/builds/${BUILD_ID}/source/chunk" \
           -H 'content-type: application/octet-stream' \
           -H "x-source-checksum-sha256: ${SHA}" \
-          -H "content-range: bytes ${OFFSET}-${LAST}/128" \
+          -H "content-range: bytes ${OFFSET}-${LAST}/4096" \
           --data-binary "${BYTES}" >/dev/null
       done
       ;;
@@ -283,7 +300,7 @@ done
 
 # round 4 — STRICT 모드가 `*` total 케이스를 거절하는지 검증.
 echo
-blue "[4/7] strict 모드 의 `'*' total` 거절 검증 (TASK-110 분기)"
+blue "[4/7] strict 모드의 '*' total 거절 검증 (TASK-110 분기)"
 APPNAME_STRICT="mr-chunked-strict-$$"
 ENQ_STRICT="$(curl -fsS -X POST "${BASE}/builds" \
   -H 'content-type: application/json' \

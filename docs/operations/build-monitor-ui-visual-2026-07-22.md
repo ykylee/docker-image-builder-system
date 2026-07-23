@@ -55,9 +55,9 @@ BUILD_REPOSITORY_BACKEND=memory \
   node apps/build-server/dist/apps/build-server/src/index.js
 # → GET /health 가 {"status":"ok"} 여야 준비 완료
 
-# 터미널 2 — frontend dev (vite.react.config, port 5174)
+# 터미널 2 — frontend dev (단일 vite.config.ts, port 5174 — TASK-153 통일)
 cd apps/build-monitor && ./node_modules/.bin/vite \
-  --config vite.react.config.ts --port 5174 --strictPort
+  --port 5174 --strictPort
 ```
 
 > `@vitejs/plugin-react` 미설치로 vite 가 안 뜨면 루트에서 `pnpm install` (lockfile 정합) 후 재기동.
