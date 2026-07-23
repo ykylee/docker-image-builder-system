@@ -6,6 +6,31 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 160→161: **사용자 결정 3종 — P2-M5 진입 전**).
+
+  ## 결정 3종 (2026-07-23)
+
+  1. **외부 배포 adapter 1호 = k8s** (TASK-059 planned 의 1호 구현). 러너 측 `apps/runner/internal/deploy/k8s.go`, 의존성 `k8s.io/client-go`, e2e 는 minikube/kind + `scripts/e2e-production-semantic-k8s.sh` (신규). `run-e2e-suite.sh` 에 `--group k8s` 신규 추가.
+  2. **결과 전달 채널 1호 = webhook**. build-server 측 `notification-routes.ts` (신규). TASK-061 `resultDelivery.mode` enum 의 `NOTIFICATION` 흡수. payload = canonical `BuildStatusResponse`. 향후 Slack / Nextcloud Tasks 는 consumer 측 webhook receiver 가 라우팅하는 식으로 흡수 가능.
+  3. **visual baseline LFS 정책 = Git LFS 자체 호스팅**. 외부 storage 의존 0, baseline PNG 가 git 히스토리에 남음. `.gitattributes` 에 `*.png filter=lfs diff=lfs merge=lfs -text` 등록. 운영 가이드 `docs/operations/visual-baseline-lfs.md` (신규) — LFS 초기 셋업 / nightly 픽셀 diff / 모달 임계값 분리 절차.
+
+  ## §8 결정 4종 현황
+
+  1. ~~배포 adapter 1호~~ → **결정됨: k8s**
+  2. ~~결과 전달 채널~~ → **결정됨: webhook**
+  3. ~~deprecated alias~~ → 결정됨(2026-07-23): 즉시 제거 (P2-M1 적용)
+  4. ~~visual baseline LFS~~ → **결정됨: Git LFS 자체 호스팅**
+
+  ## 영향 / 후속
+
+  - **P2-M3**: 러너 측 더 깊은 검증 + e2e 회귀 강화. k8s adapter 의 인터페이스 설계를 P2-M3 에서 시작할 수 있음 (실제 구현은 P2-M5).
+  - **P2-M4**: build-monitor / skill_mcp 의 preview-era 잔재 0 검증. 모달 픽셀 diff 의 임계값 분리 정책 결정.
+  - **P2-M5**: k8s adapter 1호 구현 + webhook 결과 전달 채널 1호 구현 + visual LFS 운영 가이드.
+
+  ## 검증
+
+  PHASE-2-CONCEPT.md §8 결정 3종 본문 갱신. SQL / schema / migration / version / git tag / 코드 변경 0 (docs only). workflow meta sync (state purpose_digest_rev 202→203, handoff_rev 124→125, task_count 69→70, work_backlog 118→119) 같은 commit 안에 포함.
+
 - Updated: 2026-07-23 (rev 159→160: **TASK-161 P2-M2 완전 봉인 — preview-era 잔재 청산 5 Step + migration 0008**).
 
   ## 봉인 내역 (5 commit)

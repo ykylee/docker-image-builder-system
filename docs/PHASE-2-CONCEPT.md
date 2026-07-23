@@ -130,12 +130,26 @@ P2-M1 계약  →  P2-M2 서버  →  P2-M3 runner  →  P2-M4 소비자  →  P
 
 ## 8. 진입 전 결정 대기
 
-> 시점: 2026-07-23 (P2-M1 완료, P2-M2 진입 직전)
+> 시점: 2026-07-23 (P2-M2 완전 봉인 후) — **3종 결정 완료** (배포 adapter / 결과 전달 / visual LFS).
 
-1. **외부 배포 adapter 의 1호 대상** — compose / k8s / remote host(ssh) / 기존 레지스트리 push 확장 중 무엇인가. *(미정 — P2-M5 진입 전 결정)*
-2. **결과 전달 채널** — webhook / Slack / Nextcloud Tasks(기존 후보) 중 무엇을 1호로. *(미정 — P2-M5 진입 전 결정)*
+1. **외부 배포 adapter 의 1호 대상** — **결정됨(2026-07-23): k8s**.
+   - 본 저장소가 k8s manifest 를 직접 운영하지는 않지만, **제품 목적의 "외부 시스템 배포"** 가 멀티 호스트 표준인 k8s 와 가장 잘 정합. TASK-059 (external deployment adapter v1, planned) 의 1호 구현 = k8s adapter.
+   - 러너 측 구현 위치: `apps/runner/internal/deploy/` 하위 adapter 패키지(`k8s.go`). 의존성: `k8s.io/client-go`. e2e 환경은 minikube 또는 kind + `apps/build-server/scripts/e2e-production-semantic-k8s.sh` (신규).
+   - **부정합**: 기존 `compose.dev.*.yaml` e2e 와 별도 그룹이라 TASK-156 의 `run-e2e-suite.sh` 에 `--group k8s` 신규 추가.
+
+2. **결과 전달 채널** — **결정됨(2026-07-23): webhook**.
+   - 범용 webhook endpoint 1종(`POST /webhook/build-completed` 등) 운영. 외부 SaaS 의존 없음, 빌드 시스템 / GitHub Actions / Jenkins / 사내 CI 모두 통합 가능.
+   - 구현 위치: build-server 측 `apps/build-server/src/routes/notification-routes.ts` (신규) 또는 별도 module. payload = canonical `BuildStatusResponse` + `deliveryMode: POLLING | NOTIFICATION` 결정.
+   - TASK-061 의 `resultDelivery.mode` enum(`POLLING` / `NOTIFICATION`) 와 정합. webhook = `NOTIFICATION` 모드.
+   - 향후 Slack / Nextcloud Tasks 는 consumer 측 webhook receiver 가 라우팅하는 식으로 흡수 가능 (1호 채택의 확장성).
+
 3. ~~**deprecated alias 유지 기간**~~ — **결정됨(2026-07-23, TASK-159/160)**: 외부 소비자가 없으므로 **즉시 제거**(유예 없음). P2-M1 적용 사례.
-4. **visual baseline 의 외부 LFS 정책** (Phase 1 이월) — P2-M4 의 시각 회귀 판정 강도에 영향. *(미정)*
+
+4. **visual baseline 의 외부 LFS 정책** — **결정됨(2026-07-23): Git LFS 자체 호스팅**.
+   - 외부 storage 의존 0. baseline PNG 가 git 히스토리에 그대로 남고 self-host 친화.
+   - `.gitattributes` 에 `*.png filter=lfs diff=lfs merge=lfs -text` 등록. LFS quota 는 자체 host 의 storage 로 결정.
+   - TASK-156 의 `run-visual-check.sh` 가 baseline 없이도 4종 구조 검증 가능 → **nightly 단계에서** LFS baseline 과의 픽셀 diff 까지 확장. 모달 등 알려진 변동부는 임계값 분리 또는 제외.
+   - 운영 가이드: `docs/operations/visual-baseline-lfs.md` (신규) — LFS 초기 셋업 / nightly 픽셀 diff / 모달 임계값 분리 절차.
 
 ## 9. Phase 2 완료 판정
 
