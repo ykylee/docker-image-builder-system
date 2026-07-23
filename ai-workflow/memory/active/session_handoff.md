@@ -6,6 +6,30 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 159→160: **TASK-161 P2-M2 완전 봉인 — preview-era 잔재 청산 5 Step + migration 0008**).
+
+  ## 봉인 내역 (5 commit)
+
+  - **Sub-commit A** (`2241551`) — `previewStatuses` enum + 9종 legacy state 제거 + `TestDeployment` payload 의 `previewUrl` → `runtimeUrl` rename + status canonical 흡수. build-server 의 21개 TS 컴파일 에러를 한꺼번에 정렬 (테스트 8건 canonical 화 포함).
+  - **Sub-commit B** (`a769e88`) — 메서드명 canonical 화 + 임시 어댑터 `executionToPreviewStatus` 제거 + `GET /builds/:id/test-deployment` endpoint 제거 (consumer 0) + build-monitor 정렬 + `.generated/openapi.d.ts` 재생성.
+  - **Step 3** (`52725d7`) — 러너 hostclient 의 `QueueTestDeployment` → `StartContainerTest` / `ReportPreviewReady` → `ReportContainerTestResult` / `PreviewReadyRequest.PreviewURL` → `RuntimeURL` 정렬.
+  - **Step 5** (`c92f0bd`) — skill_mcp 의 `LEGACY_PREVIEW_STATUSES` / `LEGACY_PREVIEW_TO_EXECUTION` / `is_legacy_preview_status` 정의 + 3개 skill 의 legacy fallback + mcp `testDeployment` forward-map + drift checker `ENUM_TARGETS` §6 항목 모두 제거 (4→3 enum).
+  - **migration 0008** (`6ddc427`) — `ALTER TABLE build_request RENAME COLUMN preview_url TO runtime_url` (데이터 보존) + schema 갱신 + postgres repository read/write 5곳 정렬.
+
+  ## 검증 (불변)
+
+  - TS 5 packages clean / build-server **176 PASS / fail 0** / build-monitor vitest **273 PASS** / 러너 **8/8 package PASS**.
+  - e2e source-archive (memory) / chunked / chunked-postgres / single-port PASS.
+  - migration 0008 idempotency OK (재적용 시 `applied: (none)`).
+  - 문서 무결성 가드 PASS.
+
+  ## 의도적으로 손대지 않은 것
+
+  - **러너 / skill_mcp 의 외부 환경 검증** (compose 6종 + runner 2종) — docker daemon 미가동 환경 한정. CI 환경에서 자동 검증.
+  - **사용자 결정 4종** (배포 adapter / 결과 채널 / deprecated alias / visual LFS) — P2-M2 와 별개. alias 는 사용자 결정에 따라 즉시 제거 완료 (P2-M1 부재).
+
+  workflow meta sync (state purpose_digest_rev 201→202, handoff_rev 123→124, task_count 68→69, work_backlog 117→118) 같은 commit 안에 포함.
+
 - Updated: 2026-07-23 (rev 158→159: **TASK-161 P2-M2 착수 — 서버 정렬 + test-deployment 엔드포인트 재설계, plan 단계**).
 
   ## 정지작업 3건 + 사용자 결정 2건
