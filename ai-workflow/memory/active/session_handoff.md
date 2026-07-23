@@ -6,6 +6,35 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 152→153: **Phase 2 개발 컨셉 확정**).
+
+  Phase 1(v0.2.0/v0.2.1) 종료 후 Phase 2 의 축을 정했다. 결과물 = `docs/PHASE-2-CONCEPT.md`.
+
+  ## 축 (사용자 결정)
+  **preview-era 청산 → 배포 능력 완성** — 모델 정합을 먼저 하고 그 위에 외부 배포를 올린다. Step 15 로드맵 §3 의 경고("새 기능이 preview-era 구조 위에 쌓이지 않도록 먼저 기반 refactor 를 연다")를 채택.
+
+  ## 실측으로 규명한 격차 4종
+  1. **모델이 하이브리드에 정체** — 11 phase 에 `PREVIEW_QUEUED/READY`(preview-era)와 `DEPLOYMENT_*`(신 모델)가 공존. **`CONTAINER_TEST_*` 가 없어 "컨테이너 테스트"가 1급 개념이 아니다** — 제품 목적의 한 단계가 모델에 부재.
+  2. **외부 배포 미구현** — `RUNNER_DEPLOY_MODE` 기본 `skeleton`, `cli` 도 레지스트리 push 까지. 제품 목적의 절반.
+  3. **AI 에이전트 진입점 동결** — `apps/skill_mcp` 가 TASK-069 이후 미접촉. Phase 1 전체(TASK-088~156)가 안 건드림. `preview_readiness_checker` 등 이름까지 preview-era. 단위 테스트 226 은 통과(죽어있진 않으나 계약 드리프트).
+  4. **결과 전달 경로 부재**.
+
+  ## 청산 대상 실측 (407 출현 / 6계층)
+  shared-contract **123** / build-server **117** / skill_mcp **77** / build-monitor **50** / runner **28** / db **12**.
+
+  ## 중복 작업 방지 — 이미 끝난 것
+  **DB 스키마 분리는 완료**(migration `0003`, TASK-053 으로 `build_test`/`deployment_attempt` 생성). `build_request` 의 `preview_status`/`preview_ttl_minutes`/`preview_url` 은 **의도적 shim**(스키마 주석이 "Retained during TASK-053" 로 명시). 즉 가산은 끝났고 **감산이 남았다**.
+
+  ## 마일스톤
+  `P2-M1 계약 청산` → `P2-M2 서버 정렬(+migration 0007)` → `P2-M3 runner 정렬` → `P2-M4 소비자 정렬` → `P2-M5 배포 능력`. contract 선행 원칙 — 계약을 먼저 바꾸면 나머지 드리프트가 TSC 에서 끌려 나온다(TASK-130 자산).
+
+  ## 다음 작업
+  **P2-M1** — `PREVIEW_QUEUED/READY` → `CONTAINER_TEST_STARTED/PASSED` 승격, `TestDeployment` → canonical test 모델, `previewUrl`/`TtlMinutes` → optional runtime artifact 격하.
+
+  ## 진입 전 결정 4종 (사용자)
+  배포 adapter 1호 대상(compose/k8s/ssh/registry 확장) / 결과 전달 채널 1호(webhook/Slack/Nextcloud Tasks) / deprecated alias 유지 기간 / visual baseline 외부 LFS 정책(Phase 1 이월).
+
+  workflow meta sync (state purpose_digest_rev 194→195, handoff_rev 116→117, phase.phase_2 신규, handoff doc 152→153, work_backlog 110→111) 같은 commit.
 - Updated: 2026-07-23 (rev 151→152: **TASK-156 e2e·visual CI/nightly 통합 봉인**).
 
   v0.2.1 의 프로덕션 결함 2건이 모두 "e2e 를 안 돌리면 잠복" 이었던 사각지대를 자동 검출로 덮었다.
