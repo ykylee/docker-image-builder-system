@@ -950,7 +950,7 @@ export interface components {
              */
             status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * @description Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks.
              * @enum {string}
@@ -993,7 +993,7 @@ export interface components {
         /** @description The in-flight BuildPhase, or null when the build is in a terminal state. Mirrors build.phase + carry-over timestamp. */
         BuildCurrentPhase: {
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * Format: date-time
              * @description ISO 8601 timestamp at which the current in-flight phase began. Used by the build-monitor PhaseTimeline to render the "now" indicator.
@@ -1081,7 +1081,7 @@ export interface components {
             build: components["schemas"]["BuildSummary"];
             lastError: components["schemas"]["BuildError"] & unknown;
             /**
-             * @description List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. PREVIEW_QUEUED → COMPLETED without PREVIEW_READY). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051).
+             * @description List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. CONTAINER_TEST_STARTED → COMPLETED without CONTAINER_TEST_PASSED). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051).
              * @default []
              */
             phaseHistory: components["schemas"]["BuildPhaseHistoryEntry"][];
@@ -1131,7 +1131,7 @@ export interface components {
         /** @description Single completed-phase record. Appended in transition order. The current in-flight phase is not represented here — see BuildCurrentPhase. */
         BuildPhaseHistoryEntry: {
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * Format: date-time
              * @description ISO 8601 timestamp at which this phase completed (transitioned out, regardless of outcome).
@@ -1151,7 +1151,7 @@ export interface components {
             /** Format: uuid */
             buildId: string;
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             message: string;
             /** Format: date-time */
             createdAt: string;
@@ -1172,7 +1172,7 @@ export interface components {
         /** @description Runner phase report payload (PKG-005). */
         PhaseUpdateRequest: {
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             runnerId: string;
             /** Format: date-time */
             occurredAt?: string;
@@ -1290,7 +1290,7 @@ export interface components {
              */
             status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED" | "CLAIMED" | "TEST_READY";
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "PREVIEW_QUEUED" | "PREVIEW_READY" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * @description Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks.
              * @enum {string}

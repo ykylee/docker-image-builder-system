@@ -142,7 +142,7 @@ DOCKER_BUILDING
 IMAGE_REGISTERED
 PREVIEW_QUEUEING
 PREVIEW_STARTING
-PREVIEW_READY
+CONTAINER_TEST_PASSED
 FAILED
 ```
 
@@ -614,7 +614,7 @@ class CliTests(unittest.TestCase):
         phase_ts.write_text(
             "export const buildPhases = [\"REQUEST_ACCEPTED\",\"SOURCE_PREPARING\","
             "\"INPUT_VALIDATING\",\"DOCKER_BUILDING\",\"IMAGE_REGISTERED\","
-            "\"PREVIEW_QUEUEING\",\"PREVIEW_STARTING\",\"PREVIEW_READY\",\"FAILED\"] as const;\n",
+            "\"PREVIEW_QUEUEING\",\"PREVIEW_STARTING\",\"CONTAINER_TEST_PASSED\",\"FAILED\"] as const;\n",
             encoding="utf-8",
         )
         errors_ts = (

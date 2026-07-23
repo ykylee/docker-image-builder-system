@@ -524,14 +524,14 @@ export class PostgresBuildRepository implements BuildRepository {
     const nextPhaseHistory = advancePhaseHistory(
       (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
       row.phase as BuildPhase,
-      "PREVIEW_QUEUED",
+      "CONTAINER_TEST_STARTED",
       timestamp.toISOString()
     );
 
     const [updated] = await this.db
       .update(buildRequestTable)
       .set({
-        phase: "PREVIEW_QUEUED",
+        phase: "CONTAINER_TEST_STARTED",
         previewStatus: "QUEUED",
         previewUrl: null,
         phaseHistory: nextPhaseHistory,
@@ -570,7 +570,7 @@ export class PostgresBuildRepository implements BuildRepository {
     await this.db.insert(buildLogTable).values({
       id: randomUUID(),
       buildId,
-      phase: "PREVIEW_QUEUED",
+      phase: "CONTAINER_TEST_STARTED",
       message: `Preview queued: internalPort=${internalPort} ttlMinutes=${ttlMinutes}`,
       createdAt: timestamp
     });
@@ -617,10 +617,10 @@ export class PostgresBuildRepository implements BuildRepository {
       let nextStatus: BuildStatus = row.status as BuildStatus;
 
       if (status === "PROVISIONING") {
-        nextPhase = "PREVIEW_QUEUED";
+        nextPhase = "CONTAINER_TEST_STARTED";
         nextStatus = "BUILDING";
       } else if (status === "READY") {
-        nextPhase = "PREVIEW_READY";
+        nextPhase = "CONTAINER_TEST_PASSED";
         nextStatus = "TEST_READY";
       } else if (status === "FAILED") {
         nextPhase = "FAILED";

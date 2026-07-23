@@ -253,7 +253,7 @@ export const buildStatusResponseSchema = z
       .default([])
       .meta({
         description:
-          "List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. PREVIEW_QUEUED → COMPLETED without PREVIEW_READY). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051)."
+          "List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. CONTAINER_TEST_STARTED → COMPLETED without CONTAINER_TEST_PASSED). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051)."
       }),
     currentPhase: buildCurrentPhaseSchema.default(null),
     lifecycle: buildLifecycleSchema.optional().meta({

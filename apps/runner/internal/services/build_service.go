@@ -86,7 +86,7 @@ func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *doc
 // ProcessClaim: claim → SOURCE_PREPARED →
 // source.Fetcher.Fetch (TASK-066) → DOCKER_BUILD_STARTED →
 // docker.BuildImage → DOCKER_BUILD_COMPLETED → queueTestDeployment →
-// PREVIEW_READY → DEPLOYMENT_STARTED/COMPLETED → COMPLETED.
+// CONTAINER_TEST_PASSED → DEPLOYMENT_STARTED/COMPLETED → COMPLETED.
 //
 // 모든 phase / status / errorCode string 은 `apps/runner/internal/contract`
 // canonical 상수를 통해 emit — drift structural 차단.
@@ -213,7 +213,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return fmt.Errorf("runner %s: container healthcheck: %w", s.runnerID, err)
 	}
 
-	// 1차 PR scope: container 가 PREVIEW_READY 동안 살아있어야 하므로
+	// 1차 PR scope: container 가 CONTAINER_TEST_PASSED 동안 살아있어야 하므로
 	// 자동 stop 안 함. e2e script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로
 	// 켜고 cleanup 검증.
 	if s.stopContainerOnDone {

@@ -438,9 +438,9 @@ export function createMemoryBuildRepository(): BuildRepository {
         expiresAt,
         updatedAt: timestamp
       };
-      // TASK-050: PREVIEW_QUEUED 진입 시 직전 phase 의 completedAt 기록.
+      // TASK-050: CONTAINER_TEST_STARTED 진입 시 직전 phase 의 completedAt 기록.
       const prevPhase6 = build.summary.phase;
-      if (prevPhase6 !== "PREVIEW_QUEUED") {
+      if (prevPhase6 !== "CONTAINER_TEST_STARTED") {
         build.phaseHistory.push({ phase: prevPhase6, completedAt: timestamp });
       }
       build.testDeployment = testDeployment;
@@ -454,7 +454,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       };
       build.summary = {
         ...enrichBuildSummary(build.summary),
-        phase: "PREVIEW_QUEUED",
+        phase: "CONTAINER_TEST_STARTED",
         previewStatus: "QUEUED",
         previewUrl: null,
         updatedAt: timestamp
@@ -465,7 +465,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       const log: BuildLogEntry = {
         id: randomUUID(),
         buildId,
-        phase: "PREVIEW_QUEUED",
+        phase: "CONTAINER_TEST_STARTED",
         message: `Preview queued: internalPort=${internalPort} ttlMinutes=${ttlMinutes}`,
         createdAt: timestamp
       };
@@ -535,17 +535,17 @@ export function createMemoryBuildRepository(): BuildRepository {
       let nextPhase = build.summary.phase;
       let nextStatus = build.summary.status;
       if (status === "PROVISIONING") {
-        nextPhase = "PREVIEW_QUEUED";
+        nextPhase = "CONTAINER_TEST_STARTED";
         nextStatus = "BUILDING"; // still building until ready
       } else if (status === "READY") {
-        nextPhase = "PREVIEW_READY";
+        nextPhase = "CONTAINER_TEST_PASSED";
         nextStatus = "TEST_READY";
       } else if (status === "FAILED") {
         nextPhase = "FAILED";
         nextStatus = "FAILED";
       } else if (status === "EXPIRED") {
         // Preview TTL elapsed but the container itself ran to completion; the
-        // build stays at its current phase/status (typically PREVIEW_READY /
+        // build stays at its current phase/status (typically CONTAINER_TEST_PASSED /
         // TEST_READY) so the operator can decide whether to run another
         // deployment cycle or to mark the build COMPLETED. We do NOT push
         // the prior phase into phaseHistory because the preview state

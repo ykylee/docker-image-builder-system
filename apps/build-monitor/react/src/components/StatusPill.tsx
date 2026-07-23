@@ -44,8 +44,8 @@ const ATTENTION_VARIANT: Readonly<Record<string, BadgeVariant>> = {
   CLAIMED: "info",
   TEST_READY: "info",
   PROVISIONING: "info",
-  PREVIEW_QUEUED: "info",
-  PREVIEW_READY: "info",
+  CONTAINER_TEST_STARTED: "info",
+  CONTAINER_TEST_PASSED: "info",
   // 실패 — 사용자의 행동이 필요하다
   FAILED: "error",
   DISABLED: "error"

@@ -14,7 +14,7 @@
 //
 // FAILED phase 가 completedMap 에 push 되면 자동 danger 톤 (디자인 토큰 자동 follow).
 // DEPLOYMENT_* phase 는 DOCKER_BUILD_COMPLETED 와 COMPLETED 사이의 실제 단계를
-// 표시한다 — 운영자가 PREVIEW_READY → COMPLETED 직행으로 오해하지 않게.
+// 표시한다 — 운영자가 CONTAINER_TEST_PASSED → COMPLETED 직행으로 오해하지 않게.
 //
 // a11y: <ol role="list"> + 각 step role="listitem" + 상태별 aria-label.
 //

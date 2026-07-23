@@ -41,9 +41,9 @@ function deriveLifecycleStatus(summary: BuildSummary): CanonicalBuildStatus {
       return "BUILDING";
     case "DOCKER_BUILD_COMPLETED":
       return "BUILD_SUCCESS";
-    case "PREVIEW_QUEUED":
+    case "CONTAINER_TEST_STARTED":
       return "TESTING";
-    case "PREVIEW_READY":
+    case "CONTAINER_TEST_PASSED":
       return "TEST_SUCCESS";
     case "DEPLOYMENT_STARTED":
       return "DEPLOYING";

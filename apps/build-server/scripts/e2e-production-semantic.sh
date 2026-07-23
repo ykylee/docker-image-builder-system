@@ -12,8 +12,8 @@
 #   3) SOURCE_PREPARED
 #   4) DOCKER_BUILD_STARTED   ← 실제 `docker build` (busybox image pull)
 #   5) DOCKER_BUILD_COMPLETED
-#   6) PREVIEW_QUEUED
-#   7) PREVIEW_READY          ← 실제 `docker run` + HTTP GET / 200 OK
+#   6) CONTAINER_TEST_STARTED
+#   7) CONTAINER_TEST_PASSED          ← 실제 `docker run` + HTTP GET / 200 OK
 #   8) DEPLOYMENT_STARTED     ← skeleton mode: deploy-result.json emit
 #   9) DEPLOYMENT_COMPLETED
 #  10) COMPLETED              ← stopContainerOnDone 가 defer 로 container cleanup
@@ -338,8 +338,8 @@ expected = [
   "SOURCE_PREPARED",
   "DOCKER_BUILD_STARTED",
   "DOCKER_BUILD_COMPLETED",
-  "PREVIEW_QUEUED",
-  "PREVIEW_READY",
+  "CONTAINER_TEST_STARTED",
+  "CONTAINER_TEST_PASSED",
   "DEPLOYMENT_STARTED",
   "DEPLOYMENT_COMPLETED",
   "COMPLETED",
@@ -369,7 +369,7 @@ if [[ -z "${PREVIEW_URL}" ]]; then
   yellow "    (stopContainerOnDone 의 defer 가 너무 빨리 발화했을 가능성)"
 else
   # preview URL 의 host:port 형식만 검증. 실제 curl 은 container 가 stop 된
-  # 직후면 200 OK 가 아닐 수 있어 optional — 로그의 PREVIEW_READY 가 통과했다면
+  # 직후면 200 OK 가 아닐 수 있어 optional — 로그의 CONTAINER_TEST_PASSED 가 통과했다면
   # container healthcheck 자체가 200 OK 였음을 의미.
   if printf '%s' "${PREVIEW_URL}" | grep -qE '^http://127\.0\.0\.1:[0-9]+/'; then
     green "  ✓ previewUrl well-formed: ${PREVIEW_URL}"

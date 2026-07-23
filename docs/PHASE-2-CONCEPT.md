@@ -3,7 +3,7 @@
 - 문서 목적: Phase 2 의 축·범위·마일스톤·완료 기준을 하나의 기준으로 정의한다. Phase 1 종료(v0.2.0/v0.2.1) 이후의 개발 방향 단일 출처.
 - 범위: 컨셉 근거(원 설계 대비 격차 실측), 마일스톤 P2-M1~M5, 순서와 완료 기준, 리스크
 - 대상 독자: 프로젝트 리드, 각 계층 구현자, AI agent
-- 상태: draft
+- 상태: draft (P2-M1 Step 1 완료 반영)
 - 최종 수정일: 2026-07-23
 - 진입 baseline: **v0.2.1** (2026-07-23)
 - 관련 문서: [Phase 1 회고](./PHASE-1-RETROSPECTIVE.md), [Step 15 로드맵](./sdlc/15-refactoring-roadmap-and-milestones.md), [CHANGELOG](../CHANGELOG.md)
@@ -19,11 +19,13 @@
 동시에 코드는 문서 canonical 모델을 따라가지 못하고 **하이브리드**에 멈춰 있다:
 
 ```
-… DOCKER_BUILD_COMPLETED → PREVIEW_QUEUED → PREVIEW_READY → DEPLOYMENT_STARTED → …
-                            └── preview-era 잔재 ──┘        └── 신 모델 ──┘
+착수 전:  … DOCKER_BUILD_COMPLETED → PREVIEW_QUEUED → PREVIEW_READY → DEPLOYMENT_STARTED → …
+                                      └── preview-era 잔재 ──┘        └── 신 모델 ──┘
+
+TASK-158: … DOCKER_BUILD_COMPLETED → CONTAINER_TEST_STARTED → CONTAINER_TEST_PASSED → DEPLOYMENT_STARTED → …
 ```
 
-`CONTAINER_TEST_*` phase 가 없어 **"컨테이너 테스트"가 1급 개념이 아니다**. 제품 목적의 한 단계가 모델에 존재하지 않는 셈이다.
+`CONTAINER_TEST_*` phase 가 없어 **"컨테이너 테스트"가 1급 개념이 아니었다** — 제품 목적의 한 단계가 모델에 존재하지 않았다. **P2-M1 Step 1(TASK-158)에서 해소**했고 e2e 가 10 phase 를 실증한다.
 
 Step 15 로드맵 §3 이 이 상황을 정확히 경고한다:
 
@@ -35,15 +37,17 @@ Step 15 로드맵 §3 이 이 상황을 정확히 경고한다:
 
 2026-07-23 기준 preview-era 심볼(`previewStatus` / `previewUrl` / `previewTtlMinutes` / `TestDeployment` / `TEST_READY` / `PREVIEW_QUEUED` / `PREVIEW_READY`) 출현 수:
 
-| 계층 | 출현 | 성격 |
+> **주의**: 최초 측정치 407 은 빌드 산출물(`dist/`)을 포함해 부풀려진 값이었다. 아래는 **소스만** 재측정한 값이다.
+
+| 계층 | 출현(소스) | 성격 |
 |---|---:|---|
-| `packages/shared-contract` | **123** | 계약 원천 — 여기부터 바꿔야 나머지가 컴파일 타임에 끌려온다 |
-| `apps/build-server/src` | **117** | repository / service / routes / openapi |
-| `apps/skill_mcp` | **77** | AI 에이전트 진입점. `preview_readiness_checker` 등 이름까지 preview-era |
+| `packages/shared-contract/src` | **26** | 계약 원천 — 여기부터 바꿔야 나머지가 컴파일 타임에 끌려온다 |
+| `apps/build-server` (src 124 + tests 52) | **176** | repository / service / routes / openapi |
+| `apps/skill_mcp` | **65** | AI 에이전트 진입점. `preview_readiness_checker` 등 이름까지 preview-era |
 | `apps/build-monitor/react` | **50** | PhaseTimeline / StatusPill / BuildDetail |
-| `apps/runner` | **28** | phase 보고 순서 |
-| `packages/db` | **12** | legacy 컬럼 + `test-deployment.ts` 스키마 |
-| **합계** | **407** | |
+| `apps/runner` | **24** | phase 보고 순서 |
+| `packages/db/src` | **4** | legacy 컬럼 + `test-deployment.ts` 스키마 |
+| **합계** | **345** | (이 중 44 는 TASK-158 에서 처리됨) |
 
 ### 3.1 이미 끝난 것 (중복 작업 방지)
 
@@ -54,7 +58,7 @@ Step 15 로드맵 §3 이 이 상황을 정확히 경고한다:
 
 ## 4. Phase 1 이 남긴 안전망 (이 리팩터가 가능한 이유)
 
-407곳을 건드리는 리팩터를 감당할 수 있는 것은 Phase 1 의 자산 덕분이다:
+345곳을 건드리는 리팩터를 감당할 수 있는 것은 Phase 1 의 자산 덕분이다:
 
 | 자산 | 리팩터에서의 역할 |
 |---|---|
@@ -71,8 +75,13 @@ Step 15 로드맵 §3 이 이 상황을 정확히 경고한다:
 Step 15 의 M1~M5 잔여분을 Phase 2 기준으로 재정의한다.
 
 ### P2-M1 — 계약 청산 (Contract Reset 완결)
-- **대상**: `packages/shared-contract` (123)
-- **내용**: `PREVIEW_QUEUED`/`PREVIEW_READY` → **`CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`** 로 재정의해 컨테이너 테스트를 1급 phase 로 승격. `TestDeployment` → canonical test 결과 모델. `previewUrl`/`previewTtlMinutes` 는 optional runtime artifact 로 격하.
+
+> **진행**: Step 1(phase 이름 변경) **완료 (TASK-158)**. Step 2(legacy status 제거) / Step 3(legacy 응답 필드 + migration 0007) 남음.
+>
+> **범위 정정**: 앞선 407 은 빌드 산출물(`dist/`)을 포함한 수치였다. 소스만 재측정한 실제 표면은 **345**(shared-contract/src 26 · build-server 176(src 124+tests 52) · skill_mcp 65 · build-monitor 50 · runner 24 · db 4). 계약 자체는 26 으로 작다.
+
+- **대상**: `packages/shared-contract/src` (26)
+- **내용**: ~~`PREVIEW_QUEUED`/`PREVIEW_READY` → **`CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`**~~ **완료** — 컨테이너 테스트가 1급 phase 가 됐다(e2e 로 10 phase 실증). `TestDeployment` → canonical test 결과 모델. `previewUrl`/`previewTtlMinutes` 는 optional runtime artifact 로 격하.
 - **완료 기준**: 새 모델로 TS 컴파일 통과 / deprecated alias 유지 범위가 문서에 명시 / `buildPhases` 가 단일 출처로 유지(TASK-150 의 구조적 봉인 보존).
 
 ### P2-M2 — 서버 정렬
@@ -111,17 +120,17 @@ P2-M1 계약  →  P2-M2 서버  →  P2-M3 runner  →  P2-M4 소비자  →  P
 
 | 리스크 | 완화 |
 |---|---|
-| 407곳 동시 변경의 폭발 | 계층 단위 마일스톤으로 분할 + 계약 선행으로 컴파일러가 잔여를 지목하게 함 |
+| 345곳 동시 변경의 폭발 | 계층 단위 마일스톤으로 분할 + 계약 선행으로 컴파일러가 잔여를 지목하게 함 |
 | **regex 일괄 치환의 다중 동시 결함** (TASK-130/151 재발 패턴) | read + 1:1 치환 원칙. 대량 변경일수록 regex 금지 |
 | `skill_mcp` 가 단위 테스트만 통과 (실서버 미검증) | P2-M4 에서 실서버 대상 검증 경로를 신설 |
-| runner e2e 2종의 약한 신호 (TASK-156 §6) | P2-M3 전에 단언 강화(컨테이너 기동/hostPort hard fail) 선행 검토 |
+| ~~runner e2e 2종의 약한 신호~~ | **해소 (TASK-157)** — hard assertion 화 + 근본 결함 3건 수정 |
 | 배포 adapter 의 대상 선택 미정 | P2-M5 진입 전 별도 결정 필요 — §8 |
 
 ## 8. 진입 전 결정 대기
 
 1. **외부 배포 adapter 의 1호 대상** — compose / k8s / remote host(ssh) / 기존 레지스트리 push 확장 중 무엇인가.
 2. **결과 전달 채널** — webhook / Slack / Nextcloud Tasks(기존 후보) 중 무엇을 1호로.
-3. **deprecated alias 유지 기간** — 외부 소비자가 없다면 즉시 제거, 있다면 한 릴리스 유예.
+3. ~~**deprecated alias 유지 기간**~~ — **결정됨(2026-07-23)**: 외부 소비자가 없으므로 **즉시 제거**(유예 없음).
 4. **visual baseline 의 외부 LFS 정책** (Phase 1 이월) — P2-M4 의 시각 회귀 판정 강도에 영향.
 
 ## 9. Phase 2 완료 판정

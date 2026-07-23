@@ -55,7 +55,7 @@ const MOCK_BUILD: api.BuildStatusResponse = {
     { phase: "DOCKER_BUILD_COMPLETED", completedAt: "2026-07-08T10:04:00.000Z" }
   ],
   currentPhase: {
-    phase: "PREVIEW_QUEUED",
+    phase: "CONTAINER_TEST_STARTED",
     startedAt: "2026-07-08T10:04:30.000Z"
   },
   lifecycle: {
@@ -176,7 +176,7 @@ describe("BuildDetail", () => {
     expect(within(detail).getAllByText("DOCKER_BUILD_COMPLETED").length).toBeGreaterThan(0);
     // lifecycleStatus "TESTING" — StatusPill 의 aria-label "Status: TESTING" 이
     // 매칭되지만 meta 의 Lifecycle dd 안에도 노출. PhaseTimeline 의
-    // PREVIEW_QUEUED current 단계 라벨과 별개. within(detail) 로 scope.
+    // CONTAINER_TEST_STARTED current 단계 라벨과 별개. within(detail) 로 scope.
     expect(within(detail).getAllByText("TESTING").length).toBeGreaterThan(0);
     // StatusPill 의 lifecycleStatus 우선 표시 검증.
     expect(
@@ -219,7 +219,7 @@ describe("BuildDetail", () => {
     const timeline = screen.getByTestId("phase-timeline");
     expect(within(timeline).getByText("REQUEST_ACCEPTED")).toBeInTheDocument();
     expect(within(timeline).getByText("DOCKER_BUILD_COMPLETED")).toBeInTheDocument();
-    expect(within(timeline).getByText("PREVIEW_QUEUED")).toBeInTheDocument();
+    expect(within(timeline).getByText("CONTAINER_TEST_STARTED")).toBeInTheDocument();
     // 11 phase canonical 목록에 새로 추가된 DEPLOYMENT_* 가 노출되는지.
     expect(within(timeline).getByText("DEPLOYMENT_STARTED")).toBeInTheDocument();
     expect(within(timeline).getByText("DEPLOYMENT_COMPLETED")).toBeInTheDocument();
@@ -227,7 +227,7 @@ describe("BuildDetail", () => {
     expect(within(timeline).getByText("FAILED")).toBeInTheDocument();
     // 5 completed (REQUEST_ACCEPTED, QUEUE_CLAIMED, SOURCE_PREPARED,
     // DOCKER_BUILD_STARTED, DOCKER_BUILD_COMPLETED) + 1 current
-    // (PREVIEW_QUEUED) + 5 pending (PREVIEW_READY, DEPLOYMENT_STARTED,
+    // (CONTAINER_TEST_STARTED) + 5 pending (CONTAINER_TEST_PASSED, DEPLOYMENT_STARTED,
     // DEPLOYMENT_COMPLETED, COMPLETED, FAILED).
     expect(timeline.querySelectorAll('[data-status="completed"]')).toHaveLength(5);
     expect(timeline.querySelectorAll('[data-status="current"]')).toHaveLength(1);

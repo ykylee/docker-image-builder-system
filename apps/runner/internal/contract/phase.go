@@ -14,8 +14,8 @@ const (
 	PhaseSourcePrepared        = "SOURCE_PREPARED"
 	PhaseDockerBuildStarted    = "DOCKER_BUILD_STARTED"
 	PhaseDockerBuildCompleted  = "DOCKER_BUILD_COMPLETED"
-	PhasePreviewQueued         = "PREVIEW_QUEUED"
-	PhasePreviewReady          = "PREVIEW_READY"
+	PhaseContainerTestStarted         = "CONTAINER_TEST_STARTED"
+	PhaseContainerTestPassed          = "CONTAINER_TEST_PASSED"
 	PhaseDeploymentStarted     = "DEPLOYMENT_STARTED"
 	PhaseDeploymentCompleted   = "DEPLOYMENT_COMPLETED"
 	PhaseCompleted             = "COMPLETED"
@@ -31,8 +31,8 @@ var BuildPhases = []string{
 	PhaseSourcePrepared,
 	PhaseDockerBuildStarted,
 	PhaseDockerBuildCompleted,
-	PhasePreviewQueued,
-	PhasePreviewReady,
+	PhaseContainerTestStarted,
+	PhaseContainerTestPassed,
 	PhaseDeploymentStarted,
 	PhaseDeploymentCompleted,
 	PhaseCompleted,

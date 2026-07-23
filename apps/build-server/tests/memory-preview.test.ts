@@ -41,12 +41,12 @@ describe("MemoryBuildRepository: queueTestDeployment", () => {
     assert.equal(result.kind, "invalid_state");
   });
 
-  it("queues preview at DOCKER_BUILD_COMPLETED and transitions to PREVIEW_QUEUED", async () => {
+  it("queues preview at DOCKER_BUILD_COMPLETED and transitions to CONTAINER_TEST_STARTED", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
     const result = await repo.queueTestDeployment(buildId, 8080, 30);
     assert.equal(result.kind, "queued");
     if (result.kind !== "queued") return;
-    assert.equal(result.response.build.phase, "PREVIEW_QUEUED");
+    assert.equal(result.response.build.phase, "CONTAINER_TEST_STARTED");
     assert.equal(result.response.build.previewStatus, "QUEUED");
     assert.equal(result.testDeployment.status, "QUEUED");
     assert.equal(result.testDeployment.internalPort, 8080);
@@ -61,7 +61,7 @@ describe("MemoryBuildRepository: reportPreviewStatus", () => {
     assert.equal(result.kind, "not_found");
   });
 
-  it("READY transitions to PREVIEW_READY / TEST_READY", async () => {
+  it("READY transitions to CONTAINER_TEST_PASSED / TEST_READY", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
     await repo.queueTestDeployment(buildId, 8080, 30);
     const result = await repo.reportPreviewStatus(buildId, "READY", {
@@ -75,7 +75,7 @@ describe("MemoryBuildRepository: reportPreviewStatus", () => {
     });
     assert.equal(result.kind, "ok");
     if (result.kind !== "ok") return;
-    assert.equal(result.response.build.phase, "PREVIEW_READY");
+    assert.equal(result.response.build.phase, "CONTAINER_TEST_PASSED");
     assert.equal(result.response.build.status, "TEST_READY");
     assert.equal(result.testDeployment.previewUrl, "http://preview.local/x");
     assert.equal(result.response.test.status, "SUCCESS");

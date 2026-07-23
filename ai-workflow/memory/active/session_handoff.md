@@ -6,6 +6,36 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 154→155: **P2-M1 Step 1 봉인 — phase 이름 변경 (TASK-158)**).
+
+  Phase 2 첫 실작업. `PREVIEW_QUEUED`/`PREVIEW_READY` → **`CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`**.
+
+  ## 의미
+  **컨테이너 테스트가 1급 phase 가 됐다.** 제품 목적의 4단계(build → container test → deploy → result delivery) 중 하나가 모델에 존재하지 않던 문제를 해소한 것이 이 작업의 핵심이다.
+
+  ## 범위
+  3-way canonical 정의점 + 사용처 = **18 파일 44 출현**:
+  - TS `packages/shared-contract/src/build/phase.ts`
+  - Go `apps/runner/internal/contract/phase.go` (식별자 `PhasePreviewQueued/Ready` → `PhaseContainerTestStarted/Passed` 포함)
+  - Python `apps/skill_mcp/contract/canonical.py`
+  - build-server(src+tests) / build-monitor(PhaseTimeline·StatusPill) / e2e 스크립트 / compose
+
+  ## 함정 — `.generated/openapi.d.ts` 재생성 필수
+  build-monitor 는 커밋된 `.generated/openapi.d.ts` 를 타입 원천으로 쓴다. 계약만 바꾸고 이걸 안 고치면 **TS2322(옛 enum)** 로 컴파일이 깨진다. 재생성 절차: build-server 재빌드 → 기동 → `tsx scripts/generate-openapi.ts`(= `/openapi.json` fetch). 다음 Step 에서도 동일하게 필요하다.
+
+  ## 검증
+  TS 5 packages clean / build-server **181** / build-monitor **277** / go **8 pkg** / skill_mcp **226** / **e2e 13/13 PASS (272s)**.
+  production-semantic 이 10 phase 를 `… DOCKER_BUILD_COMPLETED → CONTAINER_TEST_STARTED → CONTAINER_TEST_PASSED → DEPLOYMENT_STARTED …` 로 실증.
+
+  ## 범위 정정 (컨셉 문서 갱신함)
+  최초 407 은 **`dist/` 포함** 수치였다. 소스만 재측정하면 **345** — shared-contract/src **26** · build-server 176(src 124+tests 52) · skill_mcp 65 · build-monitor 50 · runner 24 · db 4. **계약 자체는 26 으로 작다.**
+
+  ## 남은 P2-M1
+  - **Step 2**: legacy status 제거 — `legacyBuildStatuses`(CLAIMED→`PREPARING_SOURCE`, TEST_READY→`TEST_SUCCESS`) / `previewStatuses` 제거.
+  - **Step 3**: legacy 응답 필드 제거(`previewStatus`/`previewUrl`/`previewTtlMinutes`/`TestDeployment`) + **DB migration 0007**. 주의: `build_request.preview_status` 가 **NOT NULL** 이라 응답 필드 제거와 migration 은 **동시에** 가야 한다.
+  - 사용자 결정: 외부 소비자 없음 → **즉시 제거**(alias 유예 없음).
+
+  workflow meta sync (state purpose_digest_rev 196→197, handoff_rev 118→119, backlog +1, task_count 63→64, handoff doc 154→155, work_backlog 112→113) 같은 commit.
 - Updated: 2026-07-23 (rev 153→154: **TASK-157 runner e2e hard assertion 화 봉인**).
 
   TASK-156 이 한계로 기록한 "runner 그룹 신호 약함"을 해소했다. P2-M1 진입 전 정지작업.

@@ -27,7 +27,7 @@
 #      readback 한 뒤 previewUrl 로 노출.
 #    - RUNNER_DEPLOY_MODE=skeleton   — 외부 registry push 안 함. deploy 단계를
 #      workspace/<buildID>/deploy-result.json emit 으로 갈음. e2e 의 production
-#      semantic 은 build → run → healthcheck → REPORT_PREVIEW_READY 까지가 본질.
+#      semantic 은 build → run → healthcheck → REPORT_CONTAINER_TEST_PASSED 까지가 본질.
 #    - RUNNER_STOP_CONTAINER_ON_DONE=true — build 완료 직후 container 자동 stop.
 #      e2e 의 [5] 단계가 "container 가 cleanup 됐는지" 를 검증할 수 있게 함.
 #    - PREVIEW_INTERNAL_PORT=8080    — busybox httpd 가 listen 하는 port.

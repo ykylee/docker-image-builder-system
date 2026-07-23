@@ -41,8 +41,8 @@ describe("StatusPill — a11y 계약 (배지/평문 무관)", () => {
     "CLAIMED",
     "TEST_READY",
     "PROVISIONING",
-    "PREVIEW_QUEUED",
-    "PREVIEW_READY",
+    "CONTAINER_TEST_STARTED",
+    "CONTAINER_TEST_PASSED",
     "EXPIRED",
     "ACTIVE",
     "DISABLED"
@@ -64,8 +64,8 @@ describe("StatusPill — 배지 정책", () => {
     ["CLAIMED", "info"],
     ["TEST_READY", "info"],
     ["PROVISIONING", "info"],
-    ["PREVIEW_QUEUED", "info"],
-    ["PREVIEW_READY", "info"],
+    ["CONTAINER_TEST_STARTED", "info"],
+    ["CONTAINER_TEST_PASSED", "info"],
     ["FAILED", "error"],
     ["DISABLED", "error"]
   ])("%s 는 %s 배지로 강조된다", (status, variant) => {
@@ -97,7 +97,7 @@ describe("StatusPill — 배지 정책", () => {
       "RECEIVED", "QUEUED", "PREPARING_SOURCE", "BUILDING", "BUILD_SUCCESS",
       "TEST_SUCCESS", "DEPLOY_SUCCESS", "COMPLETED", "TESTING", "DEPLOYING",
       "FAILED", "CANCELLED", "CLAIMED", "TEST_READY", "PROVISIONING",
-      "PREVIEW_QUEUED", "PREVIEW_READY", "EXPIRED", "ACTIVE", "DISABLED"
+      "CONTAINER_TEST_STARTED", "CONTAINER_TEST_PASSED", "EXPIRED", "ACTIVE", "DISABLED"
     ];
     expect(all.map(attentionVariantFor).filter((v) => v === "success")).toEqual([]);
   });

@@ -158,7 +158,7 @@ func TestPhaseConstLookup(t *testing.T) {
 		for _, decl := range []string{
 			PhaseRequestAccepted, PhaseQueueClaimed, PhaseSourcePrepared,
 			PhaseDockerBuildStarted, PhaseDockerBuildCompleted,
-			PhasePreviewQueued, PhasePreviewReady,
+			PhaseContainerTestStarted, PhaseContainerTestPassed,
 			PhaseDeploymentStarted, PhaseDeploymentCompleted,
 			PhaseCompleted, PhaseFailed,
 		} {

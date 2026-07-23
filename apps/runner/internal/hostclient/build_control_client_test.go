@@ -191,7 +191,7 @@ func TestHTTPBuildControlClient_ReportPreviewReady_OK(t *testing.T) {
 			t.Errorf("expected all test result booleans true, got %+v", body)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"build":{"buildId":"b-200","status":contract.StatusLegacyTestReady,"phase":contract.PhasePreviewReady,"lifecycleStatus":contract.StatusTestSuccess}}`))
+		_, _ = w.Write([]byte(`{"build":{"buildId":"b-200","status":contract.StatusLegacyTestReady,"phase":contract.PhaseContainerTestPassed,"lifecycleStatus":contract.StatusTestSuccess}}`))
 	}))
 	defer srv.Close()
 

@@ -199,7 +199,7 @@ RUNNER_PID=$!
 #      그런데도 스크립트는 경고만 찍고 PASS 했다.
 #
 # 이제 최대 ${WAIT_BUDGET}s 동안 build 의 phase 진행을 폴링하고, 컨테이너
-# 테스트 단계(PREVIEW_READY) 또는 terminal(COMPLETED/FAILED) 도달을 기다린다.
+# 테스트 단계(CONTAINER_TEST_PASSED) 또는 terminal(COMPLETED/FAILED) 도달을 기다린다.
 WAIT_BUDGET="${E2E_WAIT_BUDGET_SECONDS:-150}"
 yellow "  waiting up to ${WAIT_BUDGET}s for build → run → healthcheck (Build Server 상태 기준)..."
 REACHED_PHASE=""
@@ -217,7 +217,7 @@ try:
 except Exception:
     print("")' 2>/dev/null || echo "")"
   case "${REACHED_PHASE}" in
-    PREVIEW_READY|DEPLOYMENT_STARTED|DEPLOYMENT_COMPLETED|COMPLETED|FAILED) break ;;
+    CONTAINER_TEST_PASSED|DEPLOYMENT_STARTED|DEPLOYMENT_COMPLETED|COMPLETED|FAILED) break ;;
   esac
   sleep 0.5
 done
@@ -266,7 +266,7 @@ T_RUNNING="${REST%%|*}"; T_HEALTH="${REST#*|}"
 echo "  phase=${PHASE}  test.status=${T_STATUS}  containerRunning=${T_RUNNING}  healthCheckPassed=${T_HEALTH}"
 
 case "${PHASE}" in
-  COMPLETED|DEPLOYMENT_STARTED|DEPLOYMENT_COMPLETED|PREVIEW_READY) ;;
+  COMPLETED|DEPLOYMENT_STARTED|DEPLOYMENT_COMPLETED|CONTAINER_TEST_PASSED) ;;
   *)
     red "  ✗ build 가 컨테이너 테스트 단계에 도달하지 못했습니다 (phase=${PHASE:-<none>})"
     echo "    status.json: ${TMP}/status.json"
