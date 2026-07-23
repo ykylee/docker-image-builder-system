@@ -25,6 +25,12 @@ pnpm-debug.log*
 **/dist
 **/.tsbuildinfo
 
+# Svelte 시절 잔재 vite config (.gitignore 로 git 엔 제외되나 build context 엔
+# 남을 수 있음). plain `vite build` 가 확장자 우선순위(.js>.ts)로 이걸 먼저
+# 잡아 이미지 빌드를 깨뜨린다 — React SPA 는 vite.config.ts 를 쓴다.
+apps/build-monitor/vite.config.js
+apps/build-monitor/vite.config.js.map
+
 # Python (skill_mcp 영역 — 이미지에서 안 씀)
 **/__pycache__
 **/*.pyc

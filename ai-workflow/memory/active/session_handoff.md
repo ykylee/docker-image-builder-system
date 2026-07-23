@@ -6,6 +6,27 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 148→149: **TASK-153 실이미지 빌드 e2e 검증 + Dockerfile 회귀 수정 — Phase 1 유일 미결 해소**).
+
+  사용자가 "실이미지 e2e 검증 위해 docker 설치부터 안내" 요청. **확인 결과 환경엔 Docker 29.1.3 + compose v2 가 이미 설치·구동 중**(Ubuntu 25.10, user 가 `docker` 그룹) — CLAUDE.md 의 "Docker 미설치" 노트가 **outdated 였음**(정정). 설치 대신 `e2e-production-semantic.sh` (RUNNER_DOCKER_BUILD_MODE=cli) 실행.
+
+  ## 잠복 회귀 발견 → 수정 → 검증
+
+  - **첫 실행 실패**: 루트 `Dockerfile` 이 build-monitor 를 `vite build`(config 미지정)로 빌드 → vite 확장자 우선순위(.js>.ts)로 (a) Svelte 잔재 `vite.config.js`(`@sveltejs/vite-plugin-svelte` 미설치→`ERR_MODULE_NOT_FOUND`) 또는 (b) half-migrated `vite.config.ts`(루트 `index.html`→`/src/main.ts` 미존재→rollup fail)를 잡아 이미지 빌드 파손. **React 이관(TASK-088~101)이 로컬 build 명령만 `vite.react.config.ts` 로 바꾸고 Dockerfile 은 안 바꿔 v0.2.0 까지 잠복** — 실이미지 e2e 를 한 번도 안 돌려서 안 드러남.
+  - **수정 (3곳)**: ① `Dockerfile` build 스텝 → `vite build --config vite.react.config.ts`(유일 유효 config, root=`react/` outDir=`dist-react`) ② stage3 `COPY` 를 `dist`→`dist-react`(런타임 경로 `dist` 유지) ③ `.dockerignore` 에 `vite.config.js`/`.map` 제외(`.gitignore` 엔 있었으나 `.dockerignore` 누락 — **Docker build context 는 `.gitignore` 를 무시**).
+  - **재실행 ALL PASS**: 실제 `docker build`(busybox+httpd) + `docker run`(previewUrl `127.0.0.1:32768` HTTP 200) + **10/10 phase** + container auto-cleanup. e2e 는 trap 으로 `compose down -v` 자동 정리.
+
+  ## 커밋 산출물
+
+  `Dockerfile` + `.dockerignore` (수정) + `CLAUDE.md` (Docker 노트 정정 + TASK-153 교훈) + `docs/PHASE-1-RETROSPECTIVE.md` (§4/§5/§6 미결 해소) + `CHANGELOG.md` (§4/§5) + workflow meta.
+
+  ## 상태 / follow-up
+
+  - **Phase 1 유일 미결(실이미지 e2e)이 해소됨.** v0.2.1 후보.
+  - follow-up: 실이미지 e2e 를 CI/nightly 에 통합(Dockerfile 회귀 재발 방지) / compose.dev.*.yaml 나머지 e2e 변종 전수 실행 / dual vite config(`vite.config.ts`↔`vite.react.config.ts`) 통일 검토(현재 `vite.config.ts`·루트 `index.html` 은 stale).
+  - 참고: 사용자 머신에 dangling docker image 186개 누적(기존 환경) — 정리는 사용자 판단(`docker image prune`).
+
+  workflow meta sync (state purpose_digest_rev 190→191, handoff_rev 112→113, handoff doc 148→149) 같은 commit.
 - Updated: 2026-07-23 (rev 147→148: **Phase 1 완료 정리 — v0.2.0 baseline**).
 
   TASK-152 봉인 직후, 사용자 결정에 따라 **Phase 1(초기 시스템 구축 국면)을 baseline 으로 긋고 Phase 2 진입을 준비**했다. Phase 1 = 백엔드/영속화/API + runner + React 19+Astryx 프론트엔드 + 운영 가드 2계층 + 서버-프론트 계약 고정 + 시각 QA baseline (TASK-001~152 누적).

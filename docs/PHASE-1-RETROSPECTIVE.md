@@ -90,7 +90,7 @@ Phase 1 의 핵심 자산은 "회귀를 구조적으로 잡는 가드" 4종:
 | vite build (초기 index) | js gzip **134.64 KB** / css gzip **24.08 KB** | AppShell 셸 + Astryx atomic 포함 |
 | lazy chunks | BuildDetail 38.53 / buildColumns 9.85 / RegisterRunnerModal 5.74 (gzip) | 라우트 지연 로드 |
 | postgres migration | **0001~0006** | 9 테이블 |
-| e2e scripts | **9종** | Docker 환경에서 실행 (본 로컬은 Docker 미설치) |
+| e2e scripts | **9종** + 실이미지 e2e | `e2e-production-semantic.sh` 실이미지 빌드 **ALL PASS** (TASK-153, 2026-07-23) |
 | 손 CSS | **1,956줄** | Astryx 이관으로 2,323 → 1,956 |
 
 ## 5. 미결 / Phase 2 진입 후보
@@ -103,7 +103,7 @@ Phase 1 baseline 위에서 자연스럽게 이어질 후속:
 4. **신규 기능 추가** — (미정, Phase 2 축).
 5. **Nextcloud Tasks 통합** — (미정).
 6. **CI migration validation** — GitHub Actions + `db-migrate.sh`.
-7. **실이미지 빌드 e2e 검증** — 현재 runner `RUNNER_DOCKER_BUILD_MODE=skeleton` 기본이라 실제 Docker build 는 미검증. Docker 환경에서 compose.dev.*.yaml 기반 e2e 11종 실행이 필요.
+7. ~~**실이미지 빌드 e2e 검증**~~ — **해소 (TASK-153, 2026-07-23)**. `e2e-production-semantic.sh` (실제 `docker build` busybox + `docker run` + HTTP 200 + 10 phase + container cleanup) **ALL PASS**. 검증 과정에서 루트 `Dockerfile` 의 build-monitor 빌드가 `vite build`(config 미지정)로 Svelte 잔재 config 를 잡아 이미지 빌드가 깨지던 회귀를 발견·수정 (`--config vite.react.config.ts` 명시 + `.dockerignore` 보강). React 이관 후 실이미지 e2e 를 한 번도 안 돌려 잠복했던 결함. (잔여: compose.dev.*.yaml 기반 나머지 e2e 변종의 전수 실행은 후속.)
 
 ## 6. 교훈 (Phase 1 반복 패턴)
 
@@ -115,6 +115,7 @@ Phase 1 내내 반복적으로 재발한 실패 패턴 — Phase 2 에서 사전
 - **크로스플랫폼 잠복 결함**: `path/filepath` 는 호스트 OS 규약을 따라 Linux CI 에선 green 이지만 Windows 에서 Unix 절대경로를 놓친다 (TASK-126). 슬래시 기반 판정엔 `path`.
 - **bulk sync 가 문서를 덮어씀**: workflow kit sync 도구가 문서를 템플릿 스켈레톤으로 덮는 회귀가 12일 방치된 적 있음 (TASK-124/131). 저장소 자신이 보유한 무결성 가드로 방어.
 - **디자인 시스템 토큰 하이재킹**: 외부 디자인 시스템이 동명 토큰을 재정의하고 문서 루트에 상속시키면 우리 토큰이 컴포넌트 위치에서 조용히 덮인다 (TASK-132). 네임스페이스 격리(`--dib-*`)가 근본 해법.
+- **안 돌린 경로는 검증된 게 아니다 (TASK-153)**: 단위 테스트·로컬 dev·CI 가 전부 green 이어도 **프로덕션 이미지 빌드 경로**는 별개다. React 이관은 로컬 build 명령(`vite.react.config.ts`)만 바꾸고 `Dockerfile` 의 `vite build`(config 미지정 → 잔재 Svelte config 를 잡음)는 손대지 않아, 이미지 빌드가 깨진 채로 v0.2.0 까지 잠복했다. 실이미지 e2e 를 한 번 돌리자 즉시 드러남. **Docker 빌드는 `.gitignore` 가 아니라 `.dockerignore` 를 따른다** — gitignore 된 잔재가 build context 로 새 들어간 것도 같은 결의 사각지대.
 
 ## 7. Phase 2 진입 기준선
 

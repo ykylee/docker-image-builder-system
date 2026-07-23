@@ -59,12 +59,18 @@ COPY docs/ docs/
 #
 # - `tsc` 는 workspace root 의 hoist 된 .bin (`node_modules/.bin/tsc`).
 # - `vite` 는 apps/build-monitor 의 isolated .bin.
+# - `--config vite.react.config.ts` 명시 (= package.json `build` script 와 동일):
+#   React SPA 의 유일한 유효 config. root=react/, entry=react/src/main.tsx,
+#   outDir=dist-react. config 미지정(`vite build`)은 확장자 우선순위(.js>.ts)로
+#   Svelte 잔재 `vite.config.js`(@sveltejs/vite-plugin-svelte 미설치→ERR) 나
+#   half-migrated `vite.config.ts`(루트 index.html→/src/main.ts 미존재→rollup fail)
+#   를 잡아 이미지 빌드가 깨진다. 산출물은 dist-react/ → stage 3 이 dist/ 로 COPY.
 RUN pnpm install --frozen-lockfile \
  && ./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json \
  && ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json \
  && ./node_modules/.bin/tsc -p packages/db/tsconfig.json \
  && ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json \
- && cd apps/build-monitor && ./node_modules/.bin/vite build
+ && cd apps/build-monitor && ./node_modules/.bin/vite build --config vite.react.config.ts
 
 # ---------- stage 2: prod-deps (runtime 전용, prodDeps 만) ----------
 # 별도 stage 로 분리하여 runtime image 에 devDependencies 가 새지 않도록.
@@ -111,7 +117,9 @@ COPY --from=builder    /repo/apps/build-server/dist         apps/build-server/di
 COPY --from=builder    /repo/packages/shared-contract       packages/shared-contract
 COPY --from=builder    /repo/packages/shared-config         packages/shared-config
 COPY --from=builder    /repo/packages/db                    packages/db
-COPY --from=builder    /repo/apps/build-monitor/dist        apps/build-monitor/dist
+# build-monitor: vite.react.config.ts 는 dist-react/ 로 emit. 런타임은
+# BUILD_MONITOR_DIST_PATH=.../dist 를 서빙하므로 dist-react → dist 로 COPY.
+COPY --from=builder    /repo/apps/build-monitor/dist-react   apps/build-monitor/dist
 # build-monitor 의 `.generated/openapi.d.ts` — frontend client 의 type source.
 COPY --from=builder    /repo/apps/build-monitor/.generated apps/build-monitor/.generated
 # SQL migrations (postgres backend 일 때 applyMigrations 가 실행) — TASK-064.

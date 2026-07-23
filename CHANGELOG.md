@@ -107,9 +107,11 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 | vite build:react (gzip js, 초기 index) | n/a | 99.01 KB | **134.64 KB** | — |
 | vite build:react (gzip css, 초기 index) | n/a | 30.62 KB | **24.08 KB** | — |
 | postgres migration | 0001 | 0001~0006 | **0001~0006** | +5 |
-| e2e scripts | 0 | 9 | **9** | +9 |
+| e2e scripts | 0 | 9 | **9 + 실이미지 e2e ALL PASS** (TASK-153) | +9 |
 | 운영 가이드 | 0 | 32 | **37** | +37 |
 | 운영 가드 (정적/실측) | 0 | 0 | **4종** (문서 무결성 / 대비 2계층 / CSS 유출 2계층 / 시각 QA) | +4 |
+
+> **TASK-153 (2026-07-23, post-tag 패치)**: `e2e-production-semantic.sh` 실이미지 빌드 e2e 를 검증하다가 루트 `Dockerfile` 이 build-monitor 를 `vite build`(config 미지정)로 빌드해 Svelte 잔재 config 를 잡던 회귀를 발견·수정 (`--config vite.react.config.ts` + `.dockerignore` 보강). 수정 후 실제 `docker build`/`docker run` 10 phase **ALL PASS**. v0.2.1 후보.
 
 > **v0.2.0 초기 번들**: index js gzip 134.64 KB (AppShell 셸 + Astryx atomic 포함) / css gzip 24.08 KB. 라우트 지연 로드(TASK-139)로 BuildDetail(gzip 38.53) / buildColumns(9.85) / RegisterRunnerModal(5.74) 등은 필요 시 로드. 손 CSS 2,323 → 1,956줄.
 
@@ -124,6 +126,9 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 | 5 | Nextcloud Tasks 통합 | (미정) | Phase 2 |
 | 6 | CI migration validation | GitHub Actions + `db-migrate.sh` | TASK-103 follow-up |
 | 7 | git tag 다음 version (v0.2.1 / v0.3.0) | (후속) | Phase 2 |
+| 8 | 실이미지 e2e 를 CI/nightly 에 통합 (Dockerfile 회귀 재발 방지) | 이미지 빌드 회귀 가드 | TASK-153 follow-up |
+
+> ~~실이미지 빌드 e2e 검증~~ — **TASK-153 (2026-07-23) 에서 해소** (Dockerfile 회귀 수정 + `e2e-production-semantic.sh` ALL PASS).
 
 ## 6. 다음 release 가이드
 

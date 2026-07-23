@@ -95,9 +95,25 @@
   쓰거나 `.\node_modules\.bin\tsc` 로 바꿔 쓴다.
 - **Postgres 포트는 로컬 native 설치 기준 `5432`.** 기존 문서 다수가 compose 매핑 기준
   `15432` 로 적혀 있으니 로컬 실행 시 `DATABASE_URL` 을 확인할 것.
-- **Docker 미설치 환경에서는 `compose.dev.*.yaml` 기반 e2e 스크립트 11종이 모두 실행
-  불가.** runner 는 `RUNNER_DOCKER_BUILD_MODE` 기본값이 `skeleton` 이라 단위 테스트는
-  Docker 없이 통과하지만, 실제 이미지 빌드는 검증되지 않는다.
+- **실이미지 빌드 e2e (TASK-153, 2026-07-23 검증)**: 현재 Linux 개발 환경(Ubuntu 25.10)에는
+  Docker 29.1.3 + compose v2 가 설치·구동 중이고 사용자가 `docker` 그룹 소속이라 `docker`
+  가 sudo 없이 동작한다. `e2e-production-semantic.sh` (실제 `docker build` busybox + `docker
+  run` + HTTP 200 + 10 phase + container cleanup) 가 **ALL PASS** 로 검증됨:
+  ```bash
+  export DOCKER_SOCKET_GID="$(getent group docker | cut -d: -f3)"; export ADMIN_IDS=admin
+  bash apps/build-server/scripts/e2e-production-semantic.sh
+  ```
+  runner `RUNNER_DOCKER_BUILD_MODE` 기본값은 여전히 `skeleton` 이라 **단위 테스트는 Docker
+  없이 통과**하고, 실제 이미지 빌드는 `cli` 모드(위 e2e / compose.dev.e2e-production.yaml)에서만
+  탄다. **Docker 미설치 환경**(과거 Windows 로컬 등)에서는 `compose.dev.*.yaml` 기반 e2e 는
+  실행 불가.
+- **TASK-153 회귀 교훈 — 루트 `Dockerfile` 의 build-monitor 빌드는 `vite build --config
+  vite.react.config.ts` 를 써야 한다.** config 미지정(`vite build`)은 확장자 우선순위(.js>.ts)로
+  Svelte 잔재 `vite.config.js` 나 half-migrated `vite.config.ts`(루트 `index.html`→`/src/main.ts`)
+  를 잡아 이미지 빌드가 깨진다. 이 두 잔재는 `.gitignore`/부분만 정리돼 있었고 `.dockerignore`
+  에서 `vite.config.js` 를 빼먹어 build context 로 새 들어갔다. React SPA 는 root=`react/`,
+  outDir=`dist-react` (→ 이미지에서 `dist/` 로 COPY). 이 회귀는 React 이관 후 실이미지 e2e 를
+  한 번도 안 돌려 잠복해 있었다.
 - **크로스플랫폼 주의 (TASK-126 교훈)**: tar entry 이름처럼 **항상 슬래시 구분자인 값**을
   다룰 때 `path/filepath` 를 쓰면 안 된다 — `filepath` 는 호스트 OS 규약을 따르므로
   Windows 빌드에서 Unix 절대경로(`/etc/passwd`)를 놓친다. 슬래시 기반 판정에는 `path` 를
