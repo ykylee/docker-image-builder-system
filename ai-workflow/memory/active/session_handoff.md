@@ -6,6 +6,26 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 161→162: **TASK-162 P2-M3 — k8s adapter 인터페이스 + skeleton**).
+
+  ## 산출물
+
+  - **apps/runner/internal/deploy/k8s.go** — 신규. K8sDeployer 인터페이스 (Deploy / Apply / Cleanup) + K8sDeployOptions / K8sApplyOptions / K8sCleanupOptions / K8sResult 타입 + NewK8sDeployer(mode, opts) factory + noopSkeleton skeleton 구현.
+  - **apps/runner/internal/deploy/k8s_test.go** — 신규. 6 테스트 (mode 분기 4 + Deploy/Apply/Cleanup 동작).
+  - **apps/runner/internal/config/config.go** — Config 에 K8sMode / K8sCluster / K8sNamespace / K8sManifest 4 필드 추가 + Load() 에서 RUNNER_K8S_MODE / RUNNER_K8S_CLUSTER / RUNNER_K8S_NAMESPACE / RUNNER_K8S_MANIFEST env 4개 파싱.
+
+  ## 검증
+
+  go build ./... 통과 / go test ./... 8/8 package PASS (deploy 패키지 + 새 k8s 테스트 6건). SQL / schema / DB migration / version / git tag 변경 0.
+
+  ## 의도적으로 손대지 않은 것
+
+  - **실제 k8s client-go 연동** — 본 commit 은 interface + skeleton 만. P2-M5 에서 realK8sDeployer 가 들어감.
+  - **build_service.go 의 deployer 호출** — 기존 deploy.Client 호출만 존재. K8sDeployer 를 services.BuildService 에 추가하는 작업은 본 commit 범위 외.
+  - **e2e 스크립트 + run-e2e-suite.sh 의 --group k8s** — P2-M5 에서 추가.
+
+  workflow meta sync (state purpose_digest_rev 203→204, handoff_rev 125→126, task_count 70→71, work_backlog 119→120) 같은 commit 안에 포함.
+
 - Updated: 2026-07-23 (rev 160→161: **사용자 결정 3종 — P2-M5 진입 전**).
 
   ## 결정 3종 (2026-07-23)
