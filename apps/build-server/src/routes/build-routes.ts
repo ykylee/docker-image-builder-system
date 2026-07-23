@@ -217,9 +217,12 @@ export async function registerBuildRoutes(
     const payload = payloadResult.data;
     const result = await buildService.reportPreviewStatus(
       paramsResult.data.buildId,
-      "READY",
+      // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): "READY" legacy
+      // 의미는 canonical `SUCCESS` 로 흡수. 메서드명 자체의 canonical 화는
+      // 다음 commit.
+      "SUCCESS",
       {
-        previewUrl: payload.previewUrl,
+        runtimeUrl: payload.runtimeUrl,
         host: payload.host,
         hostPort: payload.hostPort,
         containerRef: payload.containerRef,

@@ -9,7 +9,6 @@ import type {
   ContainerTestResult,
   DeploymentResult,
   ExecutionStatus,
-  PreviewStatus,
   ResultDelivery,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
@@ -55,26 +54,6 @@ function deriveLifecycleStatus(summary: BuildSummary): CanonicalBuildStatus {
       return "FAILED";
     default:
       return summary.status === "FAILED" ? "FAILED" : "QUEUED";
-  }
-}
-
-function mapPreviewStatusToExecutionStatus(
-  previewStatus: PreviewStatus
-): ExecutionStatus {
-  switch (previewStatus) {
-    case "NOT_REQUESTED":
-      return "NOT_STARTED";
-    case "QUEUED":
-    case "PROVISIONING":
-      return "IN_PROGRESS";
-    case "READY":
-      return "SUCCESS";
-    case "FAILED":
-      return "FAILED";
-    case "EXPIRED":
-      return "SUCCESS";
-    default:
-      return "NOT_STARTED";
   }
 }
 

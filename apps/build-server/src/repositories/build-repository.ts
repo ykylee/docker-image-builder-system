@@ -11,6 +11,7 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   DeploymentReportRequest,
+  ExecutionStatus,
   RunnerStatus,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
@@ -102,8 +103,11 @@ export type ReportDeploymentResult =
       kind: "not_found";
     };
 
+// TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): `previewUrl` →
+// `runtimeUrl` canonical rename. 본 타입은 `reportPreviewStatus` 메서드의
+// `details` 인자 타입으로, runner 가 보내는 `runtimeUrl` 필드와 1:1 매핑.
 export type PreviewStatusDetails = {
-  previewUrl?: string;
+  runtimeUrl?: string;
   host?: string;
   hostPort?: number;
   containerRef?: string;
@@ -321,7 +325,10 @@ export interface BuildRepository {
   ): Promise<QueueTestDeploymentResult>;
   reportPreviewStatus(
     buildId: string,
-    status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
+    // TASK-161 (P2-M2 Step 1+2 묶음): status 를 canonical `executionStatuses`
+    // 로 정렬. 다음 commit 에서 메서드명이 `reportContainerTestResult` 로
+    // 정렬된다.
+    status: ExecutionStatus,
     details?: PreviewStatusDetails
   ): Promise<ReportPreviewStatusResult>;
   reportDeploymentResult(

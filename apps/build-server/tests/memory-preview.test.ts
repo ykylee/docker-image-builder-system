@@ -47,7 +47,7 @@ describe("MemoryBuildRepository: queueTestDeployment", () => {
     assert.equal(result.kind, "queued");
     if (result.kind !== "queued") return;
     assert.equal(result.response.build.phase, "CONTAINER_TEST_STARTED");
-    assert.equal(result.testDeployment.status, "QUEUED");
+    assert.equal(result.testDeployment.status, "IN_PROGRESS");
     assert.equal(result.testDeployment.internalPort, 8080);
     assert.ok(result.testDeployment.expiresAt);
   });
@@ -56,15 +56,15 @@ describe("MemoryBuildRepository: queueTestDeployment", () => {
 describe("MemoryBuildRepository: reportPreviewStatus", () => {
   it("returns not_found for unknown buildId", async () => {
     const repo = createMemoryBuildRepository();
-    const result = await repo.reportPreviewStatus("00000000-0000-0000-0000-000000000000", "READY");
+    const result = await repo.reportPreviewStatus("00000000-0000-0000-0000-000000000000", "SUCCESS");
     assert.equal(result.kind, "not_found");
   });
 
-  it("READY transitions to CONTAINER_TEST_PASSED / TEST_READY", async () => {
+  it("SUCCESS transitions to CONTAINER_TEST_PASSED / TEST_SUCCESS", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
     await repo.queueTestDeployment(buildId, 8080, 30);
-    const result = await repo.reportPreviewStatus(buildId, "READY", {
-      previewUrl: "http://preview.local/x",
+    const result = await repo.reportPreviewStatus(buildId, "SUCCESS", {
+      runtimeUrl: "http://preview.local/x",
       host: "preview.local",
       hostPort: 38124,
       containerRef: "container-x",
@@ -76,7 +76,7 @@ describe("MemoryBuildRepository: reportPreviewStatus", () => {
     if (result.kind !== "ok") return;
     assert.equal(result.response.build.phase, "CONTAINER_TEST_PASSED");
     assert.equal(result.response.build.status, "TEST_SUCCESS");
-    assert.equal(result.testDeployment.previewUrl, "http://preview.local/x");
+    assert.equal(result.testDeployment.runtimeUrl, "http://preview.local/x");
     assert.equal(result.response.test.status, "SUCCESS");
     assert.equal(result.response.test.healthCheckPassed, true);
     assert.equal(result.response.test.portOpen, true);
@@ -112,12 +112,12 @@ describe("MemoryBuildRepository: getTestDeployment", () => {
   it("returns found with full testDeployment after queue + ready", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
     await repo.queueTestDeployment(buildId, 8080, 30);
-    await repo.reportPreviewStatus(buildId, "READY", { previewUrl: "http://x/y", host: "x", hostPort: 1 });
+    await repo.reportPreviewStatus(buildId, "SUCCESS", { runtimeUrl: "http://x/y", host: "x", hostPort: 1 });
     const result = await repo.getTestDeployment(buildId);
     assert.equal(result.kind, "found");
     if (result.kind !== "found") return;
-    assert.equal(result.testDeployment.status, "READY");
-    assert.equal(result.testDeployment.previewUrl, "http://x/y");
+    assert.equal(result.testDeployment.status, "SUCCESS");
+    assert.equal(result.testDeployment.runtimeUrl, "http://x/y");
   });
 });
 
@@ -125,8 +125,8 @@ describe("MemoryBuildRepository: reportDeploymentResult", () => {
   it("SUCCESS transitions to DEPLOYMENT_COMPLETED / DEPLOY_SUCCESS", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
     await repo.queueTestDeployment(buildId, 8080, 30);
-    await repo.reportPreviewStatus(buildId, "READY", {
-      previewUrl: "http://preview.local/x",
+    await repo.reportPreviewStatus(buildId, "SUCCESS", {
+      runtimeUrl: "http://preview.local/x",
       host: "preview.local",
       hostPort: 38124,
       healthCheckPassed: true,

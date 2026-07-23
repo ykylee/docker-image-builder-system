@@ -5,8 +5,7 @@ import { buildPhases } from "./phase.js";
 import {
   buildStatuses,
   canonicalBuildStatuses,
-  executionStatuses,
-  previewStatuses
+  executionStatuses
 } from "./status.js";
 
 // All exported schemas carry a `.meta({ id, description })` so that
@@ -42,12 +41,13 @@ export const buildSummarySchema = z
     phase: z.enum(buildPhases),
     // TASK-160 (P2-M1 Step 3): `previewStatus` shim 제거. canonical `test`
     // 블록(ContainerTestResult.status)이 이 역할을 완전히 대신한다.
-    // `previewUrl` 은 **실제 런타임 URL 을 나르는 유일한 필드**라 남긴다 —
-    // canonical 이름(`runtimeUrl`, build_test 컬럼명)으로의 정렬은
-    // test-deployment 엔드포인트 재설계와 결합돼 있어 P2-M2 에서 함께 한다.
-    previewUrl: z.string().url().nullable().meta({
+    // TASK-161 (P2-M2 Step 1): `previewUrl` → `runtimeUrl` canonical rename.
+    // 동일 필드명(빌드 모니터 측 `BuildSummary.runtimeUrl`)과 build_test
+    // 테이블의 `runtime_url` 컬럼이 정렬됐다. 호환을 위해 read-only
+    // `GET /test-deployment` 는 Step 2 에서 제거된다.
+    runtimeUrl: z.string().url().nullable().meta({
       description:
-        "Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign."
+        "Runtime endpoint of the container under test. Canonical name aligned with build_test.runtime_url and the canonical container-test result block."
     }),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
@@ -352,11 +352,17 @@ export const phaseUpdateRequestSchema = z
 
 export type PhaseUpdateRequest = z.infer<typeof phaseUpdateRequestSchema>;
 
-// testDeployment minimal schema (canonical doc §9)
+// testDeployment minimal schema (canonical doc §9, TASK-161 P2-M2 Step 1)
+//
+// TASK-161 (P2-M2 Step 1): `status` 를 canonical `executionStatuses` 로
+// 흡수, `previewUrl` → `runtimeUrl` canonical rename. read-only
+// `GET /test-deployment` 는 Step 2 에서 제거되지만, write endpoint
+// (`POST /test-deployment/ready` / `POST /test-deployment/status`) 의 응답
+// payload 는 그대로 두므로 schema 자체는 유지한다.
 export const testDeploymentSchema = z
   .object({
-    status: z.enum(previewStatuses),
-    previewUrl: z.string().url().nullable(),
+    status: z.enum(executionStatuses),
+    runtimeUrl: z.string().url().nullable(),
     host: z.string().nullable(),
     hostPort: z.int().nonnegative().nullable(),
     internalPort: z.int().positive().nullable(),
@@ -366,7 +372,7 @@ export const testDeploymentSchema = z
   .meta({
     id: "TestDeployment",
     description:
-      "Legacy preview/test-deployment state. Kept as a migration shim until the Build Server and Runner switch to the canonical container-test and deployment result blocks."
+      "Container-test execution state for the running test container. status uses canonical executionStatuses; runtimeUrl is the canonical name aligned with build_test.runtime_url."
   });
 
 export type TestDeployment = z.infer<typeof testDeploymentSchema>;
@@ -397,7 +403,7 @@ export type TestDeploymentQueueResponse = z.infer<typeof testDeploymentQueueResp
 
 export const testDeploymentReadyRequestSchema = z
   .object({
-    previewUrl: z.string().url(),
+    runtimeUrl: z.string().url(),
     host: z.string().min(1),
     hostPort: z.int().nonnegative(),
     containerRef: z.string().min(1).optional(),
@@ -409,19 +415,25 @@ export const testDeploymentReadyRequestSchema = z
   .meta({
     id: "TestDeploymentReadyRequest",
     description:
-      "POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals."
+      "POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals. runtimeUrl is the canonical name (TASK-161 P2-M2 Step 1)."
   });
 
 export type TestDeploymentReadyRequest = z.infer<typeof testDeploymentReadyRequestSchema>;
 
+// TASK-161 (P2-M2 Step 1): status enum 을 canonical `executionStatuses` 로
+// 교체. runner 가 보내는 mid-flight 상태(PROVISIONING/FAILED/EXPIRED) 는
+// 서버측에서 IN_PROGRESS/FAILED/SKIPPED 로 매핑한다(서버측 어댑터는 Step 2
+// 에서 함께 제거). 본 schema 는 서버가 받아들이는 wire-format 의 canonical
+// 표현이다.
 export const testDeploymentStatusRequestSchema = z
   .object({
-    status: z.enum(["PROVISIONING", "READY", "FAILED", "EXPIRED"]),
+    status: z.enum(executionStatuses),
     runnerId: z.string().min(1)
   })
   .meta({
     id: "TestDeploymentStatusRequest",
-    description: "POST /builds/:buildId/test-deployment/status payload (Runner → Host, PROVISIONING/FAILED/EXPIRED)."
+    description:
+      "POST /builds/:buildId/test-deployment/status payload (Runner → Host). status uses canonical executionStatuses."
   });
 
 export type TestDeploymentStatusRequest = z.infer<typeof testDeploymentStatusRequestSchema>;

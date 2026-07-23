@@ -261,7 +261,7 @@ describe("POST /builds/:buildId/preview", () => {
     });
     assert.equal(res2.statusCode, 202);
     const body = res2.json();
-    assert.equal(body.testDeployment.status, "QUEUED");
+    assert.equal(body.testDeployment.status, "IN_PROGRESS");
     await app2.close();
   });
 
@@ -280,7 +280,7 @@ describe("POST /builds/:buildId/preview", () => {
 });
 
 describe("POST /builds/:buildId/test-deployment/ready", () => {
-  it("returns 200 after queue with updated status READY", async () => {
+  it("returns 200 after queue with updated status SUCCESS", async () => {
     const { service, buildId } = await (async () => {
       const repo = createMemoryBuildRepository();
       const svc = new BuildService(repo);
@@ -301,7 +301,7 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
       method: "POST",
       url: `/builds/${buildId}/test-deployment/ready`,
       payload: {
-        previewUrl: "http://preview.local/x",
+        runtimeUrl: "http://preview.local/x",
         host: "preview.local",
         hostPort: 38124,
         containerRef: "container-b-1",
@@ -315,7 +315,7 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
     const body = res.json();
     assert.equal(body.build.status, "TEST_SUCCESS");
     assert.equal(body.build.phase, "CONTAINER_TEST_PASSED");
-    assert.equal(body.build.previewUrl, "http://preview.local/x");
+    assert.equal(body.build.runtimeUrl, "http://preview.local/x");
     assert.equal(body.build.lifecycleStatus, "TEST_SUCCESS");
     assert.equal(body.lifecycle.status, "TEST_SUCCESS");
     assert.equal(body.test.status, "SUCCESS");
@@ -343,8 +343,8 @@ describe("POST /builds/:buildId/deployment", () => {
       await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
       await svc.reportPhase(id, "DOCKER_BUILD_COMPLETED");
       await svc.queueTestDeployment(id, 8080, 30);
-      await svc.reportPreviewStatus(id, "READY", {
-        previewUrl: "http://preview.local/x",
+      await svc.reportPreviewStatus(id, "SUCCESS", {
+        runtimeUrl: "http://preview.local/x",
         host: "preview.local",
         hostPort: 38124,
         healthCheckPassed: true,
@@ -421,7 +421,7 @@ describe("GET /builds/:buildId/test-deployment", () => {
     });
     assert.equal(res.statusCode, 200);
     const body = res.json();
-    assert.equal(body.testDeployment.status, "QUEUED");
+    assert.equal(body.testDeployment.status, "IN_PROGRESS");
     assert.equal(body.testDeployment.internalPort, 8080);
     await app.close();
   });

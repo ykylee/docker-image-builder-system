@@ -11,6 +11,7 @@ import type {
   BuildStatusResponse,
   ClaimResponse,
   DeploymentReportRequest,
+  ExecutionStatus,
   RunnerStatus,
   TestDeployment,
   TestDeploymentQueueResponse
@@ -285,7 +286,10 @@ export class BuildService {
 
   async reportPreviewStatus(
     buildId: string,
-    status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
+    // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): status 를
+    // canonical `ExecutionStatus` 로 정렬. 메서드명 자체의 canonical 화는
+    // 다음 commit.
+    status: ExecutionStatus,
     details?: PreviewStatusDetails
   ): Promise<ReportPreviewOutcome> {
     const result = await this.repository.reportPreviewStatus(buildId, status, details);

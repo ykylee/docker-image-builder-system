@@ -38,17 +38,15 @@ export const executionStatuses = [
 
 export type ExecutionStatus = (typeof executionStatuses)[number];
 
-// Legacy preview/test-deployment states kept for compatibility until the
-// Build Server routes and Build Monitor move to the new build/test/deploy
-// contract. Prefer the nested `test`, `deploy`, and `resultDelivery`
-// response blocks for new code.
-export const previewStatuses = [
-  "NOT_REQUESTED",
-  "QUEUED",
-  "PROVISIONING",
-  "READY",
-  "FAILED",
-  "EXPIRED"
-] as const;
-
-export type PreviewStatus = (typeof previewStatuses)[number];
+// TASK-161 (P2-M2 Step 1): legacy `previewStatuses` enum 제거.
+//   6 values (NOT_REQUESTED / QUEUED / PROVISIONING / READY / FAILED /
+//   EXPIRED) 는 `TestDeployment` 응답의 shim 으로 남겨뒀었는데, 이제
+//   testDeploymentSchema.status 가 canonical `executionStatuses` 로
+//   흡수됐고 (response.ts), read-only `GET /test-deployment` 도 Step 2 에서
+//   제거된다. 본 enum 의 마지막 사용처였던 `buildStatuses` (canonical 과
+//   동일) 와 달리 `previewStatuses` 는 외부 alias 가 아니라 분리된 enum 이라
+//   즉시 제거가 안전하다.
+// 3-way canonical mirror: Go `apps/runner/internal/contract/status.go` 와
+//   Python `apps/skill_mcp/contract/canonical.py` 에는 본 enum 이 **없다** —
+//   두 언어 모두 P2-M1 에서 동일 정리를 했으므로 본 TS 정리가 일관되게
+//   마무리된다.

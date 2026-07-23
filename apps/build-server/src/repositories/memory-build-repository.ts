@@ -94,8 +94,8 @@ const runners = new Map<string, StoredRunner>();
 
 function emptyTestDeployment(updatedAt: string): TestDeployment {
   return {
-    status: "NOT_REQUESTED",
-    previewUrl: null,
+    status: "NOT_STARTED",
+    runtimeUrl: null,
     host: null,
     hostPort: null,
     internalPort: null,
@@ -140,7 +140,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         appName: input.appName,
         status: "QUEUED",
         phase: "REQUEST_ACCEPTED",
-        previewUrl: null,
+        runtimeUrl: null,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -429,8 +429,8 @@ export function createMemoryBuildRepository(): BuildRepository {
       const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
 
       const testDeployment: TestDeployment = {
-        status: "QUEUED",
-        previewUrl: null,
+        status: "IN_PROGRESS",
+        runtimeUrl: null,
         host: null,
         hostPort: null,
         internalPort,
@@ -454,7 +454,7 @@ export function createMemoryBuildRepository(): BuildRepository {
       build.summary = {
         ...enrichBuildSummary(build.summary),
         phase: "CONTAINER_TEST_STARTED",
-        previewUrl: null,
+        runtimeUrl: null,
         updatedAt: timestamp
       };
       build.currentPhaseStartedAt = timestamp;
@@ -485,7 +485,12 @@ export function createMemoryBuildRepository(): BuildRepository {
 
     async reportPreviewStatus(
       buildId: string,
-      status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
+      // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): status 를
+      // canonical `ExecutionStatus` 로 정렬. legacy `PROVISIONING`/
+      // `READY`/`EXPIRED` 분기는 routes 측에서 canonical 로 매핑된 값이
+      // 들어온다. 메서드명 자체의 canonical 화(`reportContainerTestResult`)
+      // 는 다음 commit.
+      status: ExecutionStatus,
       details?: PreviewStatusDetails
     ): Promise<ReportPreviewStatusResult> {
       const build = builds.get(buildId);
@@ -502,59 +507,46 @@ export function createMemoryBuildRepository(): BuildRepository {
       const next: TestDeployment = {
         ...prev,
         status,
-        previewUrl: details?.previewUrl ?? prev.previewUrl,
+        runtimeUrl: details?.runtimeUrl ?? prev.runtimeUrl,
         host: details?.host ?? prev.host,
         hostPort: details?.hostPort ?? prev.hostPort,
         updatedAt: timestamp
       };
       build.testDeployment = next;
 
-      const nextBuildTestStatus: ExecutionStatus =
-        status === "READY" || status === "EXPIRED"
-          ? "SUCCESS"
-          : status === "FAILED"
-            ? "FAILED"
-            : "IN_PROGRESS";
       build.buildTest = {
-        status: nextBuildTestStatus,
+        status,
         containerRef: details?.containerRef ?? build.buildTest?.containerRef ?? null,
-        runtimeUrl: next.previewUrl,
+        runtimeUrl: next.runtimeUrl,
         healthCheckPassed:
           details?.healthCheckPassed ?? build.buildTest?.healthCheckPassed ?? null,
         portOpen: details?.portOpen ?? build.buildTest?.portOpen ?? null,
         stabilityWindowPassed:
           details?.stabilityWindowPassed ??
-          (status === "EXPIRED"
-            ? true
-            : build.buildTest?.stabilityWindowPassed ?? null)
+          build.buildTest?.stabilityWindowPassed ?? null
       };
 
-      // map previewStatus -> build.phase/status
+      // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): canonical
+      // ExecutionStatus 만 분기. legacy `PROVISIONING` / `READY` / `EXPIRED`
+      // 의미는 routes 측에서 흡수돼 canonical `IN_PROGRESS` / `SUCCESS` /
+      // `SKIPPED` 로 들어온다.
       let nextPhase = build.summary.phase;
       let nextStatus = build.summary.status;
-      if (status === "PROVISIONING") {
+      if (status === "IN_PROGRESS") {
         nextPhase = "CONTAINER_TEST_STARTED";
-        nextStatus = "BUILDING"; // still building until ready
-      } else if (status === "READY") {
+        nextStatus = "BUILDING";
+      } else if (status === "SUCCESS") {
         nextPhase = "CONTAINER_TEST_PASSED";
         nextStatus = "TEST_SUCCESS";
       } else if (status === "FAILED") {
         nextPhase = "FAILED";
         nextStatus = "FAILED";
-      } else if (status === "EXPIRED") {
-        // Preview TTL elapsed but the container itself ran to completion; the
-        // build stays at its current phase/status (typically CONTAINER_TEST_PASSED /
-        // TEST_READY) so the operator can decide whether to run another
-        // deployment cycle or to mark the build COMPLETED. We do NOT push
-        // the prior phase into phaseHistory because the preview state
-        // transition is orthogonal to the build lifecycle.
-        nextPhase = build.summary.phase;
-        nextStatus = build.summary.status;
       }
+      // SKIPPED / NOT_STARTED 는 build 의 phase/status 를 유지한다.
 
       build.summary = {
         ...enrichBuildSummary(build.summary),
-        previewUrl: next.previewUrl,
+        runtimeUrl: next.runtimeUrl,
         phase: nextPhase as BuildPhase,
         status: nextStatus,
         updatedAt: timestamp
@@ -565,7 +557,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         id: randomUUID(),
         buildId,
         phase: nextPhase as BuildPhase,
-        message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
+        message: `Container test status: ${status}` +
+          (details?.runtimeUrl ? ` runtimeUrl=${details.runtimeUrl}` : ""),
         createdAt: timestamp
       };
       build.logs.push(log);

@@ -14,7 +14,7 @@ describe("shared-contract response migration shims (TASK-052)", () => {
         appName: "todo-app",
         status: "TEST_SUCCESS",
         phase: "CONTAINER_TEST_PASSED",
-        previewUrl: "http://preview.local/todo-app",
+        runtimeUrl: "http://preview.local/todo-app",
         createdAt: "2026-07-03T00:00:00.000Z",
         updatedAt: "2026-07-03T00:05:00.000Z"
       },
@@ -41,7 +41,7 @@ describe("shared-contract response migration shims (TASK-052)", () => {
         status: "DEPLOY_SUCCESS",
         lifecycleStatus: "DEPLOY_SUCCESS",
         phase: "COMPLETED",
-        previewUrl: null,
+        runtimeUrl: null,
         createdAt: "2026-07-03T00:00:00.000Z",
         updatedAt: "2026-07-03T00:10:00.000Z"
       },

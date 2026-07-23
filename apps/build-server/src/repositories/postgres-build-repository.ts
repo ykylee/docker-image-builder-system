@@ -89,7 +89,7 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     appName: row.appName,
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
-    previewUrl: row.previewUrl,
+    runtimeUrl: row.previewUrl,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });
@@ -123,20 +123,22 @@ function mapBuildTestRowToSnapshot(row: BuildTestRow | null | undefined): BuildT
 
 // TASK-160 (P2-M1 Step 3): legacy `preview_status` 컬럼이 사라졌으므로
 // TestDeployment 응답의 status 를 canonical `build_test.status`
-// (ExecutionStatus) 에서 유도한다. TestDeployment 자체(그리고 이 매핑)는
-// test-deployment 엔드포인트를 재설계하는 P2-M2 에서 제거된다.
+// (ExecutionStatus) 에서 직접 들고 온다. TestDeployment 자체(그리고 본
+// 매핑)는 test-deployment 엔드포인트를 재설계하는 P2-M2 Step 2 에서
+// 제거된다 — 본 단계(type-level fix)에서는 status 의 타입만 정렬하고
+// 본 매핑의 의미는 유지한다.
 function executionToPreviewStatus(
   status: ExecutionStatus | null | undefined
-): TestDeployment["status"] | null {
+): ExecutionStatus | null {
   switch (status) {
     case "IN_PROGRESS":
-      return "PROVISIONING";
     case "SUCCESS":
-      return "READY";
     case "FAILED":
-      return "FAILED";
+    case "SKIPPED":
+    case "NOT_STARTED":
+      return status;
     default:
-      return null; // NOT_STARTED / SKIPPED / 없음 → 아직 요청되지 않음
+      return null; // 없음 → 아직 요청되지 않음
   }
 }
 
@@ -151,7 +153,7 @@ function mapBuildTestRowToDeployment(
 
   return {
     status: mapped,
-    previewUrl: testRow?.runtimeUrl ?? buildRow.previewUrl,
+    runtimeUrl: testRow?.runtimeUrl ?? buildRow.previewUrl,
     host: testRow?.host ?? null,
     hostPort: testRow?.hostPort ?? null,
     internalPort: testRow?.internalPort ?? null,
@@ -261,6 +263,9 @@ export class PostgresBuildRepository implements BuildRepository {
           entrypointPath: input.entrypointPath,
           dockerfilePath: input.dockerfilePath,
           metadata: input.metadata,
+          // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): DB 컬럼명
+          // `preview_url` 은 TASK-160 의 shim 으로 보존됐고 응답에서만
+          // `runtimeUrl` 로 매핑된다. 다음 migration 에서 컬럼 drop 예정.
           previewUrl: null,
           lastErrorCode: null,
           lastErrorMessage: null,
@@ -592,8 +597,8 @@ export class PostgresBuildRepository implements BuildRepository {
     });
 
     const testDeployment: TestDeployment = {
-      status: "QUEUED",
-      previewUrl: null,
+      status: "IN_PROGRESS",
+      runtimeUrl: null,
       host: null,
       hostPort: null,
       internalPort,
@@ -610,7 +615,11 @@ export class PostgresBuildRepository implements BuildRepository {
 
   async reportPreviewStatus(
     buildId: string,
-    status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED",
+    // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): status 를
+    // canonical `ExecutionStatus` 로 정렬. legacy `PROVISIONING`/`READY`/
+    // `EXPIRED` 분기는 routes 측에서 canonical 로 매핑된 값이 들어온다.
+    // 메서드명 자체의 canonical 화(`reportContainerTestResult`)는 다음 commit.
+    status: ExecutionStatus,
     details?: PreviewStatusDetails
   ): Promise<ReportPreviewStatusResult> {
     const timestamp = new Date();
@@ -632,10 +641,12 @@ export class PostgresBuildRepository implements BuildRepository {
       let nextPhase: BuildPhase = row.phase as BuildPhase;
       let nextStatus: BuildStatus = row.status as BuildStatus;
 
-      if (status === "PROVISIONING") {
+      // canonical ExecutionStatus 분기. legacy `READY`/`PROVISIONING`/
+      // `EXPIRED` 의미는 routes 측에서 흡수되어 들어온다.
+      if (status === "IN_PROGRESS") {
         nextPhase = "CONTAINER_TEST_STARTED";
         nextStatus = "BUILDING";
-      } else if (status === "READY") {
+      } else if (status === "SUCCESS") {
         nextPhase = "CONTAINER_TEST_PASSED";
         nextStatus = "TEST_SUCCESS";
       } else if (status === "FAILED") {
@@ -643,7 +654,7 @@ export class PostgresBuildRepository implements BuildRepository {
         nextStatus = "FAILED";
       }
 
-      const nextPreviewUrl = details?.previewUrl ?? row.previewUrl;
+      const nextRuntimeUrl = details?.runtimeUrl ?? row.previewUrl;
       const nextPhaseHistory = advancePhaseHistory(
         (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
         row.phase as BuildPhase,
@@ -656,7 +667,7 @@ export class PostgresBuildRepository implements BuildRepository {
         .set({
           phase: nextPhase,
           status: nextStatus,
-          previewUrl: nextPreviewUrl,
+          previewUrl: nextRuntimeUrl,
           phaseHistory: nextPhaseHistory,
           updatedAt: timestamp
         })
@@ -672,49 +683,39 @@ export class PostgresBuildRepository implements BuildRepository {
         .values({
           id: randomUUID(),
           buildId,
-          status:
-            status === "READY"
-              ? "SUCCESS"
-              : status === "FAILED"
-                ? "FAILED"
-                : "IN_PROGRESS",
+          status,
           host: details?.host ?? null,
           hostPort: details?.hostPort ?? null,
           containerRef: details?.containerRef ?? null,
-          runtimeUrl: nextPreviewUrl,
+          runtimeUrl: nextRuntimeUrl,
           healthCheckPassed:
             details?.healthCheckPassed ?? (status === "FAILED" ? false : null),
           portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
           stabilityWindowPassed:
-            details?.stabilityWindowPassed ?? (status === "EXPIRED" ? true : null),
+            details?.stabilityWindowPassed ?? null,
           errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
           errorMessage: status === "FAILED" ? "Preview/test deployment failed." : null,
           createdAt: timestamp,
           startedAt: timestamp,
-          finishedAt: status === "READY" || status === "FAILED" ? timestamp : null,
+          finishedAt: status === "SUCCESS" || status === "FAILED" ? timestamp : null,
           updatedAt: timestamp
         })
         .onConflictDoUpdate({
           target: buildTestTable.buildId,
           set: {
-            status:
-              status === "READY"
-                ? "SUCCESS"
-                : status === "FAILED"
-                  ? "FAILED"
-                  : "IN_PROGRESS",
+            status,
             host: details?.host ?? null,
             hostPort: details?.hostPort ?? null,
             containerRef: details?.containerRef ?? null,
-            runtimeUrl: nextPreviewUrl,
+            runtimeUrl: nextRuntimeUrl,
             healthCheckPassed:
               details?.healthCheckPassed ?? (status === "FAILED" ? false : null),
             portOpen: details?.portOpen ?? (status === "FAILED" ? false : null),
             stabilityWindowPassed:
-              details?.stabilityWindowPassed ?? (status === "EXPIRED" ? true : null),
+              details?.stabilityWindowPassed ?? null,
             errorCode: status === "FAILED" ? "TEST_DEPLOYMENT_FAILED" : null,
-            errorMessage: status === "FAILED" ? "Preview/test deployment failed." : null,
-            finishedAt: status === "READY" || status === "FAILED" ? timestamp : null,
+            errorMessage: status === "FAILED" ? "Container test failed." : null,
+            finishedAt: status === "SUCCESS" || status === "FAILED" ? timestamp : null,
             updatedAt: timestamp
           }
         });
@@ -723,7 +724,8 @@ export class PostgresBuildRepository implements BuildRepository {
         id: randomUUID(),
         buildId,
         phase: nextPhase,
-        message: `Preview status: ${status}` + (details?.previewUrl ? ` url=${details.previewUrl}` : ""),
+        message: `Container test status: ${status}` +
+          (details?.runtimeUrl ? ` runtimeUrl=${details.runtimeUrl}` : ""),
         createdAt: timestamp
       });
 
@@ -735,7 +737,7 @@ export class PostgresBuildRepository implements BuildRepository {
 
       const testDeployment: TestDeployment = {
         status,
-        previewUrl: nextPreviewUrl,
+        runtimeUrl: nextRuntimeUrl,
         host: details?.host ?? null,
         hostPort: details?.hostPort ?? null,
         internalPort: buildTestRow?.internalPort ?? null,
@@ -907,7 +909,7 @@ export class PostgresBuildRepository implements BuildRepository {
 
     const testDeployment: TestDeployment = {
       status: mappedStatus,
-      previewUrl: row.buildTestRuntimeUrl ?? row.previewUrl,
+      runtimeUrl: row.buildTestRuntimeUrl ?? row.previewUrl,
       host: row.buildTestHost ?? null,
       hostPort: row.buildTestHostPort ?? null,
       internalPort: row.buildTestInternalPort ?? null,
