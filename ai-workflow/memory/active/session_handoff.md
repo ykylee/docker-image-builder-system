@@ -6,6 +6,25 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 162→163: **TASK-163 P2-M3 후속 — BuildService K8sDeployer 통합**).
+
+  ## 변경
+
+  - **BuildService.k8sDeployer** 필드 + **WithK8sDeployer(d)** setter. nil 이면 docker registry adapter 만 동작 (기존과 동일).
+  - **ProcessClaim** 의 deploy 단계에서 docker registry Deploy 직후에 k8s adapter Deploy 호출. **k8s 결과 SUCCESS 시** docker registry ReportDeployment 의 ResponsePayloadJSON 에 k8s section 추가 + TargetType 에 ",K8S" 부착. **k8s FAILED 시** 별도 FAILED ReportDeployment + phase FAILED.
+  - **env 4개** (RUNNER_K8S_CLUSTER / NAMESPACE / MANIFEST) BuildService 가 os.Getenv 로 K8sDeployOptions 에 채움.
+
+  ## 검증
+
+  go build ./... 통과 / go test ./... 8/8 package PASS (services +5 신규 = Setter/Merged/Failure/NilSkips + NilByDefault = 5, 기존 모두 통과).
+
+  ## 의도적으로 손대지 않은 것
+
+  - **cmd/runner/main.go 의 wire-up** — worker.New(cfg) 가 cfg.K8sMode 로 K8sDeployer 를 주입하지 않은 상태. 별도 commit 에서 wire-up.
+  - **P2-M5 의 realK8sDeployer** — skeleton 단계 완료 후.
+
+  workflow meta sync (state purpose_digest_rev 204→205, handoff_rev 126→127, task_count 71→72, work_backlog 120→121) 같은 commit 안에 포함.
+
 - Updated: 2026-07-23 (rev 161→162: **TASK-162 P2-M3 — k8s adapter 인터페이스 + skeleton**).
 
   ## 산출물

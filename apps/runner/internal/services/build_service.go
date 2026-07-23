@@ -21,6 +21,8 @@ type BuildService struct {
 	docker         *docker.Client
 	fetcher        *source.Fetcher
 	deployer       *deploy.Client
+	// TASK-162 (P2-M3 후속): k8s adapter 1호.
+	k8sDeployer    deploy.K8sDeployer
 	runnerID       string
 	internalPort   int // default 8080, env override PREVIEW_INTERNAL_PORT
 	dockerfilePath string // default "Dockerfile", env override RUNNER_DOCKERFILE_PATH
@@ -259,6 +261,30 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 	deployResult, err := s.deployer.Deploy(ctx, buildID, deploy.DeployOptions{
 		SourceImage: containerStatus.ImageTag,
 	})
+
+	// TASK-162 (P2-M3 후속): k8s adapter 1호 통합.
+	var k8sResult *deploy.K8sResult
+	if s.k8sDeployer != nil {
+		kRes, kErr := s.k8sDeployer.Deploy(ctx, deploy.K8sDeployOptions{
+			SourceImage: containerStatus.ImageTag,
+			Cluster:     os.Getenv("RUNNER_K8S_CLUSTER"),
+			Namespace:   os.Getenv("RUNNER_K8S_NAMESPACE"),
+			Manifest:    os.Getenv("RUNNER_K8S_MANIFEST"),
+			BuildID:     buildID,
+		})
+		if kErr != nil {
+			_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
+				Status:       contract.ExecutionStatusFailed,
+				TargetType:   "K8S",
+				ErrorCode:    contract.ErrorCodeDeploymentFailed,
+				ErrorMessage: kErr.Error(),
+				RunnerID:     s.runnerID,
+			})
+			_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
+			return fmt.Errorf("runner %s: k8s deploy: %w", s.runnerID, kErr)
+		}
+		k8sResult = kRes
+	}
 	if err != nil {
 		_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
 			Status:       contract.ExecutionStatusFailed,
@@ -271,13 +297,31 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return err
 	}
 
+	// TASK-162 (P2-M3 후속): k8s 결과가 있으면 docker registry 와
+	// 합쳐서 host 에 단일 ReportDeployment 으로 보고. TargetType 에
+	// ",K8S" 부착 + ResponsePayloadJSON.k8s section 추가.
+	reportPayload := deployResult.ResponsePayloadJSON
+	reportTargetType := deployResult.TargetType
+	if k8sResult != nil {
+		if reportPayload == nil {
+			reportPayload = map[string]any{}
+		}
+		reportPayload["k8s"] = map[string]any{
+			"cluster":   k8sResult.Cluster,
+			"namespace": k8sResult.Namespace,
+			"manifest":  k8sResult.Manifest,
+			"resultRef": k8sResult.ResultRef,
+			"appliedAt": k8sResult.AppliedAt,
+		}
+		reportTargetType = deployResult.TargetType + ",K8S"
+	}
 	if err := s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
 		Status:              contract.ExecutionStatusSuccess,
-		TargetType:          deployResult.TargetType,
+		TargetType:          reportTargetType,
 		TargetRef:           deployResult.TargetRef,
 		ResultRef:           deployResult.ResultRef,
 		RunnerID:            s.runnerID,
-		ResponsePayloadJSON: deployResult.ResponsePayloadJSON,
+		ResponsePayloadJSON: reportPayload,
 	}); err != nil {
 		_ = s.reportPhase(ctx, buildID, contract.PhaseFailed)
 		return err
@@ -308,3 +352,12 @@ func (s *BuildService) WithHostPort(port int) *BuildService {
 	s.hostPortOverride = port
 	return s
 }
+
+	// WithK8sDeployer 는 BuildService 에 k8s adapter 를 주입한다. nil
+	// 을 넘기면 k8s 분기 skip (기존 docker registry 만 동작). TASK-162
+	// (P2-M3 후속) 의 1호 통합 경로. K8sMode 가 "noop" / "skeleton" 인
+	// 경우도 nil 로 안전 — worker 가 cfg.K8sMode 로 분기해 결정.
+	func (s *BuildService) WithK8sDeployer(d deploy.K8sDeployer) *BuildService {
+		s.k8sDeployer = d
+		return s
+	}
