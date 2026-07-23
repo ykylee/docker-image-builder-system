@@ -35,7 +35,7 @@ DB_NAME="dib_e2e_pg_$$"
 PG_CONN_ARGS=(-h 127.0.0.1 -p "$PG_PORT" -U "$PG_SUPERUSER")
 
 psql_cmd() {
-  psql "${PG_CONN_ARGS[@]}" "$@"
+  psql "${PG_CONN_ARGS[@]}" -d postgres "$@"
 }
 
 cleanup() {
