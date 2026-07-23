@@ -1,22 +1,23 @@
-"""preview-readiness-checker core (v2 — canonical contract aligned).
+"""preview-readiness-checker core (v3 — legacy fallback 제거).
 
-`check_readiness(input_data)` 가 build 응답 + (선택) container-test
-block + (선택) ttl 정보를 받아 readiness_state (7종) 와 사용자용 카드
-4-필드 + next_action 을 합성한다.
+`check_readiness(input_data)` 가 build 응답 + (선택) canonical
+container-test block + (선택) ttl 정보를 받아 readiness_state (7종) 와
+사용자용 카드 4-필드 + next_action 을 합성한다.
 
-TASK-061 contract rename:
-- `testDeployment` (legacy preview-era) → canonical `test`
-  (ContainerTestResult). canonical `test.status` 는 `executionStatuses`
-  union (NOT_STARTED / IN_PROGRESS / SUCCESS / FAILED / SKIPPED).
-  legacy `testDeployment.status` 는 forward-compat shim 으로 consume
-  만 (READY/PROVISIONING/QUEUED → SUCCESS/IN_PROGRESS/NOT_STARTED).
-- `nextAction = OPEN_PREVIEW` → canonical `OPEN_DEPLOYMENT`.
-- 도메인은 사실상 container-test readiness 임. 디렉터리 이름
-  (`preview_readiness_checker`) 은 import path 호환성 유지를 위해
-  그대로 둠. SKILL.md 의 표면 surface 만 canonical 으로 정렬.
-- 7 readiness_state union (`READINESS_STATES`) 은 그대로.
-  READINESS_STATES 도 python `apps.skill_mcp.contract.canonical` 의
-  frozenset 을 단일 source-of-truth 로 사용.
+TASK-161 (P2-M2 Step 5): legacy `testDeployment` 입력 fallback 코드
+제거. canonical `test`(ContainerTestResult) 만 받는다. canonical
+`test.status` 는 `executionStatuses` union (NOT_STARTED / IN_PROGRESS /
+SUCCESS / FAILED / SKIPPED). 단, 입력에 legacy status 가 와도
+UNKNOWN 분류로 떨어지므로 backward-compat 가 필요하면 caller 가
+normalizer 를 거치면 된다.
+
+도메인은 사실상 container-test readiness 임. 디렉터리 이름
+(`preview_readiness_checker`) 은 import path 호환성 유지를 위해
+그대로 둠. SKILL.md 의 표면 surface 만 canonical 으로 정렬.
+
+7 readiness_state union (`READINESS_STATES`) 은 그대로.
+READINESS_STATES 도 python `apps.skill_mcp.contract.canonical` 의
+frozenset 을 단일 source-of-truth 로 사용.
 
 자세한 동작 규칙은 같은 디렉터리의 SKILL.md §1/§2 를 따른다.
 """
@@ -28,7 +29,7 @@ from typing import Any
 
 from apps.skill_mcp.contract import canonical as C
 
-SKILL_VERSION = "v2"
+SKILL_VERSION = "v3"
 
 # Canonical unions (single source of truth).
 READINESS_STATES = C.READINESS_STATES
@@ -36,7 +37,6 @@ NEXT_ACTIONS = C.NEXT_ACTIONS
 EXECUTION_STATUSES = C.EXECUTION_STATUSES
 CANONICAL_BUILD_STATUSES = C.CANONICAL_BUILD_STATUSES
 BUILD_PHASES = C.BUILD_PHASES
-LEGACY_PREVIEW_STATUSES = C.LEGACY_PREVIEW_STATUSES
 
 # In-flight / not-yet-completed canonical build statuses.
 PREPARING_STATUSES = frozenset({
@@ -55,12 +55,6 @@ BUILDING_PHASES = frozenset({
     "DOCKER_BUILD_STARTED",
     "DOCKER_BUILD_COMPLETED",
 })
-
-# Legacy preview-status forward-mapping → canonical execution status.
-# Single source-of-truth lives in `apps.skill_mcp.contract.canonical`
-# so build-status-explainer / latest-build-status / preview-readiness-checker
-# stay aligned.
-LEGACY_PREVIEW_TO_EXECUTION = C.LEGACY_PREVIEW_TO_EXECUTION
 
 # canonical status 값에 따른 사용 안내 카드.
 CARD_BY_STATE = {
@@ -154,47 +148,21 @@ def _resolve_canonical_test_block(input_data: dict[str, Any]) -> tuple[dict[str,
     """Return (canonical_test_block, warnings).
 
     Canonical payload: `input_data["test"]` ∈ ContainerTestResult shape.
-    Legacy forward-compat: `input_data["testDeployment"]` is mapped into
-    the same shape (`status`, `containerRef` from previewUrl / containerRef).
 
     Returns the block dict (with at least `status` key) or None.
     """
     warnings: list[dict[str, str]] = []
 
     test_block = input_data.get("test")
-    if test_block is not None:
-        if not isinstance(test_block, dict):
-            warnings.append(_err(
-                "INVALID_INPUT", "test",
-                "test must be an object when provided",
-            ))
-            return None, warnings
-        return test_block, warnings
-
-    legacy = input_data.get("testDeployment")
-    if legacy is None:
+    if test_block is None:
         return None, warnings
-    if not isinstance(legacy, dict):
+    if not isinstance(test_block, dict):
         warnings.append(_err(
-            "INVALID_INPUT", "testDeployment",
-            "testDeployment must be an object when provided",
+            "INVALID_INPUT", "test",
+            "test must be an object when provided",
         ))
         return None, warnings
-
-    # forward map legacy preview.Status → canonical executionStatus.
-    legacy_status = legacy.get("status")
-    if isinstance(legacy_status, str):
-        execution = LEGACY_PREVIEW_TO_EXECUTION.get(legacy_status, legacy_status)
-    else:
-        execution = None
-
-    mapped: dict[str, Any] = {}
-    if execution is not None:
-        mapped["status"] = execution
-    container_ref = legacy.get("previewUrl") or legacy.get("containerRef")
-    if isinstance(container_ref, str) and container_ref:
-        mapped["containerRef"] = container_ref
-    return mapped, warnings
+    return test_block, warnings
 
 
 def _classify(
@@ -204,13 +172,13 @@ def _classify(
 ) -> str:
     """readiness_state 결정.
 
-    우선순위: test block 의 status (canonical execution OR legacy
-    preview) → build.status. Health probe 가 unhealthy 면 SUCCESS/READY
-    도 DEGRADED 로 다운그레이드.
+    우선순위: test block 의 status (canonical executionStatuses) → build.status.
+    Health probe 가 unhealthy 면 SUCCESS/READY 도 DEGRADED 로 다운그레이드.
     """
     if test_block is not None:
         status = test_block.get("status")
-        # canonical execution statuses
+        # canonical execution statuses (Sub-commit A 에서 executionStatuses 가
+        # TestDeployment.status 를 흡수, 본 skill 은 이를 직접 분기).
         if status == "SUCCESS":
             if health_probe is not None:
                 hp = health_probe.get("status")
@@ -224,20 +192,6 @@ def _classify(
         if status == "FAILED":
             return "DEGRADED"
         if status == "SKIPPED":
-            return "EXPIRED"
-        # legacy preview statuses (forward-compat shim; canonical payload
-        # 는 위 분기에서 처리됨)
-        if status == "READY":
-            if health_probe is not None:
-                hp = health_probe.get("status")
-                if hp == "unhealthy":
-                    return "DEGRADED"
-            return "READY"
-        if status in ("PROVISIONING", "RESERVED", "STARTING"):
-            return "STARTING"
-        if status == "QUEUED":
-            return "WAITING_FOR_SLOT"
-        if status in ("EXPIRED", "STOPPED", "NOT_REQUESTED"):
             return "EXPIRED"
         # 알 수 없는 status → fallthrough to build-side classification.
 

@@ -90,9 +90,10 @@ GO_CANONICAL_MAP: dict[str, tuple[str, str, str, str]] = {
 GO_CANONICAL_DIR = Path("apps/runner/internal/contract")
 
 # canonical § 별 enum 매핑: (enum name, canonical_section, ts file, ts export)
+# TASK-161 (P2-M2 Step 5): `previewStatuses` 제거 — legacy enum 이
+# canonical 흡수되어 (Sub-commit A) docs/sdlc/contracts §6 항목이 사라짐.
 ENUM_TARGETS = [
     ("buildStatuses", "§5", "status.ts", "buildStatuses"),
-    ("previewStatuses", "§6", "status.ts", "previewStatuses"),
     ("buildPhases", "§7", "phase.ts", "buildPhases"),
     ("errorCodes", "§8", "errors.ts", "errorCodes"),
 ]
@@ -233,15 +234,15 @@ def _extract_ts_object_keys(src: str) -> list[str] | None:
 def _extract_canonical_enums(text: str) -> dict[str, list[str]]:
     """canonical markdown 에서 ```text ... ``` block 안의 UPPER word 추출.
 
-    block 등장 순서대로 canonical_section 을 부여한다. block 4개를 매핑:
-    §5 → buildStatuses, §6 → previewStatuses, §7 → buildPhases, §8 → errorCodes.
+    block 등장 순서대로 canonical_section 을 부여한다. TASK-161 (P2-M2
+    Step 5): §6 previewStatuses 제거 → 3개 block 매핑:
+    §5 → buildStatuses, §7 → buildPhases, §8 → errorCodes.
     """
     blocks = MD_CODE_BLOCK_RE.findall(text)
     section_enum = {
         0: ("buildStatuses", "§5"),
-        1: ("previewStatuses", "§6"),
-        2: ("buildPhases", "§7"),
-        3: ("errorCodes", "§8"),
+        1: ("buildPhases", "§7"),
+        2: ("errorCodes", "§8"),
     }
     result: dict[str, list[str]] = {}
     for i, body in enumerate(blocks):

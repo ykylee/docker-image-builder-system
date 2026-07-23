@@ -206,7 +206,7 @@ class FailedTerminalTests(unittest.TestCase):
 
 # TASK-159/160 (P2-M1 Step 2/3): LegacyCompatTests 제거.
 # legacy status(CLAIMED/TEST_READY) 와 legacy preview 필드
-# (testDeployment/previewUrl/previewStatus) 가 계약에서 사라졌으므로
+# (runtimeUrl/previewUrl/previewStatus) 가 계약에서 사라졌으므로
 # 그 forward-compat 을 검증하던 4 테스트는 더 이상 의미가 없다.
 # canonical 경로 검증은 이 파일의 나머지 테스트가 담당한다.
 

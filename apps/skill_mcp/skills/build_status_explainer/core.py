@@ -1,7 +1,13 @@
-"""build-status-explainer core (v2 — canonical contract aligned).
+"""build-status-explainer core (v3 — legacy fallback 제거).
 
 `explain(input_data)` 가 Build Server 의 status 응답을 받아 3-tier 메시지
 (system / agent / user) 와 next_action 을 만든다.
+
+TASK-161 (P2-M2 Step 5): legacy `testDeployment` 입력 fallback 코드
+제거. canonical `test`(ContainerTestResult) 만 받는다. canonical
+`test.status` 는 `executionStatuses` union (NOT_STARTED / IN_PROGRESS /
+SUCCESS / FAILED / SKIPPED). backward-compat 가 필요하면 caller 가
+normalizer 를 거치면 된다.
 
 TASK-061 의 contract rename 으로:
 - Enum은 모두 `apps.skill_mcp.contract.canonical` 의 frozenset 으로 통일
@@ -27,8 +33,8 @@ from typing import Any
 
 from apps.skill_mcp.contract import canonical as C
 
-CONTRACT_VERSION = "v2"
-EXPLANATION_VERSION = "v2"
+CONTRACT_VERSION = "v3"
+EXPLANATION_VERSION = "v3"
 
 # Canonical unions (single source of truth).
 BUILD_STATUSES = C.CANONICAL_BUILD_STATUSES
@@ -38,11 +44,8 @@ ERROR_CODES = C.ERROR_CODES
 NEXT_ACTIONS = C.NEXT_ACTIONS
 TERMINAL_BUILD_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
-# Legacy forward-compat aliases. Skills that feed explain() still emit the
-# preview-era STATUSES. We accept them as input but never produce them in
-# the user-facing explanation output — they get mapped into canonical
-# terminal/in-flight states below.
-LEGACY_PREVIEW_STATUSES = C.LEGACY_PREVIEW_STATUSES
+
+# Canonical 12-status message table. Keys are the canonical
 
 
 # Canonical 12-status message table. Keys are the canonical
@@ -159,86 +162,55 @@ def _next_action_for_build_status(
 def _resolve_test_runtime_url(build: dict[str, Any], test_block: dict[str, Any] | None) -> str | None:
     """Best-effort runtime URL for the success-state user message.
 
-    Canonical `test.containerRef` is preferred (it's the canonical reference
-    to the running test container). Legacy `testDeployment.previewUrl` is a
-    forward-compat fallback during the migration window.
+    Canonical `test.containerRef` is the canonical reference to the running
+    test container. Sub-commit A 의 type-level fix 이후 `test.runtimeUrl` 도
+    옵션으로 사용 가능.
     """
-    if isinstance(test_block, dict):
-        ref = test_block.get("containerRef")
-        if isinstance(ref, str) and ref:
-            return ref
-        legacy_url = test_block.get("previewUrl")
-        if isinstance(legacy_url, str) and legacy_url:
-            return legacy_url
+    if not isinstance(test_block, dict):
+        return None
+    ref = test_block.get("containerRef")
+    if isinstance(ref, str) and ref:
+        return ref
+    runtime_url = test_block.get("runtimeUrl")
+    if isinstance(runtime_url, str) and runtime_url:
+        return runtime_url
     return None
 
 
 def _resolve_canonical_build_block(input_data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any] | None, list[dict[str, str]]]:
-    """Extract (build_summary, test_block, errors) from either canonical or legacy payload.
+    """Extract (build_summary, test_block, errors) from canonical payload.
 
     Canonical payload shape (BuildStatusResponse):
       { "build": {...}, "lastError": {...} | null, "lifecycle": {...},
         "image": {...}, "test": {...}, "deploy": {...}, "resultDelivery": {...}, ... }
-    Legacy payload shape (forward-compat):
-      { "status": "...", "currentPhase": "...", "testDeployment": {...} }
 
     Returns (build_summary, test_block_or_None, errors). `build_summary`
     always has at least a `status` key for the downstream message-table
-    lookup. Legacy `testDeployment` which is not a dict is HARD-errored
-    (matches the canonical API contract — a malformed testDeployment
-    must be visible to the caller as INVALID_TYPE rather than silently
-    dropped).
+    lookup.
     """
     errors: list[dict[str, str]] = []
 
     canonical_build = input_data.get("build")
-    if isinstance(canonical_build, dict):
-        test = input_data.get("test")
-        if test is not None and not isinstance(test, dict):
-            errors.append(_err("INVALID_TYPE", "test", "test must be a JSON object when provided"))
-            test = None
-        return canonical_build, test, errors
-
-    # legacy fallback — synthesise a build-summary dict from top-level fields.
-    legacy_build: dict[str, Any] = {}
-    for k in ("status", "currentPhase", "buildId", "userId", "appName",
-              "createdAt", "startedAt", "finishedAt", "image",
-              "lifecycle", "deploy", "resultDelivery"):
-        if k in input_data:
-            legacy_build[k] = input_data[k]
-    if "status" not in legacy_build:
-        legacy_build["status"] = input_data.get("status")
-    test = input_data.get("testDeployment")
+    if not isinstance(canonical_build, dict):
+        return {}, None, errors
+    test = input_data.get("test")
     if test is not None and not isinstance(test, dict):
-        errors.append(_err("INVALID_TYPE", "testDeployment", "testDeployment must be a JSON object when provided"))
+        errors.append(_err("INVALID_TYPE", "test", "test must be a JSON object when provided"))
         test = None
-    return legacy_build, test, errors
+    return canonical_build, test, errors
 
 
 def _execution_status_from_test(test_block: dict[str, Any] | None) -> str | None:
-    """Canonical `test.status` ∈ EXECUTION_STATUSES, with legacy preview-
-    era values forward-mapped onto the same set (single source-of-truth
-    = `apps.skill_mcp.contract.canonical.LEGACY_PREVIEW_TO_EXECUTION`).
+    """Canonical `test.status` ∈ EXECUTION_STATUSES.
 
-    Canonical execution statuses pass through. Legacy preview statuses
-    are mapped via the canonical helper; values valid in both unions
-    (FAILED, EXPIRED / RESERVED / STARTING / STOPPED) keep raw. Unknown
-    enum values are returned raw so the caller can attach a warning.
+    Unknown enum values are returned raw so the caller can attach a warning.
     """
     if test_block is None:
         return None
     raw = test_block.get("status")
     if not isinstance(raw, str):
         return None
-    if raw in EXECUTION_STATUSES:
-        return raw
-    if raw in C.LEGACY_PREVIEW_TO_EXECUTION:
-        return C.LEGACY_PREVIEW_TO_EXECUTION[raw]
-    # FAILED / EXPIRED / STARTING / STOPPED / RESERVED 등 LEGACY_PREVIEW_STATUSES
-    # 나머지는 raw 그대로 (canonical executionStatuses 외 shim values).
-    if raw in LEGACY_PREVIEW_STATUSES:
-        return raw
-    return raw  # unknown enum — surfaced as warning, not mapped
+    return raw
 
 
 @dataclass
@@ -307,10 +279,7 @@ def explain(input_data: Any) -> Explanation:
         ))
 
     test_execution = _execution_status_from_test(test_block)
-    if test_execution is not None and (
-        test_execution not in EXECUTION_STATUSES
-        and test_execution not in LEGACY_PREVIEW_STATUSES
-    ):
+    if test_execution is not None and test_execution not in EXECUTION_STATUSES:
         warnings.append(_err(
             "UNKNOWN_ENUM", "test.status",
             f"unknown test execution status: {test_execution!r}",
@@ -398,13 +367,12 @@ def explain(input_data: Any) -> Explanation:
     next_action = _next_action_for_build_status(canonical_status, test_execution)
     error_summary: str | None = None
 
-    # Legacy forward-compat: COMPLETED + testDeployment.{EXPIRED,STOPPED,FAILED}.
-    # canonical 영역에서는 위의 TEST_SUCCESS 처리 분기가 동등하게 다룬다.
-    if canonical_status == "COMPLETED" and test_execution in LEGACY_PREVIEW_STATUSES:
-        if test_execution in ("EXPIRED", "STOPPED", "FAILED"):
-            next_action = "RETRY"
-            error_summary = _error_summary_from_logs(log_tail) or None
-            user_msg = _user_msg_for_test_expired_or_failed()
+    # canonical COMPLETED + test.status == SKIPPED|FAILED → TTL 만료 또는
+    # 실패. legacy preview-era 의 EXPIRED/STOPPED 의미가 SKIPPED 에 흡수됨.
+    if canonical_status == "COMPLETED" and test_execution in ("SKIPPED", "FAILED"):
+        next_action = "RETRY"
+        error_summary = _error_summary_from_logs(log_tail) or None
+        user_msg = _user_msg_for_test_expired_or_failed()
 
     if canonical_status == "TEST_SUCCESS" and test_execution == "FAILED":
         # test 단계에서 실패 → 메시지 덮어쓰기.

@@ -60,49 +60,14 @@ EXECUTION_STATUSES: frozenset[str] = frozenset({
 # Public union: what skills accept as a `build.status` input.
 PUBLIC_BUILD_STATUSES: frozenset[str] = frozenset(CANONICAL_BUILD_STATUSES)
 
-# Legacy preview/test-deployment states. The TS contract (`previewStatuses`
-# in status.ts) lists 6 values; the Python migration shim keeps 3 additional
-# PKG-006-era historical statuses that the build-server emitted in earlier
-# versions but that the canonical contract dropped during the rename
-# refactor (TASK-052):
+# TASK-161 (P2-M2 Step 5): legacy `previewStatuses` enum + Python extras
+# 3종(`RESERVED`/`STARTING`/`STOPPED`) + `LEGACY_PREVIEW_TO_EXECUTION`
+# 매핑 + `is_legacy_preview_status` 함수 제거. canonical `EXECUTION_STATUSES`
+# 가 TestDeployment 의 status 를 흡수하고 (Sub-commit A), Skill 3종이
+# canonical 블록(`test`/`deploy`)을 직접 읽는다.
 #
-#   - "RESERVED"   — PKG-006 reservation phase
-#   - "STARTING"   — pre-canonical starting alias for PROVISIONING
-#   - "STOPPED"    — older teardown state (now superseded by EXPIRED)
-#
-# These three are Python-only legacy extras; the contract-drift-checker
-# reports them under the `extra_in_code` group (Python canonical vs TS).
-# Skills keep accepting them for caller forward-compat during the
-# migration window. New code MUST prefer the canonical `test` / `deploy`
-# blocks (ContainerTestResult / DeploymentResult) in BuildStatusResponse.
-LEGACY_PREVIEW_STATUSES: frozenset[str] = frozenset({
-    # TS-mirror subset (6)
-    "NOT_REQUESTED",
-    "QUEUED",
-    "PROVISIONING",
-    "READY",
-    "FAILED",
-    "EXPIRED",
-    # Python-only legacy extras (3) — PKG-006-era historical.
-    "RESERVED",
-    "STARTING",
-    "STOPPED",
-})
-
-# Forward-map legacy preview-status to canonical execution-status.
-# Mirrors the live build-status-explainer / latest-build-status /
-# preview-readiness-checker mapping. Single source-of-truth so the three
-# skills/MCPs that consume `testDeployment` stay aligned.
-LEGACY_PREVIEW_TO_EXECUTION: dict[str, str] = {
-    "READY": "SUCCESS",
-    "NOT_REQUESTED": "SKIPPED",
-    "QUEUED": "NOT_STARTED",
-    "PROVISIONING": "IN_PROGRESS",
-    # FAILED / EXPIRED / RESERVED / STARTING / STOPPED fall through as
-    # `execution = raw` — they're either canonical EXECUTION_STATUSES
-    # member (FAILED) or shim values handled per-case.
-}
-
+# 본 enum / 매핑이 있던 시점의 backward-compat callers(PKG-006 / TASK-052)는
+# 모두 canonical 화되어 더 이상 호출되지 않는다.
 # TASK-069: Runner registry status enum. Mirrors
 # `packages/shared-contract/src/build/runner-registry.ts` `runnerStatusSchema`
 # 와 `apps/runner/internal/contract/runner_registry.go` `RunnerStatuses`.
@@ -220,10 +185,6 @@ def is_public_build_status(value: object) -> bool:
 
 def is_execution_status(value: object) -> bool:
     return isinstance(value, str) and value in EXECUTION_STATUSES
-
-
-def is_legacy_preview_status(value: object) -> bool:
-    return isinstance(value, str) and value in LEGACY_PREVIEW_STATUSES
 
 
 def is_build_phase(value: object) -> bool:

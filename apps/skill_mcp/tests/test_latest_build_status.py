@@ -34,7 +34,7 @@ def _build_payload(**overrides):
         "appName": "demo-app",
         "status": "BUILDING",
         "currentPhase": "DOCKER_BUILDING",
-        "testDeployment": {"status": "STARTING"},
+        "test": {"status": "IN_PROGRESS"},
         "error": None,
     }
     base.update(overrides)
@@ -140,13 +140,13 @@ class FetchLatestCoreTests(unittest.TestCase):
                 "fixture": _build_payload(
                     buildId="b-1",
                     status="COMPLETED",
-                    testDeployment={"status": "READY", "previewUrl": "https://p/x"},
+                    runtimeUrl={"status": "SUCCESS", "runtimeUrl": "https://p/x"},
                 ),
             }
         )
         self.assertTrue(result.ok)
         self.assertEqual(result.build["buildId"], "b-1")
-        # TASK-061: legacy testDeployment { status: READY } forward-maps to
+        # TASK-061: legacy runtimeUrl { status: READY } forward-maps to
         # canonical { test: { status: SUCCESS } } which under
         # COMPLETED+test.SUCCESS yields next_action=NONE (terminal posture).
         # The legacy OPEN_PREVIEW emit is retired.

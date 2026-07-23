@@ -43,14 +43,7 @@ def _make_repo(tmp: Path) -> Path:
         "  \"COMPLETED\"\n"
         "] as const;\n"
         "\n"
-        "export const previewStatuses = [\n"
-        "  \"QUEUED\",\n"
-        "  \"PROVISIONING\",\n"  # TS-only
-        "  \"READY\",\n"
-        "  \"NOT_REQUESTED\",\n"  # TS-only
-
-        "  \"FAILED\"\n"
-        "] as const;\n"
+        """
     ))
     _write(contract / "phase.ts", (
         "export const buildPhases = [\n"
@@ -120,19 +113,7 @@ FAILED
 CANCELLED
 ```
 
-## 6. Preview Status Enum
-
-```text
-QUEUED
-RESERVED
-STARTING
-READY
-FAILED
-EXPIRED
-STOPPED
-```
-
-## 7. Phase Key Baseline
+## 6. Phase Key Baseline
 
 ```text
 REQUEST_ACCEPTED
@@ -324,18 +305,14 @@ class CanonicalExtractionTests(unittest.TestCase):
     def test_extract_enums(self):
         text = _CANONICAL_SAMPLE
         enums = core._extract_canonical_enums(text)
-        # 4개 block 모두 잡혔는지
+        # TASK-161 (P2-M2 Step 5): §6 previewStatuses 제거 → 3개 block.
         self.assertIn("buildStatuses", enums)
-        self.assertIn("previewStatuses", enums)
         self.assertIn("buildPhases", enums)
         self.assertIn("errorCodes", enums)
         # §5 BuildStatus 10종
         self.assertEqual(len(enums["buildStatuses"]), 10)
         self.assertIn("CANCELLED", enums["buildStatuses"])
-        # §6 PreviewStatus 7종
-        self.assertEqual(len(enums["previewStatuses"]), 7)
-        self.assertIn("STOPPED", enums["previewStatuses"])
-        # §8 ErrorCode 10종
+        # §7 ErrorCode 10종
         self.assertEqual(len(enums["errorCodes"]), 10)
         self.assertIn("INTERNAL_ERROR", enums["errorCodes"])
 
@@ -365,14 +342,11 @@ class DriftComputationTests(unittest.TestCase):
         r = core.check_drift({}, repo_root=self.repo)
         # 가짜 repo 의 _make_repo 에서 의도적으로 drift 를 심어둠
         self.assertFalse(r.ok)
+        # TASK-161 (P2-M2 Step 5): §6 previewStatuses 제거.
         # buildStatuses: TS=4(QUEUED, BUILDING, CLAIMED, COMPLETED) / canonical=10
         # shared: QUEUED, BUILDING, COMPLETED
         # missing: 7 (PREPARING, VALIDATING, IMAGE_BUILT, TEST_DEPLOYING, TEST_READY, FAILED, CANCELLED)
         # extra: 1 (CLAIMED)
-        # previewStatuses: TS=5(QUEUED, PROVISIONING, READY, NOT_REQUESTED, FAILED) / canonical=7
-        # shared: QUEUED, READY, FAILED
-        # missing: 4 (RESERVED, STARTING, EXPIRED, STOPPED)
-        # extra: 2 (PROVISIONING, NOT_REQUESTED)
         # buildPhases: TS=2 / canonical=9
         # shared: REQUEST_ACCEPTED, FAILED
         # missing: 7
@@ -387,16 +361,14 @@ class DriftComputationTests(unittest.TestCase):
         # extra: 6 (projectId, repositoryId, requestedBy, sourceArchive, entrypointPath, metadata)
 
         s = r.summary
-        self.assertEqual(s.missing_in_code, 7 + 4 + 7 + 7 + 5)
-        self.assertEqual(s.extra_in_code, 1 + 2 + 0 + 1 + 6)
+        self.assertEqual(s.missing_in_code, 7 + 7 + 7 + 5)
+        self.assertEqual(s.extra_in_code, 1 + 0 + 1 + 6)
         self.assertEqual(s.total, s.missing_in_code + s.extra_in_code)
 
         by_enum = s.by_enum
         self.assertEqual(by_enum["buildStatuses"]["missing"], 7)
         self.assertEqual(by_enum["buildStatuses"]["extra"], 1)
         self.assertEqual(by_enum["buildStatuses"]["shared"], 3)
-        self.assertEqual(by_enum["previewStatuses"]["missing"], 4)
-        self.assertEqual(by_enum["previewStatuses"]["extra"], 2)
         self.assertEqual(by_enum["buildPhases"]["missing"], 7)
         self.assertEqual(by_enum["errorCodes"]["missing"], 7)
         self.assertEqual(by_enum["errorCodes"]["extra"], 1)
@@ -422,7 +394,6 @@ class DriftComputationTests(unittest.TestCase):
         )
         # buildStatuses 만 검사 → by_enum 에 buildStatuses 만
         self.assertIn("buildStatuses", r.summary.by_enum)
-        self.assertNotIn("previewStatuses", r.summary.by_enum)
         self.assertNotIn("buildPhases", r.summary.by_enum)
         self.assertNotIn("errorCodes", r.summary.by_enum)
         self.assertNotIn("buildRequestFields", r.summary.by_enum)
@@ -445,20 +416,18 @@ class DriftComputationTests(unittest.TestCase):
             "  \"IMAGE_BUILT\", \"TEST_DEPLOYING\", \"TEST_READY\",\n"
             "  \"COMPLETED\", \"FAILED\", \"CANCELLED\"\n"
             "] as const;\n"
-            "export const previewStatuses = [\n"
-            "  \"QUEUED\", \"RESERVED\", \"STARTING\", \"READY\",\n"
-            "  \"FAILED\", \"EXPIRED\", \"STOPPED\"\n"
-            "] as const;\n",
+            # TASK-161 (P2-M2 Step 5): previewStatuses 가 canonical 흡수되어
+            # TS 정의가 사라졌다. 본 테스트는 buildStatuses 만 본 drift 0 검증.
             encoding="utf-8",
         )
         r = core.check_drift(
             {
-                "enums": ["buildStatuses", "previewStatuses"],
+                "enums": ["buildStatuses"],
                 "checkRequest": False,
             },
             repo_root=self.repo,
         )
-        # buildStatuses / previewStatuses 만 본 경우 drift 0
+        # buildStatuses 만 본 경우 drift 0
         s = r.summary
         self.assertEqual(s.total, 0)
         self.assertTrue(r.ok)
@@ -532,10 +501,11 @@ class RealRepoTests(unittest.TestCase):
                 f"ts_only={ts_only_build}, by_enum={r.summary.by_enum.get('buildStatuses')}"
             ),
         )
-        # by_enum 에 4종 + buildRequestFields + Python canonical 4종 + Go canonical
-        # 5종 모두 들어 있어야 함 (TASK-061 / TASK-062).
+        # by_enum 에 3종 (TASK-161 로 previewStatuses 제거) + buildRequestFields
+        # + Python canonical 4종 + Go canonical 4종 모두 들어 있어야 함
+        # (TASK-061 / TASK-062 / P2-M2 Step 5).
         for k in (
-            "buildStatuses", "previewStatuses", "buildPhases", "errorCodes",
+            "buildStatuses", "buildPhases", "errorCodes",
             "buildRequestFields",
             "skillBuildStatuses", "executionStatuses", "skillPhases", "skillErrorCodes",
             # Go bridge (TASK-062; TASK-159 로 goLegacyBuildStatuses 제거)
@@ -603,8 +573,8 @@ class CliTests(unittest.TestCase):
             "export const buildStatuses = [\"QUEUED\",\"PREPARING\",\"VALIDATING\","
             "\"BUILDING\",\"IMAGE_BUILT\",\"TEST_DEPLOYING\",\"TEST_READY\","
             "\"COMPLETED\",\"FAILED\",\"CANCELLED\"] as const;\n"
-            "export const previewStatuses = [\"QUEUED\",\"RESERVED\",\"STARTING\","
-            "\"READY\",\"FAILED\",\"EXPIRED\",\"STOPPED\"] as const;\n",
+            # TASK-161 (P2-M2 Step 5): previewStatuses 가 canonical 흡수되어
+            # TS 정의에서 사라짐.
             encoding="utf-8",
         )
         phase_ts = (

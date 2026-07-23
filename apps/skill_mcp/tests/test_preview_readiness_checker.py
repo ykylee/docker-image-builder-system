@@ -44,10 +44,10 @@ class InputValidationTests(unittest.TestCase):
     def test_test_deployment_non_dict_warns(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": "not a dict",
+            "test": "not a dict",
         })
         self.assertTrue(r.ok)
-        self.assertTrue(any(w["code"] == "INVALID_INPUT" and w["field"] == "testDeployment" for w in r.warnings))
+        self.assertTrue(any(w["code"] == "INVALID_INPUT" and w["field"] == "test" for w in r.warnings))
 
     def test_health_probe_non_dict_warns(self):
         r = core.check_readiness({
@@ -81,7 +81,7 @@ class InputValidationTests(unittest.TestCase):
 
 class ClassificationTests(unittest.TestCase):
     def test_queued_is_preparing(self):
-        r = core.check_readiness({"build": {"status": "QUEUED"}})
+        r = core.check_readiness({"build": {"status": "IN_PROGRESS"}})
         self.assertEqual(r.readiness_state, "PREPARING")
         self.assertEqual(r.card.next_action, "WAIT")
 
@@ -116,30 +116,30 @@ class ClassificationTests(unittest.TestCase):
     def test_preview_queued_is_waiting(self):
         r = core.check_readiness({
             "build": {"status": "TEST_SUCCESS"},
-            "testDeployment": {"status": "QUEUED"},
+            "test": {"status": "IN_PROGRESS"},
         })
         self.assertEqual(r.readiness_state, "WAITING_FOR_SLOT")
 
     def test_preview_provisioning_is_starting(self):
         r = core.check_readiness({
             "build": {"status": "TEST_SUCCESS"},
-            "testDeployment": {"status": "PROVISIONING"},
+            "test": {"status": "IN_PROGRESS"},
         })
         self.assertEqual(r.readiness_state, "STARTING")
 
     def test_preview_reserved_is_starting(self):
         r = core.check_readiness({
             "build": {"status": "TEST_SUCCESS"},
-            "testDeployment": {"status": "RESERVED"},
+            "test": {"status": "IN_PROGRESS"},
         })
         self.assertEqual(r.readiness_state, "STARTING")
 
     def test_preview_ready_no_probe_is_ready(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {
-                "status": "READY",
-                "previewUrl": "http://preview.example.com:38124",
+            "test": {
+                "status": "SUCCESS",
+                "runtimeUrl": "http://preview.example.com:38124",
             },
         })
         self.assertEqual(r.readiness_state, "READY")
@@ -150,7 +150,7 @@ class ClassificationTests(unittest.TestCase):
     def test_preview_ready_with_unhealthy_probe_is_degraded(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://..."},
             "healthProbe": {"status": "unhealthy"},
         })
         self.assertEqual(r.readiness_state, "DEGRADED")
@@ -159,7 +159,7 @@ class ClassificationTests(unittest.TestCase):
     def test_preview_ready_with_healthy_probe_is_ready(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://..."},
             "healthProbe": {"status": "healthy"},
         })
         self.assertEqual(r.readiness_state, "READY")
@@ -167,28 +167,28 @@ class ClassificationTests(unittest.TestCase):
     def test_preview_failed_is_degraded(self):
         r = core.check_readiness({
             "build": {"status": "TEST_SUCCESS"},
-            "testDeployment": {"status": "FAILED"},
+            "test": {"status": "FAILED"},
         })
         self.assertEqual(r.readiness_state, "DEGRADED")
 
     def test_preview_expired(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "EXPIRED"},
+            "test": {"status": "SKIPPED"},
         })
         self.assertEqual(r.readiness_state, "EXPIRED")
 
     def test_preview_stopped_is_expired(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "STOPPED"},
+            "test": {"status": "SKIPPED"},
         })
         self.assertEqual(r.readiness_state, "EXPIRED")
 
     def test_preview_not_requested_is_expired(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "NOT_REQUESTED"},
+            "test": {"status": "SKIPPED"},
         })
         self.assertEqual(r.readiness_state, "EXPIRED")
 
@@ -206,9 +206,9 @@ class CardContentTests(unittest.TestCase):
     def test_ready_card_has_url_subtitle(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {
-                "status": "READY",
-                "previewUrl": "http://example.com:12345",
+            "test": {
+                "status": "SUCCESS",
+                "runtimeUrl": "http://example.com:12345",
             },
         })
         # TASK-061: card title evolved from "미리보기 주소" to "테스트 컨테이너"
@@ -218,30 +218,30 @@ class CardContentTests(unittest.TestCase):
 
     def test_non_ready_card_has_empty_subtitle(self):
         r = core.check_readiness({
-            "build": {"status": "QUEUED"},
+            "build": {"status": "IN_PROGRESS"},
         })
         self.assertEqual(r.card.subtitle, "")
 
     def test_subtitle_only_when_url_string(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": 12345},
+            "test": {"status": "SUCCESS", "runtimeUrl": 12345},
         })
-        # previewUrl 이 string 아니면 subtitle 빈
+        # runtimeUrl 이 string 아니면 subtitle 빈
         self.assertEqual(r.card.subtitle, "")
 
     def test_all_states_have_card(self):
         cases = [
-            {"build": {"status": "QUEUED"}},
+            {"build": {"status": "IN_PROGRESS"}},
             {"build": {"status": "PREPARING_SOURCE"}},
             {"build": {"status": "BUILDING"}},
             {"build": {"status": "TEST_SUCCESS"}},
             {"build": {"status": "FAILED"}},
             {"build": {"status": "CANCELLED"}},
             {"build": {"status": "COMPLETED"}},
-            {"build": {"status": "COMPLETED"}, "testDeployment": {"status": "QUEUED"}},
-            {"build": {"status": "COMPLETED"}, "testDeployment": {"status": "READY"}},
-            {"build": {"status": "COMPLETED"}, "testDeployment": {"status": "EXPIRED"}},
+            {"build": {"status": "COMPLETED"}, "test": {"status": "IN_PROGRESS"}},
+            {"build": {"status": "COMPLETED"}, "test": {"status": "SUCCESS"}},
+            {"build": {"status": "COMPLETED"}, "test": {"status": "SKIPPED"}},
         ]
         for c in cases:
             with self.subTest(c=c):
@@ -260,7 +260,7 @@ class TtlTests(unittest.TestCase):
     def test_ttl_from_ttl_block(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://..."},
             "ttl": {"ttl_remaining_seconds": 3300},
         })
         self.assertEqual(r.card.ttl_remaining_seconds, 3300)
@@ -268,7 +268,7 @@ class TtlTests(unittest.TestCase):
     def test_ttl_invalid_ignored(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://..."},
             "ttl": {"ttl_remaining_seconds": -10},
         })
         self.assertIsNone(r.card.ttl_remaining_seconds)
@@ -276,7 +276,7 @@ class TtlTests(unittest.TestCase):
     def test_ttl_non_int_ignored(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://..."},
             "ttl": {"ttl_remaining_seconds": "3300"},
         })
         self.assertIsNone(r.card.ttl_remaining_seconds)
@@ -284,7 +284,7 @@ class TtlTests(unittest.TestCase):
     def test_expires_at_only_does_not_compute(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://...", "expiresAt": "2026-07-03T02:03:00Z"},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://...", "expiresAt": "2026-07-03T02:03:00Z"},
         })
         # now 가 없으면 ttl 계산 X
         self.assertIsNone(r.card.ttl_remaining_seconds)
@@ -324,7 +324,7 @@ class ResultEnvelopeTests(unittest.TestCase):
     def test_to_dict_shape(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://..."},
         })
         d = r.to_dict()
         for k in ("ok", "readiness_state", "card", "buildId", "warnings", "errors", "ref"):
@@ -353,7 +353,7 @@ class CliTests(unittest.TestCase):
     def test_cli_stdin_input(self):
         stdin = io.StringIO(json.dumps({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://example.com:38124"},
+            "test": {"status": "SUCCESS", "runtimeUrl": "http://example.com:38124"},
         }))
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf), mock.patch("sys.stdin", stdin):

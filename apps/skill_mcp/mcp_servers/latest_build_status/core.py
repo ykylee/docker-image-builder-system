@@ -82,44 +82,18 @@ _CANONICAL_OR_LEGACY_STATUSES: frozenset[str] = frozenset(
     C.CANONICAL_BUILD_STATUSES
 )
 
-# Backend 가 아직도 legacy preview-era 필드 (`testDeployment`, raw `error`) 를
-# 보내는 경우 canonical `test` / `lastError` 로 forward-map 한다. 이 단계는
-# normalize 단계에서 일어나며 explain() 은 항상 canonical payload 만 본다.
+# TASK-161 (P2-M2 Step 5): legacy `testDeployment` forward-map 코드
+# 제거. canonical `test`(ContainerTestResult) 만 받는다. legacy `error`
+# → `lastError` 변환은 보존 (legacy 단일 키 normalize 로 빌드 서버가 아직
+# 노출 가능). `LEGACY_PREVIEW_TO_EXECUTION` 매핑 제거 — canonical
+# executionStatuses 가 canonical 흡수.
 def _normalize_legacy_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Legacy preview-era 필드를 canonical 로 forward-map.
-
-    Single source-of-truth for the legacy preview-status →
-    canonical execution-status mapping is
-    `apps.skill_mcp.contract.canonical.LEGACY_PREVIEW_TO_EXECUTION`
-    — same map used by build-status-explainer and
-    preview-readiness-checker so all three stay aligned.
+    """Top-level `error` → canonical `lastError`. 그 외 legacy fallback 은
+    모두 제거됨 (P2-M2 Step 5) — caller 가 canonical payload 만 보낸다.
     """
     if not isinstance(payload, dict):
         return {}
     out = dict(payload)
-    # legacy `testDeployment` → canonical `test` (status 가 canonical
-    # executionStatuses 가 아니면 forward-map 시도).
-    if "testDeployment" in out and "test" not in out:
-        legacy_td = out.pop("testDeployment")
-        if isinstance(legacy_td, dict):
-            legacy_status = legacy_td.get("status")
-            if isinstance(legacy_status, str):
-                execution = C.LEGACY_PREVIEW_TO_EXECUTION.get(legacy_status, legacy_status)
-                mapped: dict[str, Any] = {"status": execution}
-                preview_url = legacy_td.get("previewUrl")
-                if isinstance(preview_url, str) and preview_url:
-                    mapped["containerRef"] = preview_url
-                # 보존될 raw execution 결과값들도 같이 (있다면) 옮긴다.
-                for flag in (
-                    "containerRunning",
-                    "healthCheckPassed",
-                    "portOpen",
-                    "stabilityWindowPassed",
-                ):
-                    if flag in legacy_td:
-                        mapped[flag] = legacy_td[flag]
-                out["test"] = mapped
-    # legacy `error` (top-level) → canonical `lastError`
     if "error" in out and "lastError" not in out:
         legacy_err = out.pop("error")
         if isinstance(legacy_err, dict):
