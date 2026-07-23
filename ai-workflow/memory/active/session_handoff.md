@@ -6,6 +6,44 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 159→160: **P2-M4 완료 — 소비자 정렬 + skill_mcp 실서버 검증 신설 (TASK-163)**).
+
+  ## 핵심 — 실서버 검증을 만들었더니 즉시 결함 3건이 나왔다
+  Phase 2 컨셉 §7 의 리스크("skill_mcp 가 단위 테스트만 통과 — 실서버 미검증")가 P2-M4 의 완료 기준이었다. `apps/skill_mcp/scripts/verify-live-server.sh` 를 신설했다 — build-server 를 띄우고 HTTP 로 빌드를 몰아 **서버의 실제 응답을 그대로** 스킬 입력으로 넣는다(happy path + failure path).
+
+  | # | 결함 | 증상 |
+  |---|---|---|
+  | ① | `latest-build-status` 가 `build` 키를 **전송 envelope 처럼 unwrap** | canonical 형제 블록(`test`/`deploy`/`lastError`/`lifecycle`/`resultDelivery`/`currentPhase`)이 **전부 소실**. 실측 결과 build keys 5개만 남았다 — AI 에이전트 주 진입점이 컨테이너 테스트 결과도 실패 이유도 볼 수 없었다 |
+  | ② | `_BUILD_TOP_KEYS` 에 `runtimeUrl` 부재 | "앱이 어디서 도는지" 를 MCP 소비자가 영영 볼 수 없었다 (preview-era `previewUrl` 도 마찬가지로 빠져 있었다) |
+  | ③ | canonical `currentPhase` 는 `{phase,startedAt}` **객체**인데 explainer 가 문자열로 가정 | `TypeError: unhashable type: 'dict'`. ①이 그 필드를 버리고 있어 **두 결함이 서로를 가리고** 있었다 |
+
+  **셋 다 단위 테스트 222건이 green 인 채로 존재했다.** 그 테스트는 전부 손으로 만든 평평한 payload 를 넣기 때문에 원리적으로 못 잡는다. 이 사실 자체가 실서버 검증의 근거를 실증한다.
+
+  ## skill_mcp 정렬
+  - 스킬 개명 `preview_readiness_checker` → **`container_test_readiness_checker`** (디렉터리/테스트/SKILL.md/CLI). 버전 v2→v3.
+  - preview-era 입력 경로 청산: `testDeployment`(readiness/explainer) · `previewFailure`(shaper) · `LEGACY_PREVIEW_STATUSES`/`LEGACY_PREVIEW_TO_EXECUTION` · MCP forward-map. 입력 어휘 `failure.source: preview`→`test`.
+  - **subtitle 출처 변경**: `test.containerRef` → `build.runtimeUrl` 우선. v2 의 subtitle 에 URL 이 오던 건 legacy 매핑이 `previewUrl` 을 containerRef 자리에 넣어준 덕이었다 — 매핑을 지우면 URL 을 영영 못 보게 되는 구조였다.
+  - `OPEN_PREVIEW` 입력 shim 은 **유지** — 호출자가 손으로 주는 값이라 서버 계약 표면이 아니고, 조용히 NONE 으로 떨어지는 것보다 흡수가 안전하다.
+
+  ## build-monitor
+  실패 이유 **배너 신설**(`.error-banner`, `role="alert"`). `lastError` 는 P2-M3(TASK-162) 전까지 **항상 null** 이라 "Last error" 행이 늘 `—` 만 찍는 죽은 UI 였다. 성공한 빌드에는 렌더하지 않는다(빈 자리를 `—` 로 채우면 "볼 것이 있다" 는 잘못된 신호). `DESIGN.md` **v3** 갱신.
+
+  ## 계약 — nullable 이 타입에서 사라지고 있었다 (재발 주의)
+  프런트 픽스처에 `lastError: null` 을 넣자 TS 가 거부했다. **등록된($ref) 스키마에 `.nullable()` 을 씌우면** OpenAPI 3.0 산출이 `allOf: [$ref, {nullable:true}]` 가 되고 `openapi-typescript` 가 그 두 번째 항을 `unknown` 으로 렌더해 **null 이 증발한다**(`BuildError & unknown`). 문서 자체는 유효한 3.0 이라 서버 쪽에선 아무 신호도 없었다.
+  → **object 에 nullable 을 먼저 적용한 뒤 등록**하는 패턴(`BuildCurrentPhase` 가 쓰던 방식)으로 `NullableBuildError` 신설. 필드 정의는 `buildErrorShape` 한 곳에만 둔다.
+  **규칙: `$ref` 로 등록된 스키마에 `.nullable()` 을 씌우지 말 것.**
+
+  ## 검증
+  TS 5 clean / build-server **182** / build-monitor **275**(+2) / go **8 pkg** / skill_mcp **225**(+3) / OpenAPI paths 14 · components **41** / **실서버 검증 ALL PASS** / e2e 13/13.
+  음성 검증: MCP 정규화를 개선 전 동작으로 되돌리면 새 가드 2건이 실제로 FAIL 한다.
+
+  ## 다음은 P2-M5 (배포 능력 — 제품 목적 완성)
+  Phase 2 의 마지막이자 **유일하게 남은 기능 추가**다. 외부 배포 adapter v1 + 결과 전달. 진입 전 결정 2종이 아직 열려 있다(§8): 배포 adapter 1호 대상 / 결과 전달 채널.
+
+  ## 남긴 것
+  실서버 검증이 아직 **수동 실행**이다. nightly 편입은 e2e wrapper 와 같은 자리에서 볼 문제라 별도 항목으로 남긴다.
+
+  workflow meta sync (state 201→202, handoff doc 159→160, work_backlog 117→118) 같은 commit.
 - Updated: 2026-07-23 (rev 158→159: **P2-M3 완료 — Runner 정렬 + 실패 보고 경로 결함 3건 해소 (TASK-162)**).
 
   ## 착수 실측이 바꾼 마일스톤의 중심

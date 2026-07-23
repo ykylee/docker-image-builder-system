@@ -8,13 +8,19 @@ TASK-061 의 contract rename 으로:
 - Enum은 모두 `apps.skill_mcp.contract.canonical` frozenset (ERROR_CODES,
   NEXT_ACTIONS). `OPEN_PREVIEW` 는 더 이상 emit 하지 않고 canonical
   `OPEN_DEPLOYMENT` 으로 매핑.
-- 입력 payload 는 canonical `{ stage, error, logs }` 형태 또는 legacy
-  `{ failure, previewFailure, logs }` 형태 둘 다 받는다. legacy 는
-  forward-compat shim 으로 consume 만.
-- `source: build/preview/unknown` 는 deprecated. canonical payload 는
-  `stage: BUILD/TEST/DEPLOY/DELIVERY` enum 으로 받는다. legacy caller
-  의 `failure.source` 는 stage 으로 forward-mapped (build→BUILD,
-  preview→TEST).
+- 입력 payload 는 canonical `{ stage, error, logs }` 형태 또는 flat
+  `{ failure, logs }` 형태 둘 다 받는다.
+- `source: build/test/deploy/delivery/unknown` 는 stage 으로 forward-mapped
+  (build→BUILD, test→TEST …).
+
+TASK-163 (P2-M4): preview-era 입력 경로 제거.
+- `previewFailure` 단독 입력과 그 coercion(`_coerce_legacy_preview_failure_dict`)
+  을 없앴다. 그 형태를 만들어내는 쪽이 없다 — 실패는 canonical `lastError`
+  (TASK-162 에서 처음으로 실제 기록되기 시작) 또는 `error` 로 온다.
+- 입력 `source` 어휘의 `preview` 를 `test` 로 개명.
+- `OPEN_PREVIEW` 입력 shim 은 유지 — 이건 **호출자가 손으로 주는 값**이라
+  계약 표면이 아니고, 잘못 주면 조용히 NONE 으로 떨어지는 것보다 canonical
+  로 흡수하는 편이 안전하다.
 
 자세한 동작 규칙은 같은 디렉터리의 SKILL.md §1/§2 를 따른다.
 """
@@ -26,7 +32,7 @@ from typing import Any
 
 from apps.skill_mcp.contract import canonical as C
 
-SKILL_VERSION = "v2"
+SKILL_VERSION = "v3"
 
 # Canonical unions (single source of truth).
 ERROR_CODES = C.ERROR_CODES
@@ -37,7 +43,7 @@ NEXT_ACTIONS = C.NEXT_ACTIONS
 # .canonical.CANONICAL_STAGES`.
 CANONICAL_STAGES = C.CANONICAL_STAGES
 
-# Backward-compat: legacy `source: build/preview/unknown` mapping.
+# Backward-compat: 호출자 입력 `source: build/test/deploy/delivery/unknown` mapping.
 # Source-of-truth = `apps.skill_mcp.contract.canonical.LEGACY_SOURCE_TO_STAGE`.
 LEGACY_SOURCE_TO_STAGE = C.LEGACY_SOURCE_TO_STAGE
 
@@ -143,22 +149,6 @@ def _coerce_legacy_failure_dict(f: Any) -> dict[str, Any] | None:
     }
 
 
-def _coerce_legacy_preview_failure_dict(f: Any) -> dict[str, Any] | None:
-    """Map legacy `previewFailure` payload specifically. previewFailure
-    의 도메인은 container-test preview 였으므로 stage=TEST 로 강제.
-    """
-    if f is None:
-        return None
-    if not isinstance(f, dict):
-        return None
-    return {
-        "stage": "TEST",
-        "error_code": f.get("errorCode"),
-        "error_summary": f.get("errorSummary"),
-        "next_action": _map_legacy_next_action(f.get("nextAction")),
-    }
-
-
 def _map_legacy_next_action(value: Any) -> str | None:
     """Legacy `OPEN_PREVIEW` → canonical `OPEN_DEPLOYMENT` mapping. Other
     values pass through (caller 검증 함수가 unknown enum 을 잡는다).
@@ -222,11 +212,10 @@ def _resolve_primary_failure(input_data: dict[str, Any]) -> tuple[dict[str, Any]
 
     Inputs accepted (in priority order):
       1) canonical `{ error: { code, message }, stage }` (singular, no
-         `previewFailure` analogue — canonical says deployment failures
-         use `resultDelivery.error`).
+         단수형 — canonical 은 배포 실패도 `resultDelivery.error` 로 나른다).
       2) canonical BuildStatusResponse-style `{ lastError: { code, message }, test/deploy }`
          — surfaces lastError when present.
-      3) legacy `{ failure: {...}, previewFailure: {...} }` (forward-compat).
+      3) flat `{ failure: {...} }` (envelope 이전 형태).
 
     Returns (primary_or_None, warnings).
     """
@@ -271,17 +260,11 @@ def _resolve_primary_failure(input_data: dict[str, Any]) -> tuple[dict[str, Any]
             "next_action": input_data.get("nextAction"),
         }, warnings
 
-    # 3) legacy `failure` (and optional `previewFailure`)
+    # 3) flat `failure`
     failure_raw = input_data.get("failure")
     failure = _coerce_legacy_failure_dict(failure_raw)
     if failure is not None:
         return failure, warnings
-
-    # 4) legacy `previewFailure` 단독 — legacy caller 가 preview 만 보낸
-    # 마이그레이션 종료 시점용. TEST stage 으로 forward-map.
-    legacy_preview_failure = _coerce_legacy_preview_failure_dict(input_data.get("previewFailure"))
-    if legacy_preview_failure is not None:
-        return legacy_preview_failure, warnings
 
     return None, warnings
 

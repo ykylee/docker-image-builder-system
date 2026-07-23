@@ -57,12 +57,16 @@ class DelegationTests(unittest.TestCase):
         self.assertEqual(r.build_id, "b-1")
         self.assertIn("이미지", r.cause)
 
-    def test_delegates_preview_only(self):
-        # TASK-061: legacy `previewFailure` (preview-era) 은 canonical
-        # `stage: TEST` 로 forward-mapped. PREVIEW_CONTAINER_START_FAILED
-        # 같은 legacy error code 는 canonical ERROR_CODES 8종 union 밖 → warning.
+    def test_delegates_test_stage_failure(self):
+        # TASK-163 (P2-M4): preview-era 의 `previewFailure` 입력 경로를 제거하고
+        # 호출자 입력 어휘를 canonical 로 통일했다 (`source: test` → stage TEST).
+        # canonical ERROR_CODES union 밖의 코드는 여전히 warning 으로 노출된다.
         r = core.summarize({
-            "previewFailure": {"errorCode": "PREVIEW_CONTAINER_START_FAILED", "nextAction": "RETRY"},
+            "failure": {
+                "source": "test",
+                "errorCode": "PREVIEW_CONTAINER_START_FAILED",
+                "nextAction": "RETRY",
+            },
         })
         self.assertTrue(r.ok)
         self.assertEqual(r.stage, "TEST")

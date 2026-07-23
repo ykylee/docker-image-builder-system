@@ -3,7 +3,7 @@
 - 문서 목적: Phase 2 의 축·범위·마일스톤·완료 기준을 하나의 기준으로 정의한다. Phase 1 종료(v0.2.0/v0.2.1) 이후의 개발 방향 단일 출처.
 - 범위: 컨셉 근거(원 설계 대비 격차 실측), 마일스톤 P2-M1~M5, 순서와 완료 기준, 리스크
 - 대상 독자: 프로젝트 리드, 각 계층 구현자, AI agent
-- 상태: draft (**P2-M1 · P2-M2 · P2-M3 완료** 반영)
+- 상태: draft (**P2-M1~M4 완료** 반영 — 남은 것은 P2-M5 배포 능력)
 - 최종 수정일: 2026-07-23
 - 진입 baseline: **v0.2.1** (2026-07-23)
 - 관련 문서: [Phase 1 회고](./PHASE-1-RETROSPECTIVE.md), [Step 15 로드맵](./sdlc/15-refactoring-roadmap-and-milestones.md), [CHANGELOG](../CHANGELOG.md)
@@ -127,6 +127,20 @@ Step 15 의 M1~M5 잔여분을 Phase 2 기준으로 재정의한다.
 - **내용**: PhaseTimeline/StatusPill/BuildDetail 을 새 phase 모델로. `DESIGN.md` v3. skill_mcp 의 preview-era 이름 정리(`preview_readiness_checker` → 컨테이너 테스트 기준 명명) + payload 재정렬.
 - **완료 기준**: vitest / skill_mcp pytest 통과 / 시각 QA 구조 검증 통과 / **skill_mcp 가 실서버 대상으로 검증**(현재는 단위 테스트만 — §7 리스크).
 
+> **진행: P2-M4 완료 (TASK-163).** 완료 기준의 핵심이던 **실서버 검증**을 신설했고
+> (`apps/skill_mcp/scripts/verify-live-server.sh` — 서버의 실제 응답을 그대로 스킬
+> 입력으로 넣는다), 그것이 **단위 테스트 222건이 green 인 채로 존재하던 결함 3건**을
+> 즉시 잡았다: ① `latest-build-status` 가 `build` 를 전송 envelope 처럼 unwrap 해
+> canonical 형제 블록(`test`/`deploy`/`lastError`/`currentPhase`)을 **전부 버리고
+> 있었다** ② `runtimeUrl` 이 보존 키 목록에 없어 "앱이 어디서 도는지" 를 MCP
+> 소비자가 볼 수 없었다 ③ canonical `currentPhase` 는 객체인데 explainer 가
+> 문자열로 가정해 `TypeError` — ①이 그 필드를 버리고 있어 서로를 가리고 있었다.
+> 함께: skill_mcp preview-era 입력 경로 청산 + 스킬 개명 · build-monitor 실패 이유
+> 배너(`lastError` 는 P2-M3 전까지 항상 null 이라 죽은 UI 였다) · `DESIGN.md` v3 ·
+> 계약의 nullable 산출 결함 수정(`$ref + .nullable()` → `allOf` → 타입에서 null
+> 소멸). 상세는
+> [skill_mcp 실서버 검증](operations/skill-mcp-live-verification-2026-07-23.md).
+
 ### P2-M5 — 배포 능력 (제품 목적 완성)
 - **대상**: `apps/runner/internal/deploy` + build-server 결과 전달
 - **내용**: **외부 배포 adapter v1** (최소 1종) + **결과 전달**(webhook/notification). 현재 `RUNNER_DEPLOY_MODE` 기본은 `skeleton` 이고 `cli` 도 레지스트리 push 까지다.
@@ -150,7 +164,7 @@ P2-M1 계약  →  P2-M2 서버  →  P2-M3 runner  →  P2-M4 소비자  →  P
 |---|---|
 | 345곳 동시 변경의 폭발 | 계층 단위 마일스톤으로 분할 + 계약 선행으로 컴파일러가 잔여를 지목하게 함 |
 | **regex 일괄 치환의 다중 동시 결함** (TASK-130/151 재발 패턴) | read + 1:1 치환 원칙. 대량 변경일수록 regex 금지 |
-| `skill_mcp` 가 단위 테스트만 통과 (실서버 미검증) | P2-M4 에서 실서버 대상 검증 경로를 신설 |
+| ~~`skill_mcp` 가 단위 테스트만 통과 (실서버 미검증)~~ | **해소 (TASK-163)** — 실서버 검증 스크립트 신설. 만들자마자 결함 3건 검출 |
 | ~~runner e2e 2종의 약한 신호~~ | **해소 (TASK-157)** — hard assertion 화 + 근본 결함 3건 수정 |
 | 배포 adapter 의 대상 선택 미정 | P2-M5 진입 전 별도 결정 필요 — §8 |
 

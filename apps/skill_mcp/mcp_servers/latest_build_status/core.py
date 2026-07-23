@@ -26,15 +26,21 @@ MCP_VERSION = "v2"
 DEFAULT_TIMEOUT_SECONDS = 5.0
 
 # Build Server 응답의 canonical top-level keys (BuildStatusResponse).
-# TASK-061: legacy `testDeployment` 은 canonical `test` 로 rename 됐고,
-# `error` 는 canonical `lastError` 로 이전. 둘 다 받아서 normalize 단계에서
-# forward-mapped 되도록 한다.
+# 정규화 후 보존할 키. canonical `BuildStatusResponse` 는 `build` 요약과
+# 그 **형제** 블록(`test` / `deploy` / `lastError` / `lifecycle` /
+# `resultDelivery` / `currentPhase`)으로 구성되므로, 둘을 한 dict 으로 합친
+# 뒤 이 목록으로 거른다.
+#
+# TASK-163 (P2-M4): `runtimeUrl` 추가. 이 키가 목록에 없어서 컨테이너가 실제로
+# 어디서 돌고 있는지를 MCP 소비자가 **영영 볼 수 없었다**(preview-era 의
+# `previewUrl` 도 마찬가지로 빠져 있었다).
 _BUILD_TOP_KEYS = (
     "buildId",
     "userId",
     "appName",
     "status",
     "currentPhase",
+    "runtimeUrl",
     "createdAt",
     "startedAt",
     "finishedAt",
@@ -82,44 +88,23 @@ _CANONICAL_OR_LEGACY_STATUSES: frozenset[str] = frozenset(
     C.CANONICAL_BUILD_STATUSES
 )
 
-# Backend 가 아직도 legacy preview-era 필드 (`testDeployment`, raw `error`) 를
-# 보내는 경우 canonical `test` / `lastError` 로 forward-map 한다. 이 단계는
-# normalize 단계에서 일어나며 explain() 은 항상 canonical payload 만 본다.
+# TASK-163 (P2-M4): preview-era forward-map 제거.
+#
+# 여기에는 backend 가 `testDeployment` / `previewUrl` / preview 상태 어휘를
+# 보내던 시절의 정규화가 있었다. P2-M1~M3 을 거치며 그 형태를 만들어내는
+# 쪽이 전부 사라졌다 — 계약에서 `previewStatuses` 와 `TestDeployment` DTO 가
+# 빠졌고, 엔드포인트는 `/container-test/*` 로 재설계됐고, runner 는 canonical
+# ExecutionStatus 만 보낸다. 남은 정규화는 envelope 이전 형태의 top-level
+# `error` → `lastError` 하나뿐이다.
 def _normalize_legacy_payload(payload: dict[str, Any]) -> dict[str, Any]:
-    """Legacy preview-era 필드를 canonical 로 forward-map.
+    """envelope 이전 형태를 canonical 로 정규화.
 
-    Single source-of-truth for the legacy preview-status →
-    canonical execution-status mapping is
-    `apps.skill_mcp.contract.canonical.LEGACY_PREVIEW_TO_EXECUTION`
-    — same map used by build-status-explainer and
-    preview-readiness-checker so all three stay aligned.
+    현재 유일한 대상은 top-level `error` → `lastError` 다. explain() 은
+    항상 canonical payload 만 보도록 이 단계에서 형태를 맞춘다.
     """
     if not isinstance(payload, dict):
         return {}
     out = dict(payload)
-    # legacy `testDeployment` → canonical `test` (status 가 canonical
-    # executionStatuses 가 아니면 forward-map 시도).
-    if "testDeployment" in out and "test" not in out:
-        legacy_td = out.pop("testDeployment")
-        if isinstance(legacy_td, dict):
-            legacy_status = legacy_td.get("status")
-            if isinstance(legacy_status, str):
-                execution = C.LEGACY_PREVIEW_TO_EXECUTION.get(legacy_status, legacy_status)
-                mapped: dict[str, Any] = {"status": execution}
-                preview_url = legacy_td.get("previewUrl")
-                if isinstance(preview_url, str) and preview_url:
-                    mapped["containerRef"] = preview_url
-                # 보존될 raw execution 결과값들도 같이 (있다면) 옮긴다.
-                for flag in (
-                    "containerRunning",
-                    "healthCheckPassed",
-                    "portOpen",
-                    "stabilityWindowPassed",
-                ):
-                    if flag in legacy_td:
-                        mapped[flag] = legacy_td[flag]
-                out["test"] = mapped
-    # legacy `error` (top-level) → canonical `lastError`
     if "error" in out and "lastError" not in out:
         legacy_err = out.pop("error")
         if isinstance(legacy_err, dict):
@@ -177,23 +162,43 @@ def _err(code: str, field_name: str, message: str) -> dict[str, str]:
 def _normalize_build(payload: Any) -> dict[str, Any] | None:
     """Build Server 응답을 canonical build dict 로 정규화한다.
 
-    - dict 가 `data` / `result` / `build` 키로 wrap 되어 있으면 unwrap.
-    - top-level keys 중 알려진 것만 보존.
-    - legacy `testDeployment` / `error` 는 canonical `test` / `lastError` 로 forward-map.
+    - 전송 envelope(`data` / `result` / `payload`)로 감싸여 있으면 unwrap.
+    - canonical `BuildStatusResponse`(`build` 요약 + 형제 블록)면 **합친다**.
+    - `_BUILD_TOP_KEYS` 에 있는 키만 보존.
+    - envelope 이전의 top-level `error` 는 canonical `lastError` 로 정규화.
+
+    TASK-163 (P2-M4) 결함 수정 — 이전 구현은 `build` 를 다른 전송 envelope 과
+    같이 취급해 **unwrap** 했다. 그 결과 canonical 응답에서 `build` 형제인
+    `test` / `deploy` / `lastError` / `lifecycle` / `resultDelivery` /
+    `currentPhase` 가 **전부 사라졌다** — MCP 소비자(AI 에이전트)는 빌드
+    요약만 받고 컨테이너 테스트 결과도, 실패 이유도 볼 수 없었다.
+    단위 테스트는 이미 평평한 fixture 를 넣고 있어 이 손실을 드러내지 못했고,
+    실서버 검증(`apps/skill_mcp/scripts/verify-live-server.sh`)에서 잡혔다.
     """
     if payload is None:
         return None
     if not isinstance(payload, dict):
         return None
-    for wrap_key in ("data", "result", "build", "payload"):
+    # 순수 전송 envelope 만 unwrap 한다. `build` 는 canonical 응답의 한 필드지
+    # envelope 이 아니다.
+    for wrap_key in ("data", "result", "payload"):
         if wrap_key in payload and isinstance(payload[wrap_key], dict):
             payload = payload[wrap_key]
             break
     payload = _normalize_legacy_payload(payload)
+
+    # canonical BuildStatusResponse: 요약과 형제 블록을 한 dict 으로 합친다.
+    # 같은 키가 양쪽에 있으면 형제(바깥) 쪽이 더 구체적이므로 그쪽을 남긴다.
+    merged: dict[str, Any] = {}
+    inner = payload.get("build")
+    if isinstance(inner, dict):
+        merged.update(inner)
+    merged.update({k: v for k, v in payload.items() if k != "build"})
+
     normalized: dict[str, Any] = {}
     for key in _BUILD_TOP_KEYS:
-        if key in payload:
-            normalized[key] = payload[key]
+        if key in merged:
+            normalized[key] = merged[key]
     return normalized
 
 

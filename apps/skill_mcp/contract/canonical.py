@@ -60,48 +60,16 @@ EXECUTION_STATUSES: frozenset[str] = frozenset({
 # Public union: what skills accept as a `build.status` input.
 PUBLIC_BUILD_STATUSES: frozenset[str] = frozenset(CANONICAL_BUILD_STATUSES)
 
-# Legacy preview/test-deployment states. The TS contract (`previewStatuses`
-# in status.ts) lists 6 values; the Python migration shim keeps 3 additional
-# PKG-006-era historical statuses that the build-server emitted in earlier
-# versions but that the canonical contract dropped during the rename
-# refactor (TASK-052):
+# TASK-163 (P2-M4): preview-era 상태 shim 제거.
 #
-#   - "RESERVED"   — PKG-006 reservation phase
-#   - "STARTING"   — pre-canonical starting alias for PROVISIONING
-#   - "STOPPED"    — older teardown state (now superseded by EXPIRED)
-#
-# These three are Python-only legacy extras; the contract-drift-checker
-# reports them under the `extra_in_code` group (Python canonical vs TS).
-# Skills keep accepting them for caller forward-compat during the
-# migration window. New code MUST prefer the canonical `test` / `deploy`
-# blocks (ContainerTestResult / DeploymentResult) in BuildStatusResponse.
-LEGACY_PREVIEW_STATUSES: frozenset[str] = frozenset({
-    # TS-mirror subset (6)
-    "NOT_REQUESTED",
-    "QUEUED",
-    "PROVISIONING",
-    "READY",
-    "FAILED",
-    "EXPIRED",
-    # Python-only legacy extras (3) — PKG-006-era historical.
-    "RESERVED",
-    "STARTING",
-    "STOPPED",
-})
-
-# Forward-map legacy preview-status to canonical execution-status.
-# Mirrors the live build-status-explainer / latest-build-status /
-# preview-readiness-checker mapping. Single source-of-truth so the three
-# skills/MCPs that consume `testDeployment` stay aligned.
-LEGACY_PREVIEW_TO_EXECUTION: dict[str, str] = {
-    "READY": "SUCCESS",
-    "NOT_REQUESTED": "SKIPPED",
-    "QUEUED": "NOT_STARTED",
-    "PROVISIONING": "IN_PROGRESS",
-    # FAILED / EXPIRED / RESERVED / STARTING / STOPPED fall through as
-    # `execution = raw` — they're either canonical EXECUTION_STATUSES
-    # member (FAILED) or shim values handled per-case.
-}
+# 여기에는 `LEGACY_PREVIEW_STATUSES`(NOT_REQUESTED/QUEUED/PROVISIONING/READY/
+# EXPIRED + Python 전용 RESERVED/STARTING/STOPPED)와 그것을 canonical
+# ExecutionStatus 로 되돌리는 `LEGACY_PREVIEW_TO_EXECUTION` 이 있었다.
+# forward-compat 을 위해 남겨둔 것이었으나 **그 형태를 만들어내는 쪽이
+# 사라졌다** — P2-M1 이 TS `previewStatuses` 를, P2-M2 가 `testDeployment`
+# 응답과 엔드포인트를, P2-M3 이 runner 의 preview 어휘를 각각 제거했다.
+# 이제 서버가 내보내는 컨테이너 테스트 상태는 canonical ExecutionStatus
+# (NOT_STARTED / IN_PROGRESS / SUCCESS / FAILED / SKIPPED) 하나뿐이다.
 
 # TASK-069: Runner registry status enum. Mirrors
 # `packages/shared-contract/src/build/runner-registry.ts` `runnerStatusSchema`
@@ -124,12 +92,17 @@ CANONICAL_STAGES: frozenset[str] = frozenset({
     "DELIVERY",
 })
 
-# Backward-compat: legacy `failure.source` (`build` / `preview` /
+# Backward-compat: legacy `failure.source` (`build` / `test` /
 # `deploy` / `delivery` / `unknown`) → canonical stage. "unknown"
 # defaults to BUILD (worst-case prior step) and surfaces a warning.
+#
+# TASK-163 (P2-M4): 입력 어휘의 `preview` 를 `test` 로 개명. 이 맵은
+# **호출자가 손으로 주는 값**을 canonical stage 로 정규화하는 자리라,
+# 서버 계약과 달리 소비자 편의 표면이다. preview-era 이름을 계속 받아줄
+# 이유가 없어 canonical 어휘로 통일했다.
 LEGACY_SOURCE_TO_STAGE: dict[str, str] = {
     "build": "BUILD",
-    "preview": "TEST",
+    "test": "TEST",
     "deploy": "DEPLOY",
     "delivery": "DELIVERY",
     "unknown": "BUILD",
@@ -171,7 +144,7 @@ ERROR_CODES: frozenset[str] = frozenset({
 })
 
 # Canonical next_action enum surfaced by build-status-explainer /
-# failure-summary-shaper / preview-readiness-checker.
+# failure-summary-shaper / container-test-readiness-checker.
 #
 # Note the rename vs the legacy `OPEN_PREVIEW`: under the
 # build/test/deploy/result-delivery model, the success path now ends
@@ -191,7 +164,7 @@ NEXT_ACTIONS: frozenset[str] = frozenset({
 })
 
 # Canonical readiness_state enum surfaced by
-# preview-readiness-checker (skill name retained for stability — the
+# container-test-readiness-checker (TASK-163 에서 container-test-readiness-checker
 # internal model is container-test readiness now). 7 values.
 READINESS_STATES: frozenset[str] = frozenset({
     "READY",
@@ -226,8 +199,6 @@ def is_execution_status(value: object) -> bool:
     return isinstance(value, str) and value in EXECUTION_STATUSES
 
 
-def is_legacy_preview_status(value: object) -> bool:
-    return isinstance(value, str) and value in LEGACY_PREVIEW_STATUSES
 
 
 def is_build_phase(value: object) -> bool:

@@ -42,10 +42,7 @@ const MOCK_BUILD: api.BuildStatusResponse = {
     createdAt: "2026-07-08T10:00:00.000Z",
     updatedAt: "2026-07-08T10:05:00.000Z"
   },
-  lastError: {
-    code: "UNKNOWN_ERROR",
-    message: ""
-  },
+  lastError: null,
   phaseHistory: [
     { phase: "REQUEST_ACCEPTED", completedAt: "2026-07-08T10:00:01.000Z" },
     { phase: "QUEUE_CLAIMED", completedAt: "2026-07-08T10:00:30.000Z" },
@@ -307,5 +304,42 @@ describe("BuildDetail", () => {
     expect(
       screen.getByRole("status", { name: "Status: TESTING" })
     ).toBeInTheDocument();
+  });
+
+  // TASK-163 (P2-M4): 실패 이유 배너.
+  //
+  // `lastError` 는 P2-M3(TASK-162) 전까지 항상 null 이었다 — 서버가
+  // last_error_code/message 를 한 번도 쓰지 않았기 때문이다. 이제 실제로
+  // 채워지므로 실패한 빌드에서 상단에 노출되어야 한다.
+  it("실패 이유가 있으면 상단 배너로 노출된다", async () => {
+    vi.mocked(api.getBuild).mockResolvedValue({
+      ...MOCK_BUILD,
+      build: { ...MOCK_BUILD.build, status: "FAILED", phase: "FAILED" },
+      lastError: {
+        code: "CONTAINER_TEST_FAILED",
+        message: "container healthcheck timed out"
+      }
+    });
+    vi.mocked(api.getBuildLogs).mockResolvedValue(MOCK_LOGS);
+
+    renderAt("test-build-0001-1111-2222-333344445555");
+
+    const banner = await screen.findByTestId("build-last-error");
+    expect(banner).toHaveTextContent("CONTAINER_TEST_FAILED");
+    expect(banner).toHaveTextContent("container healthcheck timed out");
+    // 스크린리더가 즉시 읽도록 alert role.
+    expect(banner).toHaveAttribute("role", "alert");
+  });
+
+  it("실패 이유가 없으면 배너를 렌더하지 않는다", async () => {
+    vi.mocked(api.getBuild).mockResolvedValue(MOCK_BUILD);
+    vi.mocked(api.getBuildLogs).mockResolvedValue(MOCK_LOGS);
+
+    renderAt("test-build-0001-1111-2222-333344445555");
+
+    await waitFor(() => {
+      expect(screen.getByTestId("build-detail")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("build-last-error")).not.toBeInTheDocument();
   });
 });

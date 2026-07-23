@@ -305,5 +305,78 @@ class CliTests(unittest.TestCase):
         self.assertTrue(data["ok"])
 
 
+class CanonicalEnvelopeTests(unittest.TestCase):
+    """TASK-163 (P2-M4): 실서버가 주는 canonical BuildStatusResponse 모양.
+
+    `verify-live-server.sh` 가 잡은 결함 2건의 회귀 가드다. 기존 단위
+    테스트는 전부 **평평한** fixture 를 넣고 있어서 둘 다 못 잡았다.
+    """
+
+    CANONICAL = {
+        "build": {
+            "buildId": "b-canon",
+            "appName": "demo",
+            "status": "TEST_SUCCESS",
+            "phase": "CONTAINER_TEST_PASSED",
+            "runtimeUrl": "http://127.0.0.1:38124/",
+            "createdAt": "2026-07-23T01:00:00.000Z",
+            "updatedAt": "2026-07-23T01:03:00.000Z",
+        },
+        "lastError": None,
+        "currentPhase": {
+            "phase": "CONTAINER_TEST_PASSED",
+            "startedAt": "2026-07-23T01:02:00.000Z",
+        },
+        "test": {
+            "status": "SUCCESS",
+            "containerRunning": True,
+            "healthCheckPassed": True,
+            "portOpen": True,
+            "stabilityWindowPassed": True,
+        },
+        "deploy": {"status": "NOT_STARTED", "targetType": None, "resultRef": None},
+        "resultDelivery": {"status": "NOT_STARTED", "mode": None},
+    }
+
+    def test_sibling_blocks_survive_normalization(self) -> None:
+        # 이전 구현은 `build` 를 전송 envelope 처럼 unwrap 해서 형제 블록을
+        # 전부 잃었다 — MCP 소비자가 test/deploy/lastError 를 볼 수 없었다.
+        r = fetch_latest({
+            "buildId": "b-canon",
+            "dryRun": True,
+            "fixture": self.CANONICAL,
+        })
+        self.assertTrue(r.ok, r.errors)
+        build = r.build or {}
+        self.assertEqual(build.get("buildId"), "b-canon")
+        self.assertEqual(build.get("test", {}).get("status"), "SUCCESS")
+        self.assertIn("deploy", build)
+        self.assertIn("resultDelivery", build)
+
+    def test_runtime_url_is_preserved(self) -> None:
+        # `runtimeUrl` 이 보존 키 목록에 없어서 "앱이 어디서 도는지" 를
+        # MCP 소비자가 영영 볼 수 없었다.
+        r = fetch_latest({
+            "buildId": "b-canon",
+            "dryRun": True,
+            "fixture": self.CANONICAL,
+        })
+        self.assertEqual((r.build or {}).get("runtimeUrl"), "http://127.0.0.1:38124/")
+
+    def test_object_current_phase_does_not_crash(self) -> None:
+        # canonical `currentPhase` 는 객체다. 문자열만 가정하던 explainer 가
+        # TypeError 로 죽었고, MCP 가 그 필드를 버리고 있어 가려져 있었다.
+        r = fetch_latest({
+            "buildId": "b-canon",
+            "dryRun": True,
+            "fixture": self.CANONICAL,
+        })
+        self.assertTrue(r.ok, r.errors)
+        self.assertFalse(
+            [w for w in r.warnings if w.get("code") == "UNKNOWN_ENUM"],
+            f"canonical payload should not produce UNKNOWN_ENUM warnings: {r.warnings}",
+        )
+
+
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()

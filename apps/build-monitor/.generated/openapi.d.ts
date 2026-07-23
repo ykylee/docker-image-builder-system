@@ -834,6 +834,12 @@ export interface components {
             code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
             message: string;
         };
+        /** @description BuildError or null. null = 이 빌드에 기록된 실패 이유가 없음 (TASK-162 이전에는 항상 null 이었다). */
+        NullableBuildError: {
+            /** @enum {string} */
+            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            message: string;
+        } | null;
         /** @description One field-level validation failure. Mirrors a zod issue narrowed to the fields the API contract guarantees. */
         ApiErrorIssue: {
             /** @description Field path of the failing value (dot-joinable). */
@@ -998,7 +1004,7 @@ export interface components {
         /** @description Returned on GET /builds/:buildId and embedded in claim responses (2-depth nesting). phaseHistory + currentPhase preserve the existing timeline contract, while lifecycle/image/test/deploy/resultDelivery provide the new canonical build/test/deploy/result-delivery model. */
         BuildStatusResponse: {
             build: components["schemas"]["BuildSummary"];
-            lastError: components["schemas"]["BuildError"] & unknown;
+            lastError: components["schemas"]["NullableBuildError"];
             /**
              * @description List of completed phase transitions in chronological order. Excludes the current in-flight phase (see currentPhase). Excludes phases that were skipped (e.g. CONTAINER_TEST_STARTED → COMPLETED without CONTAINER_TEST_PASSED). Empty when the build is still at REQUEST_ACCEPTED and has not transitioned yet. Defaulted to [] when not provided (e.g. by code paths that do not yet track transitions — see TASK-051).
              * @default []

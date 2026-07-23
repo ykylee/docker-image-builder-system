@@ -4,7 +4,7 @@
 호출해 4-구조 한국어 사용자 메시지로 변환한다. thin wrapper.
 
 TASK-061 contract rename:
-- 출력 envelope 의 `source` (legacy build/preview) → `stage`
+- 출력 envelope 의 `source` (호출자 입력 build/test) → `stage`
   (canonical BUILD/TEST/DEPLOY/DELIVERY). skill 이 canonical stage
   을 emit 하므로 MCP 도 그대로 통과시킨다.
 - MCP_VERSION v1 → v2.

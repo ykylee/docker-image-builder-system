@@ -7,10 +7,12 @@ TASK-061 의 contract rename 으로:
 - Enum은 모두 `apps.skill_mcp.contract.canonical` 의 frozenset 으로 통일
   (BUILD_STATUSES, EXECUTION_STATUSES, BUILD_PHASES, ERROR_CODES,
   NEXT_ACTIONS). 더 이상 skill 안에 literal 복제본 없음 → drift 차단.
-- 입력 payload 가 legacy preview-era 형태(`status` + `testDeployment`
-  preview field) 거나 canonical 형태(`lifecycle` / `image` / `test` /
-  `deploy` / `resultDelivery`) 거나 모두 받는다. canonical 이 우선이고
-  legacy 는 forward-compat shim 으로 consume 만.
+- 입력 payload 는 canonical 형태(`build` + `lifecycle` / `image` / `test` /
+  `deploy` / `resultDelivery`) 를 우선하고, envelope 이전의 flat 형태
+  (`status` / `currentPhase` / `test` top-level) 도 받는다.
+  TASK-163 (P2-M4) 에서 preview-era payload(`testDeployment`,
+  `previewUrl`, preview 상태 어휘) 소비 경로는 **제거**했다 — 그 형태를
+  만들어내는 쪽이 P2-M1~M3 을 거치며 모두 사라졌다.
 - 출력의 `next_action` 은 canonical `OPEN_DEPLOYMENT` 를 사용 (legacy
   `OPEN_PREVIEW` 는 더 이상 emit 하지 않는다).
 - message table 은 12 canonical statuses + legacy compat mapping 까지
@@ -42,7 +44,6 @@ TERMINAL_BUILD_STATUSES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 # preview-era STATUSES. We accept them as input but never produce them in
 # the user-facing explanation output — they get mapped into canonical
 # terminal/in-flight states below.
-LEGACY_PREVIEW_STATUSES = C.LEGACY_PREVIEW_STATUSES
 
 
 # Canonical 12-status message table. Keys are the canonical
@@ -159,17 +160,53 @@ def _next_action_for_build_status(
 def _resolve_test_runtime_url(build: dict[str, Any], test_block: dict[str, Any] | None) -> str | None:
     """Best-effort runtime URL for the success-state user message.
 
-    Canonical `test.containerRef` is preferred (it's the canonical reference
-    to the running test container). Legacy `testDeployment.previewUrl` is a
-    forward-compat fallback during the migration window.
+    canonical `build.runtimeUrl` 이 실제 접속 가능한 URL 이고,
+    `test.containerRef` 는 컨테이너 식별자다. 사용자에게 보여줄 값으로는
+    URL 이 우선이고, 없으면 containerRef 로 대체한다.
+
+    TASK-163 (P2-M4): preview-era 의 `testDeployment.previewUrl` 폴백을
+    제거하고 canonical `build.runtimeUrl`(TASK-161 개명) 을 1순위로 세웠다.
+    이전 구현은 URL 을 가진 필드를 아예 보지 않고 containerRef 만 봤다.
     """
+    runtime_url = build.get("runtimeUrl")
+    if isinstance(runtime_url, str) and runtime_url:
+        return runtime_url
     if isinstance(test_block, dict):
         ref = test_block.get("containerRef")
         if isinstance(ref, str) and ref:
             return ref
-        legacy_url = test_block.get("previewUrl")
-        if isinstance(legacy_url, str) and legacy_url:
-            return legacy_url
+    return None
+
+
+def _resolve_current_phase(
+    build_summary: Any,
+    input_data: dict[str, Any],
+) -> str | None:
+    """현재 phase 이름을 문자열로 뽑는다.
+
+    canonical `BuildStatusResponse.currentPhase` 는 **객체**
+    (`BuildCurrentPhase` = `{ phase, startedAt }`) 이거나 terminal 상태에서는
+    `null` 이다. 평평한 caller payload 는 phase 이름 문자열을 바로 주기도
+    한다. 둘 다 받는다.
+
+    TASK-163 (P2-M4): 이전 구현은 문자열만 가정해 canonical 객체가 오면
+    `phase not in PHASES` 에서 `TypeError: unhashable type: 'dict'` 로 죽었다.
+    그동안 드러나지 않았던 이유는 latest-build-status MCP 가 `currentPhase`
+    를 통째로 버리고 있었기 때문이다(같은 작업에서 수정). 즉 두 결함이
+    서로를 가리고 있었다.
+    """
+    raw = build_summary.get("currentPhase") if isinstance(build_summary, dict) else None
+    if raw is None:
+        raw = input_data.get("currentPhase")
+    if isinstance(raw, dict):
+        raw = raw.get("phase")
+    if isinstance(raw, str):
+        return raw
+    # phase 이름 폴백 — canonical 요약의 `phase` 필드.
+    if isinstance(build_summary, dict):
+        fallback = build_summary.get("phase")
+        if isinstance(fallback, str):
+            return fallback
     return None
 
 
@@ -179,15 +216,17 @@ def _resolve_canonical_build_block(input_data: dict[str, Any]) -> tuple[dict[str
     Canonical payload shape (BuildStatusResponse):
       { "build": {...}, "lastError": {...} | null, "lifecycle": {...},
         "image": {...}, "test": {...}, "deploy": {...}, "resultDelivery": {...}, ... }
-    Legacy payload shape (forward-compat):
-      { "status": "...", "currentPhase": "...", "testDeployment": {...} }
+    Flat payload shape (envelope 이전 형태, forward-compat):
+      { "status": "...", "currentPhase": "...", "test": {...} }
 
     Returns (build_summary, test_block_or_None, errors). `build_summary`
     always has at least a `status` key for the downstream message-table
-    lookup. Legacy `testDeployment` which is not a dict is HARD-errored
-    (matches the canonical API contract — a malformed testDeployment
-    must be visible to the caller as INVALID_TYPE rather than silently
-    dropped).
+    lookup. A `test` value that is not a dict is HARD-errored (matches
+    the canonical API contract — a malformed block must be visible to the
+    caller as INVALID_TYPE rather than silently dropped).
+
+    TASK-163 (P2-M4): flat 경로의 `testDeployment` 키를 canonical `test` 로
+    교체했다. preview-era payload 를 만들어내는 쪽이 더 이상 없다.
     """
     errors: list[dict[str, str]] = []
 
@@ -208,37 +247,26 @@ def _resolve_canonical_build_block(input_data: dict[str, Any]) -> tuple[dict[str
             legacy_build[k] = input_data[k]
     if "status" not in legacy_build:
         legacy_build["status"] = input_data.get("status")
-    test = input_data.get("testDeployment")
+    test = input_data.get("test")
     if test is not None and not isinstance(test, dict):
-        errors.append(_err("INVALID_TYPE", "testDeployment", "testDeployment must be a JSON object when provided"))
+        errors.append(_err("INVALID_TYPE", "test", "test must be a JSON object when provided"))
         test = None
     return legacy_build, test, errors
 
 
 def _execution_status_from_test(test_block: dict[str, Any] | None) -> str | None:
-    """Canonical `test.status` ∈ EXECUTION_STATUSES, with legacy preview-
-    era values forward-mapped onto the same set (single source-of-truth
-    = `apps.skill_mcp.contract.canonical.LEGACY_PREVIEW_TO_EXECUTION`).
+    """Canonical `test.status` ∈ EXECUTION_STATUSES.
 
-    Canonical execution statuses pass through. Legacy preview statuses
-    are mapped via the canonical helper; values valid in both unions
-    (FAILED, EXPIRED / RESERVED / STARTING / STOPPED) keep raw. Unknown
-    enum values are returned raw so the caller can attach a warning.
+    TASK-163 (P2-M4): preview-era 값의 forward-map 을 제거했다 — 그 어휘를
+    내보내는 쪽이 더 이상 없다. canonical 이 아닌 값은 raw 로 돌려주고
+    호출자가 UNKNOWN_ENUM 경고를 붙인다.
     """
     if test_block is None:
         return None
     raw = test_block.get("status")
     if not isinstance(raw, str):
         return None
-    if raw in EXECUTION_STATUSES:
-        return raw
-    if raw in C.LEGACY_PREVIEW_TO_EXECUTION:
-        return C.LEGACY_PREVIEW_TO_EXECUTION[raw]
-    # FAILED / EXPIRED / STARTING / STOPPED / RESERVED 등 LEGACY_PREVIEW_STATUSES
-    # 나머지는 raw 그대로 (canonical executionStatuses 외 shim values).
-    if raw in LEGACY_PREVIEW_STATUSES:
-        return raw
-    return raw  # unknown enum — surfaced as warning, not mapped
+    return raw
 
 
 @dataclass
@@ -298,19 +326,14 @@ def explain(input_data: Any) -> Explanation:
             "UNKNOWN_ENUM", "status", f"unknown build status: {status!r}",
         ))
 
-    phase = build_summary.get("currentPhase") if isinstance(build_summary, dict) else None
-    if phase is None:
-        phase = input_data.get("currentPhase")
+    phase = _resolve_current_phase(build_summary, input_data)
     if phase is not None and phase not in PHASES:
         warnings.append(_err(
             "UNKNOWN_ENUM", "currentPhase", f"unknown phase: {phase!r}",
         ))
 
     test_execution = _execution_status_from_test(test_block)
-    if test_execution is not None and (
-        test_execution not in EXECUTION_STATUSES
-        and test_execution not in LEGACY_PREVIEW_STATUSES
-    ):
+    if test_execution is not None and test_execution not in EXECUTION_STATUSES:
         warnings.append(_err(
             "UNKNOWN_ENUM", "test.status",
             f"unknown test execution status: {test_execution!r}",
@@ -398,13 +421,13 @@ def explain(input_data: Any) -> Explanation:
     next_action = _next_action_for_build_status(canonical_status, test_execution)
     error_summary: str | None = None
 
-    # Legacy forward-compat: COMPLETED + testDeployment.{EXPIRED,STOPPED,FAILED}.
-    # canonical 영역에서는 위의 TEST_SUCCESS 처리 분기가 동등하게 다룬다.
-    if canonical_status == "COMPLETED" and test_execution in LEGACY_PREVIEW_STATUSES:
-        if test_execution in ("EXPIRED", "STOPPED", "FAILED"):
-            next_action = "RETRY"
-            error_summary = _error_summary_from_logs(log_tail) or None
-            user_msg = _user_msg_for_test_expired_or_failed()
+    # 빌드는 COMPLETED 인데 컨테이너 테스트가 실패로 닫힌 경우 — 사용자에게는
+    # 재시도를 안내한다. TASK-163: preview-era 상태(EXPIRED/STOPPED)를 함께
+    # 보던 분기를 canonical FAILED 하나로 좁혔다.
+    if canonical_status == "COMPLETED" and test_execution == "FAILED":
+        next_action = "RETRY"
+        error_summary = _error_summary_from_logs(log_tail) or None
+        user_msg = _user_msg_for_test_expired_or_failed()
 
     if canonical_status == "TEST_SUCCESS" and test_execution == "FAILED":
         # test 단계에서 실패 → 메시지 덮어쓰기.

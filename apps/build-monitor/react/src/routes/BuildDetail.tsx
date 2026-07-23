@@ -122,6 +122,21 @@ export function BuildDetail(): ReactElement {
         />
       </header>
 
+      {/* TASK-163 (P2-M4): 실패 이유를 상단으로 승격.
+       *
+       * 이 값은 P2-M3(TASK-162) 전까지 **항상 null 이었다** — 서버가
+       * `last_error_code`/`last_error_message` 를 한 번도 쓰지 않았기 때문이다.
+       * 즉 아래 meta 목록의 "Last error" 행은 늘 "—" 만 찍는 죽은 UI 였다.
+       * 이제 실제로 채워지므로, 실패한 빌드에서 운영자가 가장 먼저 봐야 할
+       * 정보를 목록 중간이 아니라 눈에 띄는 자리에 둔다. 성공한 빌드에는
+       * 아무것도 렌더하지 않는다. */}
+      {build.lastError ? (
+        <div className="error-banner" role="alert" data-testid="build-last-error">
+          <span className="error-banner__code mono">{build.lastError.code}</span>
+          <span className="error-banner__message">{build.lastError.message}</span>
+        </div>
+      ) : null}
+
       <dl className="meta">
         <div>
           <dt>App</dt>

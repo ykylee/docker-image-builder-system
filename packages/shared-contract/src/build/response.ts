@@ -13,14 +13,35 @@ import {
 // `components.schemas` with stable refs. The `id` doubles as the component
 // name. `.meta()` is zod v4 native and is the v8+ preferred path.
 
+// 필드 정의는 한 곳에만 둔다 — 아래 두 스키마가 같은 shape 를 공유한다.
+const buildErrorShape = {
+  code: z.enum(errorCodes),
+  message: z.string().min(1)
+};
+
 export const buildErrorSchema = z
-  .object({
-    code: z.enum(errorCodes),
-    message: z.string().min(1)
-  })
+  .object(buildErrorShape)
   .meta({ id: "BuildError", description: "Standard error shape returned with 4xx/5xx responses." });
 
 export type BuildError = z.infer<typeof buildErrorSchema>;
+
+// TASK-163 (P2-M4): nullable 전용 등록 스키마.
+//
+// 왜 별도 스키마인가 — `buildErrorSchema.nullable()` 처럼 **이미 등록된($ref)
+// 스키마에 nullable 을 씌우면** OpenAPI 3.0 산출이
+// `allOf: [$ref, { nullable: true }]` 가 되고, `openapi-typescript` 는 그것을
+// `BuildError & unknown` 으로 렌더한다 — **null 이 타입에서 사라진다.**
+// 그 결과 프런트가 `lastError: null`(성공한 빌드의 절대다수)을 타입으로
+// 표현할 수 없었다. object 에 nullable 을 먼저 적용한 뒤 등록하면
+// `{...} | null` 로 제대로 나온다 (`BuildCurrentPhase` 가 쓰는 검증된 패턴).
+export const nullableBuildErrorSchema = z
+  .object(buildErrorShape)
+  .nullable()
+  .meta({
+    id: "NullableBuildError",
+    description:
+      "BuildError or null. null = 이 빌드에 기록된 실패 이유가 없음 (TASK-162 이전에는 항상 null 이었다)."
+  });
 
 export const buildSummarySchema = z
   .object({
@@ -239,7 +260,7 @@ export type ResultDelivery = z.infer<typeof resultDeliverySchema>;
 export const buildStatusResponseSchema = z
   .object({
     build: buildSummarySchema,
-    lastError: buildErrorSchema.nullable(),
+    lastError: nullableBuildErrorSchema,
     // phaseHistory 와 currentPhase 는 build lifecycle 전체의 timeline 을
     // 표현한다. build-monitor 의 PhaseTimeline 가 이 두 필드를 받아
     // canonical phase 리스트 대비 완료/진행/미진행을 시각화한다.

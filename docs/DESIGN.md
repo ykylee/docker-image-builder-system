@@ -2,8 +2,8 @@
 design_spec: dib/v2
 project: docker-image-builder-system
 surface: build-monitor (React 19 + Astryx)
-status: stable (TASK-152 — React 19 + Astryx rewrite 이후 정합)
-last_updated: 2026-07-22
+status: stable (TASK-163 / P2-M4 — canonical 모델 정렬 이후 정합)
+last_updated: 2026-07-23
 ---
 
 # DESIGN.md
@@ -12,7 +12,18 @@ last_updated: 2026-07-22
 할 design spec 이다. **React 19 + Astryx 0.1.4** 기반이며 (`apps/build-monitor/`),
 Svelte 5 시절의 첫안 (PR #6, 2026-07-03) 은 **폐기** — frontend rewrite
 시리즈 (TASK-088~094) 와 Astryx 도입 1~3단계 (TASK-134~144) 로 전면 전환됐다.
-본 v2 는 **현 tokens.css / 현 컴포넌트 셋 / 현 라우트 셋** 과 1:1 정합.
+본 v3 는 **현 tokens.css / 현 컴포넌트 셋 / 현 라우트 셋** 과 1:1 정합.
+
+**v2 → v3 (TASK-163 / P2-M4)**: Phase 2 의 canonical 모델 정렬(P2-M1~M3)이 UI 표면에
+남긴 변화를 반영한다.
+- **실패 이유 배너 신설** (`.error-banner`). `lastError` 는 P2-M3(TASK-162) 전까지
+  **항상 null 이었다** — 서버가 `last_error_code`/`last_error_message` 를 한 번도
+  쓰지 않았기 때문이다. 즉 BuildDetail 의 "Last error" 행은 늘 `—` 만 찍는 죽은
+  UI 였다. 이제 실제로 채워지므로, 실패한 빌드에서 가장 먼저 봐야 할 정보를
+  meta 목록 중간이 아니라 상단에 둔다.
+- **preview-era 표면 소멸**: `Legacy preview block` 과 `previewTtlMinutes` 입력이
+  제거됐고(TASK-160/161), 런타임 URL 은 `Container test` 블록의 `runtimeUrl` 로
+  통합됐다.
 
 Stitch 호환 YAML frontmatter 의 tokens 섹션과 8개 markdown 섹션으로
 구성된다. 색·타이포·간격·컴포넌트·레이아웃·a11y 의 1차 source-of-truth.
@@ -190,9 +201,15 @@ z:
 | **RegisterRunnerModal** | `components/RegisterRunnerModal.tsx` | 모달 (Astryx `Dialog`) | TASK-137, 148 — `data-open-modal="register-runner"` 트리거 |
 | **buildColumns** | `components/buildColumns.tsx` | Table column 정의 단일 출처 | TASK-142 — `withOwner` flag, 5열/4열 분기 |
 
+**BuildDetail 의 실패 이유 배너** (컴포넌트 아님 — 라우트 로컬 `.error-banner`):
+`lastError` 가 있을 때만 렌더한다. `role="alert"` 로 스크린리더가 즉시 읽는다.
+색은 danger accent 를 **테두리와 코드 라벨에만** 쓰고 배경은 surface 를 유지한다
+(§7 "상태색으로 면을 덮지 않는다"). 성공한 빌드에는 아무것도 렌더하지 않는다 —
+빈 자리를 `—` 로 채우면 "볼 것이 있다" 는 잘못된 신호를 준다.
+
 **삭제/이관된 컴포넌트** (v1 → v2 차이):
 - ~~**BuildRow**~~ — TASK-142 에서 Astryx Table 로 일원화, 삭제.
-- ~~**PreviewLinkCard**~~ — BuildDetail 페이지의 `Legacy preview block` 으로 통합 (deprecated badge).
+- ~~**PreviewLinkCard**~~ — BuildDetail 의 `Legacy preview block` 으로 통합됐다가, TASK-160/161 에서 그 블록마저 제거. 런타임 URL 은 canonical `Container test` 블록의 `runtimeUrl` 로 표시한다.
 - ~~**EmptyState / ErrorBanner**~~ — Astryx `EmptyState` 도입 후보였으나 현 MVP 는 인라인 처리. 후속 결정.
 
 **Astryx 라이브러리 컴포넌트** (TASK-137~144 이관):

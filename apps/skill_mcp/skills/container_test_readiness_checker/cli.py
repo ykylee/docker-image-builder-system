@@ -1,9 +1,9 @@
-"""preview-readiness-checker CLI.
+"""container-test-readiness-checker CLI.
 
 Usage::
 
-    echo '{"build":{"status":"COMPLETED"},"testDeployment":{"status":"READY","previewUrl":"http://..."}}' | \\
-        python3 -m apps.skill_mcp.skills.preview_readiness_checker.cli --input -
+    echo '{"build":{"status":"COMPLETED","runtimeUrl":"http://127.0.0.1:38124/"},"test":{"status":"SUCCESS"}}' | \\
+        python3 -m apps.skill_mcp.skills.container_test_readiness_checker.cli --input -
 """
 
 from __future__ import annotations
@@ -40,9 +40,9 @@ def _print(result: dict[str, Any], out_path: str | None) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        prog="preview-readiness-checker",
+        prog="container-test-readiness-checker",
         description=(
-            "Classify build/preview status into a 7-state readiness + Korean user card."
+            "Classify build/container-test status into a 7-state readiness + Korean user card."
         ),
     )
     parser.add_argument("--input", "-i", default=None,

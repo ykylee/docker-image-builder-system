@@ -1,4 +1,4 @@
-"""preview-readiness-checker skill tests.
+"""container-test-readiness-checker skill tests.
 
 TASK-033. 입력 검증 / readiness_state 분류 7종 / card 합성 / ttl / cli.
 """
@@ -13,7 +13,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from apps.skill_mcp.skills.preview_readiness_checker import cli, core
+from apps.skill_mcp.skills.container_test_readiness_checker import cli, core
 
 
 # ---------------------------------------------------------------------------
@@ -41,13 +41,13 @@ class InputValidationTests(unittest.TestCase):
         r = core.check_readiness({"build": "not a dict"})
         self.assertFalse(r.ok)
 
-    def test_test_deployment_non_dict_warns(self):
+    def test_test_block_non_dict_warns(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": "not a dict",
+            "test": "not a dict",
         })
         self.assertTrue(r.ok)
-        self.assertTrue(any(w["code"] == "INVALID_INPUT" and w["field"] == "testDeployment" for w in r.warnings))
+        self.assertTrue(any(w["code"] == "INVALID_INPUT" and w["field"] == "test" for w in r.warnings))
 
     def test_health_probe_non_dict_warns(self):
         r = core.check_readiness({
@@ -113,17 +113,17 @@ class ClassificationTests(unittest.TestCase):
         r = core.check_readiness({"build": {"status": "CANCELLED"}})
         self.assertEqual(r.readiness_state, "EXPIRED")
 
-    def test_preview_queued_is_waiting(self):
+    def test_test_not_started_is_waiting(self):
         r = core.check_readiness({
             "build": {"status": "TEST_SUCCESS"},
-            "testDeployment": {"status": "QUEUED"},
+            "test": {"status": "NOT_STARTED"},
         })
         self.assertEqual(r.readiness_state, "WAITING_FOR_SLOT")
 
-    def test_preview_provisioning_is_starting(self):
+    def test_test_in_progress_is_starting(self):
         r = core.check_readiness({
             "build": {"status": "TEST_SUCCESS"},
-            "testDeployment": {"status": "PROVISIONING"},
+            "test": {"status": "IN_PROGRESS"},
         })
         self.assertEqual(r.readiness_state, "STARTING")
 
@@ -134,63 +134,63 @@ class ClassificationTests(unittest.TestCase):
         })
         self.assertEqual(r.readiness_state, "STARTING")
 
-    def test_preview_ready_no_probe_is_ready(self):
+    def test_test_success_no_probe_is_ready(self):
         r = core.check_readiness({
-            "build": {"status": "COMPLETED"},
-            "testDeployment": {
-                "status": "READY",
-                "previewUrl": "http://preview.example.com:38124",
+            "build": {
+                "status": "COMPLETED",
+                "runtimeUrl": "http://127.0.0.1:38124/",
             },
+            "test": {"status": "SUCCESS"},
         })
         self.assertEqual(r.readiness_state, "READY")
         # TASK-061: OPEN_PREVIEW → OPEN_DEPLOYMENT
         self.assertEqual(r.card.next_action, "OPEN_DEPLOYMENT")
-        self.assertEqual(r.card.subtitle, "http://preview.example.com:38124")
+        # TASK-163: subtitle 은 canonical build.runtimeUrl 에서 온다.
+        self.assertEqual(r.card.subtitle, "http://127.0.0.1:38124/")
 
-    def test_preview_ready_with_unhealthy_probe_is_degraded(self):
+    def test_test_success_with_unhealthy_probe_is_degraded(self):
         r = core.check_readiness({
-            "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "build": {"status": "COMPLETED", "runtimeUrl": "http://127.0.0.1:38124/"},
+            "test": {"status": "SUCCESS"},
             "healthProbe": {"status": "unhealthy"},
         })
         self.assertEqual(r.readiness_state, "DEGRADED")
         self.assertEqual(r.card.next_action, "RETRY")
 
-    def test_preview_ready_with_healthy_probe_is_ready(self):
+    def test_test_success_with_healthy_probe_is_ready(self):
         r = core.check_readiness({
-            "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://..."},
+            "build": {"status": "COMPLETED", "runtimeUrl": "http://127.0.0.1:38124/"},
+            "test": {"status": "SUCCESS"},
             "healthProbe": {"status": "healthy"},
         })
         self.assertEqual(r.readiness_state, "READY")
 
-    def test_preview_failed_is_degraded(self):
+    def test_test_failed_is_degraded(self):
         r = core.check_readiness({
             "build": {"status": "TEST_SUCCESS"},
-            "testDeployment": {"status": "FAILED"},
+            "test": {"status": "FAILED"},
         })
         self.assertEqual(r.readiness_state, "DEGRADED")
 
-    def test_preview_expired(self):
+    def test_cancelled_build_is_expired(self):
+        r = core.check_readiness({"build": {"status": "CANCELLED"}})
+        self.assertEqual(r.readiness_state, "EXPIRED")
+
+    def test_test_skipped_is_expired(self):
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "EXPIRED"},
+            "test": {"status": "SKIPPED"},
         })
         self.assertEqual(r.readiness_state, "EXPIRED")
 
-    def test_preview_stopped_is_expired(self):
+    def test_unknown_test_status_falls_through_to_build(self):
+        # TASK-163: preview-era 값은 더 이상 매핑되지 않는다 — canonical 이
+        # 아닌 status 는 build 쪽 분류로 흘러간다.
         r = core.check_readiness({
             "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "STOPPED"},
+            "test": {"status": "NOT_REQUESTED"},
         })
-        self.assertEqual(r.readiness_state, "EXPIRED")
-
-    def test_preview_not_requested_is_expired(self):
-        r = core.check_readiness({
-            "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "NOT_REQUESTED"},
-        })
-        self.assertEqual(r.readiness_state, "EXPIRED")
+        self.assertEqual(r.readiness_state, "UNKNOWN")
 
     def test_unknown_build_status_warns(self):
         r = core.check_readiness({"build": {"status": "WEIRD_STATE"}})
@@ -205,11 +205,11 @@ class ClassificationTests(unittest.TestCase):
 class CardContentTests(unittest.TestCase):
     def test_ready_card_has_url_subtitle(self):
         r = core.check_readiness({
-            "build": {"status": "COMPLETED"},
-            "testDeployment": {
-                "status": "READY",
-                "previewUrl": "http://example.com:12345",
+            "build": {
+                "status": "COMPLETED",
+                "runtimeUrl": "http://example.com:12345",
             },
+            "test": {"status": "SUCCESS"},
         })
         # TASK-061: card title evolved from "미리보기 주소" to "테스트 컨테이너"
         self.assertIn("테스트 컨테이너", r.card.title)
@@ -333,7 +333,7 @@ class ResultEnvelopeTests(unittest.TestCase):
             self.assertIn(ck, d["card"])
         self.assertEqual(d["ref"]["contract_doc"], "docs/sdlc/contracts/01-shared-build-contract-baseline.md")
         self.assertEqual(d["ref"]["design_doc"], "docs/sdlc/design/06-user-messaging-and-failure-handling.md")
-        self.assertEqual(d["ref"]["skill_version"], "v2")
+        self.assertEqual(d["ref"]["skill_version"], "v3")
 
 
 # ---------------------------------------------------------------------------
@@ -352,8 +352,8 @@ class CliTests(unittest.TestCase):
 
     def test_cli_stdin_input(self):
         stdin = io.StringIO(json.dumps({
-            "build": {"status": "COMPLETED"},
-            "testDeployment": {"status": "READY", "previewUrl": "http://example.com:38124"},
+            "build": {"status": "COMPLETED", "runtimeUrl": "http://example.com:38124"},
+            "test": {"status": "SUCCESS"},
         }))
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf), mock.patch("sys.stdin", stdin):

@@ -190,10 +190,11 @@ class LegacyCompatTests(unittest.TestCase):
         self.assertEqual(r.stage, "BUILD")
         self.assertEqual(r.next_action, "FIX_DOCKERFILE")
 
-    def test_legacy_failure_source_preview_routes_to_test_stage(self):
+    def test_failure_source_test_routes_to_test_stage(self):
+        # TASK-163: 입력 어휘의 `preview` 를 canonical `test` 로 개명.
         r = core.shape({
             "failure": {
-                "source": "preview",
+                "source": "test",
                 "errorCode": "CONTAINER_TEST_FAILED",
                 "nextAction": "FIX_PORT",
             },
@@ -308,7 +309,7 @@ class LogsExcerptTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class ResultEnvelopeTests(unittest.TestCase):
-    def test_to_dict_shape_v2(self):
+    def test_to_dict_shape_v3(self):
         r = core.shape({
             "buildId": "b-1",
             "stage": "BUILD",
@@ -321,7 +322,7 @@ class ResultEnvelopeTests(unittest.TestCase):
             self.assertIn(k, d, msg=f"missing key {k}")
         self.assertEqual(d["ref"]["design_doc"], "docs/sdlc/design/06-user-messaging-and-failure-handling.md")
         # TASK-061 bumped skill_version to v2
-        self.assertEqual(d["ref"]["skill_version"], "v2")
+        self.assertEqual(d["ref"]["skill_version"], "v3")
         # "stage" replaces legacy "source"
         self.assertEqual(d["stage"], "BUILD")
 
