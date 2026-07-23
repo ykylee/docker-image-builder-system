@@ -94,7 +94,7 @@ func TestBuildImageMissingDockerfileReturnsError(t *testing.T) {
 }
 
 // TASK-067: RunContainer 의 skeleton mode 동작 — 실제 docker 호출 없이
-// mock ContainerStatus 를 반환하고 ReportPreviewReady 의 입력으로
+// mock ContainerStatus 를 반환하고 ReportContainerTestResult 의 입력으로
 // 그대로 사용 가능해야 한다.
 func TestRunContainerSkeletonMode(t *testing.T) {
 	tmp := t.TempDir()

@@ -14,15 +14,19 @@ import (
 // BuildControlClient 는 Host Server 의 build control endpoint 들을 호출한다.
 // - ClaimNextBuild: POST /builds/claim
 // - ReportPhase: POST /builds/:buildId/phase
-// - QueueTestDeployment: POST /builds/:buildId/preview
-// - ReportPreviewReady: POST /builds/:buildId/test-deployment/ready
+// - StartContainerTest: POST /builds/:buildId/preview
+// - ReportContainerTestResult: POST /builds/:buildId/test-deployment/ready
 // - ReportDeployment: POST /builds/:buildId/deployment
 // - DownloadSource: GET /builds/:buildId/source (TASK-066)
+//
+// TASK-161 (P2-M2 Step 3): 메서드명 canonical 화. legacy
+// `QueueTestDeployment` → `StartContainerTest`, `ReportPreviewReady` →
+// `ReportContainerTestResult`. payload 의 `previewUrl` JSON 필드 → `runtimeUrl`.
 type BuildControlClient interface {
 	ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error)
 	ReportPhase(ctx context.Context, buildID, phase, runnerID string) error
-	QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error
-	ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error
+	StartContainerTest(ctx context.Context, buildID string, req StartContainerTestRequest) error
+	ReportContainerTestResult(ctx context.Context, buildID string, req ContainerTestResultRequest) error
 	ReportDeployment(ctx context.Context, buildID string, req DeploymentReportRequest) error
 	// DownloadSource fetches the raw source archive bytes for `buildID`
 	// (TASK-066). Returns the body bytes, the SHA-256 reported by the
@@ -175,11 +179,11 @@ func (c *NoopBuildControlClient) ReportPhase(context.Context, string, string, st
 	return nil
 }
 
-func (c *NoopBuildControlClient) QueueTestDeployment(context.Context, string, QueueTestDeploymentRequest) error {
+func (c *NoopBuildControlClient) StartContainerTest(context.Context, string, StartContainerTestRequest) error {
 	return nil
 }
 
-func (c *NoopBuildControlClient) ReportPreviewReady(context.Context, string, PreviewReadyRequest) error {
+func (c *NoopBuildControlClient) ReportContainerTestResult(context.Context, string, ContainerTestResultRequest) error {
 	return nil
 }
 
@@ -239,14 +243,14 @@ func (c *HTTPBuildControlClient) DownloadSource(ctx context.Context, buildID str
 	return body, checksum, size, nil
 }
 
-// QueueTestDeployment: POST /builds/:buildId/preview
-type QueueTestDeploymentRequest struct {
+// StartContainerTest: POST /builds/:buildId/preview
+type StartContainerTestRequest struct {
 	InternalPort int    `json:"internalPort"`
 	TtlMinutes   int    `json:"ttlMinutes"`
 	RunnerID     string `json:"runnerId"`
 }
 
-func (c *HTTPBuildControlClient) QueueTestDeployment(ctx context.Context, buildID string, req QueueTestDeploymentRequest) error {
+func (c *HTTPBuildControlClient) StartContainerTest(ctx context.Context, buildID string, req StartContainerTestRequest) error {
 	body, _ := json.Marshal(req)
 	url := fmt.Sprintf("%s/builds/%s/preview", c.baseURL, buildID)
 	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))
@@ -268,9 +272,13 @@ func (c *HTTPBuildControlClient) QueueTestDeployment(ctx context.Context, buildI
 	return fmt.Errorf("queue preview failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
 }
 
-// ReportPreviewReady: POST /builds/:buildId/test-deployment/ready
-type PreviewReadyRequest struct {
-	PreviewURL            string `json:"previewUrl"`
+// ReportContainerTestResult: POST /builds/:buildId/test-deployment/ready
+// payload 의 `previewUrl` JSON 필드 → `runtimeUrl` canonical rename (TASK-161
+// P2-M2 Step 1+2 묶음 + Step 3). 본 struct 의 `RuntimeURL` Go 필드는
+// `runtimeUrl` JSON 으로 직렬화되어 build-server 의 `TestDeploymentReadyRequest`
+// 와 정합.
+type ContainerTestResultRequest struct {
+	RuntimeURL            string `json:"runtimeUrl"`
 	Host                  string `json:"host"`
 	HostPort              int    `json:"hostPort"`
 	ContainerRef          string `json:"containerRef,omitempty"`
@@ -291,7 +299,7 @@ type DeploymentReportRequest struct {
 	ResponsePayloadJSON map[string]any `json:"responsePayloadJson,omitempty"`
 }
 
-func (c *HTTPBuildControlClient) ReportPreviewReady(ctx context.Context, buildID string, req PreviewReadyRequest) error {
+func (c *HTTPBuildControlClient) ReportContainerTestResult(ctx context.Context, buildID string, req ContainerTestResultRequest) error {
 	body, _ := json.Marshal(req)
 	url := fmt.Sprintf("%s/builds/%s/test-deployment/ready", c.baseURL, buildID)
 	r, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(body))

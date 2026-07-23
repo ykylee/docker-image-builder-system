@@ -138,12 +138,12 @@ func TestNoopBuildControlClient(t *testing.T) {
 	}
 }
 
-func TestHTTPBuildControlClient_QueueTestDeployment_OK(t *testing.T) {
+func TestHTTPBuildControlClient_StartContainerTest_OK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/builds/b-100/preview" {
 			t.Errorf("expected path /builds/b-100/preview, got %s", r.URL.Path)
 		}
-		var body QueueTestDeploymentRequest
+		var body StartContainerTestRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
@@ -154,12 +154,12 @@ func TestHTTPBuildControlClient_QueueTestDeployment_OK(t *testing.T) {
 			t.Errorf("expected ttlMinutes 60, got %d", body.TtlMinutes)
 		}
 		w.WriteHeader(http.StatusAccepted)
-		_, _ = w.Write([]byte(`{"testDeployment":{"status":"QUEUED"}}`))
+		_, _ = w.Write([]byte(`{"testDeployment":{"status":"IN_PROGRESS"}}`))
 	}))
 	defer srv.Close()
 
 	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
-	err := c.QueueTestDeployment(context.Background(), "b-100", QueueTestDeploymentRequest{
+	err := c.StartContainerTest(context.Background(), "b-100", StartContainerTestRequest{
 		InternalPort: 8080,
 		TtlMinutes:   60,
 		RunnerID:     "r-1",
@@ -169,17 +169,17 @@ func TestHTTPBuildControlClient_QueueTestDeployment_OK(t *testing.T) {
 	}
 }
 
-func TestHTTPBuildControlClient_ReportPreviewReady_OK(t *testing.T) {
+func TestHTTPBuildControlClient_ReportContainerTestResult_OK(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/builds/b-200/test-deployment/ready" {
 			t.Errorf("expected path /builds/b-200/test-deployment/ready, got %s", r.URL.Path)
 		}
-		var body PreviewReadyRequest
+		var body ContainerTestResultRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
-		if body.PreviewURL != "http://preview.local/x" {
-			t.Errorf("expected previewUrl http://preview.local/x, got %s", body.PreviewURL)
+		if body.RuntimeURL != "http://preview.local/x" {
+			t.Errorf("expected runtimeUrl http://preview.local/x, got %s", body.RuntimeURL)
 		}
 		if body.HostPort != 38124 {
 			t.Errorf("expected hostPort 38124, got %d", body.HostPort)
@@ -196,8 +196,8 @@ func TestHTTPBuildControlClient_ReportPreviewReady_OK(t *testing.T) {
 	defer srv.Close()
 
 	c := NewHTTPBuildControlClient(srv.URL, "runner-1")
-	err := c.ReportPreviewReady(context.Background(), "b-200", PreviewReadyRequest{
-		PreviewURL:            "http://preview.local/x",
+	err := c.ReportContainerTestResult(context.Background(), "b-200", ContainerTestResultRequest{
+		RuntimeURL:            "http://preview.local/x",
 		Host:                  "preview.local",
 		HostPort:              38124,
 		ContainerRef:          "container-b-200",

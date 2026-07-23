@@ -3,7 +3,7 @@
 #
 # 이 스크립트는 Runner 가 Build Server 로부터 source archive 를 fetch +
 # extract 한 뒤, 그 image 로 실제 docker container 를 띄우고
-# healthcheck 가 안정될 때까지 polling 한 다음 ReportPreviewReady 에
+# healthcheck 가 안정될 때까지 polling 한 다음 ReportContainerTestResult 에
 # real container 정보를 전달하는 흐름을 검증한다. 단,
 #
 #   1) Build Server 측 `/builds/:buildId/source` endpoint 가 살아있어야

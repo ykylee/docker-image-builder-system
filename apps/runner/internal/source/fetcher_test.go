@@ -34,10 +34,10 @@ func (s *stubClient) ClaimNextBuild(context.Context) (*hostclient.ClaimedBuildRe
 func (s *stubClient) ReportPhase(context.Context, string, string, string) error {
 	return nil
 }
-func (s *stubClient) QueueTestDeployment(context.Context, string, hostclient.QueueTestDeploymentRequest) error {
+func (s *stubClient) StartContainerTest(context.Context, string, hostclient.StartContainerTestRequest) error {
 	return nil
 }
-func (s *stubClient) ReportPreviewReady(context.Context, string, hostclient.PreviewReadyRequest) error {
+func (s *stubClient) ReportContainerTestResult(context.Context, string, hostclient.ContainerTestResultRequest) error {
 	return nil
 }
 func (s *stubClient) ReportDeployment(context.Context, string, hostclient.DeploymentReportRequest) error {

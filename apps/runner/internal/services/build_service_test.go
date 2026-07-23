@@ -22,8 +22,8 @@ type fakeClient struct {
 	buildID     string
 	runnerID    string
 	reportErr   error
-	queued      []hostclient.QueueTestDeploymentRequest
-	previewReady []hostclient.PreviewReadyRequest
+	queued      []hostclient.StartContainerTestRequest
+	previewReady []hostclient.ContainerTestResultRequest
 	deployments []hostclient.DeploymentReportRequest
 }
 
@@ -49,14 +49,14 @@ func (f *fakeClient) ReportPhase(ctx context.Context, buildID, phase, runnerID s
 	return nil
 }
 
-func (f *fakeClient) QueueTestDeployment(ctx context.Context, buildID string, req hostclient.QueueTestDeploymentRequest) error {
+func (f *fakeClient) StartContainerTest(ctx context.Context, buildID string, req hostclient.StartContainerTestRequest) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.queued = append(f.queued, req)
 	return nil
 }
 
-func (f *fakeClient) ReportPreviewReady(ctx context.Context, buildID string, req hostclient.PreviewReadyRequest) error {
+func (f *fakeClient) ReportContainerTestResult(ctx context.Context, buildID string, req hostclient.ContainerTestResultRequest) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.previewReady = append(f.previewReady, req)
@@ -166,8 +166,8 @@ func TestProcessClaim_QueuesAndReportsPreviewReady(t *testing.T) {
 }
 
 // TASK-067: BuildService 가 docker.Client.RunContainer 의 ContainerStatus
-// 값을 그대로 ReportPreviewReady 의 입력으로 사용해야 한다. 새 docker
-// Client (skeleton mode) 를 명시적으로 wire-up 해서 ReportPreviewReady 에
+// 값을 그대로 ReportContainerTestResult 의 입력으로 사용해야 한다. 새 docker
+// Client (skeleton mode) 를 명시적으로 wire-up 해서 ReportContainerTestResult 에
 // 들어간 host / hostPort / runtimeUrl / containerRef 가 ContainerStatus 의
 // 그것과 일치하는지 확인.
 func TestProcessClaim_PassesContainerStatusFromRunContainer(t *testing.T) {
@@ -198,8 +198,8 @@ func TestProcessClaim_PassesContainerStatusFromRunContainer(t *testing.T) {
 		t.Errorf("expected host=preview.local, got %s", req.Host)
 	}
 	expectedRuntimeURL := "http://preview.local:38124/"
-	if req.PreviewURL != expectedRuntimeURL {
-		t.Errorf("expected previewURL=%s, got %s", expectedRuntimeURL, req.PreviewURL)
+	if req.RuntimeURL != expectedRuntimeURL {
+		t.Errorf("expected previewURL=%s, got %s", expectedRuntimeURL, req.RuntimeURL)
 	}
 	if !req.HealthCheckPassed || !req.PortOpen || !req.StabilityWindowPassed {
 		t.Errorf("expected all health flags true, got %+v", req)

@@ -41,11 +41,11 @@ func (c *tickerClient) ReportPhase(ctx context.Context, buildID, phase, runnerID
 	return nil
 }
 
-func (c *tickerClient) QueueTestDeployment(ctx context.Context, buildID string, req hostclient.QueueTestDeploymentRequest) error {
+func (c *tickerClient) StartContainerTest(ctx context.Context, buildID string, req hostclient.StartContainerTestRequest) error {
 	return nil
 }
 
-func (c *tickerClient) ReportPreviewReady(ctx context.Context, buildID string, req hostclient.PreviewReadyRequest) error {
+func (c *tickerClient) ReportContainerTestResult(ctx context.Context, buildID string, req hostclient.ContainerTestResultRequest) error {
 	return nil
 }
 

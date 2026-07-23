@@ -24,7 +24,7 @@ type BuildService struct {
 	runnerID       string
 	internalPort   int // default 8080, env override PREVIEW_INTERNAL_PORT
 	dockerfilePath string // default "Dockerfile", env override RUNNER_DOCKERFILE_PATH
-	// hostPort 는 ReportPreviewReady 가 노출할 container 의 host port.
+	// hostPort 는 ReportContainerTestResult 가 노출할 container 의 host port.
 	// 0 이면 RunContainer 가 cli mode 에서 OS 가 알려주는 ephemeral
 	// port 를 잡는다 (default). test 는 BuildService.WithHostPort 로
 	// fake health server 의 port 를 명시적으로 주입해 probe 결과를
@@ -37,7 +37,7 @@ type BuildService struct {
 	// BuildRequest 의 optional 필드로 정식 승격.
 	healthcheckPath    string
 	healthcheckTimeout time.Duration
-	// stopContainerOnDone 가 true 면 ReportPreviewReady 가 끝난 뒤
+	// stopContainerOnDone 가 true 면 ReportContainerTestResult 가 끝난 뒤
 	// container 를 stop + remove 한다. 1차 PR 은 false 가 기본 —
 	// preview URL 이 test deployment 동안 살아있어야 하므로. e2e
 	// script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 검증.
@@ -169,7 +169,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 	}
 
 	// PKG-006: queue test deployment with internalPort
-	if err := s.hostClient.QueueTestDeployment(ctx, buildID, hostclient.QueueTestDeploymentRequest{
+	if err := s.hostClient.StartContainerTest(ctx, buildID, hostclient.StartContainerTestRequest{
 		InternalPort: s.internalPort,
 		TtlMinutes:   60,
 		RunnerID:     s.runnerID,
@@ -178,11 +178,11 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return err
 	}
 
-	// TASK-067: real container run + healthcheck. queueTestDeployment 가
+	// TASK-067: real container run + healthcheck. StartContainerTest 가
 	// 받아들여진 직후 BuildImage 가 만든 image 로 docker container 를 띄우고
 	// HTTP healthcheck / TCP port open 이 안정될 때까지 polling 한다.
 	// 성공 시 ContainerStatus 의 runtimeUrl / host / hostPort / containerRef
-	// 를 그대로 ReportPreviewReady 에 전달한다 — mock 값 (preview.local,
+	// 를 그대로 ReportContainerTestResult 에 전달한다 — mock 값 (preview.local,
 	// 38124, container-<id>) 대신 진짜 binding 정보를 노출한다.
 	//
 	// hostPort=0 으로 두면 RunContainer 가 cli mode 일 때 OS 가 알려주는
@@ -224,8 +224,8 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		}()
 	}
 
-	if err := s.hostClient.ReportPreviewReady(ctx, buildID, hostclient.PreviewReadyRequest{
-		PreviewURL:            containerStatus.RuntimeURL,
+	if err := s.hostClient.ReportContainerTestResult(ctx, buildID, hostclient.ContainerTestResultRequest{
+		RuntimeURL:            containerStatus.RuntimeURL,
 		Host:                  containerStatus.Host,
 		HostPort:              containerStatus.HostPort,
 		ContainerRef:          containerStatus.ContainerRef,

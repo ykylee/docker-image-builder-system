@@ -46,7 +46,7 @@ type ContainerRunOptions struct {
 
 // ContainerStatus 는 RunContainer + WaitForHealth 가 채워서 돌려주는
 // container lifecycle snapshot. BuildService.ProcessClaim 은 이 값을
-// 그대로 ReportPreviewReady 의 입력으로 사용한다.
+// 그대로 ReportContainerTestResult 의 입력으로 사용한다.
 type ContainerStatus struct {
 	ContainerRef          string
 	ImageTag              string
@@ -310,7 +310,7 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 
 	hostPort := opts.HostPort
 	if hostPort <= 0 {
-		// skeleton 모드에선 port 38124 로 고정 (이전 ReportPreviewReady 의
+		// skeleton 모드에선 port 38124 로 고정 (이전 ReportContainerTestResult 의
 		// mock 과 정합), cli 모드에선 docker 가 자동 할당하도록 0 으로 둔다.
 		if c.runMode != "cli" {
 			hostPort = 38124
@@ -353,7 +353,7 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 	// `docker inspect --format '{{ (index (index .NetworkSettings.Ports "<internalPort>/tcp") 0) "HostPort" }}' <name>`.
 	// inspect 실패 (docker daemon race / inspect format mismatch / 빈 응답)
 	// 시 status.HostPort == 0 으로 그대로 반환한다 — caller (BuildService) 가
-	// 그대로 ReportPreviewReady 에 :0 URL 을 흘려보내면 downstream 에서 잘못된
+	// 그대로 ReportContainerTestResult 에 :0 URL 을 흘려보내면 downstream 에서 잘못된
 	// previewUrl 이 노출되므로, BuildService 가 HostPort=0 으로 빌드할 때는
 	// pickFreePort 로 OS ephemeral port 를 미리 잡아 host 포트로 명시적으로
 	// 넘기는 편이 안전하다. 그 경로는 후속 TASK 의 port-collision retry 정책과
