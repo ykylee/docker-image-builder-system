@@ -292,7 +292,7 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
       await svc.reportPhase(id, "SOURCE_PREPARED");
       await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
       await svc.reportPhase(id, "DOCKER_BUILD_COMPLETED");
-      await svc.queueTestDeployment(id, 8080, 30);
+      await svc.startContainerTest(id, 8080, 30);
       return { service: svc, buildId: id };
     })();
     const app = Fastify({ logger: false });
@@ -342,8 +342,8 @@ describe("POST /builds/:buildId/deployment", () => {
       await svc.reportPhase(id, "SOURCE_PREPARED");
       await svc.reportPhase(id, "DOCKER_BUILD_STARTED");
       await svc.reportPhase(id, "DOCKER_BUILD_COMPLETED");
-      await svc.queueTestDeployment(id, 8080, 30);
-      await svc.reportPreviewStatus(id, "SUCCESS", {
+      await svc.startContainerTest(id, 8080, 30);
+      await svc.reportContainerTestResult(id, "SUCCESS", {
         runtimeUrl: "http://preview.local/x",
         host: "preview.local",
         hostPort: 38124,
@@ -385,47 +385,9 @@ describe("POST /builds/:buildId/deployment", () => {
   });
 });
 
-describe("GET /builds/:buildId/test-deployment", () => {
-  it("returns 404 when no preview requested", async () => {
-    const repo = createMemoryBuildRepository();
-    const service = new BuildService(repo);
-    const create = await service.createBuild(baseBody);
-    if (!("accepted" in create) || !create.accepted) throw new Error("setup");
-    const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
-    const res = await app.inject({
-      method: "GET",
-      url: `/builds/${create.build.buildId}/test-deployment`
-    });
-    assert.equal(res.statusCode, 404);
-    await app.close();
-  });
-
-  it("returns 200 with testDeployment after queue", async () => {
-    const repo = createMemoryBuildRepository();
-    const service = new BuildService(repo);
-    const { buildId: id } = await seedBuildWithSource(service, {
-      appName: baseBody.appName,
-      requestedBy: baseBody.requestedBy
-    });
-    await service.claimNextBuild();
-    await service.reportPhase(id, "DOCKER_BUILD_STARTED");
-    await service.reportPhase(id, "DOCKER_BUILD_COMPLETED");
-    await service.queueTestDeployment(id, 8080, 30);
-
-    const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
-    const res = await app.inject({
-      method: "GET",
-      url: `/builds/${id}/test-deployment`
-    });
-    assert.equal(res.statusCode, 200);
-    const body = res.json();
-    assert.equal(body.testDeployment.status, "IN_PROGRESS");
-    assert.equal(body.testDeployment.internalPort, 8080);
-    await app.close();
-  });
-});
+// TASK-161 (P2-M2 Sub-commit B): GET /builds/:buildId/test-deployment
+// 제거 (consumer 0). canonical `build_test`(ContainerTestResult) 가 같은
+// 정보를 담는다.
 
 describe("POST /builds/:buildId/source (TASK-066)", () => {
   // 6 hex chars is enough to disambiguate unique content in this

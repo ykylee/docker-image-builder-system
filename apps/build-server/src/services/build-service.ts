@@ -19,11 +19,11 @@ import type {
 
 import type {
   BuildRepository,
+  ContainerTestResultDetails,
   ContentRangeParts,
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
-  PreviewStatusDetails,
   StoreSourceArchiveResult,
   StoreSourceChunkResult
 } from "../repositories/build-repository.js";
@@ -44,11 +44,6 @@ export type ReportPreviewOutcome =
 
 export type ReportDeploymentOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
-  | { kind: "not_found" };
-
-export type GetTestDeploymentOutcome =
-  | { kind: "found"; testDeployment: TestDeployment }
-  | { kind: "not_requested" }
   | { kind: "not_found" };
 
 export class BuildService {
@@ -262,12 +257,12 @@ export class BuildService {
     return result;
   }
 
-  async queueTestDeployment(
+  async startContainerTest(
     buildId: string,
     internalPort: number,
     ttlMinutes: number
   ): Promise<QueuePreviewOutcome> {
-    const result = await this.repository.queueTestDeployment(
+    const result = await this.repository.startContainerTest(
       buildId,
       internalPort,
       ttlMinutes
@@ -284,15 +279,16 @@ export class BuildService {
     };
   }
 
-  async reportPreviewStatus(
+  async reportContainerTestResult(
     buildId: string,
-    // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): status 를
-    // canonical `ExecutionStatus` 로 정렬. 메서드명 자체의 canonical 화는
-    // 다음 commit.
     status: ExecutionStatus,
-    details?: PreviewStatusDetails
+    details?: ContainerTestResultDetails
   ): Promise<ReportPreviewOutcome> {
-    const result = await this.repository.reportPreviewStatus(buildId, status, details);
+    const result = await this.repository.reportContainerTestResult(
+      buildId,
+      status,
+      details
+    );
     if (result.kind === "not_found") {
       return { kind: "not_found" };
     }
@@ -310,9 +306,9 @@ export class BuildService {
     return this.repository.reportDeploymentResult(buildId, input);
   }
 
-  async getTestDeployment(buildId: string): Promise<GetTestDeploymentOutcome> {
-    return this.repository.getTestDeployment(buildId);
-  }
+  // TASK-161 (P2-M2 Sub-commit B): `getTestDeployment` 메서드 제거
+  // (consumer 0). canonical `build_test`(ContainerTestResult) 가 같은
+  // 정보를 담는다.
 
   async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
     return this.repository.listBuilds(query);

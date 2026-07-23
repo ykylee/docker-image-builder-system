@@ -182,7 +182,7 @@ export async function registerBuildRoutes(
       );
     }
     const payload = payloadResult.data;
-    const result = await buildService.queueTestDeployment(
+    const result = await buildService.startContainerTest(
       paramsResult.data.buildId,
       payload.internalPort,
       payload.ttlMinutes
@@ -215,11 +215,8 @@ export async function registerBuildRoutes(
       );
     }
     const payload = payloadResult.data;
-    const result = await buildService.reportPreviewStatus(
+    const result = await buildService.reportContainerTestResult(
       paramsResult.data.buildId,
-      // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): "READY" legacy
-      // 의미는 canonical `SUCCESS` 로 흡수. 메서드명 자체의 canonical 화는
-      // 다음 commit.
       "SUCCESS",
       {
         runtimeUrl: payload.runtimeUrl,
@@ -253,7 +250,7 @@ export async function registerBuildRoutes(
       );
     }
     const payload = payloadResult.data;
-    const result = await buildService.reportPreviewStatus(
+    const result = await buildService.reportContainerTestResult(
       paramsResult.data.buildId,
       payload.status
     );
@@ -287,23 +284,9 @@ export async function registerBuildRoutes(
     return reply.status(200).send(result.response);
   });
 
-  // GET /builds/:buildId/test-deployment - read current test deployment
-  app.get("/builds/:buildId/test-deployment", async (request, reply) => {
-    const paramsResult = buildIdParamsSchema.safeParse(request.params);
-    if (!paramsResult.success) {
-      return reply.status(400).send(
-        validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
-      );
-    }
-    const result = await buildService.getTestDeployment(paramsResult.data.buildId);
-    if (result.kind === "not_found") {
-      return reply.status(404).send(notFoundBody("Build not found."));
-    }
-    if (result.kind === "not_requested") {
-      return reply.status(404).send(notFoundBody("Test deployment not requested."));
-    }
-    return reply.status(200).send({ testDeployment: result.testDeployment });
-  });
+  // TASK-161 (P2-M2 Sub-commit B): GET /builds/:buildId/test-deployment
+  // 제거 (consumer 0). canonical `build_test`(ContainerTestResult) 가 같은
+  // 정보를 담는다.
 
   // POST /builds/:buildId/source — upload the raw source archive bytes
   // (TASK-066). The body is a binary `application/octet-stream` payload

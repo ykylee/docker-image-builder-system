@@ -70,7 +70,11 @@ export type UpdatePhaseResult =
       toPhase: string;
     };
 
-export type QueueTestDeploymentResult =
+// TASK-161 (P2-M2 Sub-commit B): `queueTestDeployment` →
+// `startContainerTest`, `reportPreviewStatus` → `reportContainerTestResult`,
+// `getTestDeployment` → 제거(consumer 0). 본 타입들도 canonical 이름으로
+// 정렬.
+export type StartContainerTestResult =
   | {
       kind: "queued";
       response: BuildStatusResponse;
@@ -84,7 +88,7 @@ export type QueueTestDeploymentResult =
       reason: string;
     };
 
-export type ReportPreviewStatusResult =
+export type ReportContainerTestResult =
   | {
       kind: "ok";
       response: BuildStatusResponse;
@@ -103,10 +107,9 @@ export type ReportDeploymentResult =
       kind: "not_found";
     };
 
-// TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): `previewUrl` →
-// `runtimeUrl` canonical rename. 본 타입은 `reportPreviewStatus` 메서드의
-// `details` 인자 타입으로, runner 가 보내는 `runtimeUrl` 필드와 1:1 매핑.
-export type PreviewStatusDetails = {
+// TASK-161 (P2-M2 Sub-commit B): `PreviewStatusDetails` →
+// `ContainerTestResultDetails` canonical rename.
+export type ContainerTestResultDetails = {
   runtimeUrl?: string;
   host?: string;
   hostPort?: number;
@@ -115,18 +118,6 @@ export type PreviewStatusDetails = {
   portOpen?: boolean;
   stabilityWindowPassed?: boolean;
 };
-
-export type GetTestDeploymentResult =
-  | {
-      kind: "found";
-      testDeployment: TestDeployment;
-    }
-  | {
-      kind: "not_requested";
-    }
-  | {
-      kind: "not_found";
-    };
 
 // TASK-066: source archive storage. The Skill uploads the raw archive
 // bytes (e.g. tar.gz) after `POST /builds` via `POST /builds/:buildId/source`.
@@ -318,24 +309,21 @@ export interface BuildRepository {
   getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null>;
   claimNextBuild(): Promise<ClaimNextBuildResult>;
   updatePhase(buildId: string, phase: string): Promise<UpdatePhaseResult>;
-  queueTestDeployment(
+  // TASK-161 (P2-M2 Sub-commit B): 메서드명 canonical 화.
+  startContainerTest(
     buildId: string,
     internalPort: number,
     ttlMinutes: number
-  ): Promise<QueueTestDeploymentResult>;
-  reportPreviewStatus(
+  ): Promise<StartContainerTestResult>;
+  reportContainerTestResult(
     buildId: string,
-    // TASK-161 (P2-M2 Step 1+2 묶음): status 를 canonical `executionStatuses`
-    // 로 정렬. 다음 commit 에서 메서드명이 `reportContainerTestResult` 로
-    // 정렬된다.
     status: ExecutionStatus,
-    details?: PreviewStatusDetails
-  ): Promise<ReportPreviewStatusResult>;
+    details?: ContainerTestResultDetails
+  ): Promise<ReportContainerTestResult>;
   reportDeploymentResult(
     buildId: string,
     input: DeploymentReportRequest
   ): Promise<ReportDeploymentResult>;
-  getTestDeployment(buildId: string): Promise<GetTestDeploymentResult>;
   listBuilds(query: BuildListQuery): Promise<BuildListResponse>;
   storeSourceArchive(
     buildId: string,

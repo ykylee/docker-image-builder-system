@@ -38,7 +38,7 @@ const MOCK_BUILD: api.BuildStatusResponse = {
     status: "BUILD_SUCCESS",
     phase: "DOCKER_BUILD_COMPLETED",
     lifecycleStatus: "TESTING",
-    previewUrl: "http://127.0.0.1:32770/health",
+    runtimeUrl: "http://127.0.0.1:32770/health",
     createdAt: "2026-07-08T10:00:00.000Z",
     updatedAt: "2026-07-08T10:05:00.000Z"
   },

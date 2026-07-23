@@ -953,9 +953,9 @@ export interface components {
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * Format: uri
-             * @description Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign.
+             * @description Runtime endpoint of the container under test. Canonical name aligned with build_test.runtime_url and the canonical container-test result block.
              */
-            previewUrl: string | null;
+            runtimeUrl: string | null;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -1172,12 +1172,12 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
         };
-        /** @description Legacy preview/test-deployment state. Kept as a migration shim until the Build Server and Runner switch to the canonical container-test and deployment result blocks. */
+        /** @description Container-test execution state for the running test container. status uses canonical executionStatuses; runtimeUrl is the canonical name aligned with build_test.runtime_url. */
         TestDeployment: {
             /** @enum {string} */
-            status: "NOT_REQUESTED" | "QUEUED" | "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
+            status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
             /** Format: uri */
-            previewUrl: string | null;
+            runtimeUrl: string | null;
             host: string | null;
             hostPort: number | null;
             internalPort: number | null;
@@ -1197,10 +1197,10 @@ export interface components {
         TestDeploymentQueueResponse: {
             testDeployment: components["schemas"]["TestDeployment"];
         };
-        /** @description POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals. */
+        /** @description POST /builds/:buildId/test-deployment/ready payload (Runner → Host). Carries the runtime endpoint plus the minimum container-test result signals. runtimeUrl is the canonical name (TASK-161 P2-M2 Step 1). */
         TestDeploymentReadyRequest: {
             /** Format: uri */
-            previewUrl: string;
+            runtimeUrl: string;
             host: string;
             hostPort: number;
             containerRef?: string;
@@ -1209,10 +1209,10 @@ export interface components {
             stabilityWindowPassed?: boolean;
             runnerId: string;
         };
-        /** @description POST /builds/:buildId/test-deployment/status payload (Runner → Host, PROVISIONING/FAILED/EXPIRED). */
+        /** @description POST /builds/:buildId/test-deployment/status payload (Runner → Host). status uses canonical executionStatuses. */
         TestDeploymentStatusRequest: {
             /** @enum {string} */
-            status: "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
+            status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
             runnerId: string;
         };
         /** @description Source archive reference uploaded by the Skill before build request. */
@@ -1286,9 +1286,9 @@ export interface components {
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
              * Format: uri
-             * @description Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign.
+             * @description Runtime endpoint of the container under test. Canonical name aligned with build_test.runtime_url and the canonical container-test result block.
              */
-            previewUrl: string | null;
+            runtimeUrl: string | null;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}

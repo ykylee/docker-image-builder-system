@@ -22,10 +22,10 @@ async function setupBuildAtCompletedPhase() {
   return { repo, buildId };
 }
 
-describe("MemoryBuildRepository: queueTestDeployment", () => {
+describe("MemoryBuildRepository: startContainerTest", () => {
   it("returns not_found for unknown buildId", async () => {
     const repo = createMemoryBuildRepository();
-    const result = await repo.queueTestDeployment(
+    const result = await repo.startContainerTest(
       "00000000-0000-0000-0000-000000000000",
       8080,
       60
@@ -37,13 +37,13 @@ describe("MemoryBuildRepository: queueTestDeployment", () => {
     const repo = createMemoryBuildRepository();
     const create = await repo.createBuild(baseRequest);
     if (create.kind !== "accepted") throw new Error("setup");
-    const result = await repo.queueTestDeployment(create.response.build.buildId, 8080, 60);
+    const result = await repo.startContainerTest(create.response.build.buildId, 8080, 60);
     assert.equal(result.kind, "invalid_state");
   });
 
-  it("queues preview at DOCKER_BUILD_COMPLETED and transitions to CONTAINER_TEST_STARTED", async () => {
+  it("starts container test at DOCKER_BUILD_COMPLETED and transitions to CONTAINER_TEST_STARTED", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
-    const result = await repo.queueTestDeployment(buildId, 8080, 30);
+    const result = await repo.startContainerTest(buildId, 8080, 30);
     assert.equal(result.kind, "queued");
     if (result.kind !== "queued") return;
     assert.equal(result.response.build.phase, "CONTAINER_TEST_STARTED");
@@ -53,17 +53,17 @@ describe("MemoryBuildRepository: queueTestDeployment", () => {
   });
 });
 
-describe("MemoryBuildRepository: reportPreviewStatus", () => {
+describe("MemoryBuildRepository: reportContainerTestResult", () => {
   it("returns not_found for unknown buildId", async () => {
     const repo = createMemoryBuildRepository();
-    const result = await repo.reportPreviewStatus("00000000-0000-0000-0000-000000000000", "SUCCESS");
+    const result = await repo.reportContainerTestResult("00000000-0000-0000-0000-000000000000", "SUCCESS");
     assert.equal(result.kind, "not_found");
   });
 
   it("SUCCESS transitions to CONTAINER_TEST_PASSED / TEST_SUCCESS", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
-    await repo.queueTestDeployment(buildId, 8080, 30);
-    const result = await repo.reportPreviewStatus(buildId, "SUCCESS", {
+    await repo.startContainerTest(buildId, 8080, 30);
+    const result = await repo.reportContainerTestResult(buildId, "SUCCESS", {
       runtimeUrl: "http://preview.local/x",
       host: "preview.local",
       hostPort: 38124,
@@ -85,8 +85,8 @@ describe("MemoryBuildRepository: reportPreviewStatus", () => {
 
   it("FAILED transitions to FAILED", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
-    await repo.queueTestDeployment(buildId, 8080, 30);
-    const result = await repo.reportPreviewStatus(buildId, "FAILED");
+    await repo.startContainerTest(buildId, 8080, 30);
+    const result = await repo.reportContainerTestResult(buildId, "FAILED");
     assert.equal(result.kind, "ok");
     if (result.kind !== "ok") return;
     assert.equal(result.response.build.phase, "FAILED");
@@ -94,38 +94,15 @@ describe("MemoryBuildRepository: reportPreviewStatus", () => {
   });
 });
 
-describe("MemoryBuildRepository: getTestDeployment", () => {
-  it("returns not_requested when no preview has been queued", async () => {
-    const repo = createMemoryBuildRepository();
-    const create = await repo.createBuild(baseRequest);
-    if (create.kind !== "accepted") throw new Error("setup");
-    const result = await repo.getTestDeployment(create.response.build.buildId);
-    assert.equal(result.kind, "not_requested");
-  });
-
-  it("returns not_found for unknown buildId", async () => {
-    const repo = createMemoryBuildRepository();
-    const result = await repo.getTestDeployment("00000000-0000-0000-0000-000000000000");
-    assert.equal(result.kind, "not_found");
-  });
-
-  it("returns found with full testDeployment after queue + ready", async () => {
-    const { repo, buildId } = await setupBuildAtCompletedPhase();
-    await repo.queueTestDeployment(buildId, 8080, 30);
-    await repo.reportPreviewStatus(buildId, "SUCCESS", { runtimeUrl: "http://x/y", host: "x", hostPort: 1 });
-    const result = await repo.getTestDeployment(buildId);
-    assert.equal(result.kind, "found");
-    if (result.kind !== "found") return;
-    assert.equal(result.testDeployment.status, "SUCCESS");
-    assert.equal(result.testDeployment.runtimeUrl, "http://x/y");
-  });
-});
+// TASK-161 (P2-M2 Sub-commit B): `getTestDeployment` 메서드 제거 (consumer 0).
+// 본 describe 블록 전체 제거 — canonical `build_test`(ContainerTestResult) 가
+// 같은 정보를 담는다.
 
 describe("MemoryBuildRepository: reportDeploymentResult", () => {
   it("SUCCESS transitions to DEPLOYMENT_COMPLETED / DEPLOY_SUCCESS", async () => {
     const { repo, buildId } = await setupBuildAtCompletedPhase();
-    await repo.queueTestDeployment(buildId, 8080, 30);
-    await repo.reportPreviewStatus(buildId, "SUCCESS", {
+    await repo.startContainerTest(buildId, 8080, 30);
+    await repo.reportContainerTestResult(buildId, "SUCCESS", {
       runtimeUrl: "http://preview.local/x",
       host: "preview.local",
       hostPort: 38124,

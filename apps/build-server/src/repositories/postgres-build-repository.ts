@@ -51,16 +51,15 @@ import type {
 import type {
   BuildRepository,
   ClaimNextBuildResult,
+  ContainerTestResultDetails,
   ContentRangeParts,
   CreateBuildResult,
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
-  GetTestDeploymentResult,
-  PreviewStatusDetails,
-  QueueTestDeploymentResult,
+  ReportContainerTestResult,
   ReportDeploymentResult,
-  ReportPreviewStatusResult,
+  StartContainerTestResult,
   StoreSourceArchiveResult,
   StoreSourceChunkResult,
   UpdatePhaseResult
@@ -121,13 +120,11 @@ function mapBuildTestRowToSnapshot(row: BuildTestRow | null | undefined): BuildT
   };
 }
 
-// TASK-160 (P2-M1 Step 3): legacy `preview_status` 컬럼이 사라졌으므로
-// TestDeployment 응답의 status 를 canonical `build_test.status`
-// (ExecutionStatus) 에서 직접 들고 온다. TestDeployment 자체(그리고 본
-// 매핑)는 test-deployment 엔드포인트를 재설계하는 P2-M2 Step 2 에서
-// 제거된다 — 본 단계(type-level fix)에서는 status 의 타입만 정렬하고
-// 본 매핑의 의미는 유지한다.
-function executionToPreviewStatus(
+// TASK-161 (P2-M2 Sub-commit B): `executionToPreviewStatus` 의 legacy 명칭
+// 제거. canonical `build_test.status`(ExecutionStatus) 를 그대로 TestDeployment
+// 의 status 로 사용한다 (본 함수는 사실상 identity mapping 이 되어야 하지만,
+// `build_test` row 가 없을 때를 위한 null 처리만 남는다).
+function mapExecutionStatusToTestStatus(
   status: ExecutionStatus | null | undefined
 ): ExecutionStatus | null {
   switch (status) {
@@ -138,7 +135,7 @@ function executionToPreviewStatus(
     case "NOT_STARTED":
       return status;
     default:
-      return null; // 없음 → 아직 요청되지 않음
+      return null; // build_test row 없음 → 아직 테스트 시작 안 함
   }
 }
 
@@ -146,7 +143,9 @@ function mapBuildTestRowToDeployment(
   buildRow: BuildRequestRow,
   testRow: BuildTestRow | null | undefined
 ): TestDeployment | null {
-  const mapped = executionToPreviewStatus(testRow?.status as ExecutionStatus | undefined);
+  const mapped = mapExecutionStatusToTestStatus(
+    testRow?.status as ExecutionStatus | undefined
+  );
   if (!mapped) {
     return null;
   }
@@ -517,11 +516,11 @@ export class PostgresBuildRepository implements BuildRepository {
     };
   }
 
-  async queueTestDeployment(
+  async startContainerTest(
     buildId: string,
     internalPort: number,
     ttlMinutes: number
-  ): Promise<QueueTestDeploymentResult> {
+  ): Promise<StartContainerTestResult> {
     const [row] = await this.db
       .select()
       .from(buildRequestTable)
@@ -613,15 +612,11 @@ export class PostgresBuildRepository implements BuildRepository {
     };
   }
 
-  async reportPreviewStatus(
+  async reportContainerTestResult(
     buildId: string,
-    // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): status 를
-    // canonical `ExecutionStatus` 로 정렬. legacy `PROVISIONING`/`READY`/
-    // `EXPIRED` 분기는 routes 측에서 canonical 로 매핑된 값이 들어온다.
-    // 메서드명 자체의 canonical 화(`reportContainerTestResult`)는 다음 commit.
     status: ExecutionStatus,
-    details?: PreviewStatusDetails
-  ): Promise<ReportPreviewStatusResult> {
+    details?: ContainerTestResultDetails
+  ): Promise<ReportContainerTestResult> {
     const timestamp = new Date();
     // Wrap build_request update + build_test upsert + build_log insert in a
     // single transaction so that partial failures do not leave the build in a
@@ -879,46 +874,10 @@ export class PostgresBuildRepository implements BuildRepository {
     });
   }
 
-  async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> {
-    // Left join build_test so the legacy TestDeployment response exposes the
-    // same host / hostPort / internalPort / runtimeUrl as the canonical
-    // ContainerTestResult block returned by getBuild. Without the join the
-    // runner-side host info recorded in build_test would be invisible here.
-    const [row] = await this.db
-      .select({
-        previewUrl: buildRequestTable.previewUrl,
-        buildTestStatus: buildTestTable.status,
-        updatedAt: buildRequestTable.updatedAt,
-        buildTestHost: buildTestTable.host,
-        buildTestHostPort: buildTestTable.hostPort,
-        buildTestInternalPort: buildTestTable.internalPort,
-        buildTestRuntimeUrl: buildTestTable.runtimeUrl
-      })
-      .from(buildRequestTable)
-      .leftJoin(buildTestTable, eq(buildTestTable.buildId, buildRequestTable.id))
-      .where(eq(buildRequestTable.id, buildId))
-      .limit(1);
-
-    if (!row) {
-      return { kind: "not_found" };
-    }
-    const mappedStatus = executionToPreviewStatus(row.buildTestStatus as ExecutionStatus | null);
-    if (!mappedStatus) {
-      return { kind: "not_requested" };
-    }
-
-    const testDeployment: TestDeployment = {
-      status: mappedStatus,
-      runtimeUrl: row.buildTestRuntimeUrl ?? row.previewUrl,
-      host: row.buildTestHost ?? null,
-      hostPort: row.buildTestHostPort ?? null,
-      internalPort: row.buildTestInternalPort ?? null,
-      expiresAt: null,
-      updatedAt: row.updatedAt.toISOString()
-    };
-
-    return { kind: "found", testDeployment };
-  }
+  // TASK-161 (P2-M2 Sub-commit B): `getTestDeployment` 메서드 제거
+  // (consumer 0 — build-monitor · skill_mcp · e2e 어디서도 호출 안 함).
+  // canonical `build_test`(ContainerTestResult) 가 같은 정보를 담는다.
+  // async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> { ... }
 
   async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
     // (1) status filter, (2) requestedBy filter, (3) cursor skip

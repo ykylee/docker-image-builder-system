@@ -30,16 +30,15 @@ import type {
 import type {
   BuildRepository,
   ClaimNextBuildResult,
+  ContainerTestResultDetails,
   ContentRangeParts,
   CreateBuildResult,
   DeleteSourceArchiveResult,
   GetSourceArchiveMetadataResult,
   GetSourceArchiveResult,
-  GetTestDeploymentResult,
-  PreviewStatusDetails,
-  QueueTestDeploymentResult,
+  ReportContainerTestResult,
   ReportDeploymentResult,
-  ReportPreviewStatusResult,
+  StartContainerTestResult,
   StoreSourceArchiveResult,
   StoreSourceChunkResult,
   UpdatePhaseResult
@@ -406,11 +405,11 @@ export function createMemoryBuildRepository(): BuildRepository {
       };
     },
 
-    async queueTestDeployment(
+    async startContainerTest(
       buildId: string,
       internalPort: number,
       ttlMinutes: number
-    ): Promise<QueueTestDeploymentResult> {
+    ): Promise<StartContainerTestResult> {
       const build = builds.get(buildId);
       if (!build) {
         return { kind: "not_found" };
@@ -483,16 +482,13 @@ export function createMemoryBuildRepository(): BuildRepository {
       };
     },
 
-    async reportPreviewStatus(
+    async reportContainerTestResult(
       buildId: string,
-      // TASK-161 (P2-M2 Step 1+2 묶음 — type-level fix): status 를
-      // canonical `ExecutionStatus` 로 정렬. legacy `PROVISIONING`/
-      // `READY`/`EXPIRED` 분기는 routes 측에서 canonical 로 매핑된 값이
-      // 들어온다. 메서드명 자체의 canonical 화(`reportContainerTestResult`)
-      // 는 다음 commit.
+      // TASK-161 (P2-M2 Sub-commit B): 메서드명 canonical 화 — 본 호출은
+      // runner 가 보내는 container test 의 canonical result 를 기록한다.
       status: ExecutionStatus,
-      details?: PreviewStatusDetails
-    ): Promise<ReportPreviewStatusResult> {
+      details?: ContainerTestResultDetails
+    ): Promise<ReportContainerTestResult> {
       const build = builds.get(buildId);
       if (!build) {
         return { kind: "not_found" };
@@ -653,17 +649,11 @@ export function createMemoryBuildRepository(): BuildRepository {
       };
     },
 
-    async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> {
-      const build = builds.get(buildId);
-      if (!build) {
-        return { kind: "not_found" };
-      }
-      if (!build.testDeployment) {
-        return { kind: "not_requested" };
-      }
-      return { kind: "found", testDeployment: build.testDeployment };
-    }
-,
+    // TASK-161 (P2-M2 Sub-commit B): `getTestDeployment` 메서드 제거
+    // (consumer 0 — build-monitor · skill_mcp · e2e 어디서도 호출 안 함).
+    // canonical `build_test`(ContainerTestResult) 가 같은 정보를 담는다.
+    // async getTestDeployment(buildId: string): Promise<GetTestDeploymentResult> { ... }
+
     async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {
       // Build summaries 를 (1) status filter, (2) requestedBy filter,
       // (3) cursor skip, (4) createdAt desc 정렬, (5) limit 적용. cursor 는

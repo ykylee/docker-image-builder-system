@@ -192,7 +192,7 @@ export function BuildDetail(): ReactElement {
               test-deployment 엔드포인트 재설계(P2-M2)와 함께 간다. */}
           <div>
             <dt>Runtime URL</dt>
-            <dd className="mono">{build.build.previewUrl ?? "—"}</dd>
+            <dd className="mono">{build.build.runtimeUrl ?? "—"}</dd>
           </div>
           <div>
             <dt>Container running</dt>
