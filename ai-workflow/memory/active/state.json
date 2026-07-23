@@ -1,8 +1,8 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-07-23T02:00:00Z",
-  "purpose_digest": "Astryx 도입 완료 국면. 재검토 후 '제대로 도입' 결정(TASK-134~) → 토큰 네임스페이스 --dib-* / 0.1.7 업데이트 / <Theme>+astryx.css 기반 / 라우트 지연 로드 / 컴포넌트 이관 3-1~3-5 + admin. 3단계 컴포넌트 이관 사실상 마무리: Dialog(RegisterRunnerModal) / TextInput·NumberInput(BuildRequest 폼) / CodeBlock(LogStream) / Table(BuildsList+Admin) + StatusPill 배지 정책(주의 상태만 배지) / AppShell+TopNav(레이아웃 셸). BuildRow.tsx 제거, admin 라우트 통합 테스트 복원. 매 이관 방식: 특성화/기존 테스트로 계약 고정 → 이관 → 같은 테스트 통과 → 실브라우저 실측 + B층 가드. 누적 발견·수정: Login.css 전역 유출 2회(bare label/input/form/h1 + .card max-width 가 Astryx CodeBlock 을 덮어 로그 뷰어 400px 잘림) / AdminBuilds 유령 헤더(존재하지 않는 project/repository 컬럼) / LogStream 빈 상태 가드 1자/숫자 결합 + Astryx 0.1.4 CodeBlockProps 가 syntaxTheme prop 미노출(사전 결함) / PhaseTimeline 9→11 phase drift (DEPLOYMENT_* 2종 누락, TASK-150) / build-routes 응답 28곳 envelope 비일관 (TASK-151) / 반복된 측정 오류(span 부재≠색 부재 / 속성선택자는 암묵 role 못 잡음). 회귀: frontend vitest 277 / build-server 178 / TS 5 clean. 번들 초기 JS gzip 94.66→134.63(AppShell 셸 필수 비용). 손 CSS 2,323→1,956줄. 운영 가드 2계층(정적 lint + 실측 가드) + CI 분리(PR=정적, nightly/main=실측) + build-server 에러 envelope 일관. 다음: 사후 알림 자동화(이슈/Slack) / 결정 대기 5종. (TASK-150/151 이월 해소 봉인, TASK-148/149 봉인, 헤더-본문 24px 정렬 = rev 142 수용 확정, reset.css 검토 = TASK-147 종결, TASK-152 DESIGN.md v2 + visual QA 20 PNG baseline 봉인.)",
-  "purpose_digest_rev": 189,
+  "generated_at": "2026-07-23T03:00:00Z",
+  "purpose_digest": "Astryx 도입 완료 국면. 재검토 후 '제대로 도입' 결정(TASK-134~) → 토큰 네임스페이스 --dib-* / 0.1.7 업데이트 / <Theme>+astryx.css 기반 / 라우트 지연 로드 / 컴포넌트 이관 3-1~3-5 + admin. 3단계 컴포넌트 이관 사실상 마무리: Dialog(RegisterRunnerModal) / TextInput·NumberInput(BuildRequest 폼) / CodeBlock(LogStream) / Table(BuildsList+Admin) + StatusPill 배지 정책(주의 상태만 배지) / AppShell+TopNav(레이아웃 셸). BuildRow.tsx 제거, admin 라우트 통합 테스트 복원. 매 이관 방식: 특성화/기존 테스트로 계약 고정 → 이관 → 같은 테스트 통과 → 실브라우저 실측 + B층 가드. 누적 발견·수정: Login.css 전역 유출 2회(bare label/input/form/h1 + .card max-width 가 Astryx CodeBlock 을 덮어 로그 뷰어 400px 잘림) / AdminBuilds 유령 헤더(존재하지 않는 project/repository 컬럼) / LogStream 빈 상태 가드 1자/숫자 결합 + Astryx 0.1.4 CodeBlockProps 가 syntaxTheme prop 미노출(사전 결함) / PhaseTimeline 9→11 phase drift (DEPLOYMENT_* 2종 누락, TASK-150) / build-routes 응답 28곳 envelope 비일관 (TASK-151) / 반복된 측정 오류(span 부재≠색 부재 / 속성선택자는 암묵 role 못 잡음). 회귀: frontend vitest 277 / build-server 178 / TS 5 clean. 번들 초기 JS gzip 94.66→134.63(AppShell 셸 필수 비용). 손 CSS 2,323→1,956줄. 운영 가드 2계층(정적 lint + 실측 가드) + CI 분리(PR=정적, nightly/main=실측) + build-server 에러 envelope 일관. 다음: 사후 알림 자동화(이슈/Slack) / 결정 대기 5종. (TASK-150/151 이월 해소 봉인, TASK-148/149 봉인, 헤더-본문 24px 정렬 = rev 142 수용 확정, reset.css 검토 = TASK-147 종결, TASK-152 DESIGN.md v2 + visual QA 20 PNG baseline 봉인.) **[Phase 1 완료]** v0.2.0(2026-07-22) 로 Phase 1(초기 시스템 구축) 봉인 — 5 package.json 0.1.0→0.2.0 bump + git tag v0.2.0 + CHANGELOG v0.2.0 + docs/PHASE-1-RETROSPECTIVE.md + RELEASE_NOTES-2026-07-22.md. 실측 baseline: vitest 277 / build-server 178 / go 8 pkg / TS 5 clean / 초기 index js gzip 134.64·css 24.08KB. Phase 2 진입 대기.",
+  "purpose_digest_rev": 190,
   "source_of_truth": {
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
@@ -28,10 +28,11 @@
   },
   "session": {
     "current_baseline": "TASK-147 (reset.css 미도입) + TASK-148 (B층 오버레이) + TASK-149 (CI 통합) + TASK-150 (PhaseTimeline drift) + TASK-151 (errorBody) + TASK-152 (DESIGN.md v2 + visual QA baseline) 모두 봉인. TASK-152 **완전 봉인** — DESIGN.md v2 / capture.py v3 / README.md / 운영 가이드(build-monitor-ui-visual-2026-07-22.md) + baseline 20 PNG 재승격 / diff self-test 20/20 PASS / test_diff.py 5/5 PASS (baseline/ 는 .gitignore — PNG 는 외부 LFS 정책 미결). 누적 회귀 baseline: frontend vitest 277 / build-server 178 / TS 5 packages clean / go 8/8 / db-migrate.sh 6 게이트 / 서버-프론트 에러 계약 컴파일 타임 고정 + envelope 일관(validation/errorBody/notFoundBody) / 문서 무결성 가드 / 양 테마 WCAG AA / Astryx 토큰 충돌 0종 / CSS 유출 방어 2층 / visual QA 20 PNG baseline (dark≠light).",
-    "current_axis": "Astryx 이관 완료 후 마감/보강 국면. TASK-145/146 으로 CSS 유출 방어 2층 완성(HEAD 이하 main 병합). TASK-147 로 TASK-136 이월분(reset.css)까지 정리 — 실측 결과 미도입 결정. 로컬 브랜치는 main + feat/task-147-reset-css(빈 브랜치, 삭제 예정) 단독. 원격 반영 여부는 `git log origin/main..main` 을 볼 것.",
-    "current_focus": "다음 후보: (1) 사후 알림 자동화 (nightly 실패 → Issue / Slack) / (2) visual baseline 의 CI 통합 (nightly-visual 워크플로 + baseline PNG 외부 LFS 동기화 정책 선행 결정) / (3) 결정 대기 5종 (옵션 Z 외부 object storage / 신규 기능 / Nextcloud Tasks / CI migration validation / git tag 다음 version). (TASK-152 완전 봉인 — DESIGN.md v2 + visual QA 20 PNG baseline + 운영 가이드.)",
+    "current_axis": "**Phase 1 종료 baseline (v0.2.0, 2026-07-22)**. 초기 시스템 구축 국면 종결 — 백엔드/runner/React 19+Astryx 프론트엔드/운영 가드 2계층/계약 고정/시각 QA. 5 package.json 0.2.0 통일 + git tag v0.2.0 + CHANGELOG/회고/RELEASE_NOTES 봉인. Phase 2 는 이 baseline 을 회귀 없이 유지하며 follow-up 후보 중 사용자 선택 축으로 진입. 원격 반영 여부는 `git log origin/main..main` 확인.",
+    "current_focus": "**Phase 2 진입 대기.** 후보: (1) 사후 알림 자동화 (nightly 실패 → Issue/Slack) / (2) visual baseline CI 통합 (nightly-visual + PNG 외부 LFS 정책) / (3) 옵션 Z 외부 object storage (S3/MinIO) / (4) 신규 기능 / (5) Nextcloud Tasks / (6) CI migration validation / (7) 실이미지 빌드 e2e (Docker 환경 필요). (Phase 1 = v0.2.0 완료 baseline — docs/PHASE-1-RETROSPECTIVE.md 참조.)",
     "blocked_items": [],
     "recent_done_items": [
+      "Phase 1 완료 정리 (v0.2.0 baseline): TASK-152 봉인 직후 Phase 1(초기 시스템 구축) 을 baseline 으로 긋고 Phase 2 진입 준비. ① 5 package.json 0.1.0→0.2.0 통일 bump (runner 는 Go module — git tag 로 버전 관리) ② git tag v0.2.0 (Phase 1 완료 anchor) ③ CHANGELOG.md v0.2.0 전면 갱신 (v0.1.0 이후 코드 델타 = TASK-124~152 그룹 테이블 + 회귀 baseline 종합) ④ docs/PHASE-1-RETROSPECTIVE.md 신규 (정의/아키텍처/성과/baseline/미결/교훈/Phase2 기준선) ⑤ docs/RELEASE_NOTES-2026-07-22.md 신규 ⑥ 시각 요약 아티팩트 (Phase 1 대시보드). 실측 검증(전 green): vitest 277 / build-server 178 / go 8 pkg / TS 5 clean / vite build 초기 index js gzip 134.64·css 24.08KB. 미결: 실이미지 빌드 e2e 는 Docker 미설치로 미검증 (RUNNER_DOCKER_BUILD_MODE=skeleton 기본).",
       "TASK-152 (build-monitor UI 시각 QA baseline + DESIGN.md v2 완전 봉인): 이전 세션 부분 봉인(DESIGN.md v2 / capture.py v3 / README / .gitignore / package.json)의 남은 5단계 완료. ① baseline 20 PNG 재캡처+승격 (이전 세션 .visual/ 산출물이 gitignore 로 로컬 소거돼 build-server memory + vite dev 재기동 후 capture.py 로 재생성 — 9 라우트 × 2 모드 18 + RegisterRunnerModal 2 = 20 PNG, dark≠light MD5 확인). ② diff.py self-test 20/20 PASS (run==baseline → ratio 0.0000). ③ test_diff.py 단위 5/5 PASS. ④ 운영 가이드 신규 docs/operations/build-monitor-ui-visual-2026-07-22.md (7 섹션). ⑤ workflow meta sync + commit. 환경 복구: @vitejs/plugin-react 미설치로 vite dev 실패 → pnpm install (lockfile 정합) 후 재기동 / Pillow --user 설치. baseline/ 는 .gitignore 대상이라 커밋 산출물은 운영 가이드 + workflow meta 뿐 (PNG 외부 LFS 동기화 정책은 미결 follow-up).",
       "TASK-147 (Astryx reset.css 도입 검토 — 미도입 결정, Review 무변경): TASK-136 이 '손 CSS 2,000여 줄을 흔들 수 있어' 미룬 항목을, 손 CSS 가 1,956줄로 줄고 폼·버튼·테이블이 Astryx 로 넘어간 시점에 재검토. **실측 방법**: reset.css 를 astryx.css 앞에 임시 import 후 빌드 → 전 라우트 실브라우저 측정 + reset ON/OFF 요소별 computed-style 지문 대조. **결론 = 미도입**. 근거 3가지: (1) **안전하나 무익** — reset.css 는 @layer reset(최하위) + :where()(zero specificity)라 우리 unlayered CSS·Astryx atomic 을 절대 못 이긴다. 우리 앱의 모든 요소는 우리 클래스 또는 Astryx atomic 으로 이미 스타일돼 reset 이 닿는 순수 미스타일 요소가 없다. h1/input/section/.preset-btn 등 요소별 지문이 reset ON/OFF 완전 동일(margin/padding/border/bg 전부 불변). (2) 우리 globals 가 이미 필요한 reset(`* {box-sizing:border-box}`, `html,body {margin:0;padding:0}`)을 보유 — reset.css 의 실질 추가분이 우리 요소엔 0. (3) 비용은 CSS gzip +0.97KB + import 1줄 + 의존 표면. **부수 실증**: reset ON 상태로 TASK-146 실측 CSS 유출 가드 전 6 라우트 통과 → reset.css 가 Astryx primary 버튼을 안 깬다는 것을 가드가 확인(가드 가치 재실증). **자기 정정 1건(반복 패턴)**: 첫 측정에서 `button.astryx-button` 첫 요소의 bg 가 transparent 라 'reset 이 Astryx 버튼 깸' 으로 오판했으나, 그 첫 요소는 Logout(ghost variant, 정상 투명)이었고 실제 Submit Build 는 rgb(126,129,243) 인디고 정상 — 엉뚱한 요소 잡고 회귀로 단정하는 측정 오류가 또 재발(TASK-140/141 계열). **결과**: main.tsx 원복(reset import 없음), 코드/테스트/번들 변경 0. TASK-136 의 미도입 판단이 데이터로 유효 확인됨(단, '위험해서'가 아니라 '무익해서'로 근거 정정). reset.css 검토는 본 태스크로 종결 — 재개 불필요.",
       "TASK-146 (실측 CSS 유출 가드 스크립트화, Code 도구): TASK-145 follow-up 1순위. 정적 lint(css-leak.test.ts)는 bare element 셀렉터만 잡는데 우리 CSS 사고의 절반은 **일반 클래스명 충돌**(TASK-140 .card 가 Astryx CodeBlock container='card' literal 클래스를 덮음)이라 정적으로 못 잡는다 — Astryx 가 런타임에 붙이는 클래스는 실브라우저에서만 안다. TASK-145 에서 그 회귀를 찾은 실측 로직을 재사용 가능한 opt-in 가드 scripts/check-css-leak.mjs 로 남김(B층 대비 가드와 동일 패턴 — Chrome channel / 인자 / 종료 코드). **검사 2종**: (1) 클래스 충돌 — 우리 **단독 클래스 규칙**(.card{})의 클래스명을 가진 요소가 동시에 Astryx 클래스(astryx-*/atomic)를 가지면 유출. (2) element 유출 — Astryx solid Button(대비색 글자)이 배경을 잃으면 우리 button reset 유출(TASK-145 시그니처). **정밀화**: 초판이 클래스 이름 존재만 봐서 .md(주석 DESIGN.md 오인) / .secondary(우리는 .preset-btn.secondary 복합으로만 씀)를 오탐 → 주석 제거 + 단독 클래스 셀렉터(.class 또는 .class:pseudo 하나로만 이뤄진 규칙)만 수집하도록 고침(복합/자손은 조상·형제가 함께 있어야 매칭돼 Astryx 를 우연히 안 덮음). **실증**: 정상 상태 전 6 라우트 통과 / TASK-145 회귀 재현(button reset 제외 제거) 시 Register(primary) 등 배경 소실 3건 검출. admin/runners 는 Register Runner 모달을 자동으로 열어 오버레이 버튼도 검사. **검증**: TSC clean / vitest 277 불변 / 가드 정상 통과·회귀 검출 실증 / package.json check:css-leak 등록. 코드 동작 변경 0(가드 도구+등록만), 백엔드 영향 0. **CSS 유출 방어가 2층 완성**: 정적 lint(항상, bare element) + 실측 가드(opt-in, 클래스 충돌+element 유출) — B층 대비 가드와 같은 A/B 구조.",
@@ -115,7 +116,7 @@
       "TASK-078 container self-dogfood (PR #28)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 111,
+    "handoff_rev": 112,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
     "index_rev": 100,
     "latest_rev": 48,
@@ -477,5 +478,17 @@
     }
   ],
   "memory_entries_count": 7,
-  "schema_version_memory_entries": "1"
+  "schema_version_memory_entries": "1",
+  "phase": {
+    "current": "Phase 2 진입 대기",
+    "phase_1": {
+      "status": "완료 (baseline 봉인)",
+      "release_anchor": "v0.2.0 (2026-07-22)",
+      "prev_anchor": "v0.1.0 (2026-07-20)",
+      "scope": "초기 시스템 구축 — 백엔드/영속화/API + runner + React 19+Astryx 프론트엔드 + 운영 가드 2계층 + 서버-프론트 계약 컴파일 타임 고정 + 시각 QA baseline. TASK-001~152 누적.",
+      "baseline": "vitest 277 / build-server 178 / go 8 pkg / TS 5 clean / 초기 index js gzip 134.64KB·css 24.08KB / migration 0001~0006 / 운영 가이드 37종 / 운영 가드 4종.",
+      "retrospective": "docs/PHASE-1-RETROSPECTIVE.md",
+      "release_notes": "docs/RELEASE_NOTES-2026-07-22.md"
+    }
+  }
 }

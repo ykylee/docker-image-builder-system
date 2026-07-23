@@ -6,6 +6,34 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 147→148: **Phase 1 완료 정리 — v0.2.0 baseline**).
+
+  TASK-152 봉인 직후, 사용자 결정에 따라 **Phase 1(초기 시스템 구축 국면)을 baseline 으로 긋고 Phase 2 진입을 준비**했다. Phase 1 = 백엔드/영속화/API + runner + React 19+Astryx 프론트엔드 + 운영 가드 2계층 + 서버-프론트 계약 고정 + 시각 QA baseline (TASK-001~152 누적).
+
+  ## 산출물 (6종)
+
+  1. **5 package.json bump** — `apps/build-server` / `apps/build-monitor` / `packages/shared-contract` / `packages/shared-config` / `packages/db` 를 `0.1.0` → `0.2.0` 통일 (각 1줄만 변경). `apps/runner` 는 Go module 이라 version field 없이 git tag 로 관리.
+  2. **git tag `v0.2.0`** — Phase 1 완료 anchor (annotated).
+  3. **CHANGELOG.md v0.2.0 전면 갱신** — v0.1.0 이후 코드 델타 = TASK-124~152 그룹 테이블 + 회귀 baseline 종합(TASK-088→v0.2.0) + follow-up 7종.
+  4. **docs/PHASE-1-RETROSPECTIVE.md 신규** — 정의 / 아키텍처 / 성과(마일스톤) / 회귀 baseline / 미결 / 교훈(반복 패턴 6종) / Phase 2 기준선.
+  5. **docs/RELEASE_NOTES-2026-07-22.md 신규** — v0.2.0 종합 리뷰 + 운영자 staging.
+  6. **시각 요약 아티팩트** — Phase 1 대시보드 (claude.ai artifact).
+
+  ## 실측 검증 (v0.2.0 baseline, 전 green)
+
+  - build-monitor `vitest run` → **277 PASS** (25 files)
+  - build-server `node --import tsx --test tests/*.test.ts` → **178 PASS** (42 suites)
+  - runner `go test ./...` → **8 pkg PASS**
+  - `tsc --noEmit` × 5 packages → **clean**
+  - `vite build` → 초기 index js gzip **134.64 KB** / css **24.08 KB** (lazy: BuildDetail 38.53 / buildColumns 9.85 / RegisterRunnerModal 5.74)
+  - 문서 무결성 가드 (staged) → PASS
+
+  ## 주의 / 미결
+
+  - **실이미지 빌드 e2e 미검증** — 본 로컬 Docker 미설치 + runner `RUNNER_DOCKER_BUILD_MODE=skeleton` 기본. compose.dev.*.yaml 기반 e2e 11종은 Docker 환경에서 별도 검증 필요.
+  - **Phase 2 진입 후보 7종** — 사후 알림 자동화 / visual baseline CI 통합 / 외부 object storage / 신규 기능 / Nextcloud Tasks / CI migration validation / 실이미지 e2e. (CHANGELOG §5 / 회고 §5)
+
+  workflow meta sync (state purpose_digest_rev 189→190, handoff_rev 111→112, phase 마커 신규, handoff doc 147→148) 같은 commit.
 - Updated: 2026-07-23 (rev 146→147: **TASK-152 완전 봉인 — 남은 5단계 완료**).
 
   이전 세션의 부분 봉인(rev 145→146, commit `bd1dfb7`)이 이월한 5단계를 본 세션에서 마무리했다. **주의**: 이전 handoff 는 "working tree 에 staged 변경 + untracked PNG 22개" 로 적혔으나, 실제로는 부분 봉인 commit `bd1dfb7` 가 이미 main 에 반영돼 **working tree 는 clean·origin/main 동기** 상태였고, `.visual/` baseline PNG 는 gitignore 대상이라 세션 종료 후 로컬에서 소거된 상태였다.
