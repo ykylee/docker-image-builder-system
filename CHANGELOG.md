@@ -107,7 +107,7 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 | vite build:react (gzip js, 초기 index) | n/a | 99.01 KB | **134.64 KB** | — |
 | vite build:react (gzip css, 초기 index) | n/a | 30.62 KB | **24.08 KB** | — |
 | postgres migration | 0001 | 0001~0006 | **0001~0006** | +5 |
-| e2e scripts | 0 | 9 | **9 + 실이미지 e2e ALL PASS** (TASK-153) | +9 |
+| e2e scripts | 0 | 9 | **13종 전수 PASS** (TASK-153/155) | +13 |
 | 운영 가이드 | 0 | 32 | **37** | +37 |
 | 운영 가드 (정적/실측) | 0 | 0 | **4종** (문서 무결성 / 대비 2계층 / CSS 유출 2계층 / 시각 QA) | +4 |
 
@@ -126,7 +126,9 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 | 5 | Nextcloud Tasks 통합 | (미정) | Phase 2 |
 | 6 | CI migration validation | GitHub Actions + `db-migrate.sh` | TASK-103 follow-up |
 | 7 | git tag 다음 version (v0.2.1 / v0.3.0) | (후속) | Phase 2 |
-| 8 | 실이미지 e2e 를 CI/nightly 에 통합 (Dockerfile 회귀 재발 방지) | 이미지 빌드 회귀 가드 | TASK-153 follow-up |
+| 8 | **e2e·visual baseline 의 CI/nightly 통합 (최우선)** | 회귀 재발 방지 | TASK-153/155 follow-up |
+
+> **TASK-154/155 (2026-07-23, post-tag 패치)**: dual vite config 통일(TASK-153 회귀의 구조적 원인 제거) + e2e 변종 **13/13 전수 PASS**. 그 과정에서 제품 결함 1건 발견·수정 — `claimNextBuild` 의 source-gate 가 legacy `build_source` 로만 판정해 **chunked 로 업로드된 build 가 영원히 claim 되지 않던** 결함(회귀 가드 3건, build-server 178→181). 실이미지 빌드 경로와 chunked claim 둘 다 "e2e 를 안 돌리면 잠복한다"가 실증돼 §8 이 최우선 후보가 됐다. v0.2.1 후보.
 
 > ~~실이미지 빌드 e2e 검증~~ — **TASK-153 (2026-07-23) 에서 해소** (Dockerfile 회귀 수정 + `e2e-production-semantic.sh` ALL PASS).
 

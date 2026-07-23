@@ -90,7 +90,7 @@ Phase 1 의 핵심 자산은 "회귀를 구조적으로 잡는 가드" 4종:
 | vite build (초기 index) | js gzip **134.64 KB** / css gzip **24.08 KB** | AppShell 셸 + Astryx atomic 포함 |
 | lazy chunks | BuildDetail 38.53 / buildColumns 9.85 / RegisterRunnerModal 5.74 (gzip) | 라우트 지연 로드 |
 | postgres migration | **0001~0006** | 9 테이블 |
-| e2e scripts | **9종** + 실이미지 e2e | `e2e-production-semantic.sh` 실이미지 빌드 **ALL PASS** (TASK-153, 2026-07-23) |
+| e2e scripts | **13종 전수 PASS** | 로컬 5 + compose 6 + runner 2. 실이미지 `docker build`/`run` 포함 (TASK-153/155) |
 | 손 CSS | **1,956줄** | Astryx 이관으로 2,323 → 1,956 |
 
 ## 5. 미결 / Phase 2 진입 후보
@@ -103,7 +103,7 @@ Phase 1 baseline 위에서 자연스럽게 이어질 후속:
 4. **신규 기능 추가** — (미정, Phase 2 축).
 5. **Nextcloud Tasks 통합** — (미정).
 6. **CI migration validation** — GitHub Actions + `db-migrate.sh`.
-7. ~~**실이미지 빌드 e2e 검증**~~ — **해소 (TASK-153, 2026-07-23)**. `e2e-production-semantic.sh` (실제 `docker build` busybox + `docker run` + HTTP 200 + 10 phase + container cleanup) **ALL PASS**. 검증 과정에서 루트 `Dockerfile` 의 build-monitor 빌드가 `vite build`(config 미지정)로 Svelte 잔재 config 를 잡아 이미지 빌드가 깨지던 회귀를 발견·수정 (`--config vite.react.config.ts` 명시 + `.dockerignore` 보강). React 이관 후 실이미지 e2e 를 한 번도 안 돌려 잠복했던 결함. (잔여: compose.dev.*.yaml 기반 나머지 e2e 변종의 전수 실행은 후속.)
+7. ~~**실이미지 빌드 e2e 검증**~~ — **해소 (TASK-153, 2026-07-23)**. `e2e-production-semantic.sh` (실제 `docker build` busybox + `docker run` + HTTP 200 + 10 phase + container cleanup) **ALL PASS**. 검증 과정에서 루트 `Dockerfile` 의 build-monitor 빌드가 `vite build`(config 미지정)로 Svelte 잔재 config 를 잡아 이미지 빌드가 깨지던 회귀를 발견·수정 (`--config vite.react.config.ts` 명시 + `.dockerignore` 보강). React 이관 후 실이미지 e2e 를 한 번도 안 돌려 잠복했던 결함. **후속 TASK-154/155 에서 e2e 변종 전수 실행까지 완료 — 13/13 PASS**(로컬 5 + compose 6 + runner 2). 그 과정에서 제품 결함 1건(chunked 로 업로드된 build 가 runner 에게 영원히 claim 되지 않던 source-gate 누락)과 e2e 인프라 결함 12건을 추가로 발견·수정했다.
 
 ## 6. 교훈 (Phase 1 반복 패턴)
 

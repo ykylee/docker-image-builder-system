@@ -6,6 +6,44 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 149→150: **TASK-154 + TASK-155 봉인 — dual vite config 통일 / e2e 13/13 전수 PASS / chunked claim 제품 결함 해소**).
+
+  사용자 요청 2건("dual vite config 통일", "나머지 e2e 변종 전수 실행")을 수행했고, 그 과정에서 **제품 결함 1건 + e2e 인프라 결함 12건**을 발견·수정했다.
+
+  ## TASK-154 — dual vite config 통일 (commit `e0f2c81`)
+
+  build-monitor 가 `vite.config.ts`(dev+test, root 미설정 → stale 루트 index.html 로 **build 불가**)와 `vite.react.config.ts`(build, root=react/)로 이원화돼 있었다. **이 틈이 TASK-153 이미지 빌드 회귀의 구조적 원인**이었다.
+  - 단일 canonical `vite.config.ts` 로 병합: root=react/ + `build.outDir=dist-react` + publicDir + server(5174) + test(vitest, setupFiles 절대경로).
+  - 제거: `vite.react.config.ts` / 루트 `index.html`(→`/src/main.ts` Svelte 엔트리) / `svelte.config.js` / 미추적 `src/`.
+  - 갱신: `package.json`(플래그 없는 `vite`/`vite build`, `:react` 별칭은 e2e-single-port.sh 힌트 호환 유지) / `tsconfig.react.json` / `Dockerfile`(plain `vite build`) / visual README + ops 가이드.
+  - 검증: vitest 277 / TS 5 clean / 번들 동일(index js gzip 134.64KB) / 실이미지 e2e ALL PASS.
+
+  ## TASK-155 — e2e 전수 실행 + 제품 결함 (commits `f4e6010`, `615c013`)
+
+  ### 제품 결함: chunked 업로드 build 가 claim 되지 않음
+  `claimNextBuild` 의 source-gate(TASK-080)가 legacy `build_source` 로만 inner join 해 자격을 판정했다. 그런데 TASK-106 chunked 업로드는 **첫 chunk 에서 그 legacy row 를 삭제**하고 `build_source_chunk` 에 쓴다 → chunked 로 올린 build 는 **영원히 claim 되지 않고 QUEUED/REQUEST_ACCEPTED 로 정체**(runner 3대가 5s 주기로 정상 폴링, `legacy_rows=0 / chunk_rows>=1` 로 실증).
+  - 수정: postgres/memory 양쪽 자격을 `(legacy 존재) OR (chunk>=1 AND 누적 size >= 선언 total)` 로 확장. `EXISTS(chunk)` 를 AND 로 함께 걸어 chunk 0건 + sizeBytes 0 인 build 가 `0>=0` 으로 가드를 뚫는 것을 차단.
+  - 회귀 가드 3건 신규 → build-server **178 → 181**.
+  - 잠복 이유: chunked 업로드 + claim 을 함께 타는 e2e 가 하나뿐인데 그 스크립트가 `--build` 없이 **stale 이미지만 검증**해왔다.
+
+  ### e2e 인프라 결함 12건
+  `REPO_ROOT` off-by-one / `tsc -p` 다중 project(TS5042) / 엉터리 `DATABASE_URL`(`postgres://memory://test`) / 검증 psql 포트 하드코딩 / 고정 appName 재실행 충돌(409) / 잘못된 단언 전제(cap 은 `ceil(total/1024)` **개수** 기준) / `schema_migrations` 컬럼명(`version_num`→`version`, `2>/dev/null` 가 원인 은폐) / 큰따옴표 안 백틱 명령치환 / **`--build` 누락 2건** / **죽은 cleanup trap**(`COMPOSE_PID` 미할당 → 실패 런이 postgres 볼륨을 남겨 고정 project name 탓에 `buildsClaimed` 가 런 간 누적 5→10→15) / flaky 분배 단언(서버가 `active_build_exists` 로 동시 1건만 처리 → 타이밍 의존, 경고로 강등) / `compose.dev.yaml` postgres 호스트 포트 하드코딩(`5432:5432` → `${DIBS_POSTGRES_HOST_PORT:-5432}`).
+
+  ### 최종 검증 — **e2e 13/13 PASS, 0 FAIL**
+  로컬 5(source-archive ×2 / chunked ×2 / single-port) + compose 6(production-semantic ×2 / multi-runner ×3 / insecure-registry) + runner 2(container-run / deploy-push). 실이미지 `docker build`+`docker run` 경로 포함.
+
+  ## 회귀 baseline
+  frontend vitest **277** / build-server **181** / runner go **8 pkg** / TS 5 packages clean / vite build 초기 index js gzip 134.64KB·css 24.08KB / e2e **13/13**.
+
+  ## 환경 정리
+  docker 이미지 302→95개(54.4GB→14.1GB), 빌드 캐시 5.3GB→137MB — **약 45GB 회수**. 중지 컨테이너 23개·볼륨 41개는 다른 프로젝트(devhub/bamboo 등) 데이터가 섞여 있어 **의도적으로 미정리**.
+
+  ## follow-up
+  - **e2e·visual baseline 의 CI/nightly 통합** — 실이미지 빌드 경로(TASK-153)와 chunked claim(TASK-155) 둘 다 "e2e 를 안 돌리면 잠복한다"가 실증됐다. 최우선 후보.
+  - 사후 알림 자동화 / 외부 object storage / 신규 기능 / Nextcloud Tasks / CI migration validation.
+  - v0.2.1 태깅 여부(사용자 결정 대기) — TASK-153/154/155 는 v0.2.0 이후 패치.
+
+  workflow meta sync (state purpose_digest_rev 191→192, handoff_rev 113→114, backlog index 85→86·latest 63→64, handoff doc 149→150, work_backlog 107→108, daily rev 29→30 §31·§32) 같은 commit.
 - Updated: 2026-07-23 (rev 148→149: **TASK-153 실이미지 빌드 e2e 검증 + Dockerfile 회귀 수정 — Phase 1 유일 미결 해소**).
 
   사용자가 "실이미지 e2e 검증 위해 docker 설치부터 안내" 요청. **확인 결과 환경엔 Docker 29.1.3 + compose v2 가 이미 설치·구동 중**(Ubuntu 25.10, user 가 `docker` 그룹) — CLAUDE.md 의 "Docker 미설치" 노트가 **outdated 였음**(정정). 설치 대신 `e2e-production-semantic.sh` (RUNNER_DOCKER_BUILD_MODE=cli) 실행.
