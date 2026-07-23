@@ -6,9 +6,25 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 160→161: **원격 발산 조정 + k8s adapter 이식 (TASK-164)**).
 - Updated: 2026-07-23 (rev 159→160: **P2-M4 완료 — 소비자 정렬 + skill_mcp 실서버 검증 신설 (TASK-163)**).
 
-  ## 핵심 — 실서버 검증을 만들었더니 즉시 결함 3건이 나왔다
+  ## 핵심 (rev 161) — 원격이 로컬과 다른 축으로 갈라져 있었고, k8s 어댑터만 건져 왔다
+  원격 `origin/main` 이 P2-M1 완료(`060cc0b`) 이후 로컬과 **다른 축**으로 발산해 있었다(로컬 3커밋 vs 원격 12커밋, 33파일 충돌). 진단 결과 **같은 작업 중복이 아니라 설계 분기**였다:
+  - **로컬 라인**: preview-era 완전 청산 — 엔드포인트 `/container-test/{start,result}` 통합 + errorCode 채널 + skill_mcp 실서버 검증 + NullableBuildError (M2→M3→M4)
+  - **원격 라인**: preview 최소 rename(`/preview`+`/test-deployment/*` 유지) + 실제 **k8s 배포 어댑터** (M2 얕게 + M3=k8s)
+
+  엔드포인트 설계가 정면 대립(`/container-test/*` vs `/preview+/test-deployment/*`)해 자동 병합 불가, 어느 쪽도 상위집합이 아니었다. **사용자 결정**: 로컬 baseline(청산 축이 더 앞섬) 유지 + 원격 고유분(k8s adapter)만 이식.
+
+  **이식**(`6014322`): `deploy/k8s.go`+`k8s_test.go`(그대로) / `config.go` `RUNNER_K8S_*` env 4종 / `build_service.go` k8sDeployer 필드+`WithK8sDeployer`+`deployImage` k8s 분기. 원격은 `ProcessClaim` 인라인 raw-error 방식이었으나 로컬은 `deployImage` 가 `*stageFailure` 반환 구조라 로컬 컨벤션(단일 `fail()`)에 맞춰 재작성. **프로덕션 미배선**(worker/main 미주입 → nil skip)이라 기존 동작 불변 — skeleton 단계.
+
+  **원격 반영**: `merge -s ours`(원격 12커밋을 히스토리상 흡수, 트리는 로컬 유지 = 원격 엔드포인트/계약 변경분 의도적 폐기, `7c85a18`) 후 **일반 push(비파괴, force-push 없음)**. 검증: `go build`/`vet` clean / `go test ./...` **8 pkg PASS**(신규 k8s 테스트 deploy 6 + services 5).
+
+  **다음 세션 주의**:
+  - k8s adapter 는 **skeleton(noop + ResultRef emit)** — P2-M5 에서 실제 k8s client-go 구현 + worker 배선(`cfg.K8sMode` 분기) 필요. P2-M5 결정 ①(배포 adapter 대상)은 사실상 **k8s 로 seed** 됨(원격도 §8 에서 k8s 로 봉인했었음).
+  - 원격 엔드포인트/계약 라인은 폐기됨 — **협업자가 그 라인 기준으로 작업 중이었다면** 로컬 계약(`/container-test/*`)으로 재정렬이 필요하다.
+
+  ## 핵심 (rev 160) — 실서버 검증을 만들었더니 즉시 결함 3건이 나왔다
   Phase 2 컨셉 §7 의 리스크("skill_mcp 가 단위 테스트만 통과 — 실서버 미검증")가 P2-M4 의 완료 기준이었다. `apps/skill_mcp/scripts/verify-live-server.sh` 를 신설했다 — build-server 를 띄우고 HTTP 로 빌드를 몰아 **서버의 실제 응답을 그대로** 스킬 입력으로 넣는다(happy path + failure path).
 
   | # | 결함 | 증상 |
