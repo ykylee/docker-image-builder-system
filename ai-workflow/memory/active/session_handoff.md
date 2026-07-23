@@ -6,6 +6,30 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 158→159: **TASK-161 P2-M2 착수 — 서버 정렬 + test-deployment 엔드포인트 재설계, plan 단계**).
+
+  ## 정지작업 3건 + 사용자 결정 2건
+  - 결정 (a) **endpoint path 의 preview 단어는 유지** (payload 의 `previewUrl` → `runtimeUrl` 정렬만). 후속 cycle 에서 path 재설계 재검토.
+  - 결정 (b) **메서드명 canonical 화** — `reportPreviewStatus` → `reportContainerTestResult`, `queueTestDeployment` → `startContainerTest`, `getTestDeployment` → 제거 (consumer 0).
+  - 정지 (1) **계약 선행 원칙 재확인**: shared-contract → server → frontend → runner → skill_mcp 순서 (TASK-130/151 의 회귀 막기 — 단일 commit 폭발 금지).
+  - 정지 (2) **live vs read-only endpoint 분류**: live (POST /preview, POST /test-deployment/ready, POST /test-deployment/status) 는 runner 가 호출하므로 **유지**, read-only (GET /test-deployment) 는 build-monitor/skill_mcp/e2e 모두 consumer 0 으로 **즉시 제거**.
+  - 정지 (3) GET endpoint **제거 결정 확정**.
+
+  ## 5 Step 작업 계획
+  - Step 1 shared-contract (`previewUrl` → `runtimeUrl`, `previewStatuses` enum 제거, `TestDeployment` DTO 정리, **3-way canonical 동시**)
+  - Step 2 build-server (메서드명 정렬, `executionToPreviewStatus` 어댑터 제거, GET /test-deployment 제거)
+  - Step 3 runner (hostclient endpoint path / 페이로드 정렬, 내부 변수 `previewUrl` → `runtimeUrl`)
+  - Step 4 build-monitor (openapi.d.ts 재생성 + 사용처 정렬)
+  - Step 5 skill_mcp (`previewStatuses` / `previewUrl` fallback 코드 제거, `contract_drift_checker` §6 제거)
+
+  ## 산출물
+  - 신규 일일 백로그 `ai-workflow/memory/active/backlog/2026-07-23.md` (정지작업 + Step 별 작업 + 검증 기준 + follow-up).
+
+  ## 현재 상태
+  **plan 단계 완료**. Step 1 코드 작업부터 후속 commit. SQL / schema / migration / version / git tag / 코드 변경 0 — plan only.
+
+  workflow meta sync (state purpose_digest_rev 200→201, handoff_rev 122→123, task_count 67→68, latest_backlog 2026-07-21→2026-07-23, work_backlog 116→117) 같은 commit.
+
 - Updated: 2026-07-23 (rev 157→158: **Doc-sync — v0.2.1 의 진짜 범위(TASK-156~160/P2-M1)를 운영자/사용자가 볼 수 있도록 문서 동기화**).
 
   ## 동기화 대상 4건
