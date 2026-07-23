@@ -12,10 +12,6 @@ export const buildRequestTable = pgTable("build_request", {
   requestedBy: text("requested_by").notNull(),
   status: text("status").notNull(),
   phase: text("phase").notNull(),
-  // Legacy preview-era field. Retained during TASK-053 so the current
-  // repository/service paths continue to work while build_test /
-  // deployment_attempt adoption is phased in.
-  previewStatus: text("preview_status").notNull(),
   phaseHistory: jsonb("phase_history")
     .$type<Array<{ phase: string; completedAt: string }>>()
     .notNull()
@@ -25,9 +21,6 @@ export const buildRequestTable = pgTable("build_request", {
   sourceArchiveSizeBytes: integer("source_archive_size_bytes").notNull(),
   entrypointPath: text("entrypoint_path").notNull(),
   dockerfilePath: text("dockerfile_path").notNull(),
-  // Legacy preview runtime retention knob. Canonical test lifecycle data
-  // moves to build_test; this stays until the route/service migration lands.
-  previewTtlMinutes: integer("preview_ttl_minutes").notNull(),
   metadata: jsonb("metadata").$type<Record<string, string>>().notNull(),
   // Legacy preview-era runtime URL. Canonical runtime/deploy refs will move
   // into build_test.runtime_url / deployment_attempt.result_ref.

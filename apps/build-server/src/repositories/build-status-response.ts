@@ -79,64 +79,34 @@ function mapPreviewStatusToExecutionStatus(
 }
 
 function buildTestResult(
-  summary: BuildSummary,
-  testDeployment: TestDeployment | null,
   buildTest?: BuildTestSnapshot | null
 ): ContainerTestResult {
-  if (buildTest) {
+  // TASK-160 (P2-M1 Step 3): canonical `build_test` 전용으로 축소.
+  //
+  // 이전에는 buildTest 가 없으면 legacy `testDeployment.status` /
+  // `summary.previewStatus` 로 폴백했다. 그 shim 이 제거됐고, memory /
+  // postgres **양쪽 저장소 모두 build_test 를 채우므로** 폴백이 필요 없다.
+  // buildTest 가 없다 = 아직 컨테이너 테스트를 시작하지 않았다.
+  if (!buildTest) {
     return {
-      status: buildTest.status,
-      containerRunning:
-        buildTest.status === "SUCCESS"
-          ? true
-          : buildTest.status === "FAILED"
-            ? false
-            : null,
-      healthCheckPassed: buildTest.healthCheckPassed ?? null,
-      portOpen: buildTest.portOpen ?? null,
-      stabilityWindowPassed: buildTest.stabilityWindowPassed ?? null
-    };
-  }
-
-  const previewStatus = testDeployment?.status ?? summary.previewStatus;
-  const status = mapPreviewStatusToExecutionStatus(previewStatus);
-
-  if (status === "NOT_STARTED") {
-    return {
-      status,
+      status: "NOT_STARTED",
       containerRunning: null,
       healthCheckPassed: null,
       portOpen: null,
       stabilityWindowPassed: null
     };
   }
-
-  if (status === "FAILED") {
-    return {
-      status,
-      containerRunning: false,
-      healthCheckPassed: null,
-      portOpen: false,
-      stabilityWindowPassed: null
-    };
-  }
-
-  if (status === "SUCCESS") {
-    return {
-      status,
-      containerRunning: true,
-      healthCheckPassed: null,
-      portOpen: true,
-      stabilityWindowPassed: previewStatus === "EXPIRED" ? true : null
-    };
-  }
-
   return {
-    status,
-    containerRunning: null,
-    healthCheckPassed: null,
-    portOpen: null,
-    stabilityWindowPassed: null
+    status: buildTest.status,
+    containerRunning:
+      buildTest.status === "SUCCESS"
+        ? true
+        : buildTest.status === "FAILED"
+          ? false
+          : null,
+    healthCheckPassed: buildTest.healthCheckPassed ?? null,
+    portOpen: buildTest.portOpen ?? null,
+    stabilityWindowPassed: buildTest.stabilityWindowPassed ?? null
   };
 }
 
@@ -215,7 +185,7 @@ export function buildStatusResponseFromState(input: {
       finishedAt: isTerminalPhase(summary.phase) ? summary.updatedAt : null
     },
     image: null,
-    test: buildTestResult(summary, input.testDeployment ?? null, input.buildTest ?? null),
+    test: buildTestResult(input.buildTest ?? null),
     deploy: buildDeployResult(input.deploymentAttempt ?? null),
     resultDelivery: buildResultDelivery({
       summary,

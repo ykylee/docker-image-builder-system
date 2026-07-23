@@ -37,16 +37,17 @@ export const buildSummarySchema = z
     }),
     status: z.enum(buildStatuses).meta({
       description:
-        "Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility."
+        "Current top-level build status (canonical lifecycle). TASK-159 에서 legacy adapter status(CLAIMED/TEST_READY)를 제거해 canonical 과 동일해졌다."
     }),
     phase: z.enum(buildPhases),
-    previewStatus: z.enum(previewStatuses).meta({
-      description:
-        "Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks."
-    }),
+    // TASK-160 (P2-M1 Step 3): `previewStatus` shim 제거. canonical `test`
+    // 블록(ContainerTestResult.status)이 이 역할을 완전히 대신한다.
+    // `previewUrl` 은 **실제 런타임 URL 을 나르는 유일한 필드**라 남긴다 —
+    // canonical 이름(`runtimeUrl`, build_test 컬럼명)으로의 정렬은
+    // test-deployment 엔드포인트 재설계와 결합돼 있어 P2-M2 에서 함께 한다.
     previewUrl: z.string().url().nullable().meta({
       description:
-        "Legacy preview-era field. Represents the temporary runtime endpoint used by the current test-deployment adapter."
+        "Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign."
     }),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:

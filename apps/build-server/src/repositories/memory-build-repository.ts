@@ -140,7 +140,6 @@ export function createMemoryBuildRepository(): BuildRepository {
         appName: input.appName,
         status: "QUEUED",
         phase: "REQUEST_ACCEPTED",
-        previewStatus: "NOT_REQUESTED",
         previewUrl: null,
         createdAt: timestamp,
         updatedAt: timestamp
@@ -455,7 +454,6 @@ export function createMemoryBuildRepository(): BuildRepository {
       build.summary = {
         ...enrichBuildSummary(build.summary),
         phase: "CONTAINER_TEST_STARTED",
-        previewStatus: "QUEUED",
         previewUrl: null,
         updatedAt: timestamp
       };
@@ -556,7 +554,6 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       build.summary = {
         ...enrichBuildSummary(build.summary),
-        previewStatus: status,
         previewUrl: next.previewUrl,
         phase: nextPhase as BuildPhase,
         status: nextStatus,

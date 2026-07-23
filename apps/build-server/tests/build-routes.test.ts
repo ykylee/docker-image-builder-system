@@ -314,7 +314,6 @@ describe("POST /builds/:buildId/test-deployment/ready", () => {
     assert.equal(res.statusCode, 200);
     const body = res.json();
     assert.equal(body.build.status, "TEST_SUCCESS");
-    assert.equal(body.build.previewStatus, "READY");
     assert.equal(body.build.phase, "CONTAINER_TEST_PASSED");
     assert.equal(body.build.previewUrl, "http://preview.local/x");
     assert.equal(body.build.lifecycleStatus, "TEST_SUCCESS");

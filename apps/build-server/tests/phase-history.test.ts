@@ -16,7 +16,6 @@ function buildSummary(overrides: Partial<BuildSummary> = {}): BuildSummary {
     appName: "app-1",
     status: "QUEUED",
     phase: "REQUEST_ACCEPTED",
-    previewStatus: "NOT_REQUESTED",
     previewUrl: null,
     createdAt: "2026-07-03T00:00:00.000Z",
     updatedAt: "2026-07-03T00:00:00.000Z",

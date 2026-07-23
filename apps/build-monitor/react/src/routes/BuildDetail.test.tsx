@@ -7,7 +7,7 @@
 //   - 4 block (lifecycle / test / deploy / resultDelivery) + meta header
 //   - PhaseTimeline mount + 11 phase list (TASK-150: shared-contract 와 정합)
 //   - LogStream mount + entries
-//   - Legacy preview block (deprecated badge + previewStatus/previewUrl)
+//   - Container test block 의 Runtime URL 노출 (TASK-160: legacy preview block 제거)
 //   - BuildSummary lifecycleStatus 우선 표시
 //
 // getBuildLogs 실패는 .catch(() => null) 로 silent — LogStream entries 빈
@@ -38,7 +38,6 @@ const MOCK_BUILD: api.BuildStatusResponse = {
     status: "BUILD_SUCCESS",
     phase: "DOCKER_BUILD_COMPLETED",
     lifecycleStatus: "TESTING",
-    previewStatus: "READY",
     previewUrl: "http://127.0.0.1:32770/health",
     createdAt: "2026-07-08T10:00:00.000Z",
     updatedAt: "2026-07-08T10:05:00.000Z"
@@ -274,19 +273,20 @@ describe("BuildDetail", () => {
     expect(emptyPre.textContent?.replace(/[\d\s\u200B-\u200D\uFEFF]/g, "")).toBe("");
   });
 
-  it("renders Legacy preview block with deprecated badge + preview fields", async () => {
+  it("Container test 블록이 런타임 URL 을 노출한다 (TASK-160)", async () => {
+    // deprecated "Legacy preview" 섹션을 제거하면서 런타임 URL 을 canonical
+    // Container test 블록으로 옮겼다. previewStatus 는 test.status 가 대신한다.
     vi.mocked(api.getBuild).mockResolvedValue(MOCK_BUILD);
     vi.mocked(api.getBuildLogs).mockResolvedValue(MOCK_LOGS);
 
     renderAt("test-build-0001-1111-2222-333344445555");
 
     await waitFor(() => {
-      expect(screen.getByTestId("block-legacy-preview")).toBeInTheDocument();
+      expect(screen.getByTestId("block-test")).toBeInTheDocument();
     });
 
-    expect(screen.getByText(/Legacy preview/)).toBeInTheDocument();
-    expect(screen.getByText("deprecated")).toBeInTheDocument();
-    expect(screen.getByText("READY")).toBeInTheDocument(); // previewStatus
+    expect(screen.queryByTestId("block-legacy-preview")).not.toBeInTheDocument();
+    expect(screen.getByText("Runtime URL")).toBeInTheDocument();
     expect(
       screen.getByText("http://127.0.0.1:32770/health")
     ).toBeInTheDocument();

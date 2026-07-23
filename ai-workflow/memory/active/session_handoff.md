@@ -6,6 +6,34 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-23 (rev 156→157: **P2-M1 완료 — Step 3 legacy 응답 필드 + DB 컬럼 제거 (TASK-160)**).
+
+  ## 제거한 것
+  `buildSummary.previewStatus` / `buildRequest.previewTtlMinutes` / DB 컬럼 `preview_status`·`preview_ttl_minutes`(**migration 0007**) / dead `packages/db/src/schema/test-deployment.ts`(사용처 0).
+
+  ## 핵심 설계 — buildTestResult 를 canonical 전용으로 축소
+  이전에는 `buildTest` 가 없으면 legacy `previewStatus` 로 폴백했다. **memory·postgres 양쪽 다 `build_test` 를 채우므로** 폴백이 불필요했다(근거: `test.healthCheckPassed` 는 canonical 분기에서만 나오는 값인데 e2e 가 True 를 실측한다). 이제 buildTest 부재 = 아직 테스트 시작 안 함 = `NOT_STARTED`.
+
+  ## 의도적으로 남긴 것 → **P2-M2 로 이월**
+  엔드포인트 재설계와 결합돼 분리할 수 없는 것들이다:
+  - `previewUrl` — 컨테이너 **런타임 URL 을 나르는 유일한 필드**다. canonical 이름(`runtimeUrl`, `build_test` 컬럼명)으로의 정렬은 test-deployment 엔드포인트와 함께 간다.
+  - `previewStatuses` enum — `testDeploymentSchema.status` 가 쓴다.
+  - `TestDeployment` 및 queue/ready/status 요청·응답 DTO 일가 — runner 가 실제로 호출하는 **live 엔드포인트의 계약**이다.
+  - **임시 어댑터 `executionToPreviewStatus`** (postgres 저장소) — previewStatus 컬럼이 사라져 TestDeployment 응답의 status 를 `build_test` 에서 유도해야 했다. P2-M2 에서 엔드포인트와 함께 제거할 것.
+  - `reportPreviewStatus`/`queueTestDeployment`/`getTestDeployment` 메서드명.
+  - 참고: `GET /builds/:id/test-deployment` 는 **소비자 0**(build-monitor·skill_mcp·e2e 어디서도 호출 안 함)이고 canonical `test` 블록과 중복이라 **제거 후보**다.
+
+  ## UI
+  deprecated "Legacy preview" 섹션 제거 → 런타임 URL 을 canonical **Container test** 블록으로 이동. BuildRequest 폼의 `previewTtlMinutes` 필드 제거.
+
+  ## 검증
+  TS 5 clean / build-server **181** / build-monitor **273** / go **8 pkg** / skill_mcp **222** / **e2e 13/13 PASS (290s)**.
+  compose postgres e2e 가 migration `0001~0007` 을 적용한 뒤 정상 동작해 컬럼 drop 을 실증한다.
+
+  ## P2-M1 완료 — 다음은 P2-M2 (서버 정렬)
+  build-server 의 repository/service/routes/OpenAPI 를 canonical 로 재정렬하고 **test-deployment 엔드포인트 3종을 재설계**한다. 위 "이월" 목록이 그 작업 목록이다.
+
+  workflow meta sync (state 198→199, handoff_rev 120→121, handoff doc 156→157, work_backlog 114→115) 같은 commit.
 - Updated: 2026-07-23 (rev 155→156: **P2-M1 Step 2 봉인 — legacy status 제거 (TASK-159)**).
 
   `legacyBuildStatuses`(CLAIMED, TEST_READY) / `previewStatuses` 정의를 **TS·Go·Python 3계층에서 삭제**하고 사용처를 canonical 로 치환했다 — `CLAIMED → PREPARING_SOURCE`, `TEST_READY → TEST_SUCCESS`.

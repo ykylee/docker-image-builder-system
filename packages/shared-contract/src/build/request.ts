@@ -50,7 +50,9 @@ export const buildRequestSchema = z
     sourceArchive: sourceArchiveSchema,
     entrypointPath: z.string().min(1),
     dockerfilePath: z.string().min(1).default("Dockerfile"),
-    previewTtlMinutes: z.int().positive().default(60),
+    // TASK-160 (P2-M1 Step 3): `previewTtlMinutes` 제거. preview 런타임의
+    // 보존 시간 knob 이었으나 canonical build/test/deploy 모델에는 대응
+    // 개념이 없고 실제로 소비되는 곳도 없었다.
     metadata: z.record(z.string(), z.string()).default({})
   })
   .meta({ id: "BuildRequest", description: "POST /builds payload (Skill → Host)." });

@@ -47,7 +47,6 @@ describe("MemoryBuildRepository: queueTestDeployment", () => {
     assert.equal(result.kind, "queued");
     if (result.kind !== "queued") return;
     assert.equal(result.response.build.phase, "CONTAINER_TEST_STARTED");
-    assert.equal(result.response.build.previewStatus, "QUEUED");
     assert.equal(result.testDeployment.status, "QUEUED");
     assert.equal(result.testDeployment.internalPort, 8080);
     assert.ok(result.testDeployment.expiresAt);

@@ -157,8 +157,7 @@ export function BuildDetail(): ReactElement {
 
       {/* TASK-060: canonical build/test/deploy/result-delivery sections.
        * Build lifecycle / Container test / Deployment / Result delivery 가
-       * source of truth. legacy preview-* 는 아래 deprecated section 으로
-       * 분리. */}
+       * source of truth. (TASK-160 에서 legacy preview-* 섹션 제거) */}
       <section className="block" data-testid="block-lifecycle">
         <h2>Build lifecycle</h2>
         <dl className="kv">
@@ -187,6 +186,13 @@ export function BuildDetail(): ReactElement {
           <div>
             <dt>Status</dt>
             <dd className="mono">{build.test?.status ?? "NOT_STARTED"}</dd>
+          </div>
+          {/* TASK-160: deprecated "Legacy preview" 섹션을 제거하면서 런타임 URL 을
+              canonical 블록으로 옮겼다. 필드명 previewUrl → runtimeUrl 정렬은
+              test-deployment 엔드포인트 재설계(P2-M2)와 함께 간다. */}
+          <div>
+            <dt>Runtime URL</dt>
+            <dd className="mono">{build.build.previewUrl ?? "—"}</dd>
           </div>
           <div>
             <dt>Container running</dt>
@@ -271,28 +277,6 @@ export function BuildDetail(): ReactElement {
           phaseHistory={build.phaseHistory ?? []}
           currentPhase={build.currentPhase ?? null}
         />
-      </section>
-
-      {/* Legacy preview-era fields — TASK-060 follow-up 에서 제거 예정. */}
-      <section className="block deprecated" data-testid="block-legacy-preview">
-        <h2>
-          Legacy preview <span className="badge">deprecated</span>
-        </h2>
-        <dl className="kv">
-          <div>
-            <dt>Preview status</dt>
-            <dd className="mono">{build.build.previewStatus}</dd>
-          </div>
-          <div>
-            <dt>Preview URL</dt>
-            <dd className="mono">{build.build.previewUrl ?? "—"}</dd>
-          </div>
-        </dl>
-        <p className="muted small">
-          Source of truth: see the <strong>Container test</strong> and
-          <strong> Deployment</strong> sections above. Removal planned once
-          admin / build-list consumers stop reading these legacy fields.
-        </p>
       </section>
 
       <section className="block" data-testid="block-logs">

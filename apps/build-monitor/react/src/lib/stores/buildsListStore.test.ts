@@ -42,7 +42,6 @@ describe("useBuildsListStore", () => {
           appName: "a",
           status: "BUILDING",
           phase: "REQUEST_ACCEPTED",
-          previewStatus: "NOT_REQUESTED",
           previewUrl: null,
           createdAt: "2026-07-08T10:00:00.000Z",
           updatedAt: "2026-07-08T10:00:00.000Z"
@@ -110,7 +109,6 @@ describe("useBuildsListStore", () => {
           appName: "x",
           status: "BUILDING",
           phase: "REQUEST_ACCEPTED",
-          previewStatus: "NOT_REQUESTED",
           previewUrl: null,
           createdAt: "2026-07-08T10:00:00.000Z",
           updatedAt: "2026-07-08T10:00:00.000Z"

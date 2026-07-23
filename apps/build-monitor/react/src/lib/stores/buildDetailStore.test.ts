@@ -33,7 +33,6 @@ const SAMPLE_BUILD: api.BuildStatusResponse = {
     appName: "test-app",
     status: "BUILD_SUCCESS",
     phase: "DOCKER_BUILD_COMPLETED",
-    previewStatus: "READY",
     previewUrl: "http://localhost:32770/health",
     createdAt: "2026-07-08T10:00:00.000Z",
     updatedAt: "2026-07-08T10:05:00.000Z"

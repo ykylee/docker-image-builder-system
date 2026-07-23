@@ -49,7 +49,6 @@ interface FormState {
   sizeBytes: number;
   entrypointPath: string;
   dockerfilePath: string;
-  previewTtlMinutes: number;
 }
 
 const DEFAULT_FORM: FormState = {
@@ -60,7 +59,6 @@ const DEFAULT_FORM: FormState = {
   sizeBytes: 0,
   entrypointPath: "src/index.ts",
   dockerfilePath: "Dockerfile",
-  previewTtlMinutes: 60
 };
 
 /**
@@ -152,16 +150,10 @@ const FIELDS: readonly {
     placeholder: "Dockerfile",
     hint: "Default 'Dockerfile'.",
     testId: "req-dockerfile"
-  },
-  {
-    key: "previewTtlMinutes",
-    label: "previewTtlMinutes",
-    errorPath: "previewTtlMinutes",
-    kind: "number",
-    required: false,
-    hint: "Preview container TTL.",
-    testId: "req-ttl"
   }
+  // TASK-160 (P2-M1 Step 3): previewTtlMinutes 필드 제거. preview 런타임의
+  // 보존 시간 knob 이었으나 canonical build/test/deploy 모델에 대응 개념이
+  // 없고 서버 계약(BuildRequest)에서도 사라졌다.
 ];
 
 function makePreset(
@@ -179,7 +171,6 @@ function makePreset(
       sizeBytes: 12345,
       entrypointPath: "src/index.ts",
       dockerfilePath: "Dockerfile",
-      previewTtlMinutes: 60
     };
   }
   if (kind === "minimal") {
@@ -191,7 +182,6 @@ function makePreset(
       sizeBytes: 4096,
       entrypointPath: "main.py",
       dockerfilePath: "Dockerfile",
-      previewTtlMinutes: 15
     };
   }
   return {
@@ -202,7 +192,6 @@ function makePreset(
     sizeBytes: 102400,
     entrypointPath: "src/server.ts",
     dockerfilePath: "Dockerfile",
-    previewTtlMinutes: 60
   };
 }
 
@@ -256,7 +245,6 @@ export function BuildRequest(): ReactElement {
         },
         entrypointPath: form.entrypointPath,
         dockerfilePath: form.dockerfilePath,
-        previewTtlMinutes: form.previewTtlMinutes
       },
       null,
       2
@@ -292,7 +280,6 @@ export function BuildRequest(): ReactElement {
     const sizeBytesValue = Number(form.sizeBytes);
     const entrypointValue = form.entrypointPath;
     const dockerfileValue = form.dockerfilePath;
-    const previewTtlValue = Number(form.previewTtlMinutes);
 
     // form validation — zod 가 backend 에서도 검증하지만 client-side sanity
     // check 로 빠르게 피드백. BuildRequest schema 그대로. native form
@@ -334,12 +321,6 @@ export function BuildRequest(): ReactElement {
         message: "Required. Default 'Dockerfile'."
       });
     }
-    if (!Number.isInteger(previewTtlValue) || previewTtlValue <= 0) {
-      errs.push({
-        path: "previewTtlMinutes",
-        message: "Positive integer. Default 60."
-      });
-    }
     if (errs.length > 0) {
       setSubmitFieldErrors(errs);
       return;
@@ -357,7 +338,6 @@ export function BuildRequest(): ReactElement {
         },
         entrypointPath: entrypointValue,
         dockerfilePath: dockerfileValue,
-        previewTtlMinutes: previewTtlValue,
         metadata: {}
       };
       const result = await submitBuildRequest(payload);

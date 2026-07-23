@@ -3,7 +3,7 @@
 - 문서 목적: Phase 2 의 축·범위·마일스톤·완료 기준을 하나의 기준으로 정의한다. Phase 1 종료(v0.2.0/v0.2.1) 이후의 개발 방향 단일 출처.
 - 범위: 컨셉 근거(원 설계 대비 격차 실측), 마일스톤 P2-M1~M5, 순서와 완료 기준, 리스크
 - 대상 독자: 프로젝트 리드, 각 계층 구현자, AI agent
-- 상태: draft (P2-M1 Step 1 완료 반영)
+- 상태: draft (**P2-M1 완료** 반영)
 - 최종 수정일: 2026-07-23
 - 진입 baseline: **v0.2.1** (2026-07-23)
 - 관련 문서: [Phase 1 회고](./PHASE-1-RETROSPECTIVE.md), [Step 15 로드맵](./sdlc/15-refactoring-roadmap-and-milestones.md), [CHANGELOG](../CHANGELOG.md)
@@ -76,13 +76,15 @@ Step 15 의 M1~M5 잔여분을 Phase 2 기준으로 재정의한다.
 
 ### P2-M1 — 계약 청산 (Contract Reset 완결)
 
-> **진행**: Step 1(phase 이름 변경) **완료 (TASK-158)**. Step 2(legacy status 제거) / Step 3(legacy 응답 필드 + migration 0007) 남음.
+> **진행: P2-M1 완료.** Step 1 phase 이름 변경(TASK-158) / Step 2 legacy status 제거(TASK-159) / Step 3 legacy 응답 필드 + migration 0007(TASK-160).
+>
+> **P2-M2 로 넘긴 것** (엔드포인트 재설계와 결합돼 분리 불가): `previewUrl`→`runtimeUrl` 정렬 · `previewStatuses` enum · `TestDeployment` DTO 일가 · 저장소의 임시 어댑터 `executionToPreviewStatus` · `reportPreviewStatus`/`queueTestDeployment`/`getTestDeployment` 메서드명.
 >
 > **범위 정정**: 앞선 407 은 빌드 산출물(`dist/`)을 포함한 수치였다. 소스만 재측정한 실제 표면은 **345**(shared-contract/src 26 · build-server 176(src 124+tests 52) · skill_mcp 65 · build-monitor 50 · runner 24 · db 4). 계약 자체는 26 으로 작다.
 
 - **대상**: `packages/shared-contract/src` (26)
 - **내용**: ~~`PREVIEW_QUEUED`/`PREVIEW_READY` → **`CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`**~~ **완료** — 컨테이너 테스트가 1급 phase 가 됐다(e2e 로 10 phase 실증). `TestDeployment` → canonical test 결과 모델. `previewUrl`/`previewTtlMinutes` 는 optional runtime artifact 로 격하.
-- **완료 기준**: 새 모델로 TS 컴파일 통과 / deprecated alias 유지 범위가 문서에 명시 / `buildPhases` 가 단일 출처로 유지(TASK-150 의 구조적 봉인 보존).
+- **완료 기준**: ✅ TS 5 packages clean / ✅ 잔여 legacy 범위를 위 note 에 명시 / ✅ `buildPhases` 단일 출처 유지 / ✅ e2e 13/13 PASS.
 
 ### P2-M2 — 서버 정렬
 - **대상**: `apps/build-server/src` (117) + `packages/db` (12)

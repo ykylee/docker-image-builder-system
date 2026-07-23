@@ -71,7 +71,6 @@ const acceptedResponse = (appName: string) => ({
     status: "QUEUED" as const,
     lifecycleStatus: "REQUEST_ACCEPTED" as const,
     phase: "REQUEST_ACCEPTED" as const,
-    previewStatus: "NOT_REQUESTED" as const,
     previewUrl: null,
     createdAt: "2026-07-18T00:00:00.000Z",
     updatedAt: "2026-07-18T00:00:00.000Z"
@@ -88,7 +87,6 @@ const duplicateResponse = (appName: string) => ({
     status: "QUEUED" as const,
     lifecycleStatus: "REQUEST_ACCEPTED" as const,
     phase: "REQUEST_ACCEPTED" as const,
-    previewStatus: "NOT_REQUESTED" as const,
     previewUrl: null,
     createdAt: "2026-07-18T00:00:00.000Z",
     updatedAt: "2026-07-18T00:00:00.000Z"
@@ -158,21 +156,9 @@ describe("BuildRequest (React) — TASK-099", () => {
     expect(submitBuildRequestMock).not.toHaveBeenCalled();
   });
 
-  it("previewTtlMinutes 가 0 이하면 field-level error 노출", async () => {
-    localStorage.setItem("userId", "yklee");
-    renderPage();
-    await waitFor(() =>
-      expect((screen.getByTestId("req-appName") as HTMLInputElement).value).toMatch(/^hello-/)
-    );
-    // form 의 onSubmit handler 는 fireEvent.submit(form) 으로 직접 trigger
-    // (RTL fireEvent.click(submit-button) 은 form submit 을 trigger 하지 않음).
-    fireEvent.change(screen.getByTestId("req-ttl"), { target: { value: "0" } });
-    fireEvent.submit(screen.getByTestId("req-form"));
-    await waitFor(() => {
-      expect(screen.getByTestId("req-field-errors").textContent).toMatch(/previewTtlMinutes/);
-    });
-    expect(submitBuildRequestMock).not.toHaveBeenCalled();
-  });
+  // TASK-160 (P2-M1 Step 3): previewTtlMinutes 필드가 계약과 폼에서
+  // 제거되어 이 검증 테스트도 함께 삭제. 다른 필드의 field-level error
+  // 동작은 위의 테스트들이 계속 보장한다.
 
   it("Submit 성공 → 202 accepted → 결과 패널 + Open Build Detail 버튼 노출", async () => {
     localStorage.setItem("userId", "yklee");

@@ -945,20 +945,15 @@ export interface components {
             /** @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI. */
             appName: string;
             /**
-             * @description Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility.
+             * @description Current top-level build status (canonical lifecycle). TASK-159 에서 legacy adapter status(CLAIMED/TEST_READY)를 제거해 canonical 과 동일해졌다.
              * @enum {string}
              */
             status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @enum {string} */
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
-             * @description Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks.
-             * @enum {string}
-             */
-            previewStatus: "NOT_REQUESTED" | "QUEUED" | "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
-            /**
              * Format: uri
-             * @description Legacy preview-era field. Represents the temporary runtime endpoint used by the current test-deployment adapter.
+             * @description Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign.
              */
             previewUrl: string | null;
             /**
@@ -1242,8 +1237,6 @@ export interface components {
             entrypointPath: string;
             /** @default Dockerfile */
             dockerfilePath: string;
-            /** @default 60 */
-            previewTtlMinutes: number;
             /** @default {} */
             metadata: {
                 [key: string]: string;
@@ -1285,20 +1278,15 @@ export interface components {
             /** @description Canonical application name (BuildRequest.appName). One identifier per build, used as the active-build lock key and rendered in the UI. */
             appName: string;
             /**
-             * @description Current top-level build status. This union includes the new canonical lifecycle statuses and the temporary legacy adapter statuses (`CLAIMED`, `TEST_READY`) for backward compatibility.
+             * @description Current top-level build status (canonical lifecycle). TASK-159 에서 legacy adapter status(CLAIMED/TEST_READY)를 제거해 canonical 과 동일해졌다.
              * @enum {string}
              */
             status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @enum {string} */
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
             /**
-             * @description Legacy preview-era field. Kept as a migration shim until TASK-054/060 move server and UI to the new build/test/deploy response blocks.
-             * @enum {string}
-             */
-            previewStatus: "NOT_REQUESTED" | "QUEUED" | "PROVISIONING" | "READY" | "FAILED" | "EXPIRED";
-            /**
              * Format: uri
-             * @description Legacy preview-era field. Represents the temporary runtime endpoint used by the current test-deployment adapter.
+             * @description Runtime endpoint of the container under test. Canonical rename to `runtimeUrl` lands with the P2-M2 endpoint redesign.
              */
             previewUrl: string | null;
             /**

@@ -43,7 +43,7 @@ import type {
   BuildSummary,
   DeploymentReportRequest,
   ErrorCode,
-  PreviewStatus,
+  ExecutionStatus,
   RunnerStatus,
   TestDeployment
 } from "@docker-image-builder-system/shared-contract";
@@ -89,7 +89,6 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     appName: row.appName,
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
-    previewStatus: row.previewStatus as PreviewStatus,
     previewUrl: row.previewUrl,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
@@ -122,16 +121,36 @@ function mapBuildTestRowToSnapshot(row: BuildTestRow | null | undefined): BuildT
   };
 }
 
+// TASK-160 (P2-M1 Step 3): legacy `preview_status` 컬럼이 사라졌으므로
+// TestDeployment 응답의 status 를 canonical `build_test.status`
+// (ExecutionStatus) 에서 유도한다. TestDeployment 자체(그리고 이 매핑)는
+// test-deployment 엔드포인트를 재설계하는 P2-M2 에서 제거된다.
+function executionToPreviewStatus(
+  status: ExecutionStatus | null | undefined
+): TestDeployment["status"] | null {
+  switch (status) {
+    case "IN_PROGRESS":
+      return "PROVISIONING";
+    case "SUCCESS":
+      return "READY";
+    case "FAILED":
+      return "FAILED";
+    default:
+      return null; // NOT_STARTED / SKIPPED / 없음 → 아직 요청되지 않음
+  }
+}
+
 function mapBuildTestRowToDeployment(
   buildRow: BuildRequestRow,
   testRow: BuildTestRow | null | undefined
 ): TestDeployment | null {
-  if (buildRow.previewStatus === "NOT_REQUESTED") {
+  const mapped = executionToPreviewStatus(testRow?.status as ExecutionStatus | undefined);
+  if (!mapped) {
     return null;
   }
 
   return {
-    status: buildRow.previewStatus as TestDeployment["status"],
+    status: mapped,
     previewUrl: testRow?.runtimeUrl ?? buildRow.previewUrl,
     host: testRow?.host ?? null,
     hostPort: testRow?.hostPort ?? null,
@@ -236,13 +255,11 @@ export class PostgresBuildRepository implements BuildRepository {
           requestedBy: input.requestedBy,
           status: "QUEUED",
           phase: "REQUEST_ACCEPTED",
-          previewStatus: "NOT_REQUESTED",
           sourceArchiveKey: input.sourceArchive.objectKey,
           sourceArchiveChecksumSha256: input.sourceArchive.checksumSha256,
           sourceArchiveSizeBytes: input.sourceArchive.sizeBytes,
           entrypointPath: input.entrypointPath,
           dockerfilePath: input.dockerfilePath,
-          previewTtlMinutes: input.previewTtlMinutes,
           metadata: input.metadata,
           previewUrl: null,
           lastErrorCode: null,
@@ -532,7 +549,6 @@ export class PostgresBuildRepository implements BuildRepository {
       .update(buildRequestTable)
       .set({
         phase: "CONTAINER_TEST_STARTED",
-        previewStatus: "QUEUED",
         previewUrl: null,
         phaseHistory: nextPhaseHistory,
         updatedAt: timestamp
@@ -640,7 +656,6 @@ export class PostgresBuildRepository implements BuildRepository {
         .set({
           phase: nextPhase,
           status: nextStatus,
-          previewStatus: status as PreviewStatus,
           previewUrl: nextPreviewUrl,
           phaseHistory: nextPhaseHistory,
           updatedAt: timestamp
@@ -869,8 +884,8 @@ export class PostgresBuildRepository implements BuildRepository {
     // runner-side host info recorded in build_test would be invisible here.
     const [row] = await this.db
       .select({
-        previewStatus: buildRequestTable.previewStatus,
         previewUrl: buildRequestTable.previewUrl,
+        buildTestStatus: buildTestTable.status,
         updatedAt: buildRequestTable.updatedAt,
         buildTestHost: buildTestTable.host,
         buildTestHostPort: buildTestTable.hostPort,
@@ -885,12 +900,13 @@ export class PostgresBuildRepository implements BuildRepository {
     if (!row) {
       return { kind: "not_found" };
     }
-    if (!row.previewStatus || row.previewStatus === "NOT_REQUESTED") {
+    const mappedStatus = executionToPreviewStatus(row.buildTestStatus as ExecutionStatus | null);
+    if (!mappedStatus) {
       return { kind: "not_requested" };
     }
 
     const testDeployment: TestDeployment = {
-      status: row.previewStatus as TestDeployment["status"],
+      status: mappedStatus,
       previewUrl: row.buildTestRuntimeUrl ?? row.previewUrl,
       host: row.buildTestHost ?? null,
       hostPort: row.buildTestHostPort ?? null,

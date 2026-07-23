@@ -232,7 +232,6 @@ describe("AdminBuilds — 유령 헤더 회귀 (TASK-142)", () => {
           appName: "demo",
           status: "COMPLETED",
           phase: "COMPLETED",
-          previewStatus: "NOT_REQUESTED",
           previewUrl: null,
           createdAt: "2026-07-22T00:00:00.000Z",
           updatedAt: "2026-07-22T00:00:00.000Z",
