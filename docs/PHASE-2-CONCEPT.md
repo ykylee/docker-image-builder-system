@@ -170,8 +170,8 @@ P2-M1 계약  →  P2-M2 서버  →  P2-M3 runner  →  P2-M4 소비자  →  P
 
 ## 8. 진입 전 결정 대기
 
-1. **외부 배포 adapter 의 1호 대상** — compose / k8s / remote host(ssh) / 기존 레지스트리 push 확장 중 무엇인가.
-2. **결과 전달 채널** — webhook / Slack / Nextcloud Tasks(기존 후보) 중 무엇을 1호로.
+1. ~~**외부 배포 adapter 의 1호 대상**~~ — **결정됨(2026-07-24)**: **k8s**. 근거: TASK-164 에서 원격의 k8s adapter skeleton(`deploy.K8sDeployer` noop + `RUNNER_K8S_*` env)이 이미 이식돼 있고, 폐기된 원격 라인도 §8 을 k8s 로 봉인했었다(전략 방향 일치). 로컬에 클러스터가 없으므로 e2e 는 **`kind`(Docker 위 구동) 설치를 선행**한다. 구현 방식: client-go 무거운 의존성 대신 기존 `deploy.Client` 의 docker CLI shell-out 패턴과 일관되게 **`kubectl` shell-out**(manifest apply + rollout status) 우선 검토.
+2. ~~**결과 전달 채널**~~ — **결정됨(2026-07-24)**: **webhook**. 근거: 가장 범용적이고 로컬 stub 수신서로 e2e 자동 검증이 가능하다(Slack/Nextcloud 는 외부 credential 의존). 폐기된 원격 라인도 webhook 으로 봉인했었다. Slack/Nextcloud 는 후속에서 webhook 위 어댑터로 확장 가능.
 3. ~~**deprecated alias 유지 기간**~~ — **결정됨(2026-07-23)**: 외부 소비자가 없으므로 **즉시 제거**(유예 없음).
 4. **visual baseline 의 외부 LFS 정책** (Phase 1 이월) — P2-M4 의 시각 회귀 판정 강도에 영향.
 

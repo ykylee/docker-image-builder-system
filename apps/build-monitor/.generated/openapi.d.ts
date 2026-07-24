@@ -880,7 +880,7 @@ export interface components {
              */
             status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             /**
              * Format: uri
              * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.
@@ -918,7 +918,7 @@ export interface components {
         /** @description The in-flight BuildPhase, or null when the build is in a terminal state. Mirrors build.phase + carry-over timestamp. */
         BuildCurrentPhase: {
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             /**
              * Format: date-time
              * @description ISO 8601 timestamp at which the current in-flight phase began. Used by the build-monitor PhaseTimeline to render the "now" indicator.
@@ -1056,7 +1056,7 @@ export interface components {
         /** @description Single completed-phase record. Appended in transition order. The current in-flight phase is not represented here — see BuildCurrentPhase. */
         BuildPhaseHistoryEntry: {
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             /**
              * Format: date-time
              * @description ISO 8601 timestamp at which this phase completed (transitioned out, regardless of outcome).
@@ -1076,7 +1076,7 @@ export interface components {
             /** Format: uuid */
             buildId: string;
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             message: string;
             /** Format: date-time */
             createdAt: string;
@@ -1097,7 +1097,7 @@ export interface components {
         /** @description Runner phase report payload (PKG-005). FAILED phase 는 errorCode/errorMessage 로 실패 이유를 함께 보고한다 (TASK-162). */
         PhaseUpdateRequest: {
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             runnerId: string;
             /** Format: date-time */
             occurredAt?: string;
@@ -1195,7 +1195,7 @@ export interface components {
              */
             status: "RECEIVED" | "QUEUED" | "PREPARING_SOURCE" | "BUILDING" | "BUILD_SUCCESS" | "TESTING" | "TEST_SUCCESS" | "DEPLOYING" | "DEPLOY_SUCCESS" | "COMPLETED" | "FAILED" | "CANCELLED";
             /** @enum {string} */
-            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "FAILED";
+            phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             /**
              * Format: uri
              * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.

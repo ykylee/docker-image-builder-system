@@ -18,7 +18,7 @@ func TestCanonicalStatusCount(t *testing.T) {
 }
 
 func TestBuildPhasesCount(t *testing.T) {
-	if got, want := len(BuildPhases), 11; got != want {
+	if got, want := len(BuildPhases), 13; got != want {
 		t.Errorf("BuildPhases size = %d, want %d (TS+Python mirror must match)", got, want)
 	}
 }
@@ -135,7 +135,7 @@ func TestErrorCodeConstLookup(t *testing.T) {
 	}
 }
 
-// TestPhaseConstLookup 는 BuildPhases 11 종 모두 const 로 선언됐는지 확인.
+// TestPhaseConstLookup 는 BuildPhases 13 종 모두 const 로 선언됐는지 확인.
 func TestPhaseConstLookup(t *testing.T) {
 	for _, v := range BuildPhases {
 		found := false
@@ -144,7 +144,8 @@ func TestPhaseConstLookup(t *testing.T) {
 			PhaseDockerBuildStarted, PhaseDockerBuildCompleted,
 			PhaseContainerTestStarted, PhaseContainerTestPassed,
 			PhaseDeploymentStarted, PhaseDeploymentCompleted,
-			PhaseCompleted, PhaseFailed,
+			PhaseCompleted, PhaseResultDeliveryStarted, PhaseResultDelivered,
+			PhaseFailed,
 		} {
 			if decl == v {
 				found = true

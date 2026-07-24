@@ -19,12 +19,17 @@ const (
 	PhaseDeploymentStarted    = "DEPLOYMENT_STARTED"
 	PhaseDeploymentCompleted  = "DEPLOYMENT_COMPLETED"
 	PhaseCompleted            = "COMPLETED"
-	PhaseFailed               = "FAILED"
+	// TASK-165 (P2-M5 Step 1): 결과 전달 phase. **build-server 가 emit** 한다
+	// (runner 는 COMPLETED 까지만). runner 코드에서 직접 쓰지는 않지만 canonical
+	// enum 미러링을 위해 정의를 유지한다.
+	PhaseResultDeliveryStarted = "RESULT_DELIVERY_STARTED"
+	PhaseResultDelivered       = "RESULT_DELIVERED"
+	PhaseFailed                = "FAILED"
 )
 
-// BuildPhases — canonical 11-phase list. Mirrors
+// BuildPhases — canonical 13-phase list. Mirrors
 // `apps.skill_mcp.contract.canonical.BUILD_PHASES` (Python) /
-// `buildPhases` (TS).
+// `buildPhases` (TS). TASK-165 (P2-M5): result-delivery 2종 추가.
 var BuildPhases = []string{
 	PhaseRequestAccepted,
 	PhaseQueueClaimed,
@@ -36,5 +41,7 @@ var BuildPhases = []string{
 	PhaseDeploymentStarted,
 	PhaseDeploymentCompleted,
 	PhaseCompleted,
+	PhaseResultDeliveryStarted,
+	PhaseResultDelivered,
 	PhaseFailed,
 }

@@ -196,7 +196,7 @@ describe("BuildDetail", () => {
     ).toBeInTheDocument();
   });
 
-  it("mounts PhaseTimeline with 11 phases", async () => {
+  it("mounts PhaseTimeline with 13 phases", async () => {
     vi.mocked(api.getBuild).mockResolvedValue(MOCK_BUILD);
     vi.mocked(api.getBuildLogs).mockResolvedValue(MOCK_LOGS);
 
@@ -206,28 +206,29 @@ describe("BuildDetail", () => {
       expect(screen.getByTestId("phase-timeline")).toBeInTheDocument();
     });
 
-    // 11 phases 모두 노출 (5 completed + 1 current + 5 pending) — PhaseTimeline
-    // 내부에서만 매칭되도록 within 으로 scope 좁힘. TASK-150: drift 수정으로
-    // canonical phases 가 9 → 11 (DEPLOYMENT_STARTED / DEPLOYMENT_COMPLETED
-    // 추가, shared-contract 의 buildPhases 가 단일 출처). PhaseTimeline 은
-    // shared-contract 의 buildPhases 를 import 해서 표시 목록을 그 배열 그대로
-    // 쓴다 — 9 phase 하드코딩 시절의 잔재.
+    // 13 phases 모두 노출 (5 completed + 1 current + 7 pending) — PhaseTimeline
+    // 내부에서만 매칭되도록 within 으로 scope 좁힘. TASK-165 (P2-M5): result
+    // delivery 2종(RESULT_DELIVERY_STARTED/RESULT_DELIVERED) 추가로 canonical
+    // phases 가 11 → 13. PhaseTimeline 은 shared-contract 의 buildPhases 를
+    // import 해서 표시 목록을 그 배열 그대로 쓴다(drift 구조적 봉인).
     const timeline = screen.getByTestId("phase-timeline");
     expect(within(timeline).getByText("REQUEST_ACCEPTED")).toBeInTheDocument();
     expect(within(timeline).getByText("DOCKER_BUILD_COMPLETED")).toBeInTheDocument();
     expect(within(timeline).getByText("CONTAINER_TEST_STARTED")).toBeInTheDocument();
-    // 11 phase canonical 목록에 새로 추가된 DEPLOYMENT_* 가 노출되는지.
     expect(within(timeline).getByText("DEPLOYMENT_STARTED")).toBeInTheDocument();
     expect(within(timeline).getByText("DEPLOYMENT_COMPLETED")).toBeInTheDocument();
     expect(within(timeline).getByText("COMPLETED")).toBeInTheDocument();
+    // TASK-165: 새로 추가된 result-delivery phase 가 노출되는지.
+    expect(within(timeline).getByText("RESULT_DELIVERY_STARTED")).toBeInTheDocument();
+    expect(within(timeline).getByText("RESULT_DELIVERED")).toBeInTheDocument();
     expect(within(timeline).getByText("FAILED")).toBeInTheDocument();
     // 5 completed (REQUEST_ACCEPTED, QUEUE_CLAIMED, SOURCE_PREPARED,
     // DOCKER_BUILD_STARTED, DOCKER_BUILD_COMPLETED) + 1 current
-    // (CONTAINER_TEST_STARTED) + 5 pending (CONTAINER_TEST_PASSED, DEPLOYMENT_STARTED,
-    // DEPLOYMENT_COMPLETED, COMPLETED, FAILED).
+    // (CONTAINER_TEST_STARTED) + 7 pending (CONTAINER_TEST_PASSED, DEPLOYMENT_STARTED,
+    // DEPLOYMENT_COMPLETED, COMPLETED, RESULT_DELIVERY_STARTED, RESULT_DELIVERED, FAILED).
     expect(timeline.querySelectorAll('[data-status="completed"]')).toHaveLength(5);
     expect(timeline.querySelectorAll('[data-status="current"]')).toHaveLength(1);
-    expect(timeline.querySelectorAll('[data-status="pending"]')).toHaveLength(5);
+    expect(timeline.querySelectorAll('[data-status="pending"]')).toHaveLength(7);
   });
 
   it("mounts LogStream with entries", async () => {

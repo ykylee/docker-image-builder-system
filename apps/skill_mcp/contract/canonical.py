@@ -121,6 +121,9 @@ BUILD_PHASES: frozenset[str] = frozenset({
     "DEPLOYMENT_STARTED",
     "DEPLOYMENT_COMPLETED",
     "COMPLETED",
+    # TASK-165 (P2-M5): 결과 전달 1급 phase (build-server emit).
+    "RESULT_DELIVERY_STARTED",
+    "RESULT_DELIVERED",
     "FAILED",
 })
 
