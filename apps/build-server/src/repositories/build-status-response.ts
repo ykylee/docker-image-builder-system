@@ -109,7 +109,33 @@ function buildDeployResult(
 function buildResultDelivery(input: {
   summary: BuildSummary;
   deploymentAttempt?: DeploymentAttemptSnapshot | null;
+  phaseHistory?: BuildPhaseHistoryEntry[];
 }): ResultDelivery {
+  // TASK-165 (P2-M5): webhook(NOTIFICATION) 경로. build-server 가 terminal
+  // 도달 후 결과 전달을 시도하면 phase history 에 RESULT_DELIVERY_STARTED /
+  // RESULT_DELIVERED 를 append 한다(recordResultDeliveryPhase). 별도 컬럼을
+  // 두지 않고 phase history 를 단일 출처로 써서 memory/postgres 양쪽이 같은
+  // semantics 를 갖는다(마이그레이션 불필요).
+  const history = input.phaseHistory ?? [];
+  const delivered = history.find((e) => e.phase === "RESULT_DELIVERED");
+  if (delivered) {
+    return {
+      status: "SUCCESS",
+      mode: "NOTIFICATION",
+      deliveredAt: delivered.completedAt
+    };
+  }
+  if (history.some((e) => e.phase === "RESULT_DELIVERY_STARTED")) {
+    // STARTED 는 있는데 DELIVERED 가 없음 = webhook POST 가 실패했다
+    // (best-effort). 전달 시도 자체는 NOTIFICATION 이었음을 보존한다.
+    return {
+      status: "FAILED",
+      mode: "NOTIFICATION",
+      deliveredAt: null
+    };
+  }
+
+  // 아래는 webhook 미설정 시의 기존 POLLING 파생(변경 없음).
   if (input.deploymentAttempt && isTerminalPhase(input.summary.phase)) {
     return {
       status: "SUCCESS",
@@ -166,7 +192,8 @@ export function buildStatusResponseFromState(input: {
     deploy: buildDeployResult(input.deploymentAttempt ?? null),
     resultDelivery: buildResultDelivery({
       summary,
-      deploymentAttempt: input.deploymentAttempt ?? null
+      deploymentAttempt: input.deploymentAttempt ?? null,
+      phaseHistory: input.phaseHistory
     })
   };
 }

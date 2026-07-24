@@ -69,6 +69,26 @@ export type UpdatePhaseResult =
       toPhase: string;
     };
 
+// TASK-165 (P2-M5): 결과 전달(webhook) phase 를 phase history 에 append 한다.
+// terminal(COMPLETED/FAILED) 이후의 후처리라 build_request 의 phase/status 는
+// 건드리지 않고 history 에만 기록한다 — 일반 updatePhase 의 terminal-transition
+// 로직(prevPhase push, currentPhase=null)을 우회해 중복 push 를 피한다.
+// `appended`=false 는 이미 기록됨(idempotent no-op)을 뜻해 서버가 webhook 을
+// 두 번 쏘지 않게 한다.
+export type ResultDeliveryPhase =
+  | "RESULT_DELIVERY_STARTED"
+  | "RESULT_DELIVERED";
+
+export type RecordResultDeliveryResult =
+  | {
+      kind: "ok";
+      appended: boolean;
+      response: BuildStatusResponse;
+    }
+  | {
+      kind: "not_found";
+    };
+
 // TASK-161 (P2-M2): preview-era 의 TestDeployment 반환을 걷어냈다. 컨테이너
 // 테스트 상태는 BuildStatusResponse 의 canonical `test` 블록이 이미 담고
 // 있어 별도 payload 를 되돌려줄 이유가 없다.
@@ -321,6 +341,11 @@ export interface BuildRepository {
     phase: string,
     failure?: PhaseFailureDetails
   ): Promise<UpdatePhaseResult>;
+  // TASK-165 (P2-M5): 결과 전달 phase 를 history 에 idempotent append.
+  recordResultDeliveryPhase(
+    buildId: string,
+    phase: ResultDeliveryPhase
+  ): Promise<RecordResultDeliveryResult>;
   startContainerTest(
     buildId: string,
     internalPort: number

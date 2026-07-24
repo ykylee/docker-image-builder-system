@@ -62,7 +62,9 @@ import type {
   ReportContainerTestResult,
   StoreSourceArchiveResult,
   StoreSourceChunkResult,
-  UpdatePhaseResult
+  UpdatePhaseResult,
+  ResultDeliveryPhase,
+  RecordResultDeliveryResult
 } from "./build-repository.js";
 import {
   advancePhaseHistory,
@@ -489,6 +491,52 @@ export class PostgresBuildRepository implements BuildRepository {
 
     return {
       kind: "ok",
+      response: toBuildStatusResponse(updated)
+    };
+  }
+
+  // TASK-165 (P2-M5): 결과 전달 phase 를 phaseHistory JSONB 에 idempotent
+  // append. terminal 이후 후처리라 phase/status/updatedAt 은 건드리지 않고
+  // history 에만 기록한다(memory 저장소와 동일 semantics — TASK-155 교훈).
+  async recordResultDeliveryPhase(
+    buildId: string,
+    phase: ResultDeliveryPhase
+  ): Promise<RecordResultDeliveryResult> {
+    const [row] = await this.db
+      .select()
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+
+    if (!row) {
+      return { kind: "not_found" };
+    }
+
+    const history = (row.phaseHistory ?? []) as Array<{
+      phase: BuildPhase;
+      completedAt: string;
+    }>;
+    if (history.some((e) => e.phase === phase)) {
+      return { kind: "ok", appended: false, response: toBuildStatusResponse(row) };
+    }
+
+    const nextHistory = [
+      ...history,
+      { phase: phase as BuildPhase, completedAt: new Date().toISOString() }
+    ];
+    const [updated] = await this.db
+      .update(buildRequestTable)
+      .set({ phaseHistory: nextHistory })
+      .where(eq(buildRequestTable.id, buildId))
+      .returning();
+
+    if (!updated) {
+      return { kind: "not_found" };
+    }
+
+    return {
+      kind: "ok",
+      appended: true,
       response: toBuildStatusResponse(updated)
     };
   }

@@ -46,6 +46,30 @@ export type ReportDeploymentOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
   | { kind: "not_found" };
 
+// TASK-165 (P2-M5): webhook POST helper. Node 20+ 의 global fetch 사용.
+// 5s timeout 으로 매달림을 막고, 2xx 가 아니면 throw 해 deliverResult 가
+// best-effort 로 흡수하게 한다.
+async function postResultWebhook(
+  url: string,
+  payload: BuildStatusResponse
+): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 5000);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+    if (!res.ok) {
+      throw new Error(`webhook returned HTTP ${res.status}`);
+    }
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export class BuildService {
   // TASK-110: STRICT_CONTENT_RANGE env flag mirror. Default `false`
   // (TASK-108 / TASK-109 lenient semantics preserved for existing
@@ -58,7 +82,14 @@ export class BuildService {
   // numeric totals as a deployment policy.
   constructor(
     private readonly repository: BuildRepository,
-    private readonly runtime: { strictContentRange: boolean } = {
+    private readonly runtime: {
+      strictContentRange: boolean;
+      // TASK-165 (P2-M5): 설정되면 build 가 terminal(COMPLETED/FAILED) 에
+      // 도달할 때 canonical BuildStatusResponse 를 이 URL 로 POST 한다
+      // (webhook = NOTIFICATION 모드 결과 전달). 미설정이면 기존 POLLING
+      // 만 — 소비자가 GET /builds/:id 로 조회.
+      resultWebhookUrl?: string;
+    } = {
       strictContentRange: false
     }
   ) {}
@@ -255,7 +286,63 @@ export class BuildService {
         await this.repository.markRunnerSeen(trimmed, null, "failed");
       }
     }
+
+    // TASK-165 (P2-M5): terminal 도달 시 webhook 결과 전달(NOTIFICATION).
+    // best-effort — 전달 실패가 phase 보고(=빌드 파이프라인)를 깨지 않는다.
+    // 결과 전달은 build 파이프라인 이후의 외부 알림이므로 여기서 result 를
+    // 덮어쓰지 않고 원래 phase 결과를 그대로 돌려준다.
+    if (
+      result.kind === "ok" &&
+      (phase === "COMPLETED" || phase === "FAILED") &&
+      this.runtime.resultWebhookUrl
+    ) {
+      await this.deliverResult(
+        buildId,
+        result.response,
+        this.runtime.resultWebhookUrl
+      );
+    }
+
     return result;
+  }
+
+  /**
+   * TASK-165 (P2-M5): webhook 결과 전달. terminal 도달 후 1회 실행.
+   * 1) RESULT_DELIVERY_STARTED phase 를 history 에 append (idempotent —
+   *    이미 있으면 아무것도 하지 않고 조기 반환해 재전송을 막는다).
+   * 2) canonical BuildStatusResponse 를 webhook 으로 POST.
+   * 3) 성공 시 RESULT_DELIVERED append. 실패해도 예외를 삼킨다(best-effort);
+   *    STARTED 만 남으면 resultDelivery 가 NOTIFICATION/FAILED 로 파생된다.
+   */
+  private async deliverResult(
+    buildId: string,
+    payload: BuildStatusResponse,
+    webhookUrl: string
+  ): Promise<void> {
+    const started = await this.repository.recordResultDeliveryPhase(
+      buildId,
+      "RESULT_DELIVERY_STARTED"
+    );
+    if (started.kind !== "ok" || !started.appended) {
+      // 이미 전달을 시작(또는 완료)했음 — 중복 전송 방지.
+      return;
+    }
+
+    try {
+      await postResultWebhook(webhookUrl, payload);
+      await this.repository.recordResultDeliveryPhase(
+        buildId,
+        "RESULT_DELIVERED"
+      );
+    } catch (err) {
+      // best-effort: 로그만 남기고 빌드 흐름은 진행. resultDelivery 는
+      // RESULT_DELIVERY_STARTED 만 있는 상태에서 NOTIFICATION/FAILED 로 파생.
+      console.warn(
+        `[result-delivery] webhook POST failed for build ${buildId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`
+      );
+    }
   }
 
   async startContainerTest(

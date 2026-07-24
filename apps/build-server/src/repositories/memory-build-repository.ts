@@ -41,7 +41,9 @@ import type {
   ReportContainerTestResult,
   StoreSourceArchiveResult,
   StoreSourceChunkResult,
-  UpdatePhaseResult
+  UpdatePhaseResult,
+  ResultDeliveryPhase,
+  RecordResultDeliveryResult
 } from "./build-repository.js";
 import {
   type BuildTestSnapshot,
@@ -394,6 +396,48 @@ export function createMemoryBuildRepository(): BuildRepository {
                 phase: build.summary.phase,
                 startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
           },
+          buildTest: build.buildTest,
+          deploymentAttempt: build.deploymentAttempt
+        })
+      };
+    },
+
+    // TASK-165 (P2-M5): 결과 전달 phase 를 history 에 idempotent append.
+    // build.summary.phase(terminal) 는 그대로 두고 history 에만 push 한다 —
+    // 일반 updatePhase 의 prevPhase push 를 거치지 않아 COMPLETED 중복 push
+    // 를 피한다.
+    async recordResultDeliveryPhase(
+      buildId: string,
+      phase: ResultDeliveryPhase
+    ): Promise<RecordResultDeliveryResult> {
+      const build = builds.get(buildId);
+      if (!build) {
+        return { kind: "not_found" };
+      }
+
+      const already = build.phaseHistory.some((e) => e.phase === phase);
+      if (!already) {
+        build.phaseHistory.push({
+          phase: phase as BuildPhase,
+          completedAt: nowIsoString()
+        });
+        builds.set(buildId, build);
+      }
+
+      const isTerminal = isTerminalPhase(build.summary.phase);
+      return {
+        kind: "ok",
+        appended: !already,
+        response: buildStatusResponseFromState({
+          summary: build.summary,
+          lastError: build.lastError,
+          phaseHistory: build.phaseHistory,
+          currentPhase: isTerminal
+            ? null
+            : {
+                phase: build.summary.phase,
+                startedAt: build.currentPhaseStartedAt ?? build.summary.createdAt
+              },
           buildTest: build.buildTest,
           deploymentAttempt: build.deploymentAttempt
         })

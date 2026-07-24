@@ -135,8 +135,16 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   // `docs/operations/content-range-rfc-7233-strict-mode-2026-07-20.md`
   // for the rollout playbook.
   const strictContentRange = parseStrictContentRangeFlag(process.env);
+  // TASK-165 (P2-M5): 결과 전달 webhook. 설정 시 build 가 terminal 에 도달할
+  // 때 canonical BuildStatusResponse 를 이 URL 로 POST 한다(NOTIFICATION).
+  // 빈 문자열/미설정이면 undefined 로 넘겨 기존 POLLING 만 유지.
+  const resultWebhookUrl =
+    process.env.RESULT_WEBHOOK_URL && process.env.RESULT_WEBHOOK_URL.trim() !== ""
+      ? process.env.RESULT_WEBHOOK_URL.trim()
+      : undefined;
   const buildService = new BuildService(buildRepository, {
-    strictContentRange
+    strictContentRange,
+    resultWebhookUrl
   });
 
   void registerHealthRoute(app);
