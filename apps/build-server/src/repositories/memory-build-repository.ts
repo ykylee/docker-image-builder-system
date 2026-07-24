@@ -155,6 +155,10 @@ export function createMemoryBuildRepository(): BuildRepository {
         status: "QUEUED",
         phase: "REQUEST_ACCEPTED",
         runtimeUrl: null,
+        // TASK-167 (P3-M2): 할당된 호스팅 입력을 summary 에 실어 claim 응답으로
+        // runner 에 전달한다.
+        contextPath: input.contextPath ?? null,
+        runtimePort: input.runtimePort ?? 8080,
         createdAt: timestamp,
         updatedAt: timestamp
       };

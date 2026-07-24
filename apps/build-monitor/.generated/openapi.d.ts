@@ -886,6 +886,10 @@ export interface components {
              * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.
              */
             runtimeUrl: string | null;
+            /** @description Allocated hosting context path (URL prefix). Null on pre-hosting builds. */
+            contextPath?: string | null;
+            /** @description App container listen port used by hosting Service/Ingress. Defaults to 8080. */
+            runtimePort?: number;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -945,11 +949,14 @@ export interface components {
             /** @enum {string} */
             status: "IN_PROGRESS" | "SUCCESS" | "FAILED";
             /** @enum {string} */
-            targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "OTHER";
+            targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "K8S" | "OTHER";
             targetRef?: string | null;
             resultRef?: string | null;
             errorCode?: string | null;
             errorMessage?: string | null;
+            contextPath?: string | null;
+            namespace?: string | null;
+            deploymentName?: string | null;
             runnerId: string;
             responsePayloadJson?: {
                 [key: string]: unknown;
@@ -960,7 +967,7 @@ export interface components {
             /** @enum {string} */
             status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
             /** @enum {string|null} */
-            targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "OTHER" | null;
+            targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "K8S" | "OTHER" | null;
             resultRef: string | null;
         };
         /** @description Result-delivery state for the final external notification or polling handoff. */
@@ -1040,7 +1047,7 @@ export interface components {
                 /** @enum {string} */
                 status: "NOT_STARTED" | "IN_PROGRESS" | "SUCCESS" | "FAILED" | "SKIPPED";
                 /** @enum {string|null} */
-                targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "OTHER" | null;
+                targetType: "HTTP_API" | "SCP" | "SFTP" | "SHARED_STORAGE" | "DOCKER_REGISTRY" | "K8S" | "OTHER" | null;
                 resultRef: string | null;
             };
             /** @description Canonical result-delivery block for polling/notification completion. Optional until final handoff tracking is implemented. */
@@ -1204,6 +1211,10 @@ export interface components {
              * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.
              */
             runtimeUrl: string | null;
+            /** @description Allocated hosting context path (URL prefix). Null on pre-hosting builds. */
+            contextPath?: string | null;
+            /** @description App container listen port used by hosting Service/Ingress. Defaults to 8080. */
+            runtimePort?: number;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}

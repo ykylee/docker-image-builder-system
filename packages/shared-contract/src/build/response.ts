@@ -68,6 +68,15 @@ export const buildSummarySchema = z
       description:
         "Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다."
     }),
+    // TASK-166/167 (P3): 호스팅 입력. context path 는 배포 시 runner 가 Ingress
+    // path 로 쓰고, runtimePort 는 컨테이너 내부 포트다. claim 응답을 통해
+    // runner 에 전달된다(서버가 build 생성 시 할당).
+    contextPath: z.string().nullable().optional().meta({
+      description: "Allocated hosting context path (URL prefix). Null on pre-hosting builds."
+    }),
+    runtimePort: z.int().positive().optional().meta({
+      description: "App container listen port used by hosting Service/Ingress. Defaults to 8080."
+    }),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
         "Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window."
@@ -205,6 +214,8 @@ export const deploymentResultSchema = z
       "SFTP",
       "SHARED_STORAGE",
       "DOCKER_REGISTRY",
+      // TASK-167 (P3-M2): k8s 호스팅 배포 대상.
+      "K8S",
       "OTHER"
     ]).nullable(),
     resultRef: z.string().min(1).nullable()
@@ -226,12 +237,20 @@ export const deploymentReportRequestSchema = z
       "SFTP",
       "SHARED_STORAGE",
       "DOCKER_REGISTRY",
+      // TASK-167 (P3-M2): k8s 호스팅 배포 대상. P2-M5 가 K8sResult 를 만들면서도
+      // 이 enum 에 없어 서버가 실제 보고를 거부하던 잠복 결함을 함께 해소.
+      "K8S",
       "OTHER"
     ]),
     targetRef: z.string().min(1).nullable().optional(),
     resultRef: z.string().min(1).nullable().optional(),
     errorCode: z.string().min(1).nullable().optional(),
     errorMessage: z.string().min(1).nullable().optional(),
+    // TASK-167 (P3-M2): 호스팅 upsert 입력. runner 가 배포한 k8s 자원의 좌표를
+    // 보고하면 build-server 가 HostedService 를 upsert 한다(§9-2 결정).
+    contextPath: z.string().min(1).nullable().optional(),
+    namespace: z.string().min(1).nullable().optional(),
+    deploymentName: z.string().min(1).nullable().optional(),
     runnerId: z.string().min(1),
     responsePayloadJson: z.record(z.string(), z.unknown()).nullable().optional()
   })

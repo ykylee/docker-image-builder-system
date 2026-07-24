@@ -94,6 +94,9 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     status: row.status as BuildStatus,
     phase: row.phase as BuildPhase,
     runtimeUrl: row.runtimeUrl,
+    // TASK-167 (P3-M2): 호스팅 입력을 claim 응답으로 runner 에 전달.
+    contextPath: row.contextPath,
+    runtimePort: row.runtimePort,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });

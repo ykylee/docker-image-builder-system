@@ -97,6 +97,11 @@ export class BuildService {
       // (webhook = NOTIFICATION 모드 결과 전달). 미설정이면 기존 POLLING
       // 만 — 소비자가 GET /builds/:id 로 조회.
       resultWebhookUrl?: string;
+      // TASK-167 (P3-M2): 호스팅 base host. 설정되면 배포 성공 보고 시
+      // HostedService 를 upsert 하고 url = `https://<host>/<contextPath>/`
+      // 를 조립한다. 미설정이면 호스팅 비활성(k8s 배포는 되지만 registry
+      // upsert 안 함 — opt-in, 설계 §9-3).
+      hostingBaseHost?: string;
     } = {
       strictContentRange: false
     }
@@ -422,7 +427,33 @@ export class BuildService {
     buildId: string,
     input: DeploymentReportRequest
   ): Promise<ReportDeploymentOutcome> {
-    return this.repository.reportDeploymentResult(buildId, input);
+    const result = await this.repository.reportDeploymentResult(buildId, input);
+
+    // TASK-167 (P3-M2): 배포 성공 + 호스팅 좌표 보고 + HOSTING_BASE_HOST 설정
+    // 시 HostedService 를 upsert(앱당 1개 교체). registry 가 호스팅 SSOT 다.
+    if (
+      result.kind === "ok" &&
+      input.status === "SUCCESS" &&
+      input.contextPath &&
+      this.runtime.hostingBaseHost
+    ) {
+      const build = result.response.build;
+      const contextPath = input.contextPath;
+      await this.repository.upsertHostedService({
+        appName: build.appName,
+        contextPath,
+        namespace: input.namespace ?? "dib-hosted",
+        deploymentName: input.deploymentName ?? `dib-${contextPath}`,
+        containerPort: build.runtimePort ?? 8080,
+        stripPrefix: true,
+        status: "RUNNING",
+        url: `https://${this.runtime.hostingBaseHost}/${contextPath}/`,
+        currentBuildId: buildId,
+        imageRef: input.resultRef ?? null
+      });
+    }
+
+    return result;
   }
 
   async listBuilds(query: BuildListQuery): Promise<BuildListResponse> {

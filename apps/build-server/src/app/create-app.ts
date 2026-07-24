@@ -142,9 +142,16 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     process.env.RESULT_WEBHOOK_URL && process.env.RESULT_WEBHOOK_URL.trim() !== ""
       ? process.env.RESULT_WEBHOOK_URL.trim()
       : undefined;
+  // TASK-167 (P3-M2): 호스팅 base host. 설정 시 배포 성공 보고가 HostedService
+  // 를 upsert 하고 접속 URL 을 조립한다. 미설정이면 호스팅 비활성(opt-in).
+  const hostingBaseHost =
+    process.env.HOSTING_BASE_HOST && process.env.HOSTING_BASE_HOST.trim() !== ""
+      ? process.env.HOSTING_BASE_HOST.trim()
+      : undefined;
   const buildService = new BuildService(buildRepository, {
     strictContentRange,
-    resultWebhookUrl
+    resultWebhookUrl,
+    hostingBaseHost
   });
 
   void registerHealthRoute(app);

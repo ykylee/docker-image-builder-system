@@ -130,3 +130,53 @@ describe("createBuild — context-path 할당", () => {
     assert.equal(same.kind, "accepted");
   });
 });
+
+describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () => {
+  it("HOSTING_BASE_HOST 설정 + contextPath 보고 시 upsert + url 조립", async () => {
+    const repo = createMemoryBuildRepository();
+    const svc = new BuildService(repo, {
+      strictContentRange: false,
+      hostingBaseHost: "apps.example.com"
+    });
+    const created = await createBuild(svc, "todo-app");
+    assert.equal(created.kind, "accepted");
+    const buildId =
+      created.kind === "accepted" ? created.response.build.buildId : "";
+
+    const outcome = await svc.reportDeploymentResult(buildId, {
+      status: "SUCCESS",
+      targetType: "K8S",
+      contextPath: "todo-app",
+      namespace: "dib-hosted",
+      deploymentName: "dib-todo-app",
+      resultRef: "deployment/dib-todo-app",
+      runnerId: "r-1"
+    });
+    assert.equal(outcome.kind, "ok");
+
+    const hosted = await svc.getHostedService("todo-app");
+    assert.ok(hosted, "HostedService 가 upsert 돼야 함");
+    assert.equal(hosted!.status, "RUNNING");
+    assert.equal(hosted!.contextPath, "todo-app");
+    assert.equal(hosted!.url, "https://apps.example.com/todo-app/");
+    assert.equal(hosted!.currentBuildId, buildId);
+    assert.equal(hosted!.containerPort, 8080);
+  });
+
+  it("HOSTING_BASE_HOST 미설정 시 upsert 안 함(호스팅 비활성)", async () => {
+    const repo = createMemoryBuildRepository();
+    const svc = new BuildService(repo, { strictContentRange: false });
+    const created = await createBuild(svc, "todo-app-2");
+    const buildId =
+      created.kind === "accepted" ? created.response.build.buildId : "";
+
+    await svc.reportDeploymentResult(buildId, {
+      status: "SUCCESS",
+      targetType: "K8S",
+      contextPath: "todo-app-2",
+      runnerId: "r-1"
+    });
+
+    assert.equal((await svc.listHostedServices()).length, 0);
+  });
+});
