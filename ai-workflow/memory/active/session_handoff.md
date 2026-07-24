@@ -6,9 +6,30 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-24 (rev 162→163: **Phase 3 완료 — 호스팅 능력 (P3-M1~M5, TASK-166~170) + v0.3.0 릴리스**).
 - Updated: 2026-07-24 (rev 161→162: **P2-M5 배포 능력 완료 → Phase 2 전체 완료 (TASK-165)**).
 - Updated: 2026-07-23 (rev 160→161: **원격 발산 조정 + k8s adapter 이식 (TASK-164)**).
 - Updated: 2026-07-23 (rev 159→160: **P2-M4 완료 — 소비자 정렬 + skill_mcp 실서버 검증 신설 (TASK-163)**).
+
+  ## 핵심 (rev 163) — Phase 3 완료: 호스팅 능력
+  이번 세션은 원격 충돌 조정(TASK-164) → **Phase 2 완료 + v0.3.0 릴리스**(TASK-165) → **Phase 3(호스팅) 전체**(TASK-166~170)까지 한 흐름으로 진행했다. 이제 빌드된 이미지가 k8s 에 **지속 호스팅**되고 `http(s)://<HOSTING_BASE_HOST>/<context-path>/` 로 접근·관리된다.
+
+  **Phase 3 마일스톤 (각 sub-commit + workflow meta)**:
+  - **P3-M1**(TASK-166): 계약(BuildRequest contextPath/runtimePort + HostedService + `CONTEXT_PATH_TAKEN`) + `hosted_service` 테이블(migration 0009) + context-path 할당(정규화/유일성/예약어) + registry CRUD(memory+postgres) + admin API GET.
+  - **P3-M2**(TASK-167): Ingress adapter(배포=호스팅). renderK8sManifest 4-doc(+Ingress rewrite-target + APP_BASE_PATH env) + claim contextPath 전파 + 배포 성공 보고로 HostedService upsert(url=https://<host>/<cp>/). targetType 'K8S' 추가(P2-M5 잠복 결함 해소).
+  - **P3-M3**(TASK-168): 관리 라이프사이클. build-server 가 kubectl 직접 shell-out(K8sAdmin) — stop(scale 0)/start(scale 1)/remove(delete+registry 제거=contextPath 반환). admin API POST/DELETE + UI `/admin/hosting`.
+  - **P3-M4**(TASK-169): sub-path. stripPrefix override(migration 0010, true=rewrite/false=pass-through) + `examples/hosted-base-path-app`(APP_BASE_PATH 규약 실증) + 제약 가이드(절대경로 앱 미지원 명시).
+  - **P3-M5**(TASK-170): 실 e2e(`apps/runner/scripts/e2e-hosting.sh`, kind+ingress-nginx). **Phase A 라우팅**(host/demo/ 페이지+자산 로드) + **Phase B 관리**(stop/remove 실측) **ALL PASS**.
+
+  **역할 분리**: runner = 배포 생성(Deployment/Service/Ingress) + contextPath 보고. build-server = registry SSOT + 관리(scale/delete) kubectl + Ingress URL 조립.
+
+  **검증(회귀 baseline)**: TS 5 clean / build-server **198** / build-monitor **279** / go **8 pkg** / skill_mcp **225** / migration **0001~0010** / 계약 e2e 13 + k8s e2e + **호스팅 e2e ALL PASS**. Phase 3 완료 판정 §9 5항 전부 충족.
+
+  **환경 노트**: kind v0.24.0 + kubectl v1.31.4 는 `~/go/bin`(기본 PATH 밖 — `export PATH=$PATH:~/go/bin`). 호스팅 e2e 는 host port 18080 사용(8080 은 다른 프로세스 점유). skill_mcp pytest 는 `-s` 필수.
+
+  **다음 세션 후보(사용자 결정 대기)**:
+  - **v0.4.0 릴리스 태깅**(Phase 3 = minor. 5 package.json bump + git tag + CHANGELOG + RELEASE_NOTES).
+  - 호스팅 e2e 의 nightly CI 편입 / status 주기 sync+캐시 / k8s adapter 확장(Helm·ArgoCD·per-build ns 정리) / subdomain 스킴(sub-path 대안) / `<base>` 주입 옵션.
 
   ## 핵심 (rev 162) — Phase 2 완료: 배포 능력(k8s) + 결과 전달(webhook)
   P2-M5 로 Phase 2(preview-era 청산 → 배포 능력 완성)를 마무리했다. 제품 목적 4단계(`build → container test → deploy → result delivery`)가 모두 1급 phase 로 존재하고 **실인프라 e2e** 로 검증된다.

@@ -3,7 +3,7 @@
 - 문서 목적: Phase 3(호스팅 능력)의 컨셉 근거 + 아키텍처 결정 + 마일스톤 + 완료 기준 + 리스크.
 - 범위: 빌드된 이미지를 **지속적으로 서빙**하고 URL(context path)로 접근·**관리**하는 능력.
 - 대상 독자: 개발자, 운영자, AI 에이전트, workflow 설계자
-- 상태: **draft (진입 전 검토 완료 — 아키텍처 2종 + 세부 결정 확정, 착수 대기)**
+- 상태: **완료 (P3-M1~M5 전부 봉인, 2026-07-24). Phase 3 완료 판정 §9 충족 — 실 e2e ALL PASS.**
 - 최종 수정일: 2026-07-24
 - 관련 문서: [Phase 2 컨셉](./PHASE-2-CONCEPT.md), [k8s 배포/webhook 운영](./operations/k8s-deploy-webhook-2026-07-24.md), [CHANGELOG](../CHANGELOG.md)
 
@@ -110,10 +110,12 @@ P3-M1 계약/registry → P3-M2 Ingress → P3-M3 관리 → P3-M4 sub-path → 
 4. ~~서비스당 버전 수명~~ — **결정: 앱당 1개 활성 호스팅.** 재배포 시 rolling update 로 교체(동일 Deployment/context-path). 다중 버전 병존·TTL·유휴 eviction 은 후속.
 5. ~~Ingress 컨트롤러~~ — **결정: ingress-nginx**(범용, kind 설치 쉬움, e2e 검증 용이).
 
-## 9. Phase 3 완료 판정 (초안)
+## 9. Phase 3 완료 판정 (2026-07-24 충족)
 
-- 빌드된 이미지가 k8s 에 **지속 호스팅**되고 `https://<host>/<context-path>/` 로 접근된다(자산 포함, base-path-aware 앱 기준).
-- 호스팅 서비스가 **관리**된다: 목록/상태/기동·중지/제거가 API+UI 로 동작하고 k8s 실측과 정합.
-- context-path **유일성**이 강제되고 제거 시 자원(Deployment/Service/Ingress/namespace)이 정리된다.
-- 신규 e2e(kind + ingress-nginx, path-routed 접속 + 관리 라이프사이클)가 ALL PASS.
-- 회귀 baseline 이 Phase 2(v0.3.0) 대비 후퇴하지 않음.
+- ✅ 빌드된 이미지가 k8s 에 **지속 호스팅**되고 `http(s)://<host>/<context-path>/` 로 접근된다 — **실 e2e(kind+ingress-nginx)로 자산 포함 로드 실측**(base-path-aware 앱 + `APP_BASE_PATH`).
+- ✅ 호스팅 서비스가 **관리**된다: 목록/기동·중지/제거가 API(admin) + UI(`/admin/hosting`)로 동작, 실 kubectl(K8sAdmin)로 scale/delete 실측.
+- ✅ context-path **유일성** 강제(`CONTEXT_PATH_TAKEN`) + 제거 시 Deployment/Service/Ingress 정리 + context-path 반환.
+- ✅ 신규 e2e(`apps/runner/scripts/e2e-hosting.sh`: path-routed 접속 + 관리 라이프사이클) **ALL PASS**.
+- ✅ 회귀 baseline 후퇴 없음: TS 5 clean / build-server 198 / build-monitor 279 / go 8 pkg / skill_mcp 225 / migration 0001~0010.
+
+**→ Phase 3 완료(2026-07-24).** 마일스톤 P3-M1~M5 전부 봉인(TASK-166~170). 다음: v0.4.0 릴리스 태깅 검토(사용자 결정 대기).
