@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/config"
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/hostclient"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/queue"
@@ -46,10 +47,31 @@ func newWorkerWithDeps(cfg config.Config, client hostclient.BuildControlClient) 
 	}
 	dockerClient := docker.NewClient()
 	fetcher := source.NewFetcher(client, workspaceRoot)
+	svc := services.NewBuildService(client, dockerClient, fetcher, cfg.RunnerID)
+
+	// TASK-165 (P2-M5): k8s adapter 배선. cfg.K8sMode 가 설정된 경우에만
+	// K8sDeployer 를 주입한다. "" 이면 미주입(기존 docker registry 배포만).
+	// "k8s" = kubectl 실구현, "noop"/"skeleton" = noop. 지원하지 않는
+	// mode 는 NewK8sDeployer 가 에러를 돌려주므로 로그만 남기고 미주입한다
+	// (배포 자체가 optional 이라 runner 부팅을 막지 않는다).
+	if cfg.K8sMode != "" {
+		k8sDeployer, err := deploy.NewK8sDeployer(cfg.K8sMode, deploy.K8sDeployOptions{
+			Cluster:   cfg.K8sCluster,
+			Namespace: cfg.K8sNamespace,
+			Manifest:  cfg.K8sManifest,
+		})
+		if err != nil {
+			log.Printf("runner %s: k8s adapter 비활성 (mode=%q): %v", cfg.RunnerID, cfg.K8sMode, err)
+		} else {
+			svc = svc.WithK8sDeployer(k8sDeployer)
+			log.Printf("runner %s: k8s adapter 활성 (mode=%q, namespace=%q)", cfg.RunnerID, cfg.K8sMode, cfg.K8sNamespace)
+		}
+	}
+
 	return &Worker{
 		config:  cfg,
 		claimer: queue.NewHostServerClaimer(client),
-		svc:     services.NewBuildService(client, dockerClient, fetcher, cfg.RunnerID),
+		svc:     svc,
 	}
 }
 

@@ -14,7 +14,7 @@ func TestNewK8sDeployer_Modes(t *testing.T) {
 	}{
 		{"noop", "noop", false},
 		{"skeleton", "skeleton", false},
-		{"k8s-still-skeleton-this-commit", "k8s", false},
+		{"k8s-real-kubectl", "k8s", false},
 		{"unsupported-empty", "", true},
 		{"unsupported-rubbish", "garbage", true},
 	}
@@ -72,7 +72,7 @@ func TestNoopSkeleton_Deploy_EmptySource(t *testing.T) {
 }
 
 func TestNoopSkeleton_Apply_EmptyManifest(t *testing.T) {
-	d, _ := NewK8sDeployer("k8s", K8sDeployOptions{Cluster: "c", Namespace: "n", BuildID: "b"})
+	d, _ := NewK8sDeployer("noop", K8sDeployOptions{Cluster: "c", Namespace: "n", BuildID: "b"})
 	_, err := d.Apply(context.Background(), K8sApplyOptions{Cluster: "c", Namespace: "n", BuildID: "b"})
 	if err == nil {
 		t.Errorf("expected error for empty manifest")
@@ -80,7 +80,7 @@ func TestNoopSkeleton_Apply_EmptyManifest(t *testing.T) {
 }
 
 func TestNoopSkeleton_Apply_OK(t *testing.T) {
-	d, _ := NewK8sDeployer("k8s", K8sDeployOptions{Cluster: "c", Namespace: "n", BuildID: "b"})
+	d, _ := NewK8sDeployer("noop", K8sDeployOptions{Cluster: "c", Namespace: "n", BuildID: "b"})
 	res, err := d.Apply(context.Background(), K8sApplyOptions{
 		Cluster:   "c",
 		Namespace: "n",

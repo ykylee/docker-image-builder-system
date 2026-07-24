@@ -99,12 +99,10 @@ func NewK8sDeployer(mode string, opts K8sDeployOptions) (K8sDeployer, error) {
 	case "noop", "skeleton":
 		return &noopSkeleton{}, nil
 	case "k8s":
-		// P2-M5 의 실제 구현체가 들어갈 자리. 본 commit 은 interface
-		// + skeleton 만 정의하고, k8s 가용 여부 / cluster 연결성
-		// / manifest path 등이 주어져도 의도적으로 noopSkeleton
-		// 을 반환한다 (사용자 결정 3종 + plan 단계). 후속 commit
-		// 에서 realK8sDeployer 를 추가한다.
-		return &noopSkeleton{opts: opts}, nil
+		// TASK-165 (P2-M5): 실제 kubectl 기반 구현체. manifest apply +
+		// rollout status 대기. cluster 연결성/kubectl 가용은 런타임에
+		// kubectl 이 판정한다(실패 시 Deploy 가 에러 반환 → 배포 FAILED).
+		return newKubectlDeployer(opts), nil
 	default:
 		return nil, fmt.Errorf("deploy: unsupported k8s mode %q", mode)
 	}
