@@ -57,6 +57,10 @@ type K8sDeployOptions struct {
 	Namespace   string // e.g. "builds" or per-build namespace
 	Manifest    string // path to manifest YAML, or "" for skeleton
 	BuildID     string // audit / cleanup 추적용
+	// TASK-167 (P3-M2): 호스팅 입력. ContextPath 는 Ingress path prefix,
+	// ContainerPort 는 앱이 listen 하는 포트(0 이면 deployer 기본 8080).
+	ContextPath   string
+	ContainerPort int
 }
 
 // K8sApplyOptions 는 Apply 의 입력 (manifest 만 별도 호출하는 경우).
@@ -86,6 +90,9 @@ type K8sResult struct {
 	ResultRef    string // e.g. deployment/<name> 의 kubectl get 형태
 	AppliedAt    time.Time
 	DeploymentID string // 선택 — k8s 가 Deployment 를 만든 경우
+	// TASK-167 (P3-M2): 호스팅 좌표. build-server 가 HostedService upsert 시
+	// 사용(URL 은 서버가 HOSTING_BASE_HOST + ContextPath 로 조립).
+	ContextPath string
 }
 
 // NewK8sDeployer 는 K8sDeployer 구현체 factory. mode 가 "k8s" 면 실제

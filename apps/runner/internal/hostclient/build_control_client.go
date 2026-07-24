@@ -44,6 +44,10 @@ type ClaimedBuildResponse struct {
 	Phase           string `json:"phase"`
 	LifecycleStatus string `json:"lifecycleStatus"`
 	UpdatedAt       string `json:"updatedAt"`
+	// TASK-167 (P3-M2): 호스팅 입력. 서버가 build 생성 시 할당한 context path 와
+	// 앱 컨테이너 포트. runner 가 k8s 배포(Ingress) 시 사용한다.
+	ContextPath string `json:"contextPath"`
+	RuntimePort int    `json:"runtimePort"`
 }
 
 type claimResponseBody struct {
@@ -69,6 +73,8 @@ type buildSummaryBody struct {
 	Phase           string `json:"phase"`
 	LifecycleStatus string `json:"lifecycleStatus"`
 	UpdatedAt       string `json:"updatedAt"`
+	ContextPath     string `json:"contextPath"`
+	RuntimePort     int    `json:"runtimePort"`
 }
 
 // PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
@@ -139,6 +145,8 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		Phase:           inner.Phase,
 		LifecycleStatus: inner.LifecycleStatus,
 		UpdatedAt:       inner.UpdatedAt,
+		ContextPath:     inner.ContextPath,
+		RuntimePort:     inner.RuntimePort,
 	}, nil
 }
 
@@ -301,12 +309,17 @@ type ContainerTestResultRequest struct {
 }
 
 type DeploymentReportRequest struct {
-	Status              string         `json:"status"`
-	TargetType          string         `json:"targetType"`
-	TargetRef           string         `json:"targetRef,omitempty"`
-	ResultRef           string         `json:"resultRef,omitempty"`
-	ErrorCode           string         `json:"errorCode,omitempty"`
-	ErrorMessage        string         `json:"errorMessage,omitempty"`
+	Status       string `json:"status"`
+	TargetType   string `json:"targetType"`
+	TargetRef    string `json:"targetRef,omitempty"`
+	ResultRef    string `json:"resultRef,omitempty"`
+	ErrorCode    string `json:"errorCode,omitempty"`
+	ErrorMessage string `json:"errorMessage,omitempty"`
+	// TASK-167 (P3-M2): 호스팅 좌표. 배포 성공 시 build-server 가 이 값으로
+	// HostedService 를 upsert 한다(§9-2).
+	ContextPath         string         `json:"contextPath,omitempty"`
+	Namespace           string         `json:"namespace,omitempty"`
+	DeploymentName      string         `json:"deploymentName,omitempty"`
 	RunnerID            string         `json:"runnerId"`
 	ResponsePayloadJSON map[string]any `json:"responsePayloadJson,omitempty"`
 }

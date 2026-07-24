@@ -94,7 +94,16 @@ func (d *kubectlDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K
 
 	namespace := d.namespaceOf(opts)
 	name := deploymentName(opts.BuildID)
-	manifest := renderK8sManifest(name, namespace, opts.SourceImage, d.containerPort)
+	port := opts.ContainerPort
+	if port <= 0 {
+		port = d.containerPort
+	}
+	// context path 미지정 시 deployment 이름을 fallback 으로 쓴다.
+	contextPath := opts.ContextPath
+	if contextPath == "" {
+		contextPath = name
+	}
+	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
@@ -123,6 +132,7 @@ func (d *kubectlDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K
 		ResultRef:    fmt.Sprintf("deployment/%s", name),
 		AppliedAt:    d.now().UTC(),
 		DeploymentID: name,
+		ContextPath:  contextPath,
 	}, nil
 }
 
@@ -213,9 +223,15 @@ func deploymentName(buildID string) string {
 	return s
 }
 
-// renderK8sManifest 는 Namespace + Deployment + Service 3-doc YAML 을 만든다.
-// imagePullPolicy=IfNotPresent 로 로컬(kind 적재) 이미지를 그대로 쓴다.
-func renderK8sManifest(name, namespace, image string, port int) string {
+// renderK8sManifest 는 Namespace + Deployment + Service + Ingress 4-doc YAML
+// 을 만든다(TASK-167 / P3-M2). imagePullPolicy=IfNotPresent 로 로컬(kind 적재)
+// 이미지를 그대로 쓴다.
+//
+// 호스팅 라우팅: Ingress 가 `/<contextPath>(/|$)(.*)` 를 Service 로 보내고
+// rewrite-target `/$2` 로 prefix 를 벗겨 앱 서버는 루트 기준 요청을 받는다.
+// 앱은 `APP_BASE_PATH=/<contextPath>/` env 를 읽어 자신이 브라우저에 emit 하는
+// 자산/링크 URL 에 prefix 를 붙인다(설계 §6). ingressClassName=nginx 전제.
+func renderK8sManifest(name, namespace, image string, port int, contextPath string) string {
 	return fmt.Sprintf(`apiVersion: v1
 kind: Namespace
 metadata:
@@ -243,6 +259,9 @@ spec:
         - name: app
           image: %[3]s
           imagePullPolicy: IfNotPresent
+          env:
+            - name: APP_BASE_PATH
+              value: "/%[5]s/"
           ports:
             - containerPort: %[4]d
 ---
@@ -259,5 +278,28 @@ spec:
   ports:
     - port: %[4]d
       targetPort: %[4]d
-`, name, namespace, image, port)
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: %[1]s
+  namespace: %[2]s
+  labels:
+    app.kubernetes.io/name: %[1]s
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /%[5]s(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: %[1]s
+                port:
+                  number: %[4]d
+`, name, namespace, image, port, contextPath)
 }

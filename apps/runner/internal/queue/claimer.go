@@ -11,6 +11,9 @@ type ClaimedBuild struct {
 	AppName string
 	Status  string
 	Phase   string
+	// TASK-167 (P3-M2): 호스팅 입력. 배포(Ingress) 시 사용.
+	ContextPath string
+	RuntimePort int
 }
 
 type Claimer interface {
@@ -38,9 +41,11 @@ func (c *HostServerClaimer) ClaimNext(ctx context.Context) (*ClaimedBuild, error
 	}
 
 	return &ClaimedBuild{
-		BuildID: response.BuildID,
-		AppName: response.AppName,
-		Status:  response.Status,
-		Phase:   response.Phase,
+		BuildID:     response.BuildID,
+		AppName:     response.AppName,
+		Status:      response.Status,
+		Phase:       response.Phase,
+		ContextPath: response.ContextPath,
+		RuntimePort: response.RuntimePort,
 	}, nil
 }

@@ -129,7 +129,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return s.fail(ctx, buildID, failure)
 	}
 
-	if failure := s.deployImage(ctx, buildID, containerStatus); failure != nil {
+	if failure := s.deployImage(ctx, buildID, containerStatus, claim.ContextPath, claim.RuntimePort); failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
 
@@ -335,6 +335,8 @@ func (s *BuildService) deployImage(
 	ctx context.Context,
 	buildID string,
 	containerStatus *docker.ContainerStatus,
+	contextPath string,
+	runtimePort int,
 ) *stageFailure {
 	// 컨테이너는 컨테이너 테스트가 끝난 뒤 정리한다. e2e script 가
 	// RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 cleanup 을 검증한다.
@@ -376,13 +378,16 @@ func (s *BuildService) deployImage(
 	// FAILED 를 보고하고 배포 단계를 실패 처리한다.
 	reportPayload := deployResult.ResponsePayloadJSON
 	reportTargetType := deployResult.TargetType
+	var k8sResult *deploy.K8sResult
 	if s.k8sDeployer != nil {
-		k8sResult, kErr := s.k8sDeployer.Deploy(ctx, deploy.K8sDeployOptions{
-			SourceImage: containerStatus.ImageTag,
-			Cluster:     os.Getenv("RUNNER_K8S_CLUSTER"),
-			Namespace:   os.Getenv("RUNNER_K8S_NAMESPACE"),
-			Manifest:    os.Getenv("RUNNER_K8S_MANIFEST"),
-			BuildID:     buildID,
+		kRes, kErr := s.k8sDeployer.Deploy(ctx, deploy.K8sDeployOptions{
+			SourceImage:   containerStatus.ImageTag,
+			Cluster:       os.Getenv("RUNNER_K8S_CLUSTER"),
+			Namespace:     os.Getenv("RUNNER_K8S_NAMESPACE"),
+			Manifest:      os.Getenv("RUNNER_K8S_MANIFEST"),
+			BuildID:       buildID,
+			ContextPath:   contextPath,
+			ContainerPort: runtimePort,
 		})
 		if kErr != nil {
 			_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
@@ -394,8 +399,11 @@ func (s *BuildService) deployImage(
 			})
 			return &stageFailure{errorCode: contract.ErrorCodeDeploymentFailed, err: kErr}
 		}
-		// docker registry 결과와 합쳐 단일 SUCCESS 보고로 emit —
-		// TargetType 에 ",K8S" 부착 + payload 에 k8s section 추가.
+		k8sResult = kRes
+		// docker registry 결과를 payload 의 k8s section 으로 합친다. 호스팅이
+		// 활성이면 TargetType 은 "K8S" 로 보고한다(서버가 HostedService 를
+		// upsert 하고 canonical enum 을 만족하도록 — P2-M5 의 ",K8S" 병합은
+		// 서버 enum 에 없어 거부됐다, TASK-167).
 		if reportPayload == nil {
 			reportPayload = map[string]any{}
 		}
@@ -406,17 +414,26 @@ func (s *BuildService) deployImage(
 			"resultRef": k8sResult.ResultRef,
 			"appliedAt": k8sResult.AppliedAt,
 		}
-		reportTargetType = deployResult.TargetType + ",K8S"
+		reportTargetType = "K8S"
 	}
 
-	if err := s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
+	successReport := hostclient.DeploymentReportRequest{
 		Status:              contract.ExecutionStatusSuccess,
 		TargetType:          reportTargetType,
 		TargetRef:           deployResult.TargetRef,
 		ResultRef:           deployResult.ResultRef,
 		RunnerID:            s.runnerID,
 		ResponsePayloadJSON: reportPayload,
-	}); err != nil {
+	}
+	// TASK-167 (P3-M2): 호스팅 좌표를 실어 build-server 가 HostedService 를
+	// upsert 하게 한다.
+	if k8sResult != nil {
+		successReport.ContextPath = k8sResult.ContextPath
+		successReport.Namespace = k8sResult.Namespace
+		successReport.DeploymentName = k8sResult.DeploymentID
+		successReport.ResultRef = k8sResult.ResultRef
+	}
+	if err := s.hostClient.ReportDeployment(ctx, buildID, successReport); err != nil {
 		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
 	return nil

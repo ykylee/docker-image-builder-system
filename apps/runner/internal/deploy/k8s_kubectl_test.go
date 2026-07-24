@@ -81,6 +81,44 @@ func TestKubectlDeploy_AppliesManifestAndWaitsRollout(t *testing.T) {
 	}
 }
 
+func TestKubectlDeploy_RendersIngressAndBasePath(t *testing.T) {
+	d, calls := newRecordingDeployer(K8sDeployOptions{Namespace: "dib-hosted"})
+	res, err := d.Deploy(context.Background(), K8sDeployOptions{
+		SourceImage:   "img:1",
+		Namespace:     "dib-hosted",
+		BuildID:       "b-9",
+		ContextPath:   "todo-app",
+		ContainerPort: 3000,
+	})
+	if err != nil {
+		t.Fatalf("Deploy: %v", err)
+	}
+	m := (*calls)[0].stdin
+	// Ingress + rewrite-target + context-path 규칙
+	if !strings.Contains(m, "kind: Ingress") {
+		t.Errorf("manifest missing Ingress:\n%s", m)
+	}
+	if !strings.Contains(m, "ingressClassName: nginx") {
+		t.Errorf("manifest missing ingressClassName nginx")
+	}
+	if !strings.Contains(m, "rewrite-target: /$2") {
+		t.Errorf("manifest missing rewrite-target")
+	}
+	if !strings.Contains(m, "path: /todo-app(/|$)(.*)") {
+		t.Errorf("manifest missing context-path rule:\n%s", m)
+	}
+	// APP_BASE_PATH env 주입 + containerPort 반영
+	if !strings.Contains(m, `name: APP_BASE_PATH`) || !strings.Contains(m, `value: "/todo-app/"`) {
+		t.Errorf("manifest missing APP_BASE_PATH env:\n%s", m)
+	}
+	if !strings.Contains(m, "containerPort: 3000") {
+		t.Errorf("manifest missing containerPort 3000 (runtimePort)")
+	}
+	if res.ContextPath != "todo-app" {
+		t.Errorf("result ContextPath = %q, want todo-app", res.ContextPath)
+	}
+}
+
 func TestKubectlDeploy_WithClusterAddsContext(t *testing.T) {
 	d, calls := newRecordingDeployer(K8sDeployOptions{})
 	_, err := d.Deploy(context.Background(), K8sDeployOptions{
