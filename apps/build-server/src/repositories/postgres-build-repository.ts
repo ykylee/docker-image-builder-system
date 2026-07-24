@@ -97,6 +97,7 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     // TASK-167 (P3-M2): 호스팅 입력을 claim 응답으로 runner 에 전달.
     contextPath: row.contextPath,
     runtimePort: row.runtimePort,
+    stripPrefix: row.stripPrefix,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });
@@ -236,6 +237,7 @@ export class PostgresBuildRepository implements BuildRepository {
           // TASK-166 (P3-M1): 할당된 호스팅 context path + 앱 컨테이너 포트.
           contextPath: input.contextPath ?? null,
           runtimePort: input.runtimePort ?? 8080,
+          stripPrefix: input.stripPrefix ?? true,
           runtimeUrl: null,
           lastErrorCode: null,
           lastErrorMessage: null,

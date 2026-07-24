@@ -48,6 +48,8 @@ type ClaimedBuildResponse struct {
 	// 앱 컨테이너 포트. runner 가 k8s 배포(Ingress) 시 사용한다.
 	ContextPath string `json:"contextPath"`
 	RuntimePort int    `json:"runtimePort"`
+	// TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
+	StripPrefix bool `json:"stripPrefix"`
 }
 
 type claimResponseBody struct {
@@ -75,6 +77,7 @@ type buildSummaryBody struct {
 	UpdatedAt       string `json:"updatedAt"`
 	ContextPath     string `json:"contextPath"`
 	RuntimePort     int    `json:"runtimePort"`
+	StripPrefix     bool   `json:"stripPrefix"`
 }
 
 // PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
@@ -147,6 +150,7 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		UpdatedAt:       inner.UpdatedAt,
 		ContextPath:     inner.ContextPath,
 		RuntimePort:     inner.RuntimePort,
+		StripPrefix:     inner.StripPrefix,
 	}, nil
 }
 

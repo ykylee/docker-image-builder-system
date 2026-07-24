@@ -80,6 +80,8 @@ type StoredBuild = {
   // build 생성 시 서비스가 정규화/검증해 채운다. runner 가 배포(P3-M2) 시 사용.
   contextPath: string | null;
   runtimePort: number;
+  // TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
+  stripPrefix: boolean;
 };
 
 // TASK-166 (P3-M1): 호스팅 registry(앱당 1개). deployment 성공 시 upsert.
@@ -159,6 +161,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         // runner 에 전달한다.
         contextPath: input.contextPath ?? null,
         runtimePort: input.runtimePort ?? 8080,
+        stripPrefix: input.stripPrefix ?? true,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -187,7 +190,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         // 전까지 in-flight.
         currentPhaseStartedAt: timestamp,
         contextPath: input.contextPath ?? null,
-        runtimePort: input.runtimePort ?? 8080
+        runtimePort: input.runtimePort ?? 8080,
+        stripPrefix: input.stripPrefix ?? true
       });
 
       return {

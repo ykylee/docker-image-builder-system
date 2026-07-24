@@ -164,6 +164,37 @@ describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () 
     assert.equal(hosted!.containerPort, 8080);
   });
 
+  it("stripPrefix=false 빌드는 HostedService 에 그대로 반영 (TASK-169)", async () => {
+    const repo = createMemoryBuildRepository();
+    const svc = new BuildService(repo, {
+      strictContentRange: false,
+      hostingBaseHost: "apps.example.com"
+    });
+    const bytes = new Uint8Array(randomBytes(16));
+    const checksum = createHash("sha256")
+      .update(Buffer.from(bytes))
+      .digest("hex");
+    const created = await svc.createBuild({
+      appName: "next-app",
+      requestedBy: "yklee",
+      sourceArchive: { objectKey: "k", checksumSha256: checksum, sizeBytes: bytes.byteLength },
+      entrypointPath: "src/index.ts",
+      dockerfilePath: "Dockerfile",
+      stripPrefix: false,
+      metadata: {}
+    });
+    const buildId = created.kind === "accepted" ? created.response.build.buildId : "";
+
+    await svc.reportDeploymentResult(buildId, {
+      status: "SUCCESS",
+      targetType: "K8S",
+      contextPath: "next-app",
+      runnerId: "r-1"
+    });
+    const hosted = await svc.getHostedService("next-app");
+    assert.equal(hosted!.stripPrefix, false);
+  });
+
   it("HOSTING_BASE_HOST 미설정 시 upsert 안 함(호스팅 비활성)", async () => {
     const repo = createMemoryBuildRepository();
     const svc = new BuildService(repo, { strictContentRange: false });

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
 
 // v0.2 schema (TASK-045): appName 이 canonical identifier 다. legacy
 // project_id / repository_id 컬럼은 bootstrap.ts 의 bootstrapStatements
@@ -27,6 +27,8 @@ export const buildRequestTable = pgTable("build_request", {
   // 포트(기본 8080). runner 가 배포(P3-M2) 시 사용한다. migration 0009.
   contextPath: text("context_path"),
   runtimePort: integer("runtime_port").notNull().default(8080),
+  // TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true). migration 0010.
+  stripPrefix: boolean("strip_prefix").notNull().default(true),
   // TASK-161 (P2-M2): canonical 이름으로 정렬 — build_test.runtime_url 과
   // 같은 개념이다. 구 preview_url 은 migration 0008 에서 rename 됐다.
   runtimeUrl: text("runtime_url"),

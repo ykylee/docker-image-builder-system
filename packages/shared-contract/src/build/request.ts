@@ -63,6 +63,12 @@ export const buildRequestSchema = z
     // (`.default()` 는 OpenAPI 산출에서 required 로 나와 소비자에게 강제되므로
     // optional + 서버측 fallback 으로 둔다).
     runtimePort: z.int().positive().optional(),
+    // TASK-169 (P3-M4): Ingress 가 context-path prefix 를 strip 하는지(설계 §6).
+    // true(기본): rewrite-target 으로 prefix 를 벗겨 앱 서버는 루트 기준 요청을
+    // 받고, 앱은 APP_BASE_PATH 로 emit URL 에만 prefix. false: pass-through —
+    // 앱 서버가 `/<cp>/...` 를 직접 서빙(base-path-aware 서버, 예: Next basePath).
+    // optional + 서버측 기본 true.
+    stripPrefix: z.boolean().optional(),
     // TASK-160 (P2-M1 Step 3): `previewTtlMinutes` 제거. preview 런타임의
     // 보존 시간 knob 이었으나 canonical build/test/deploy 모델에는 대응
     // 개념이 없고 실제로 소비되는 곳도 없었다.

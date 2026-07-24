@@ -77,6 +77,10 @@ export const buildSummarySchema = z
     runtimePort: z.int().positive().optional().meta({
       description: "App container listen port used by hosting Service/Ingress. Defaults to 8080."
     }),
+    // TASK-169 (P3-M4): Ingress prefix strip 여부(claim 으로 runner 에 전달).
+    stripPrefix: z.boolean().optional().meta({
+      description: "Whether the hosting Ingress strips the context-path prefix (default true)."
+    }),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
         "Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window."

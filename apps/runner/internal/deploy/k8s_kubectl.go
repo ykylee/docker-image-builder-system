@@ -103,7 +103,7 @@ func (d *kubectlDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K
 	if contextPath == "" {
 		contextPath = name
 	}
-	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath)
+	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath, opts.StripPrefix)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
@@ -227,11 +227,25 @@ func deploymentName(buildID string) string {
 // 을 만든다(TASK-167 / P3-M2). imagePullPolicy=IfNotPresent 로 로컬(kind 적재)
 // 이미지를 그대로 쓴다.
 //
-// 호스팅 라우팅: Ingress 가 `/<contextPath>(/|$)(.*)` 를 Service 로 보내고
-// rewrite-target `/$2` 로 prefix 를 벗겨 앱 서버는 루트 기준 요청을 받는다.
-// 앱은 `APP_BASE_PATH=/<contextPath>/` env 를 읽어 자신이 브라우저에 emit 하는
-// 자산/링크 URL 에 prefix 를 붙인다(설계 §6). ingressClassName=nginx 전제.
-func renderK8sManifest(name, namespace, image string, port int, contextPath string) string {
+// 호스팅 라우팅(설계 §6):
+//   - stripPrefix=true(기본): Ingress 가 `/<cp>(/|$)(.*)` 를 Service 로 보내고
+//     rewrite-target `/$2` 로 prefix 를 벗겨 앱 서버는 루트 기준 요청을 받는다.
+//     앱은 `APP_BASE_PATH=/<cp>/` 를 읽어 emit URL 에만 prefix 를 붙인다.
+//   - stripPrefix=false: rewrite 없이 `/<cp>` (Prefix) 를 그대로 넘겨 앱 서버가
+//     `/<cp>/...` 를 직접 서빙(base-path-aware 서버, 예: Next basePath).
+//
+// 어느 경우든 APP_BASE_PATH env 는 주입한다. ingressClassName=nginx 전제.
+func renderK8sManifest(name, namespace, image string, port int, contextPath string, stripPrefix bool) string {
+	ingressAnnotations := ""
+	ingressPath := fmt.Sprintf("/%s", contextPath)
+	pathType := "Prefix"
+	if stripPrefix {
+		ingressAnnotations = "  annotations:\n" +
+			"    nginx.ingress.kubernetes.io/rewrite-target: /$2\n" +
+			"    nginx.ingress.kubernetes.io/use-regex: \"true\"\n"
+		ingressPath = fmt.Sprintf("/%s(/|$)(.*)", contextPath)
+		pathType = "ImplementationSpecific"
+	}
 	return fmt.Sprintf(`apiVersion: v1
 kind: Namespace
 metadata:
@@ -286,20 +300,17 @@ metadata:
   namespace: %[2]s
   labels:
     app.kubernetes.io/name: %[1]s
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
+%[6]sspec:
   ingressClassName: nginx
   rules:
     - http:
         paths:
-          - path: /%[5]s(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: %[7]s
+            pathType: %[8]s
             backend:
               service:
                 name: %[1]s
                 port:
                   number: %[4]d
-`, name, namespace, image, port, contextPath)
+`, name, namespace, image, port, contextPath, ingressAnnotations, ingressPath, pathType)
 }

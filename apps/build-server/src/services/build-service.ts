@@ -509,7 +509,7 @@ export class BuildService {
         namespace: input.namespace ?? "dib-hosted",
         deploymentName: input.deploymentName ?? `dib-${contextPath}`,
         containerPort: build.runtimePort ?? 8080,
-        stripPrefix: true,
+        stripPrefix: build.stripPrefix ?? true,
         status: "RUNNING",
         url: `https://${this.runtime.hostingBaseHost}/${contextPath}/`,
         currentBuildId: buildId,

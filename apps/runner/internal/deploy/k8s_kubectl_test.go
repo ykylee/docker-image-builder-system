@@ -89,12 +89,13 @@ func TestKubectlDeploy_RendersIngressAndBasePath(t *testing.T) {
 		BuildID:       "b-9",
 		ContextPath:   "todo-app",
 		ContainerPort: 3000,
+		StripPrefix:   true,
 	})
 	if err != nil {
 		t.Fatalf("Deploy: %v", err)
 	}
 	m := (*calls)[0].stdin
-	// Ingress + rewrite-target + context-path 규칙
+	// Ingress + rewrite-target + context-path 규칙 (stripPrefix=true)
 	if !strings.Contains(m, "kind: Ingress") {
 		t.Errorf("manifest missing Ingress:\n%s", m)
 	}
@@ -116,6 +117,34 @@ func TestKubectlDeploy_RendersIngressAndBasePath(t *testing.T) {
 	}
 	if res.ContextPath != "todo-app" {
 		t.Errorf("result ContextPath = %q, want todo-app", res.ContextPath)
+	}
+}
+
+func TestKubectlDeploy_StripPrefixFalsePassThrough(t *testing.T) {
+	d, calls := newRecordingDeployer(K8sDeployOptions{Namespace: "dib-hosted"})
+	if _, err := d.Deploy(context.Background(), K8sDeployOptions{
+		SourceImage: "img:1",
+		Namespace:   "dib-hosted",
+		BuildID:     "b-10",
+		ContextPath: "next-app",
+		StripPrefix: false,
+	}); err != nil {
+		t.Fatalf("Deploy: %v", err)
+	}
+	m := (*calls)[0].stdin
+	// pass-through: rewrite-target 없음, path 는 prefix 그대로
+	if strings.Contains(m, "rewrite-target") {
+		t.Errorf("stripPrefix=false 인데 rewrite-target 존재:\n%s", m)
+	}
+	if !strings.Contains(m, "path: /next-app") || strings.Contains(m, "/next-app(/|$)") {
+		t.Errorf("stripPrefix=false path 는 /next-app(Prefix) 여야 함:\n%s", m)
+	}
+	if !strings.Contains(m, "pathType: Prefix") {
+		t.Errorf("stripPrefix=false 는 pathType Prefix 여야 함")
+	}
+	// APP_BASE_PATH 는 어느 경우든 주입
+	if !strings.Contains(m, `value: "/next-app/"`) {
+		t.Errorf("APP_BASE_PATH 누락(stripPrefix 무관 주입):\n%s", m)
 	}
 }
 

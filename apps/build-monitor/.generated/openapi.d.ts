@@ -890,6 +890,8 @@ export interface components {
             contextPath?: string | null;
             /** @description App container listen port used by hosting Service/Ingress. Defaults to 8080. */
             runtimePort?: number;
+            /** @description Whether the hosting Ingress strips the context-path prefix (default true). */
+            stripPrefix?: boolean;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -1159,6 +1161,7 @@ export interface components {
             /** @description Optional hosting URL context path. Defaults to a normalized appName. Server normalizes and enforces global uniqueness. */
             contextPath?: string;
             runtimePort?: number;
+            stripPrefix?: boolean;
             /** @default {} */
             metadata: {
                 [key: string]: string;
@@ -1215,6 +1218,8 @@ export interface components {
             contextPath?: string | null;
             /** @description App container listen port used by hosting Service/Ingress. Defaults to 8080. */
             runtimePort?: number;
+            /** @description Whether the hosting Ingress strips the context-path prefix (default true). */
+            stripPrefix?: boolean;
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}

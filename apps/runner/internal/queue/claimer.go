@@ -14,6 +14,8 @@ type ClaimedBuild struct {
 	// TASK-167 (P3-M2): 호스팅 입력. 배포(Ingress) 시 사용.
 	ContextPath string
 	RuntimePort int
+	// TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
+	StripPrefix bool
 }
 
 type Claimer interface {
@@ -47,5 +49,6 @@ func (c *HostServerClaimer) ClaimNext(ctx context.Context) (*ClaimedBuild, error
 		Phase:       response.Phase,
 		ContextPath: response.ContextPath,
 		RuntimePort: response.RuntimePort,
+		StripPrefix: response.StripPrefix,
 	}, nil
 }

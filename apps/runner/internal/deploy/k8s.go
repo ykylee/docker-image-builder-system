@@ -61,6 +61,8 @@ type K8sDeployOptions struct {
 	// ContainerPort 는 앱이 listen 하는 포트(0 이면 deployer 기본 8080).
 	ContextPath   string
 	ContainerPort int
+	// TASK-169 (P3-M4): Ingress 가 prefix 를 strip 하는지(rewrite-target).
+	StripPrefix bool
 }
 
 // K8sApplyOptions 는 Apply 의 입력 (manifest 만 별도 호출하는 경우).
