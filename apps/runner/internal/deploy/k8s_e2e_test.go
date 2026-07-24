@@ -16,7 +16,6 @@ package deploy
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -48,15 +47,19 @@ func TestK8sE2E_RealDeploy(t *testing.T) {
 		t.Fatalf("NewK8sDeployer: %v", err)
 	}
 
-	// P3-M5: context path 가 주어지면 Ingress 라우팅 e2e — stripPrefix=true.
-	// 없으면 P2-M5 배포 e2e(deployment 이름 fallback).
+	// P3-M5: context path 가 주어지면 Ingress 라우팅 e2e. scheme 은 path(기본,
+	// stripPrefix=true) / subdomain(TASK-172, host rule + BaseHost). 없으면
+	// P2-M5 배포 e2e(deployment 이름 fallback).
+	scheme := os.Getenv("DIB_K8S_E2E_SCHEME")
 	opts := K8sDeployOptions{
-		SourceImage: image,
-		Cluster:     kctx,
-		Namespace:   ns,
-		BuildID:     buildID,
-		ContextPath: os.Getenv("DIB_K8S_E2E_CONTEXT_PATH"),
-		StripPrefix: os.Getenv("DIB_K8S_E2E_CONTEXT_PATH") != "",
+		SourceImage:   image,
+		Cluster:       kctx,
+		Namespace:     ns,
+		BuildID:       buildID,
+		ContextPath:   os.Getenv("DIB_K8S_E2E_CONTEXT_PATH"),
+		StripPrefix:   os.Getenv("DIB_K8S_E2E_CONTEXT_PATH") != "" && scheme != "subdomain",
+		HostingScheme: scheme,
+		BaseHost:      os.Getenv("DIB_K8S_E2E_BASE_HOST"),
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
@@ -102,26 +105,26 @@ func TestK8sE2E_RealDeploy(t *testing.T) {
 	}
 	t.Logf("k8s e2e OK: %s (availableReplicas=1)", res.ResultRef)
 
-	// P3-M5: context path + ingress URL 이 주어지면 실제 Ingress 라우팅 +
-	// APP_BASE_PATH 자산 로드를 검증한다(base 는 host/<cp>/).
-	cp := os.Getenv("DIB_K8S_E2E_CONTEXT_PATH")
-	ingress := os.Getenv("DIB_K8S_E2E_INGRESS_URL")
-	if cp == "" || ingress == "" {
+	// P3-M5 / TASK-172: page URL 이 주어지면 실 Ingress 라우팅 + 자산 로드를
+	// 검증한다. path 스킴은 host/<cp>/, subdomain 스킴은 <cp>.<host>/ — 어느
+	// 쪽이든 PAGE_URL 은 앱 루트를 가리키므로 PAGE_URL + "app.js" 가 자산이다.
+	pageURL := os.Getenv("DIB_K8S_E2E_PAGE_URL")
+	if pageURL == "" {
 		return
 	}
-	pageURL := fmt.Sprintf("%s/%s/", strings.TrimRight(ingress, "/"), cp)
-	assetURL := fmt.Sprintf("%s/%s/app.js", strings.TrimRight(ingress, "/"), cp)
+	base := strings.TrimRight(pageURL, "/") + "/"
+	assetURL := base + "app.js"
 
 	// ingress 전파 지연 흡수 — 최대 30회 재시도.
-	body := httpGetWithRetry(t, pageURL, 30)
-	if !strings.Contains(body, fmt.Sprintf("/%s/app.js", cp)) {
-		t.Fatalf("page 가 APP_BASE_PATH prefix 자산을 참조하지 않음:\n%s", body)
+	body := httpGetWithRetry(t, base, 30)
+	if !strings.Contains(body, "hosted") {
+		t.Fatalf("page 가 예상 콘텐츠를 담지 않음:\n%s", body)
 	}
 	asset := httpGetWithRetry(t, assetURL, 10)
 	if !strings.Contains(asset, "hosted OK") {
 		t.Fatalf("asset(app.js) 로드 실패:\n%s", asset)
 	}
-	t.Logf("P3-M5 라우팅 OK: %s (page + %s/app.js 자산 로드)", pageURL, cp)
+	t.Logf("P3-M5 라우팅 OK (scheme=%s): %s (page + app.js 자산 로드)", scheme, base)
 }
 
 func httpGetWithRetry(t *testing.T, url string, attempts int) string {

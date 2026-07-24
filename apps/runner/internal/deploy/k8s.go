@@ -63,6 +63,10 @@ type K8sDeployOptions struct {
 	ContainerPort int
 	// TASK-169 (P3-M4): Ingress 가 prefix 를 strip 하는지(rewrite-target).
 	StripPrefix bool
+	// TASK-172 (v0.5.0): 호스팅 URL 스킴("path"|"subdomain", 기본 path).
+	// subdomain 이면 Ingress host rule = `<cp>.<BaseHost>`.
+	HostingScheme string
+	BaseHost      string
 }
 
 // K8sApplyOptions 는 Apply 의 입력 (manifest 만 별도 호출하는 경우).

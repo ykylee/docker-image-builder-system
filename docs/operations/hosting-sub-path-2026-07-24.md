@@ -39,7 +39,7 @@
 
 - **1급 지원**: `APP_BASE_PATH` 규약을 따르는 앱(emit URL 에 prefix) 또는 base-path-aware 서버(`stripPrefix=false`).
 - **지원 안 됨**: 자산 경로를 **절대 루트로 하드코딩**(`/main.js`)하고 `APP_BASE_PATH` 도 base 설정도 없는 앱. 이 경우 브라우저가 context-path 밖(`host/main.js`)을 요청해 404 가 난다. path-prefix 호스팅의 본질적 한계다.
-- 완전 격리(앱 수정 없이)가 필요하면 후속의 **subdomain 스킴**(`<app>.host`)이 대안이나 Phase 3 범위 밖이다.
+- 완전 격리(앱 수정 없이)가 필요하면 **subdomain 스킴**(`<app>.host`, `BuildRequest.hostingScheme="subdomain"`, TASK-172)을 쓴다 — 앱이 자기 subdomain 루트에서 서빙돼 절대경로 자산이 자연 동작(무수정). wildcard DNS/TLS 필요(dev/e2e 는 nip.io). [설계](../design/subdomain-hosting.md) 참조.
 - `<base href="/<cp>/">` 주입(HTML 상대경로 앱 구제)은 best-effort 옵션으로 후속 검토(절대경로/JS fetch 는 못 구제).
 
 ## 4. 빌드 요청 필드 (호스팅)

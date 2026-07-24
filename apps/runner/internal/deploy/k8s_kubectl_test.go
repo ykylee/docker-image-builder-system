@@ -148,6 +148,36 @@ func TestKubectlDeploy_StripPrefixFalsePassThrough(t *testing.T) {
 	}
 }
 
+func TestKubectlDeploy_SubdomainScheme(t *testing.T) {
+	d, calls := newRecordingDeployer(K8sDeployOptions{Namespace: "dib-hosted"})
+	if _, err := d.Deploy(context.Background(), K8sDeployOptions{
+		SourceImage:   "img:1",
+		Namespace:     "dib-hosted",
+		BuildID:       "b-11",
+		ContextPath:   "todo-app",
+		HostingScheme: "subdomain",
+		BaseHost:      "apps.example.com",
+	}); err != nil {
+		t.Fatalf("Deploy: %v", err)
+	}
+	m := (*calls)[0].stdin
+	// subdomain: host rule 로 라우팅
+	if !strings.Contains(m, "host: todo-app.apps.example.com") {
+		t.Errorf("manifest missing subdomain host rule:\n%s", m)
+	}
+	// prefix strip/rewrite 없음, path 는 루트
+	if strings.Contains(m, "rewrite-target") {
+		t.Errorf("subdomain 인데 rewrite-target 존재:\n%s", m)
+	}
+	if !strings.Contains(m, "path: /\n") {
+		t.Errorf("subdomain path 는 / 여야 함:\n%s", m)
+	}
+	// APP_BASE_PATH 는 루트(/)
+	if !strings.Contains(m, `value: "/"`) {
+		t.Errorf("subdomain APP_BASE_PATH 는 / 여야 함:\n%s", m)
+	}
+}
+
 func TestKubectlDeploy_WithClusterAddsContext(t *testing.T) {
 	d, calls := newRecordingDeployer(K8sDeployOptions{})
 	_, err := d.Deploy(context.Background(), K8sDeployOptions{

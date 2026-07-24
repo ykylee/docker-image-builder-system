@@ -29,6 +29,8 @@ export const buildRequestTable = pgTable("build_request", {
   runtimePort: integer("runtime_port").notNull().default(8080),
   // TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true). migration 0010.
   stripPrefix: boolean("strip_prefix").notNull().default(true),
+  // TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path). migration 0011.
+  hostingScheme: text("hosting_scheme").notNull().default("path"),
   // TASK-161 (P2-M2): canonical 이름으로 정렬 — build_test.runtime_url 과
   // 같은 개념이다. 구 preview_url 은 migration 0008 에서 rename 됐다.
   runtimeUrl: text("runtime_url"),

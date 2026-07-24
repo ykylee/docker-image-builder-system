@@ -195,6 +195,38 @@ describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () 
     assert.equal(hosted!.stripPrefix, false);
   });
 
+  it("hostingScheme=subdomain 은 url 을 <cp>.<host>/ 로 조립 (TASK-172)", async () => {
+    const repo = createMemoryBuildRepository();
+    const svc = new BuildService(repo, {
+      strictContentRange: false,
+      hostingBaseHost: "apps.example.com"
+    });
+    const bytes = new Uint8Array(randomBytes(16));
+    const checksum = createHash("sha256")
+      .update(Buffer.from(bytes))
+      .digest("hex");
+    const created = await svc.createBuild({
+      appName: "spa-app",
+      requestedBy: "yklee",
+      sourceArchive: { objectKey: "k", checksumSha256: checksum, sizeBytes: bytes.byteLength },
+      entrypointPath: "src/index.ts",
+      dockerfilePath: "Dockerfile",
+      hostingScheme: "subdomain",
+      metadata: {}
+    });
+    const buildId = created.kind === "accepted" ? created.response.build.buildId : "";
+
+    await svc.reportDeploymentResult(buildId, {
+      status: "SUCCESS",
+      targetType: "K8S",
+      contextPath: "spa-app",
+      runnerId: "r-1"
+    });
+    const hosted = await svc.getHostedService("spa-app");
+    assert.equal(hosted!.hostingScheme, "subdomain");
+    assert.equal(hosted!.url, "https://spa-app.apps.example.com/");
+  });
+
   it("HOSTING_BASE_HOST 미설정 시 upsert 안 함(호스팅 비활성)", async () => {
     const repo = createMemoryBuildRepository();
     const svc = new BuildService(repo, { strictContentRange: false });

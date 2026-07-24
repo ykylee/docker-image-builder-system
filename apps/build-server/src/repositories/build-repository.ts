@@ -477,6 +477,7 @@ export type UpsertHostedServiceInput = {
   deploymentName: string;
   containerPort: number;
   stripPrefix: boolean;
+  hostingScheme: string;
   status: string;
   url: string | null;
   currentBuildId: string | null;

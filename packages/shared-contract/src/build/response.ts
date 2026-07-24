@@ -8,6 +8,13 @@ import {
   executionStatuses,
 } from "./status.js";
 
+// TASK-172 (v0.5.0): 호스팅 URL 스킴. path=`host/<cp>/`(기본, APP_BASE_PATH 규약),
+// subdomain=`<cp>.host/`(앱 무수정 — 루트 서빙). BuildSummary/HostedService/
+// BuildRequest 가 공유하므로 파일 상단에 선언(BuildSummary 보다 먼저).
+export const hostingSchemes = ["path", "subdomain"] as const;
+
+export type HostingScheme = (typeof hostingSchemes)[number];
+
 // All exported schemas carry a `.meta({ id, description })` so that
 // @asteasolutions/zod-to-openapi's OpenApiGeneratorV3 can lift them into
 // `components.schemas` with stable refs. The `id` doubles as the component
@@ -80,6 +87,10 @@ export const buildSummarySchema = z
     // TASK-169 (P3-M4): Ingress prefix strip 여부(claim 으로 runner 에 전달).
     stripPrefix: z.boolean().optional().meta({
       description: "Whether the hosting Ingress strips the context-path prefix (default true)."
+    }),
+    // TASK-172 (v0.5.0): 호스팅 URL 스킴(claim 으로 runner 에 전달).
+    hostingScheme: z.enum(hostingSchemes).optional().meta({
+      description: "Hosting URL scheme: path (host/<cp>/) or subdomain (<cp>.host/). Default path."
     }),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
@@ -309,6 +320,8 @@ export const hostedServiceSchema = z
     containerPort: z.int().positive(),
     // Ingress 가 context-path prefix 를 strip 하는지 (기본 true).
     stripPrefix: z.boolean(),
+    // TASK-172: URL 스킴(path|subdomain).
+    hostingScheme: z.enum(hostingSchemes),
     status: z.enum(hostedServiceStatuses),
     // 접속 URL. status 가 PROVISIONING/REMOVED 등에서는 null 일 수 있다.
     url: z.string().url().nullable(),

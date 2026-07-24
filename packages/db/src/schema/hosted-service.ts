@@ -22,6 +22,8 @@ export const hostedServiceTable = pgTable(
     deploymentName: text("deployment_name").notNull(),
     containerPort: integer("container_port").notNull(),
     stripPrefix: boolean("strip_prefix").notNull().default(true),
+    // TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path).
+    hostingScheme: text("hosting_scheme").notNull().default("path"),
     status: text("status").notNull(),
     url: text("url"),
     currentBuildId: uuid("current_build_id"),

@@ -2,7 +2,7 @@
 
 - 문서 목적: Phase 3 의 path-prefix 호스팅에 **subdomain URL 스킴**을 대안으로 더하는 설계 검토.
 - 대상 독자: 개발자, 리뷰어, AI 에이전트
-- 상태: **draft (검토 완료 — 결정 4종 확정, 구현 대기)**
+- 상태: **구현 완료 (TASK-172, 2026-07-24) — 실 e2e(kind+ingress-nginx+nip.io) ALL PASS.**
 - 최종 수정일: 2026-07-24
 - 관련 문서: [Phase 3 컨셉](../PHASE-3-CONCEPT.md), [Phase 3 설계](../PHASE-3-DESIGN.md), [sub-path 규약](../operations/hosting-sub-path-2026-07-24.md)
 

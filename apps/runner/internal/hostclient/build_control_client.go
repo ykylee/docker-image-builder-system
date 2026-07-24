@@ -50,6 +50,8 @@ type ClaimedBuildResponse struct {
 	RuntimePort int    `json:"runtimePort"`
 	// TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
 	StripPrefix bool `json:"stripPrefix"`
+	// TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path).
+	HostingScheme string `json:"hostingScheme"`
 }
 
 type claimResponseBody struct {
@@ -78,6 +80,7 @@ type buildSummaryBody struct {
 	ContextPath     string `json:"contextPath"`
 	RuntimePort     int    `json:"runtimePort"`
 	StripPrefix     bool   `json:"stripPrefix"`
+	HostingScheme   string `json:"hostingScheme"`
 }
 
 // PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
@@ -151,6 +154,7 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		ContextPath:     inner.ContextPath,
 		RuntimePort:     inner.RuntimePort,
 		StripPrefix:     inner.StripPrefix,
+		HostingScheme:   inner.HostingScheme,
 	}, nil
 }
 

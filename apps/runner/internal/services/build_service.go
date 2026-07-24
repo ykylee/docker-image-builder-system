@@ -129,7 +129,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return s.fail(ctx, buildID, failure)
 	}
 
-	if failure := s.deployImage(ctx, buildID, containerStatus, claim.ContextPath, claim.RuntimePort, claim.StripPrefix); failure != nil {
+	if failure := s.deployImage(ctx, buildID, containerStatus, claim.ContextPath, claim.RuntimePort, claim.StripPrefix, claim.HostingScheme); failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
 
@@ -338,6 +338,7 @@ func (s *BuildService) deployImage(
 	contextPath string,
 	runtimePort int,
 	stripPrefix bool,
+	hostingScheme string,
 ) *stageFailure {
 	// 컨테이너는 컨테이너 테스트가 끝난 뒤 정리한다. e2e script 가
 	// RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 cleanup 을 검증한다.
@@ -390,6 +391,8 @@ func (s *BuildService) deployImage(
 			ContextPath:   contextPath,
 			ContainerPort: runtimePort,
 			StripPrefix:   stripPrefix,
+			HostingScheme: hostingScheme,
+			BaseHost:      os.Getenv("RUNNER_HOSTING_BASE_HOST"),
 		})
 		if kErr != nil {
 			_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{

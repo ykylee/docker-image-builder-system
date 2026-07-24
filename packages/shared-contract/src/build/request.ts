@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { buildStatuses } from "./status.js";
+import { hostingSchemes } from "./response.js";
 
 export const sourceArchiveSchema = z
   .object({
@@ -69,6 +70,10 @@ export const buildRequestSchema = z
     // 앱 서버가 `/<cp>/...` 를 직접 서빙(base-path-aware 서버, 예: Next basePath).
     // optional + 서버측 기본 true.
     stripPrefix: z.boolean().optional(),
+    // TASK-172 (v0.5.0): 호스팅 URL 스킴. "path"(기본) = `host/<cp>/`(APP_BASE_PATH
+    // 규약), "subdomain" = `<cp>.host/`(앱 무수정, 루트 서빙 — sub-path 자산 제약
+    // 없음, 단 wildcard DNS/TLS 필요). subdomain 은 stripPrefix 무관.
+    hostingScheme: z.enum(hostingSchemes).optional(),
     // TASK-160 (P2-M1 Step 3): `previewTtlMinutes` 제거. preview 런타임의
     // 보존 시간 knob 이었으나 canonical build/test/deploy 모델에는 대응
     // 개념이 없고 실제로 소비되는 곳도 없었다.

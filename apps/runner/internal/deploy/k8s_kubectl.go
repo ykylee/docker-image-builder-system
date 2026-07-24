@@ -103,7 +103,7 @@ func (d *kubectlDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K
 	if contextPath == "" {
 		contextPath = name
 	}
-	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath, opts.StripPrefix)
+	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath, opts.StripPrefix, opts.HostingScheme, opts.BaseHost)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
@@ -235,11 +235,20 @@ func deploymentName(buildID string) string {
 //     `/<cp>/...` 를 직접 서빙(base-path-aware 서버, 예: Next basePath).
 //
 // 어느 경우든 APP_BASE_PATH env 는 주입한다. ingressClassName=nginx 전제.
-func renderK8sManifest(name, namespace, image string, port int, contextPath string, stripPrefix bool) string {
+func renderK8sManifest(name, namespace, image string, port int, contextPath string, stripPrefix bool, hostingScheme, baseHost string) string {
+	// TASK-172 (v0.5.0): subdomain 스킴이면 Ingress host rule 로 라우팅하고
+	// 앱은 자기 subdomain 루트에서 서빙된다(prefix strip / rewrite 불필요,
+	// APP_BASE_PATH=/). path 스킴이면 기존 path-prefix(+stripPrefix rewrite).
 	ingressAnnotations := ""
 	ingressPath := fmt.Sprintf("/%s", contextPath)
 	pathType := "Prefix"
-	if stripPrefix {
+	ruleHost := ""
+	appBasePath := fmt.Sprintf("/%s/", contextPath)
+	if hostingScheme == "subdomain" {
+		ruleHost = fmt.Sprintf("host: %s.%s\n      ", contextPath, baseHost)
+		ingressPath = "/"
+		appBasePath = "/"
+	} else if stripPrefix {
 		ingressAnnotations = "  annotations:\n" +
 			"    nginx.ingress.kubernetes.io/rewrite-target: /$2\n" +
 			"    nginx.ingress.kubernetes.io/use-regex: \"true\"\n"
@@ -275,7 +284,7 @@ spec:
           imagePullPolicy: IfNotPresent
           env:
             - name: APP_BASE_PATH
-              value: "/%[5]s/"
+              value: "%[5]s"
           ports:
             - containerPort: %[4]d
 ---
@@ -303,7 +312,7 @@ metadata:
 %[6]sspec:
   ingressClassName: nginx
   rules:
-    - http:
+    - %[9]shttp:
         paths:
           - path: %[7]s
             pathType: %[8]s
@@ -312,5 +321,5 @@ metadata:
                 name: %[1]s
                 port:
                   number: %[4]d
-`, name, namespace, image, port, contextPath, ingressAnnotations, ingressPath, pathType)
+`, name, namespace, image, port, appBasePath, ingressAnnotations, ingressPath, pathType, ruleHost)
 }

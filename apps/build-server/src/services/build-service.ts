@@ -503,6 +503,13 @@ export class BuildService {
     ) {
       const build = result.response.build;
       const contextPath = input.contextPath;
+      const scheme = build.hostingScheme ?? "path";
+      // TASK-172 (v0.5.0): 스킴별 URL 조립. subdomain=`<cp>.<host>/`,
+      // path=`<host>/<cp>/`.
+      const url =
+        scheme === "subdomain"
+          ? `https://${contextPath}.${this.runtime.hostingBaseHost}/`
+          : `https://${this.runtime.hostingBaseHost}/${contextPath}/`;
       await this.repository.upsertHostedService({
         appName: build.appName,
         contextPath,
@@ -510,8 +517,9 @@ export class BuildService {
         deploymentName: input.deploymentName ?? `dib-${contextPath}`,
         containerPort: build.runtimePort ?? 8080,
         stripPrefix: build.stripPrefix ?? true,
+        hostingScheme: scheme,
         status: "RUNNING",
-        url: `https://${this.runtime.hostingBaseHost}/${contextPath}/`,
+        url,
         currentBuildId: buildId,
         imageRef: input.resultRef ?? null
       });

@@ -893,6 +893,11 @@ export interface components {
             /** @description Whether the hosting Ingress strips the context-path prefix (default true). */
             stripPrefix?: boolean;
             /**
+             * @description Hosting URL scheme: path (host/<cp>/) or subdomain (<cp>.host/). Default path.
+             * @enum {string}
+             */
+            hostingScheme?: "path" | "subdomain";
+            /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
              */
@@ -1162,6 +1167,8 @@ export interface components {
             contextPath?: string;
             runtimePort?: number;
             stripPrefix?: boolean;
+            /** @enum {string} */
+            hostingScheme?: "path" | "subdomain";
             /** @default {} */
             metadata: {
                 [key: string]: string;
@@ -1220,6 +1227,11 @@ export interface components {
             runtimePort?: number;
             /** @description Whether the hosting Ingress strips the context-path prefix (default true). */
             stripPrefix?: boolean;
+            /**
+             * @description Hosting URL scheme: path (host/<cp>/) or subdomain (<cp>.host/). Default path.
+             * @enum {string}
+             */
+            hostingScheme?: "path" | "subdomain";
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}

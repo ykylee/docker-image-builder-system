@@ -80,20 +80,39 @@ log "kind 노드에 이미지 load"
 kind load docker-image "${IMAGE}" --name "${CLUSTER}"
 
 # ============================================================================
-# Phase A — 실 라우팅
+# Phase A — path-prefix 실 라우팅
 # ============================================================================
-log "Phase A: kubectlDeployer 로 배포 + 실 Ingress 라우팅 검증"
+log "Phase A(path): 배포 + 실 Ingress path 라우팅 (host/${CP}/)"
 ( cd "${REPO_ROOT}/apps/runner" && \
   DIB_K8S_E2E_IMAGE="${IMAGE}" \
   DIB_K8S_E2E_CONTEXT="${CONTEXT}" \
   DIB_K8S_E2E_NS="${NS}" \
   DIB_K8S_E2E_CONTEXT_PATH="${CP}" \
-  DIB_K8S_E2E_INGRESS_URL="${INGRESS_URL}" \
+  DIB_K8S_E2E_PAGE_URL="${INGRESS_URL}/${CP}/" \
   DIB_K8S_E2E_BUILD_ID="${BUILD_ID}" \
   DIB_K8S_E2E_KEEP_DEPLOY=1 \
   go test -tags k8se2e -count=1 -run TestK8sE2E_RealDeploy ./internal/deploy/ -v ) \
-  || fail "Phase A: 라우팅 검증 실패"
+  || fail "Phase A: path 라우팅 검증 실패"
 log "Phase A PASS — host/${CP}/ 페이지 + APP_BASE_PATH 자산 로드 실측"
+
+# ============================================================================
+# Phase A2 — subdomain 실 라우팅 (nip.io magic DNS, TASK-172)
+# ============================================================================
+SUB_CP="demo2"
+NIP_HOST="127.0.0.1.nip.io"
+log "Phase A2(subdomain): 배포 + 실 host 라우팅 (${SUB_CP}.${NIP_HOST}) — 앱 무수정 자산"
+( cd "${REPO_ROOT}/apps/runner" && \
+  DIB_K8S_E2E_IMAGE="${IMAGE}" \
+  DIB_K8S_E2E_CONTEXT="${CONTEXT}" \
+  DIB_K8S_E2E_NS="${NS}" \
+  DIB_K8S_E2E_CONTEXT_PATH="${SUB_CP}" \
+  DIB_K8S_E2E_SCHEME="subdomain" \
+  DIB_K8S_E2E_BASE_HOST="${NIP_HOST}" \
+  DIB_K8S_E2E_PAGE_URL="http://${SUB_CP}.${NIP_HOST}:${HOST_PORT}/" \
+  DIB_K8S_E2E_BUILD_ID="hosting-e2e-sub" \
+  go test -tags k8se2e -count=1 -run TestK8sE2E_RealDeploy ./internal/deploy/ -v ) \
+  || fail "Phase A2: subdomain 라우팅 검증 실패"
+log "Phase A2 PASS — ${SUB_CP}.${NIP_HOST}/ 페이지 + 루트 자산(무수정) 로드 실측"
 
 # ============================================================================
 # Phase B — 실 관리(K8sAdmin)

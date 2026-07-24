@@ -82,6 +82,8 @@ type StoredBuild = {
   runtimePort: number;
   // TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
   stripPrefix: boolean;
+  // TASK-172 (v0.5.0): 호스팅 URL 스킴(기본 path).
+  hostingScheme: string;
 };
 
 // TASK-166 (P3-M1): 호스팅 registry(앱당 1개). deployment 성공 시 upsert.
@@ -92,6 +94,7 @@ type StoredHostedService = {
   deploymentName: string;
   containerPort: number;
   stripPrefix: boolean;
+  hostingScheme: string;
   status: string;
   url: string | null;
   currentBuildId: string | null;
@@ -162,6 +165,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         contextPath: input.contextPath ?? null,
         runtimePort: input.runtimePort ?? 8080,
         stripPrefix: input.stripPrefix ?? true,
+        hostingScheme: input.hostingScheme ?? "path",
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -191,7 +195,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         currentPhaseStartedAt: timestamp,
         contextPath: input.contextPath ?? null,
         runtimePort: input.runtimePort ?? 8080,
-        stripPrefix: input.stripPrefix ?? true
+        stripPrefix: input.stripPrefix ?? true,
+        hostingScheme: input.hostingScheme ?? "path"
       });
 
       return {
@@ -1307,6 +1312,7 @@ function toHostedService(s: StoredHostedService): HostedService {
     deploymentName: s.deploymentName,
     containerPort: s.containerPort,
     stripPrefix: s.stripPrefix,
+    hostingScheme: s.hostingScheme as HostedService["hostingScheme"],
     status: s.status as HostedService["status"],
     url: s.url,
     currentBuildId: s.currentBuildId,
