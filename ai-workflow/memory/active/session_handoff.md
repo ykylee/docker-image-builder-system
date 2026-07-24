@@ -6,8 +6,28 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-24 (rev 161→162: **P2-M5 배포 능력 완료 → Phase 2 전체 완료 (TASK-165)**).
 - Updated: 2026-07-23 (rev 160→161: **원격 발산 조정 + k8s adapter 이식 (TASK-164)**).
 - Updated: 2026-07-23 (rev 159→160: **P2-M4 완료 — 소비자 정렬 + skill_mcp 실서버 검증 신설 (TASK-163)**).
+
+  ## 핵심 (rev 162) — Phase 2 완료: 배포 능력(k8s) + 결과 전달(webhook)
+  P2-M5 로 Phase 2(preview-era 청산 → 배포 능력 완성)를 마무리했다. 제품 목적 4단계(`build → container test → deploy → result delivery`)가 모두 1급 phase 로 존재하고 **실인프라 e2e** 로 검증된다.
+
+  **진입 결정 2종(사용자 확정)**: ① 배포 adapter = **k8s** / ② 결과 전달 = **webhook**.
+
+  **4 Step (각 sub-commit)**:
+  - **Step1 계약**(`928fb5b`): result-delivery 1급 phase 2종(`RESULT_DELIVERY_STARTED`/`RESULT_DELIVERED`) 3-way canonical 신설(11→13). runner 무변경 — 서버가 terminal 이후 append(배열상 COMPLETED 다음).
+  - **Step2 서버**(`d5392b8`): terminal 도달 시 `RESULT_WEBHOOK_URL` 로 canonical `BuildStatusResponse` POST(NOTIFICATION). `resultDelivery` 는 **phase history 에서 파생**(신규 repo 메서드 `recordResultDeliveryPhase` memory+postgres, idempotent append, `build.phase` 무변경 → 중복 push 회피). **마이그레이션 0**. best-effort(전달 실패가 빌드 안 깨뜨림) + idempotent(중복 전송 방지).
+  - **Step3 runner**(`a44b631`): `kubectlDeployer` 실구현 — Namespace+Deployment+Service manifest 렌더 → `kubectl apply -f -` → `kubectl rollout status`. **client-go 아님**(deploy.Client 의 docker CLI shell-out 패턴과 일관되게 kubectl shell-out). `imagePullPolicy: IfNotPresent`(kind load). worker `cfg.K8sMode` 배선.
+  - **Step4 e2e**(`1bc0e75`): `apps/runner/scripts/e2e-k8s-deploy.sh` — Phase A(busybox 빌드→kind load→실배포 availableReplicas=1 실측) + Phase B(build-server memory+webhook stub+HTTP terminal 구동→수신 검증). 로컬 **ALL PASS**(kind v0.24.0 + kubectl v1.31.4). Go e2e 테스트는 `//go:build k8se2e` 태그라 기본 `go test ./...` 에서 제외.
+
+  **검증(회귀 baseline)**: TS 5 clean / build-server **186** / build-monitor **275** / go **8 pkg** / skill_mcp **225** / 계약 e2e 13종 + k8s e2e 1종. Phase 1 대비 후퇴 없음. **Phase 2 완료 판정 §9 4항 전부 충족.** 운영 문서 `docs/operations/k8s-deploy-webhook-2026-07-24.md`.
+
+  **다음 세션 후보(사용자 결정 대기)**:
+  - **v0.3.0 릴리스 태깅**(Phase 1 의 v0.2.0 선례 — 5 package.json bump + git tag + CHANGELOG + RELEASE_NOTES).
+  - kind e2e 의 nightly CI 편입(현재 수동, kind 미가용 CI).
+  - k8s adapter 확장(Helm/ArgoCD, per-build namespace 정리, 실 URL 회수) / webhook 확장(Slack/Nextcloud, 재시도/서명).
+  - 실패 경로 e2e(현 계약 e2e 13종 전부 happy path — P2-M3 이월).
 
   ## 핵심 (rev 161) — 원격이 로컬과 다른 축으로 갈라져 있었고, k8s 어댑터만 건져 왔다
   원격 `origin/main` 이 P2-M1 완료(`060cc0b`) 이후 로컬과 **다른 축**으로 발산해 있었다(로컬 3커밋 vs 원격 12커밋, 33파일 충돌). 진단 결과 **같은 작업 중복이 아니라 설계 분기**였다:

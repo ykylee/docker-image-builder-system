@@ -3,7 +3,7 @@
 - 문서 목적: Phase 2 의 축·범위·마일스톤·완료 기준을 하나의 기준으로 정의한다. Phase 1 종료(v0.2.0/v0.2.1) 이후의 개발 방향 단일 출처.
 - 범위: 컨셉 근거(원 설계 대비 격차 실측), 마일스톤 P2-M1~M5, 순서와 완료 기준, 리스크
 - 대상 독자: 프로젝트 리드, 각 계층 구현자, AI agent
-- 상태: draft (**P2-M1~M4 완료** 반영 — 남은 것은 P2-M5 배포 능력)
+- 상태: **완료 (P2-M1~M5 전부 봉인, 2026-07-24). Phase 2 완료 판정 §9 충족.**
 - 최종 수정일: 2026-07-23
 - 진입 baseline: **v0.2.1** (2026-07-23)
 - 관련 문서: [Phase 1 회고](./PHASE-1-RETROSPECTIVE.md), [Step 15 로드맵](./sdlc/15-refactoring-roadmap-and-milestones.md), [CHANGELOG](../CHANGELOG.md)
@@ -141,10 +141,14 @@ Step 15 의 M1~M5 잔여분을 Phase 2 기준으로 재정의한다.
 > 소멸). 상세는
 > [skill_mcp 실서버 검증](operations/skill-mcp-live-verification-2026-07-23.md).
 
-### P2-M5 — 배포 능력 (제품 목적 완성)
+### P2-M5 — 배포 능력 (제품 목적 완성) ✅ 완료 (TASK-165, 2026-07-24)
 - **대상**: `apps/runner/internal/deploy` + build-server 결과 전달
-- **내용**: **외부 배포 adapter v1** (최소 1종) + **결과 전달**(webhook/notification). 현재 `RUNNER_DEPLOY_MODE` 기본은 `skeleton` 이고 `cli` 도 레지스트리 push 까지다.
-- **완료 기준**: deploy success/failure 가 Build Server status query 에 반영 / 운영자가 end-to-end 확인 가능한 smoke 문서와 명령 존재 / **신규 e2e 1종 추가**.
+- **내용**: **외부 배포 adapter v1 = k8s** (`kubectl` shell-out — TASK-164 skeleton 위 실구현) + **결과 전달 = webhook**(NOTIFICATION).
+- **완료 기준 충족**:
+  - Step 1(계약): result-delivery 1급 phase 2종(`RESULT_DELIVERY_STARTED`/`RESULT_DELIVERED`) 신설 → 4단계 모두 phase 로 존재.
+  - Step 2(서버): terminal 도달 시 `RESULT_WEBHOOK_URL` 로 canonical 응답 POST, `resultDelivery` NOTIFICATION 파생(phase history 단일 출처, 마이그레이션 0). best-effort + idempotent.
+  - Step 3(runner): `kubectlDeployer`(manifest apply + rollout status) + worker `cfg.K8sMode` 배선. deploy success/failure 가 status query 에 반영.
+  - Step 4(e2e): `scripts/e2e-k8s-deploy.sh` — 실 kind 배포(availableReplicas=1) + 실 webhook 수신, 로컬 ALL PASS. 운영 문서 `docs/operations/k8s-deploy-webhook-2026-07-24.md`.
 
 ## 6. 순서와 원칙
 
@@ -177,7 +181,9 @@ P2-M1 계약  →  P2-M2 서버  →  P2-M3 runner  →  P2-M4 소비자  →  P
 
 ## 9. Phase 2 완료 판정
 
-- 코드에 preview-era 심볼 **0** (deprecated alias 정책상 잔존분은 문서에 명시).
-- `build → container test → deploy → result delivery` 4단계가 모두 **1급 phase** 로 존재하고 e2e 로 검증됨.
-- 외부 배포 adapter 1종 + 결과 전달 1종이 동작하고 운영 문서가 존재.
-- 회귀 baseline 이 Phase 1 대비 후퇴하지 않음(테스트 수 · e2e 13종 이상 · 가드 4종).
+- ✅ 코드에 preview-era 심볼 **0** (P2-M1~M4 청산 — legacy status/응답/엔드포인트/DTO/skill 이름 제거).
+- ✅ `build → container test → deploy → result delivery` 4단계가 모두 **1급 phase** 로 존재하고 e2e 로 검증됨 (result delivery = TASK-165 Step 1 신설 + Step 4 e2e).
+- ✅ 외부 배포 adapter 1종(**k8s**) + 결과 전달 1종(**webhook**)이 동작하고 운영 문서(`docs/operations/k8s-deploy-webhook-2026-07-24.md`) 존재.
+- ✅ 회귀 baseline 후퇴 없음: TS 5 clean / build-server **186** / build-monitor **275** / go **8 pkg** / skill_mcp **225** / 계약 e2e 13종 + k8s e2e 1종 / 운영 가드 4종.
+
+**→ Phase 2 완료(2026-07-24).** 다음: v0.3.0 릴리스 태깅(Phase 1 의 v0.2.0 선례) 검토 — 사용자 결정 대기.
