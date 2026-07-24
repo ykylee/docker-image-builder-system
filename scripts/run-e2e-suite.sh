@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # scripts/run-e2e-suite.sh
 #
-# TASK-156: e2e 스크립트 13종을 CI / nightly 환경에서 그룹 단위로 실행하는
+# TASK-156: e2e 스크립트 14종을 CI / nightly 환경에서 그룹 단위로 실행하는
 # wrapper. `scripts/run-b-layer-guards.sh` 와 같은 계열이지만, e2e 는
 # **호스트에서 docker compose 를 직접 구동**하므로 compose.ci.yaml 의 guard
 # container 안이 아니라 러너 호스트에서 돈다.
@@ -13,7 +13,7 @@
 #
 # 그룹:
 #   local    로컬 프로세스 기반 5종 (build-server 를 dist 로 부팅)
-#   compose  docker compose 기반 6종 (실이미지 build/run 포함)
+#   compose  docker compose 기반 7종 (실이미지 build/run + 실패 경로 포함)
 #   runner   runner 바이너리 기반 2종 (TASK-157 로 hard assertion 화)
 #   all      위 전부 (default)
 #
@@ -166,6 +166,7 @@ COMPOSE_E2E=(
   "apps/build-server/scripts/e2e-multi-runner-postgres.sh"
   "apps/build-server/scripts/e2e-multi-runner-chunked-postgres.sh"
   "apps/build-server/scripts/e2e-insecure-registry.sh"
+  "apps/build-server/scripts/e2e-failure-paths.sh"
 )
 RUNNER_E2E=(
   "apps/runner/scripts/e2e-container-run.sh"
