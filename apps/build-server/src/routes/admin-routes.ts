@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import {
@@ -22,7 +22,10 @@ import {
   type AdminRunner
 } from "@docker-image-builder-system/shared-contract";
 
-import type { BuildService } from "../services/build-service.js";
+import type {
+  BuildService,
+  HostingActionOutcome
+} from "../services/build-service.js";
 
 // Admin guard (ADMIN-004, ADMIN-049). The admin allow-list is a mutable
 // Set owned by the process and seeded from `runtime.adminIds` at boot.
@@ -232,6 +235,63 @@ export async function registerAdminRoutes(
     }
     return reply.status(200).send(hostedServiceSchema.parse(service));
   });
+
+  // 관리 라이프사이클 (TASK-168 / P3-M3): stop/start/delete → kubectl.
+  function hostingAction(
+    action: (appName: string) => Promise<HostingActionOutcome>
+  ) {
+    return async (request: FastifyRequest, reply: FastifyReply) => {
+      const callerId = adminIdHeaderSchema.safeParse(
+        request.headers[ADMIN_ID_HEADER]
+      );
+      if (!callerId.success) {
+        return reply
+          .status(401)
+          .send({ message: "Admin id header missing.", header: ADMIN_ID_HEADER });
+      }
+      if (!isAdmin(callerId.data)) {
+        return reply.status(403).send({
+          message: "Caller is not in the admin allow-list.",
+          callerId: callerId.data
+        });
+      }
+      const params = request.params as { appName?: string };
+      const appName = (params.appName ?? "").trim();
+      if (appName === "") {
+        return reply.status(400).send(
+          errorBody("appName path parameter is required.", {
+            errorCode: "INVALID_REQUEST"
+          })
+        );
+      }
+      const outcome = await action(appName);
+      if (outcome.kind === "not_found") {
+        return reply.status(404).send(notFoundBody("Hosted service not found."));
+      }
+      if (outcome.kind === "k8s_error") {
+        // k8s 조작 실패 — 상류(kubectl/cluster) 문제이므로 502.
+        return reply.status(502).send(
+          errorBody(`k8s operation failed: ${outcome.message}`, {
+            errorCode: "DEPLOYMENT_FAILED"
+          })
+        );
+      }
+      return reply.status(200).send(hostedServiceSchema.parse(outcome.service));
+    };
+  }
+
+  app.post(
+    "/admin/hosted-services/:appName/stop",
+    hostingAction((appName) => buildService.stopHostedService(appName))
+  );
+  app.post(
+    "/admin/hosted-services/:appName/start",
+    hostingAction((appName) => buildService.startHostedService(appName))
+  );
+  app.delete(
+    "/admin/hosted-services/:appName",
+    hostingAction((appName) => buildService.removeHostedService(appName))
+  );
 
   app.get("/admin/users", async (request, reply) => {
     const callerId = adminIdHeaderSchema.safeParse(

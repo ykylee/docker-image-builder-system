@@ -1274,6 +1274,19 @@ export function createMemoryBuildRepository(): BuildRepository {
       hostedServices.set(input.appName, stored);
       return toHostedService(stored);
     },
+    async updateHostedServiceStatus(
+      appName: string,
+      status: string
+    ): Promise<HostedService | null> {
+      const stored = hostedServices.get(appName);
+      if (!stored) {
+        return null;
+      }
+      stored.status = status;
+      stored.updatedAt = nowIsoString();
+      hostedServices.set(appName, stored);
+      return toHostedService(stored);
+    },
     async deleteHostedService(appName: string): Promise<boolean> {
       return hostedServices.delete(appName);
     }

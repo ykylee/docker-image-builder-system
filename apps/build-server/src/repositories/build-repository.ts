@@ -461,6 +461,11 @@ export interface BuildRepository {
     contextPath: string
   ): Promise<HostedService | null>;
   upsertHostedService(input: UpsertHostedServiceInput): Promise<HostedService>;
+  // TASK-168 (P3-M3): 관리 라이프사이클 — status 만 갱신(scale stop/start).
+  updateHostedServiceStatus(
+    appName: string,
+    status: string
+  ): Promise<HostedService | null>;
   deleteHostedService(appName: string): Promise<boolean>;
 }
 

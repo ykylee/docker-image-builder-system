@@ -4,6 +4,7 @@ import { describe, it } from "node:test";
 
 import { createMemoryBuildRepository } from "../src/repositories/memory-build-repository.js";
 import { BuildService } from "../src/services/build-service.js";
+import type { K8sAdmin } from "../src/services/k8s-admin.js";
 import {
   normalizeContextPath,
   validateContextPath,
@@ -178,5 +179,95 @@ describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () 
     });
 
     assert.equal((await svc.listHostedServices()).length, 0);
+  });
+});
+
+function fakeK8sAdmin() {
+  const calls: Array<{ op: string; ns: string; name: string; replicas?: number }> = [];
+  const admin: K8sAdmin & { calls: typeof calls; failNext?: boolean } = {
+    calls,
+    async scale(ns, name, replicas) {
+      if (admin.failNext) throw new Error("kubectl boom");
+      calls.push({ op: "scale", ns, name, replicas });
+    },
+    async remove(ns, name) {
+      if (admin.failNext) throw new Error("kubectl boom");
+      calls.push({ op: "remove", ns, name });
+    },
+    async availableReplicas() {
+      return 1;
+    }
+  };
+  return admin;
+}
+
+async function seedHosted(repo: ReturnType<typeof createMemoryBuildRepository>) {
+  await repo.upsertHostedService({
+    appName: "app-x",
+    contextPath: "app-x",
+    namespace: "dib-hosted",
+    deploymentName: "dib-app-x",
+    containerPort: 8080,
+    stripPrefix: true,
+    status: "RUNNING",
+    url: "https://h/app-x/",
+    currentBuildId: null,
+    imageRef: null
+  });
+}
+
+describe("호스팅 관리 라이프사이클 (TASK-168 / P3-M3)", () => {
+  it("stop → scale 0 + STOPPED / start → scale 1 + RUNNING", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedHosted(repo);
+    const admin = fakeK8sAdmin();
+    const svc = new BuildService(repo, { strictContentRange: false }, admin);
+
+    const stopped = await svc.stopHostedService("app-x");
+    assert.equal(stopped.kind, "ok");
+    if (stopped.kind === "ok") assert.equal(stopped.service.status, "STOPPED");
+    assert.deepEqual(admin.calls.at(-1), {
+      op: "scale",
+      ns: "dib-hosted",
+      name: "dib-app-x",
+      replicas: 0
+    });
+
+    const started = await svc.startHostedService("app-x");
+    assert.equal(started.kind, "ok");
+    if (started.kind === "ok") assert.equal(started.service.status, "RUNNING");
+    assert.equal(admin.calls.at(-1)!.replicas, 1);
+  });
+
+  it("remove → kubectl delete + registry 제거(contextPath 반환)", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedHosted(repo);
+    const admin = fakeK8sAdmin();
+    const svc = new BuildService(repo, { strictContentRange: false }, admin);
+
+    const removed = await svc.removeHostedService("app-x");
+    assert.equal(removed.kind, "ok");
+    if (removed.kind === "ok") assert.equal(removed.service.status, "REMOVED");
+    assert.equal(admin.calls.at(-1)!.op, "remove");
+    assert.equal(await svc.getHostedService("app-x"), null);
+    // context path 반환 확인 — 다른 앱이 app-x 를 다시 쓸 수 있다
+    const other = await createBuild(svc, "other-app", "app-x");
+    assert.equal(other.kind, "accepted");
+  });
+
+  it("없는 앱 → not_found / k8s 실패 → k8s_error(registry 불변)", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedHosted(repo);
+    const admin = fakeK8sAdmin();
+    const svc = new BuildService(repo, { strictContentRange: false }, admin);
+
+    assert.equal((await svc.stopHostedService("nope")).kind, "not_found");
+
+    admin.failNext = true;
+    const err = await svc.stopHostedService("app-x");
+    assert.equal(err.kind, "k8s_error");
+    // k8s 실패 시 registry status 는 그대로 RUNNING
+    const still = await svc.getHostedService("app-x");
+    assert.equal(still!.status, "RUNNING");
   });
 });

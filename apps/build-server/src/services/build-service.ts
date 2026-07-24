@@ -11,6 +11,7 @@ import type {
   BuildStatusResponse,
   ClaimResponse,
   DeploymentReportRequest,
+  HostedService,
   RunnerStatus,
 } from "@docker-image-builder-system/shared-contract";
 
@@ -26,6 +27,7 @@ import type {
   StoreSourceChunkResult
 } from "../repositories/build-repository.js";
 import { validateContextPath } from "./context-path.js";
+import { createKubectlK8sAdmin, type K8sAdmin } from "./k8s-admin.js";
 
 export type ReportPhaseOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
@@ -38,6 +40,12 @@ export type CreateBuildOutcome =
   | { kind: "duplicate"; response: BuildDuplicateResponse }
   | { kind: "context_path_invalid"; reason: string }
   | { kind: "context_path_taken"; contextPath: string; appName: string };
+
+// TASK-168 (P3-M3): 호스팅 관리(stop/start/remove) 결과.
+export type HostingActionOutcome =
+  | { kind: "ok"; service: HostedService }
+  | { kind: "not_found" }
+  | { kind: "k8s_error"; message: string };
 
 // TASK-161 (P2-M2): 컨테이너 테스트 outcome 은 canonical BuildStatusResponse
 // 하나만 돌려준다. 구 TestDeployment payload 는 `test` 블록과 중복이었다.
@@ -104,7 +112,10 @@ export class BuildService {
       hostingBaseHost?: string;
     } = {
       strictContentRange: false
-    }
+    },
+    // TASK-168 (P3-M3): 호스팅 관리(scale/delete)용 k8s 헬퍼. build-server 가
+    // kubectl 을 직접 shell-out 한다(§9-1). 테스트가 fake 를 주입한다.
+    private readonly k8sAdmin: K8sAdmin = createKubectlK8sAdmin()
   ) {}
 
   // TASK-166 (P3-M1): createBuild 는 이제 호스팅 context path 를 할당·검증한다.
@@ -283,6 +294,59 @@ export class BuildService {
 
   getHostedService(appName: string) {
     return this.repository.getHostedServiceByAppName(appName);
+  }
+
+  // TASK-168 (P3-M3): 호스팅 수명 관리. stop=scale 0 / start=scale 1 /
+  // remove=k8s 자원 삭제 + registry 제거(contextPath 반환). k8s 실패는
+  // registry 를 바꾸지 않고 k8s_error 로 표면화한다.
+  async stopHostedService(appName: string): Promise<HostingActionOutcome> {
+    return this.#scaleHostedService(appName, 0, "STOPPED");
+  }
+
+  async startHostedService(appName: string): Promise<HostingActionOutcome> {
+    return this.#scaleHostedService(appName, 1, "RUNNING");
+  }
+
+  async #scaleHostedService(
+    appName: string,
+    replicas: number,
+    nextStatus: string
+  ): Promise<HostingActionOutcome> {
+    const svc = await this.repository.getHostedServiceByAppName(appName);
+    if (!svc) {
+      return { kind: "not_found" };
+    }
+    try {
+      await this.k8sAdmin.scale(svc.namespace, svc.deploymentName, replicas);
+    } catch (err) {
+      return {
+        kind: "k8s_error",
+        message: err instanceof Error ? err.message : String(err)
+      };
+    }
+    const updated = await this.repository.updateHostedServiceStatus(
+      appName,
+      nextStatus
+    );
+    return { kind: "ok", service: updated ?? svc };
+  }
+
+  async removeHostedService(appName: string): Promise<HostingActionOutcome> {
+    const svc = await this.repository.getHostedServiceByAppName(appName);
+    if (!svc) {
+      return { kind: "not_found" };
+    }
+    try {
+      await this.k8sAdmin.remove(svc.namespace, svc.deploymentName);
+    } catch (err) {
+      return {
+        kind: "k8s_error",
+        message: err instanceof Error ? err.message : String(err)
+      };
+    }
+    // registry 에서 제거 → context path 반환.
+    await this.repository.deleteHostedService(appName);
+    return { kind: "ok", service: { ...svc, status: "REMOVED" } };
   }
 
   // TASK-077: admin-initiated runner registration. Distinct surface from

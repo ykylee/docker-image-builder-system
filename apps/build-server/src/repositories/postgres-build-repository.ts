@@ -1704,6 +1704,18 @@ export class PostgresBuildRepository implements BuildRepository {
     return toHostedService(row!);
   }
 
+  async updateHostedServiceStatus(
+    appName: string,
+    status: string
+  ): Promise<HostedService | null> {
+    const [row] = await this.db
+      .update(hostedServiceTable)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(hostedServiceTable.appName, appName))
+      .returning();
+    return row ? toHostedService(row) : null;
+  }
+
   async deleteHostedService(appName: string): Promise<boolean> {
     const rows = await this.db
       .delete(hostedServiceTable)
