@@ -12,17 +12,17 @@ Phase 3(v0.4.0)은 **path-prefix**(`host/<context-path>/`)로 호스팅한다. �
 
 **subdomain**(`<context-path>.<host>`)은 이 제약을 **근본적으로 없앤다**: 앱이 자기 subdomain 의 **루트**에서 서빙되므로 절대경로 자산(`/main.js`)이 자연스럽게 동작한다. **앱 무수정 지원** — `APP_BASE_PATH`·rewrite·stripPrefix 불필요. 완전 격리가 필요한 앱(임의의 SPA/프레임워크)에 적합하다.
 
-트레이드오프: **wildcard DNS + wildcard TLS** 가 필요하다(path-prefix 는 단일 host + 인증서로 충분).
+트레이드오프: **wildcard DNS** 가 필요하다(path-prefix 는 단일 host 로 충분). HTTPS/TLS 는 시스템 범위 밖(평문 HTTP).
 
 ## 2. 모델
 
 | | path-prefix (기존) | subdomain (신규) |
 |---|---|---|
-| URL | `https://<host>/<cp>/` | `https://<cp>.<host>/` |
+| URL | `http://<host>/<cp>/` | `http://<cp>.<host>/` |
 | Ingress | `path: /<cp>(...)` (+rewrite) | `host: <cp>.<host>`, `path: /` |
 | 앱 요구사항 | `APP_BASE_PATH` 로 emit URL prefix | **없음**(루트 서빙) |
 | DNS | 단일 host | **wildcard** `*.<host>` |
-| TLS | 단일/host 인증서 | **wildcard** `*.<host>` |
+| TLS | — (HTTPS 미도입) | — (HTTPS 미도입) |
 
 `<cp>`(context-path)는 두 스킴 공통 식별자 — subdomain 에선 DNS label 로 쓰인다(기존 정규화가 이미 DNS-1123 정합).
 
@@ -43,13 +43,13 @@ Phase 3(v0.4.0)은 **path-prefix**(`host/<context-path>/`)로 호스팅한다. �
   - `path`: 기존 그대로.
 
 ### 3.4 build-server
-- url 조립 분기: subdomain → `https://<cp>.<HOSTING_BASE_HOST>/`. HostedService upsert 에 scheme 반영.
+- url 조립 분기: subdomain → `http://<cp>.<HOSTING_BASE_HOST>/`. HostedService upsert 에 scheme 반영.
 - 관리(K8sAdmin scale/delete)는 스킴 무관(자원 이름 동일).
 
-## 4. DNS / TLS
+## 4. DNS (HTTPS 미도입)
 
 - **prod wildcard DNS**: `*.<HOSTING_BASE_HOST>` → ingress. 운영자 책임(DNS 레코드).
-- **prod wildcard TLS**: `*.<host>` 인증서. cert-manager(DNS-01) 또는 사전 프로비저닝. **TLS 자동화는 본 검토 범위 밖**(별도 후속) — 이번엔 스킴 라우팅까지.
+- **HTTPS/TLS**: 시스템은 **평문 HTTP** 만 서빙한다(HTTPS 미도입 — 확정). 필요 시 외부 LB/프록시가 TLS 를 종단한다(시스템 밖).
 - **dev / e2e**: **nip.io** magic DNS 로 wildcard 없이 실검증. `<cp>.127.0.0.1.nip.io` → 127.0.0.1. Ingress host rule 을 `<cp>.127.0.0.1.nip.io` 로 두고 `curl http://<cp>.127.0.0.1.nip.io:18080/`. 평문 HTTP.
 
 ## 5. e2e
@@ -61,7 +61,7 @@ Phase 3(v0.4.0)은 **path-prefix**(`host/<context-path>/`)로 호스팅한다. �
 1. ~~추가 vs 대체~~ — **병존**. path-prefix + subdomain 둘 다 지원, per-build 선택. Phase 3 유지 + 확장.
 2. ~~스킴 선택 단위~~ — **per-build `hostingScheme` 필드**(path|subdomain, 기본 path).
 3. ~~dev/e2e DNS~~ — **nip.io** magic DNS(`<cp>.127.0.0.1.nip.io`). 오프라인 CI 는 sslip.io/curl --resolve 대안 문서화.
-4. ~~TLS 범위~~ — **후속**. 이번엔 스킴 라우팅(Ingress host rule) + dev 평문(nip.io)까지. wildcard TLS(cert-manager DNS-01)는 별도 마일스톤.
+4. ~~TLS 범위~~ — **HTTPS/TLS 미도입(확정)**. 시스템은 평문 HTTP 만. TLS 는 외부 LB 책임(시스템 밖).
 
 ## 7. 규모 (구현 시)
 

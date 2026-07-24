@@ -106,7 +106,7 @@ export class BuildService {
       // 만 — 소비자가 GET /builds/:id 로 조회.
       resultWebhookUrl?: string;
       // TASK-167 (P3-M2): 호스팅 base host. 설정되면 배포 성공 보고 시
-      // HostedService 를 upsert 하고 url = `https://<host>/<contextPath>/`
+      // HostedService 를 upsert 하고 url = `http://<host>/<contextPath>/`
       // 를 조립한다. 미설정이면 호스팅 비활성(k8s 배포는 되지만 registry
       // upsert 안 함 — opt-in, 설계 §9-3).
       hostingBaseHost?: string;
@@ -505,11 +505,12 @@ export class BuildService {
       const contextPath = input.contextPath;
       const scheme = build.hostingScheme ?? "path";
       // TASK-172 (v0.5.0): 스킴별 URL 조립. subdomain=`<cp>.<host>/`,
-      // path=`<host>/<cp>/`.
+      // path=`<host>/<cp>/`. HTTPS 는 도입하지 않으므로 http (TLS 는 필요 시
+      // 외부 LB 가 종단한다는 전제로 시스템은 평문만 조립한다).
       const url =
         scheme === "subdomain"
-          ? `https://${contextPath}.${this.runtime.hostingBaseHost}/`
-          : `https://${this.runtime.hostingBaseHost}/${contextPath}/`;
+          ? `http://${contextPath}.${this.runtime.hostingBaseHost}/`
+          : `http://${this.runtime.hostingBaseHost}/${contextPath}/`;
       await this.repository.upsertHostedService({
         appName: build.appName,
         contextPath,

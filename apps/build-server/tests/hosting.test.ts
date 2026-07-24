@@ -45,7 +45,7 @@ describe("호스팅 registry (memory)", () => {
       containerPort: 8080,
       stripPrefix: true,
       status: "RUNNING",
-      url: "https://h/app-a/",
+      url: "http://h/app-a/",
       currentBuildId: null,
       imageRef: "img:1"
     };
@@ -159,7 +159,7 @@ describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () 
     assert.ok(hosted, "HostedService 가 upsert 돼야 함");
     assert.equal(hosted!.status, "RUNNING");
     assert.equal(hosted!.contextPath, "todo-app");
-    assert.equal(hosted!.url, "https://apps.example.com/todo-app/");
+    assert.equal(hosted!.url, "http://apps.example.com/todo-app/");
     assert.equal(hosted!.currentBuildId, buildId);
     assert.equal(hosted!.containerPort, 8080);
   });
@@ -224,7 +224,7 @@ describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () 
     });
     const hosted = await svc.getHostedService("spa-app");
     assert.equal(hosted!.hostingScheme, "subdomain");
-    assert.equal(hosted!.url, "https://spa-app.apps.example.com/");
+    assert.equal(hosted!.url, "http://spa-app.apps.example.com/");
   });
 
   it("HOSTING_BASE_HOST 미설정 시 upsert 안 함(호스팅 비활성)", async () => {
@@ -273,7 +273,7 @@ async function seedHosted(repo: ReturnType<typeof createMemoryBuildRepository>) 
     containerPort: 8080,
     stripPrefix: true,
     status: "RUNNING",
-    url: "https://h/app-x/",
+    url: "http://h/app-x/",
     currentBuildId: null,
     imageRef: null
   });

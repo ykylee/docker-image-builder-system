@@ -1,6 +1,6 @@
 // Phase 3 / TASK-166 (P3-M1): 호스팅 context path 정규화 + 검증.
 //
-// context path 는 `https://<host>/<contextPath>/` 의 URL prefix 이자 그대로
+// context path 는 `http://<host>/<contextPath>/` 의 URL prefix 이자 그대로
 // k8s 자원 이름 suffix(deploymentName) 의 근거가 되므로 DNS-1123 label 과
 // 정합하는 URL-safe 형태로 정규화한다(소문자 / [a-z0-9-] / 양끝·연속 '-' 정리).
 

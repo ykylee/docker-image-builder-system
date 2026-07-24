@@ -35,7 +35,7 @@
 
 - `POST /builds` 의 `hostingScheme`: `"path"`(기본) | `"subdomain"`.
 - subdomain 은 Ingress `host:` rule(`<cp>.<HOSTING_BASE_HOST>`)로 라우팅. runner 가 host rule 을 렌더하려면 **base host 를 알아야 하므로** 신규 env `RUNNER_HOSTING_BASE_HOST`(build-server `HOSTING_BASE_HOST` 와 대칭).
-- **전제**: subdomain 은 **wildcard DNS**(`*.<host>`) + (운영 시) **wildcard TLS** 필요. dev/e2e 는 **nip.io** magic DNS 로 무설정 검증. wildcard TLS 자동화(cert-manager)는 후속.
+- **전제**: subdomain 은 **wildcard DNS**(`*.<host>`) 필요. dev/e2e 는 **nip.io** magic DNS 로 무설정 검증. **HTTPS/TLS 는 시스템 범위 밖**(평문 HTTP 로 서빙 — 필요 시 외부 LB 가 종단). URL 은 `http://<cp>.<host>/`.
 - 설계: [subdomain 호스팅](./docs/design/subdomain-hosting.md), [sub-path 규약](./docs/operations/hosting-sub-path-2026-07-24.md).
 
 ### 2.2 검증
@@ -291,7 +291,7 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 ## 11. 다음 release 가이드
 
 - `v0.5.1` — patch (회귀 baseline 변경 0 + 운영 가이드/CI 소폭)
-- `v0.6.0` — minor (신규 기능 표면 큼: k8s adapter 확장(Helm·ArgoCD·per-build ns 정리) / wildcard TLS(cert-manager) / 호스팅 status 캐시 / webhook 확장(Slack·재시도) / 실패 경로 e2e)
+- `v0.6.0` — minor (신규 기능 표면 큼: k8s adapter 확장(Helm·ArgoCD·per-build ns 정리) / 호스팅 status 캐시 / webhook 확장(Slack·재시도) / 실패 경로 e2e). **HTTPS/TLS 는 도입하지 않음(범위 밖).**
 - `v1.0.0` — major (breaking change 또는 정식 GA)
 
 운영자 release staging 검증 순서(5 phase)는 [`docs/operations/release-checklist-2026-07-20.md`](./docs/operations/release-checklist-2026-07-20.md) 참조.

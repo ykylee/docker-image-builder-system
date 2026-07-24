@@ -8,7 +8,7 @@
 
 ## 1. 핵심 규약 — `APP_BASE_PATH`
 
-호스팅 시스템은 각 앱을 `https://<HOSTING_BASE_HOST>/<context-path>/` 하위에 서빙한다. 앱 컨테이너에는 **`APP_BASE_PATH=/<context-path>/` env 가 주입**된다.
+호스팅 시스템은 각 앱을 `http://<HOSTING_BASE_HOST>/<context-path>/` 하위에 서빙한다(평문 HTTP). 앱 컨테이너에는 **`APP_BASE_PATH=/<context-path>/` env 가 주입**된다.
 
 **앱의 책임**: 브라우저에 emit 하는 **자산/링크 URL 에 `APP_BASE_PATH` prefix 를 붙인다.**
 
@@ -39,7 +39,7 @@
 
 - **1급 지원**: `APP_BASE_PATH` 규약을 따르는 앱(emit URL 에 prefix) 또는 base-path-aware 서버(`stripPrefix=false`).
 - **지원 안 됨**: 자산 경로를 **절대 루트로 하드코딩**(`/main.js`)하고 `APP_BASE_PATH` 도 base 설정도 없는 앱. 이 경우 브라우저가 context-path 밖(`host/main.js`)을 요청해 404 가 난다. path-prefix 호스팅의 본질적 한계다.
-- 완전 격리(앱 수정 없이)가 필요하면 **subdomain 스킴**(`<app>.host`, `BuildRequest.hostingScheme="subdomain"`, TASK-172)을 쓴다 — 앱이 자기 subdomain 루트에서 서빙돼 절대경로 자산이 자연 동작(무수정). wildcard DNS/TLS 필요(dev/e2e 는 nip.io). [설계](../design/subdomain-hosting.md) 참조.
+- 완전 격리(앱 수정 없이)가 필요하면 **subdomain 스킴**(`<app>.host`, `BuildRequest.hostingScheme="subdomain"`, TASK-172)을 쓴다 — 앱이 자기 subdomain 루트에서 서빙돼 절대경로 자산이 자연 동작(무수정). wildcard DNS 필요(dev/e2e 는 nip.io). HTTPS 는 미도입(평문 HTTP). [설계](../design/subdomain-hosting.md) 참조.
 - `<base href="/<cp>/">` 주입(HTML 상대경로 앱 구제)은 best-effort 옵션으로 후속 검토(절대경로/JS fetch 는 못 구제).
 
 ## 4. 빌드 요청 필드 (호스팅)
