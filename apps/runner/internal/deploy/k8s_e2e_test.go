@@ -16,6 +16,9 @@ package deploy
 
 import (
 	"context"
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -34,30 +37,42 @@ func TestK8sE2E_RealDeploy(t *testing.T) {
 		t.Skip("DIB_K8S_E2E_IMAGE / DIB_K8S_E2E_CONTEXT 미설정 — kind e2e skip")
 	}
 
-	buildID := "e2e-" + time.Now().UTC().Format("150405")
+	// P3-M5: buildID 를 env 로 고정할 수 있게 한다(후속 관리 e2e 가 deployment
+	// 이름을 예측). 미지정 시 timestamp.
+	buildID := os.Getenv("DIB_K8S_E2E_BUILD_ID")
+	if buildID == "" {
+		buildID = "e2e-" + time.Now().UTC().Format("150405")
+	}
 	deployer, err := NewK8sDeployer("k8s", K8sDeployOptions{})
 	if err != nil {
 		t.Fatalf("NewK8sDeployer: %v", err)
 	}
 
+	// P3-M5: context path 가 주어지면 Ingress 라우팅 e2e — stripPrefix=true.
+	// 없으면 P2-M5 배포 e2e(deployment 이름 fallback).
 	opts := K8sDeployOptions{
 		SourceImage: image,
 		Cluster:     kctx,
 		Namespace:   ns,
 		BuildID:     buildID,
+		ContextPath: os.Getenv("DIB_K8S_E2E_CONTEXT_PATH"),
+		StripPrefix: os.Getenv("DIB_K8S_E2E_CONTEXT_PATH") != "",
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	// 배포 자원은 테스트 종료 시 정리.
-	t.Cleanup(func() {
-		_ = deployer.Cleanup(context.Background(), K8sCleanupOptions{
-			Cluster:   kctx,
-			Namespace: ns,
-			BuildID:   buildID,
+	// 배포 자원은 테스트 종료 시 정리. 단 후속 관리 e2e 가 이어받도록
+	// DIB_K8S_E2E_KEEP_DEPLOY=1 이면 정리를 건너뛴다(호출자가 정리 책임).
+	if os.Getenv("DIB_K8S_E2E_KEEP_DEPLOY") != "1" {
+		t.Cleanup(func() {
+			_ = deployer.Cleanup(context.Background(), K8sCleanupOptions{
+				Cluster:   kctx,
+				Namespace: ns,
+				BuildID:   buildID,
+			})
 		})
-	})
+	}
 
 	res, err := deployer.Deploy(ctx, opts)
 	if err != nil {
@@ -86,4 +101,48 @@ func TestK8sE2E_RealDeploy(t *testing.T) {
 		t.Fatalf("availableReplicas = %q, want 1 (배포가 실제로 뜨지 않음)", strings.TrimSpace(string(out)))
 	}
 	t.Logf("k8s e2e OK: %s (availableReplicas=1)", res.ResultRef)
+
+	// P3-M5: context path + ingress URL 이 주어지면 실제 Ingress 라우팅 +
+	// APP_BASE_PATH 자산 로드를 검증한다(base 는 host/<cp>/).
+	cp := os.Getenv("DIB_K8S_E2E_CONTEXT_PATH")
+	ingress := os.Getenv("DIB_K8S_E2E_INGRESS_URL")
+	if cp == "" || ingress == "" {
+		return
+	}
+	pageURL := fmt.Sprintf("%s/%s/", strings.TrimRight(ingress, "/"), cp)
+	assetURL := fmt.Sprintf("%s/%s/app.js", strings.TrimRight(ingress, "/"), cp)
+
+	// ingress 전파 지연 흡수 — 최대 30회 재시도.
+	body := httpGetWithRetry(t, pageURL, 30)
+	if !strings.Contains(body, fmt.Sprintf("/%s/app.js", cp)) {
+		t.Fatalf("page 가 APP_BASE_PATH prefix 자산을 참조하지 않음:\n%s", body)
+	}
+	asset := httpGetWithRetry(t, assetURL, 10)
+	if !strings.Contains(asset, "hosted OK") {
+		t.Fatalf("asset(app.js) 로드 실패:\n%s", asset)
+	}
+	t.Logf("P3-M5 라우팅 OK: %s (page + %s/app.js 자산 로드)", pageURL, cp)
+}
+
+func httpGetWithRetry(t *testing.T, url string, attempts int) string {
+	t.Helper()
+	var lastErr error
+	var lastCode int
+	for i := 0; i < attempts; i++ {
+		res, err := http.Get(url) //nolint:gosec // e2e, local ingress
+		if err != nil {
+			lastErr = err
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		b, _ := io.ReadAll(res.Body)
+		res.Body.Close()
+		if res.StatusCode == 200 {
+			return string(b)
+		}
+		lastCode = res.StatusCode
+		time.Sleep(2 * time.Second)
+	}
+	t.Fatalf("GET %s 실패: lastErr=%v lastCode=%d", url, lastErr, lastCode)
+	return ""
 }
