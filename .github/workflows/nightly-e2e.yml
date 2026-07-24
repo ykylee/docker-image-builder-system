@@ -212,3 +212,44 @@ jobs:
           path: .visual/ci/
           retention-days: 14
           if-no-files-found: warn
+
+  # ---------------------------------------------------------------------------
+  # 호스팅 e2e (Phase 3 / TASK-171) — kind + ingress-nginx 실 path 라우팅 +
+  # 관리 라이프사이클. kind 셋업이 무거워 schedule / 수동 dispatch 에서만 돈다
+  # (매 push 는 제외).
+  # ---------------------------------------------------------------------------
+  hosting-e2e:
+    name: hosting-e2e (kind+ingress-nginx)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install kind + kubectl
+        run: |
+          set -euo pipefail
+          go install sigs.k8s.io/kind@v0.24.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+          curl -sLo /tmp/kubectl "https://dl.k8s.io/release/v1.31.4/bin/linux/amd64/kubectl"
+          sudo install -m 0755 /tmp/kubectl /usr/local/bin/kubectl
+
+      - name: Install deps (tsx)
+        run: pnpm install --frozen-lockfile
+
+      - name: Run hosting e2e
+        env:
+          NO_COLOR: "1"
+        run: bash apps/runner/scripts/e2e-hosting.sh
