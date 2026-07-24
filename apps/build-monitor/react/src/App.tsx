@@ -55,6 +55,7 @@ const AdminBuilds = lazy(async () => ({ default: (await import("@/routes/AdminBu
 const AdminUsers = lazy(async () => ({ default: (await import("@/routes/AdminUsers")).AdminUsers }));
 const AdminAdmins = lazy(async () => ({ default: (await import("@/routes/AdminAdmins")).AdminAdmins }));
 const AdminRunners = lazy(async () => ({ default: (await import("@/routes/AdminRunners")).AdminRunners }));
+const AdminHostedServices = lazy(async () => ({ default: (await import("@/routes/AdminHostedServices")).AdminHostedServices }));
 
 export function App(): ReactElement {
   return (
@@ -91,6 +92,7 @@ export function App(): ReactElement {
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/admins" element={<AdminAdmins />} />
           <Route path="/admin/runners" element={<AdminRunners />} />
+          <Route path="/admin/hosting" element={<AdminHostedServices />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Suspense>

@@ -159,6 +159,66 @@ export async function removeAdminFromAllowList(
   return result;
 }
 
+// TASK-168 (P3-M3): 호스팅 관리 helpers. generated openapi.d.ts 가
+// /admin/hosted-services response 를 추론하지 못해(build-server openapi 에
+// 미등록) inline 타입으로 받는다 — admin/admins 패턴과 동일.
+export type HostedServiceView = {
+  appName: string;
+  contextPath: string;
+  namespace: string;
+  deploymentName: string;
+  containerPort: number;
+  stripPrefix: boolean;
+  status: string;
+  url: string | null;
+  currentBuildId: string | null;
+  imageRef: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastDeployedAt: string | null;
+};
+
+export async function listHostedServices(
+  callerId: string
+): Promise<{ services: HostedServiceView[] }> {
+  return (await apiGet("/admin/hosted-services", "/admin/hosted-services", {
+    headers: { "X-Admin-Id": callerId }
+  })) as { services: HostedServiceView[] };
+}
+
+export async function stopHostedService(
+  callerId: string,
+  appName: string
+): Promise<HostedServiceView> {
+  return (await apiSend(
+    "POST",
+    `/admin/hosted-services/${encodeURIComponent(appName)}/stop`,
+    callerId
+  )) as HostedServiceView;
+}
+
+export async function startHostedService(
+  callerId: string,
+  appName: string
+): Promise<HostedServiceView> {
+  return (await apiSend(
+    "POST",
+    `/admin/hosted-services/${encodeURIComponent(appName)}/start`,
+    callerId
+  )) as HostedServiceView;
+}
+
+export async function removeHostedService(
+  callerId: string,
+  appName: string
+): Promise<HostedServiceView> {
+  return (await apiSend(
+    "DELETE",
+    `/admin/hosted-services/${encodeURIComponent(appName)}`,
+    callerId
+  )) as HostedServiceView;
+}
+
 // TASK-098: admin 페이지 endpoint helpers.
 // Svelte src/lib/api.ts 의 listAdminBuilds / listAdminUsers 와 1:1 정합.
 // X-Admin-Id header 가 Build Server 의 admin 가드 (401/403) 통과 필수.

@@ -23,7 +23,8 @@ const TABS = [
   { href: "/admin/builds", label: "Builds" },
   { href: "/admin/users", label: "Users" },
   { href: "/admin/admins", label: "Admins" },
-  { href: "/admin/runners", label: "Runners" }
+  { href: "/admin/runners", label: "Runners" },
+  { href: "/admin/hosting", label: "Hosting" }
 ] as const;
 
 export function AdminTabs(): ReactElement {
