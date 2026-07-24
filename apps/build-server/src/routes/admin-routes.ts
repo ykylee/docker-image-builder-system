@@ -14,6 +14,10 @@ import {
   adminRunnerRegisterRequestSchema,
   adminRunnerRegisterResponseSchema,
   adminUserListResponseSchema,
+  errorBody,
+  hostedServiceListResponseSchema,
+  hostedServiceSchema,
+  notFoundBody,
   validationErrorBody,
   type AdminRunner
 } from "@docker-image-builder-system/shared-contract";
@@ -171,6 +175,62 @@ export async function registerAdminRoutes(
 
     const body = await buildService.listBuildsAcrossUsers(queryResult.data);
     return reply.status(200).send(adminListBuildsResponseSchema.parse(body));
+  });
+
+  // ---- Hosting management (TASK-166 / P3-M1) --------------------------------
+  // 목록 + 상세(registry). scale/stop/delete(kubectl 연동)는 P3-M3.
+  app.get("/admin/hosted-services", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(
+      request.headers[ADMIN_ID_HEADER]
+    );
+    if (!callerId.success) {
+      return reply.status(401).send({
+        message: "Admin id header missing.",
+        header: ADMIN_ID_HEADER
+      });
+    }
+    if (!isAdmin(callerId.data)) {
+      return reply.status(403).send({
+        message: "Caller is not in the admin allow-list.",
+        callerId: callerId.data
+      });
+    }
+    const services = await buildService.listHostedServices();
+    return reply
+      .status(200)
+      .send(hostedServiceListResponseSchema.parse({ services }));
+  });
+
+  app.get("/admin/hosted-services/:appName", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(
+      request.headers[ADMIN_ID_HEADER]
+    );
+    if (!callerId.success) {
+      return reply.status(401).send({
+        message: "Admin id header missing.",
+        header: ADMIN_ID_HEADER
+      });
+    }
+    if (!isAdmin(callerId.data)) {
+      return reply.status(403).send({
+        message: "Caller is not in the admin allow-list.",
+        callerId: callerId.data
+      });
+    }
+    const params = request.params as { appName?: string };
+    const appName = (params.appName ?? "").trim();
+    if (appName === "") {
+      return reply.status(400).send(
+        errorBody("appName path parameter is required.", {
+          errorCode: "INVALID_REQUEST"
+        })
+      );
+    }
+    const service = await buildService.getHostedService(appName);
+    if (!service) {
+      return reply.status(404).send(notFoundBody("Hosted service not found."));
+    }
+    return reply.status(200).send(hostedServiceSchema.parse(service));
   });
 
   app.get("/admin/users", async (request, reply) => {

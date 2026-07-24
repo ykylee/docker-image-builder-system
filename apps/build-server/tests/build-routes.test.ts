@@ -54,12 +54,12 @@ async function seedBuildWithSource(
     },
     entrypointPath: base.entrypointPath ?? baseBody.entrypointPath
   });
-  if (!("accepted" in create) || !create.accepted) {
+  if (create.kind !== "accepted") {
     throw new Error(
       `seedBuildWithSource: expected accepted, got ${JSON.stringify(create)}`
     );
   }
-  const buildId = create.build.buildId;
+  const buildId = create.response.build.buildId;
   const upload = await service.storeSourceArchive(
     buildId,
     bytes,

@@ -143,6 +143,8 @@ ERROR_CODES: frozenset[str] = frozenset({
     "DOCKER_BUILD_FAILED",
     "CONTAINER_TEST_FAILED",
     "DEPLOYMENT_FAILED",
+    # TASK-166 (P3-M1): 호스팅 context path 가 다른 앱에 이미 할당됨.
+    "CONTEXT_PATH_TAKEN",
     "UNKNOWN_ERROR",
 })
 

@@ -15,6 +15,7 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   BuildSummary,
+  HostedService,
   DeploymentReportRequest,
   ExecutionStatus,
   SourceArchive,
@@ -43,7 +44,8 @@ import type {
   StoreSourceChunkResult,
   UpdatePhaseResult,
   ResultDeliveryPhase,
-  RecordResultDeliveryResult
+  RecordResultDeliveryResult,
+  UpsertHostedServiceInput
 } from "./build-repository.js";
 import {
   type BuildTestSnapshot,
@@ -74,6 +76,27 @@ type StoredBuild = {
   // currentPhase 자체가 없음을 의미.
   phaseHistory: { phase: BuildPhase; completedAt: string }[];
   currentPhaseStartedAt: string | null;
+  // TASK-166 (P3-M1): 할당된 호스팅 context path + 앱 컨테이너 포트.
+  // build 생성 시 서비스가 정규화/검증해 채운다. runner 가 배포(P3-M2) 시 사용.
+  contextPath: string | null;
+  runtimePort: number;
+};
+
+// TASK-166 (P3-M1): 호스팅 registry(앱당 1개). deployment 성공 시 upsert.
+type StoredHostedService = {
+  appName: string;
+  contextPath: string;
+  namespace: string;
+  deploymentName: string;
+  containerPort: number;
+  stripPrefix: boolean;
+  status: string;
+  url: string | null;
+  currentBuildId: string | null;
+  imageRef: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lastDeployedAt: string | null;
 };
 
 // TASK-069: stored runner registry state. The in-memory repo keeps a
@@ -95,6 +118,8 @@ const runners = new Map<string, StoredRunner>();
 
 export function createMemoryBuildRepository(): BuildRepository {
   const builds = new Map<string, StoredBuild>();
+  // TASK-166 (P3-M1): 호스팅 registry — appName 기준(앱당 1개).
+  const hostedServices = new Map<string, StoredHostedService>();
 
   return {
     async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
@@ -156,7 +181,9 @@ export function createMemoryBuildRepository(): BuildRepository {
         phaseHistory: [],
         // REQUEST_ACCEPTED 가 initial phase. transition 이벤트가 들어오기
         // 전까지 in-flight.
-        currentPhaseStartedAt: timestamp
+        currentPhaseStartedAt: timestamp,
+        contextPath: input.contextPath ?? null,
+        runtimePort: input.runtimePort ?? 8080
       });
 
       return {
@@ -1207,7 +1234,65 @@ export function createMemoryBuildRepository(): BuildRepository {
     async getRunnerStatus(runnerId: string): Promise<RunnerStatus | null> {
       const stored = runners.get(runnerId);
       return stored ? stored.status : null;
+    },
+
+    // ---- Hosting registry (TASK-166 / P3-M1) --------------------------------
+    async listHostedServices(): Promise<HostedService[]> {
+      return [...hostedServices.values()]
+        .map(toHostedService)
+        .sort((a, b) => a.appName.localeCompare(b.appName));
+    },
+    async getHostedServiceByAppName(
+      appName: string
+    ): Promise<HostedService | null> {
+      const stored = hostedServices.get(appName);
+      return stored ? toHostedService(stored) : null;
+    },
+    async getHostedServiceByContextPath(
+      contextPath: string
+    ): Promise<HostedService | null> {
+      const stored = [...hostedServices.values()].find(
+        (s) => s.contextPath === contextPath
+      );
+      return stored ? toHostedService(stored) : null;
+    },
+    async upsertHostedService(
+      input: UpsertHostedServiceInput
+    ): Promise<HostedService> {
+      const now = nowIsoString();
+      const existing = hostedServices.get(input.appName);
+      const stored: StoredHostedService = {
+        ...input,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+        lastDeployedAt: now
+      };
+      hostedServices.set(input.appName, stored);
+      return toHostedService(stored);
+    },
+    async deleteHostedService(appName: string): Promise<boolean> {
+      return hostedServices.delete(appName);
     }
+  };
+}
+
+// TASK-166 (P3-M1): StoredHostedService → HostedService 계약. 구조가 동일해
+// url 만 명시적으로 null 정규화.
+function toHostedService(s: StoredHostedService): HostedService {
+  return {
+    appName: s.appName,
+    contextPath: s.contextPath,
+    namespace: s.namespace,
+    deploymentName: s.deploymentName,
+    containerPort: s.containerPort,
+    stripPrefix: s.stripPrefix,
+    status: s.status as HostedService["status"],
+    url: s.url,
+    currentBuildId: s.currentBuildId,
+    imageRef: s.imageRef,
+    createdAt: s.createdAt,
+    updatedAt: s.updatedAt,
+    lastDeployedAt: s.lastDeployedAt
   };
 }
 

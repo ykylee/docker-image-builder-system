@@ -50,6 +50,19 @@ export const buildRequestSchema = z
     sourceArchive: sourceArchiveSchema,
     entrypointPath: z.string().min(1),
     dockerfilePath: z.string().min(1).default("Dockerfile"),
+    // TASK-166 (P3-M1): 호스팅 context path. `https://<host>/<contextPath>/`
+    // 로 서비스가 라우팅된다. 미지정 시 서버가 appName 을 정규화해 자동 부여.
+    // 서버가 정규화(소문자/URL-safe)·유일성·예약어를 최종 검증하므로 계약은
+    // 관대하게 문자열만 받는다.
+    contextPath: z.string().min(1).optional().meta({
+      description:
+        "Optional hosting URL context path. Defaults to a normalized appName. Server normalizes and enforces global uniqueness."
+    }),
+    // TASK-166 (P3-M1): 앱이 컨테이너 안에서 listen 하는 포트. Ingress/Service
+    // 가 이 포트로 트래픽을 보낸다. optional — 서버가 미지정 시 8080 을 쓴다
+    // (`.default()` 는 OpenAPI 산출에서 required 로 나와 소비자에게 강제되므로
+    // optional + 서버측 fallback 으로 둔다).
+    runtimePort: z.int().positive().optional(),
     // TASK-160 (P2-M1 Step 3): `previewTtlMinutes` 제거. preview 런타임의
     // 보존 시간 knob 이었으나 canonical build/test/deploy 모델에는 대응
     // 개념이 없고 실제로 소비되는 곳도 없었다.

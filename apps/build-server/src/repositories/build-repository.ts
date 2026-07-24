@@ -10,6 +10,7 @@ import type {
   BuildLogEntry,
   BuildRequest,
   BuildStatusResponse,
+  HostedService,
   DeploymentReportRequest,
   ErrorCode,
   RunnerStatus,
@@ -451,4 +452,28 @@ export interface BuildRepository {
   // "first time we've seen this id — let the call proceed and then
   // register".
   getRunnerStatus(runnerId: string): Promise<RunnerStatus | null>;
+
+  // ---- Hosting registry (Phase 3 / TASK-166) --------------------------------
+  // 앱당 1개 활성 호스팅. 배포 성공 시 upsert(appName 기준 교체).
+  listHostedServices(): Promise<HostedService[]>;
+  getHostedServiceByAppName(appName: string): Promise<HostedService | null>;
+  getHostedServiceByContextPath(
+    contextPath: string
+  ): Promise<HostedService | null>;
+  upsertHostedService(input: UpsertHostedServiceInput): Promise<HostedService>;
+  deleteHostedService(appName: string): Promise<boolean>;
 }
+
+// TASK-166 (P3-M1): 호스팅 upsert 입력. appName 기준으로 기존 row 를 교체한다.
+export type UpsertHostedServiceInput = {
+  appName: string;
+  contextPath: string;
+  namespace: string;
+  deploymentName: string;
+  containerPort: number;
+  stripPrefix: boolean;
+  status: string;
+  url: string | null;
+  currentBuildId: string | null;
+  imageRef: string | null;
+};

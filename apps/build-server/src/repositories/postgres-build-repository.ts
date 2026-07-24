@@ -10,6 +10,7 @@ import {
   buildRequestTable,
   desc,
   deploymentAttemptTable,
+  hostedServiceTable,
   runnerTable,
   sql,
   type DatabaseClient
@@ -40,6 +41,7 @@ import type {
   BuildRequest,
   BuildStatus,
   BuildStatusResponse,
+  HostedService,
   BuildSummary,
   DeploymentReportRequest,
   ErrorCode,
@@ -64,7 +66,8 @@ import type {
   StoreSourceChunkResult,
   UpdatePhaseResult,
   ResultDeliveryPhase,
-  RecordResultDeliveryResult
+  RecordResultDeliveryResult,
+  UpsertHostedServiceInput
 } from "./build-repository.js";
 import {
   advancePhaseHistory,
@@ -227,6 +230,9 @@ export class PostgresBuildRepository implements BuildRepository {
           entrypointPath: input.entrypointPath,
           dockerfilePath: input.dockerfilePath,
           metadata: input.metadata,
+          // TASK-166 (P3-M1): 할당된 호스팅 context path + 앱 컨테이너 포트.
+          contextPath: input.contextPath ?? null,
+          runtimePort: input.runtimePort ?? 8080,
           runtimeUrl: null,
           lastErrorCode: null,
           lastErrorMessage: null,
@@ -1622,6 +1628,105 @@ export class PostgresBuildRepository implements BuildRepository {
       .limit(1);
     return row[0] ? (row[0].status as RunnerStatus) : null;
   }
+
+  // ---- Hosting registry (TASK-166 / P3-M1) ----------------------------------
+  async listHostedServices(): Promise<HostedService[]> {
+    const rows = await this.db
+      .select()
+      .from(hostedServiceTable)
+      .orderBy(hostedServiceTable.appName);
+    return rows.map(toHostedService);
+  }
+
+  async getHostedServiceByAppName(
+    appName: string
+  ): Promise<HostedService | null> {
+    const [row] = await this.db
+      .select()
+      .from(hostedServiceTable)
+      .where(eq(hostedServiceTable.appName, appName))
+      .limit(1);
+    return row ? toHostedService(row) : null;
+  }
+
+  async getHostedServiceByContextPath(
+    contextPath: string
+  ): Promise<HostedService | null> {
+    const [row] = await this.db
+      .select()
+      .from(hostedServiceTable)
+      .where(eq(hostedServiceTable.contextPath, contextPath))
+      .limit(1);
+    return row ? toHostedService(row) : null;
+  }
+
+  async upsertHostedService(
+    input: UpsertHostedServiceInput
+  ): Promise<HostedService> {
+    const now = new Date();
+    const [row] = await this.db
+      .insert(hostedServiceTable)
+      .values({
+        id: randomUUID(),
+        appName: input.appName,
+        contextPath: input.contextPath,
+        namespace: input.namespace,
+        deploymentName: input.deploymentName,
+        containerPort: input.containerPort,
+        stripPrefix: input.stripPrefix,
+        status: input.status,
+        url: input.url,
+        currentBuildId: input.currentBuildId,
+        imageRef: input.imageRef,
+        updatedAt: now,
+        lastDeployedAt: now
+      })
+      .onConflictDoUpdate({
+        target: hostedServiceTable.appName,
+        set: {
+          contextPath: input.contextPath,
+          namespace: input.namespace,
+          deploymentName: input.deploymentName,
+          containerPort: input.containerPort,
+          stripPrefix: input.stripPrefix,
+          status: input.status,
+          url: input.url,
+          currentBuildId: input.currentBuildId,
+          imageRef: input.imageRef,
+          updatedAt: now,
+          lastDeployedAt: now
+        }
+      })
+      .returning();
+    return toHostedService(row!);
+  }
+
+  async deleteHostedService(appName: string): Promise<boolean> {
+    const rows = await this.db
+      .delete(hostedServiceTable)
+      .where(eq(hostedServiceTable.appName, appName))
+      .returning({ id: hostedServiceTable.id });
+    return rows.length > 0;
+  }
+}
+
+// TASK-166 (P3-M1): hosted_service row → HostedService 계약.
+function toHostedService(row: typeof hostedServiceTable.$inferSelect): HostedService {
+  return {
+    appName: row.appName,
+    contextPath: row.contextPath,
+    namespace: row.namespace,
+    deploymentName: row.deploymentName,
+    containerPort: row.containerPort,
+    stripPrefix: row.stripPrefix,
+    status: row.status as HostedService["status"],
+    url: row.url,
+    currentBuildId: row.currentBuildId,
+    imageRef: row.imageRef,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+    lastDeployedAt: row.lastDeployedAt ? row.lastDeployedAt.toISOString() : null
+  };
 }
 
 // TASK-069: postgres → AdminRunner 변환. row 의 status 는 text 로 저장되지만

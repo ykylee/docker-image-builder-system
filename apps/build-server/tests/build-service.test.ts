@@ -32,12 +32,12 @@ async function createBuildWithSource(
     },
     entrypointPath: partial.entrypointPath ?? "src/index.ts"
   });
-  if (!("accepted" in create) || !create.accepted) {
+  if (create.kind !== "accepted") {
     throw new Error(
       `createBuildWithSource: expected accepted, got ${JSON.stringify(create)}`
     );
   }
-  const buildId = create.build.buildId;
+  const buildId = create.response.build.buildId;
   const upload = await service.storeSourceArchive(
     buildId,
     bytes,

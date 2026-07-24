@@ -58,14 +58,29 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid build request payload", payloadResult.error.issues)
       );
     }
-    const result = await buildService.createBuild(payloadResult.data);
+    const outcome = await buildService.createBuild(payloadResult.data);
 
-    if ("duplicate" in result && result.duplicate) {
-      const body = buildDuplicateResponseSchema.parse(result);
+    // TASK-166 (P3-M1): 호스팅 context path 할당 실패.
+    if (outcome.kind === "context_path_invalid") {
+      return reply.status(400).send(
+        errorBody(outcome.reason, { errorCode: "INVALID_REQUEST" })
+      );
+    }
+    if (outcome.kind === "context_path_taken") {
+      return reply.status(409).send(
+        errorBody(
+          `Context path "${outcome.contextPath}" is already hosted by app "${outcome.appName}".`,
+          { errorCode: "CONTEXT_PATH_TAKEN", contextPath: outcome.contextPath }
+        )
+      );
+    }
+
+    if (outcome.kind === "duplicate") {
+      const body = buildDuplicateResponseSchema.parse(outcome.response);
       return reply.status(409).send(body);
     }
 
-    const body = buildAcceptedResponseSchema.parse(result);
+    const body = buildAcceptedResponseSchema.parse(outcome.response);
     return reply.status(202).send(body);
   });
 

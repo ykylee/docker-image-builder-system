@@ -8,4 +8,5 @@ export * from "./schema/build-source.js";
 export * from "./schema/build-source-chunk.js";
 export * from "./schema/build-test.js";
 export * from "./schema/deployment-attempt.js";
+export * from "./schema/hosted-service.js";
 export * from "./schema/runner.js";

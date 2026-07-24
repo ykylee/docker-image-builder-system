@@ -831,13 +831,13 @@ export interface components {
         /** @description Standard error shape returned with 4xx/5xx responses. */
         BuildError: {
             /** @enum {string} */
-            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
             message: string;
         };
         /** @description BuildError or null. null = 이 빌드에 기록된 실패 이유가 없음 (TASK-162 이전에는 항상 null 이었다). */
         NullableBuildError: {
             /** @enum {string} */
-            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
             message: string;
         } | null;
         /** @description One field-level validation failure. Mirrors a zod issue narrowed to the fields the API contract guarantees. */
@@ -1102,7 +1102,7 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
             /** @enum {string} */
-            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
             errorMessage?: string;
         };
         /** @description POST /builds/:buildId/container-test/start payload (Runner → Host). 컨테이너 테스트 시작을 알린다. preview-era 의 ttlMinutes 는 canonical 모델에 대응 개념이 없어 제거됐다. */
@@ -1123,7 +1123,7 @@ export interface components {
             portOpen?: boolean;
             stabilityWindowPassed?: boolean;
             /** @enum {string} */
-            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "UNKNOWN_ERROR";
+            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
             errorMessage?: string;
             runnerId: string;
         };
@@ -1149,6 +1149,9 @@ export interface components {
             entrypointPath: string;
             /** @default Dockerfile */
             dockerfilePath: string;
+            /** @description Optional hosting URL context path. Defaults to a normalized appName. Server normalizes and enforces global uniqueness. */
+            contextPath?: string;
+            runtimePort?: number;
             /** @default {} */
             metadata: {
                 [key: string]: string;

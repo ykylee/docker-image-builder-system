@@ -25,11 +25,19 @@ import type {
   StoreSourceArchiveResult,
   StoreSourceChunkResult
 } from "../repositories/build-repository.js";
+import { validateContextPath } from "./context-path.js";
 
 export type ReportPhaseOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
   | { kind: "not_found" }
   | { kind: "invalid_transition"; fromPhase: string; toPhase: string };
+
+// TASK-166 (P3-M1): createBuild 결과 — 호스팅 context path 할당 실패를 포함.
+export type CreateBuildOutcome =
+  | { kind: "accepted"; response: BuildAcceptedResponse }
+  | { kind: "duplicate"; response: BuildDuplicateResponse }
+  | { kind: "context_path_invalid"; reason: string }
+  | { kind: "context_path_taken"; contextPath: string; appName: string };
 
 // TASK-161 (P2-M2): 컨테이너 테스트 outcome 은 canonical BuildStatusResponse
 // 하나만 돌려준다. 구 TestDeployment payload 는 `test` 블록과 중복이었다.
@@ -94,19 +102,40 @@ export class BuildService {
     }
   ) {}
 
-  async createBuild(
-    input: BuildRequest
-  ): Promise<BuildAcceptedResponse | BuildDuplicateResponse> {
-    const result = await this.repository.createBuild(input);
+  // TASK-166 (P3-M1): createBuild 는 이제 호스팅 context path 를 할당·검증한다.
+  // 정규화(appName 파생 포함) → 예약어/빈값 거부 → registry 유일성(다른 앱이
+  // 이미 점유했으면 CONTEXT_PATH_TAKEN) → 해소된 contextPath 를 build 에 저장.
+  async createBuild(input: BuildRequest): Promise<CreateBuildOutcome> {
+    const raw = input.contextPath ?? input.appName;
+    const validation = validateContextPath(raw);
+    if (!validation.ok) {
+      return { kind: "context_path_invalid", reason: validation.reason };
+    }
+    const contextPath = validation.contextPath;
+
+    const existing =
+      await this.repository.getHostedServiceByContextPath(contextPath);
+    if (existing && existing.appName !== input.appName) {
+      return {
+        kind: "context_path_taken",
+        contextPath,
+        appName: existing.appName
+      };
+    }
+
+    const result = await this.repository.createBuild({ ...input, contextPath });
 
     if (result.kind === "duplicate") {
-      return result.response;
+      return { kind: "duplicate", response: result.response };
     }
 
     return {
-      accepted: true,
-      duplicate: false,
-      build: result.response.build
+      kind: "accepted",
+      response: {
+        accepted: true,
+        duplicate: false,
+        build: result.response.build
+      }
     };
   }
 
@@ -240,6 +269,15 @@ export class BuildService {
    */
    listAdminRunners() {
     return this.repository.listRunners();
+  }
+
+  // ---- Hosting management (TASK-166 / P3-M1) --------------------------------
+  listHostedServices() {
+    return this.repository.listHostedServices();
+  }
+
+  getHostedService(appName: string) {
+    return this.repository.getHostedServiceByAppName(appName);
   }
 
   // TASK-077: admin-initiated runner registration. Distinct surface from

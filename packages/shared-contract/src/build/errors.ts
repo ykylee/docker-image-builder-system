@@ -21,8 +21,12 @@ export const errorCodes = [
   // external deployment phase. Parallel to the container test failure code
   // but at the deployment step.
   "DEPLOYMENT_FAILED",
+  "CONTEXT_PATH_TAKEN",
   "UNKNOWN_ERROR"
 ] as const;
+// TASK-166 (P3-M1): `CONTEXT_PATH_TAKEN` — 호스팅 context path 가 다른 앱에
+// 이미 할당돼 있어 build 요청을 거부할 때. (설명은 배열 밖 — drift-checker 가
+// 배열 본문 토큰을 enum 으로 복원하므로.)
 
 export type ErrorCode = (typeof errorCodes)[number];
 

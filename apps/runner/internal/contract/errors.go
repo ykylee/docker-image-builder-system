@@ -21,10 +21,12 @@ const (
 	// TASK-062: external deployment phase failure (parallel to
 	// CONTAINER_TEST_FAILED at the container test step).
 	ErrorCodeDeploymentFailed = "DEPLOYMENT_FAILED"
+	// TASK-166 (P3-M1): 호스팅 context path 가 다른 앱에 이미 할당됨.
+	ErrorCodeContextPathTaken = "CONTEXT_PATH_TAKEN"
 	ErrorCodeUnknownError     = "UNKNOWN_ERROR"
 )
 
-// ErrorCodes — canonical 9-value list. Mirrors
+// ErrorCodes — canonical 10-value list. Mirrors
 // `apps.skill_mcp.contract.canonical.ERROR_CODES` (Python) /
 // `errorCodes` (TS).
 var ErrorCodes = []string{
@@ -36,5 +38,6 @@ var ErrorCodes = []string{
 	ErrorCodeDockerBuildFailed,
 	ErrorCodeContainerTestFailed,
 	ErrorCodeDeploymentFailed,
+	ErrorCodeContextPathTaken,
 	ErrorCodeUnknownError,
 }

@@ -22,6 +22,11 @@ export const buildRequestTable = pgTable("build_request", {
   entrypointPath: text("entrypoint_path").notNull(),
   dockerfilePath: text("dockerfile_path").notNull(),
   metadata: jsonb("metadata").$type<Record<string, string>>().notNull(),
+  // TASK-166 (P3-M1): 호스팅 입력. context_path 는 build 생성 시 할당(미지정
+  // 시 app_name 정규화)·유일성 검증되고, runtime_port 는 앱 컨테이너 내부
+  // 포트(기본 8080). runner 가 배포(P3-M2) 시 사용한다. migration 0009.
+  contextPath: text("context_path"),
+  runtimePort: integer("runtime_port").notNull().default(8080),
   // TASK-161 (P2-M2): canonical 이름으로 정렬 — build_test.runtime_url 과
   // 같은 개념이다. 구 preview_url 은 migration 0008 에서 rename 됐다.
   runtimeUrl: text("runtime_url"),

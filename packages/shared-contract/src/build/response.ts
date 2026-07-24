@@ -257,6 +257,65 @@ export const resultDeliverySchema = z
 
 export type ResultDelivery = z.infer<typeof resultDeliverySchema>;
 
+// ---------------------------------------------------------------------------
+// Hosting (Phase 3 / TASK-166)
+// ---------------------------------------------------------------------------
+//
+// HostedService = 앱 1개의 지속 호스팅(앱당 1개 활성). 빌드가 성공적으로
+// 배포되면 그 앱의 HostedService 가 upsert 된다. build-server 가 registry
+// (SSOT)를 소유하고 관리 API(admin)가 이 스키마를 반환한다.
+
+export const hostedServiceStatuses = [
+  "PROVISIONING",
+  "RUNNING",
+  "STOPPED",
+  "FAILED",
+  "REMOVED"
+] as const;
+
+export type HostedServiceStatus = (typeof hostedServiceStatuses)[number];
+
+export const hostedServiceSchema = z
+  .object({
+    appName: z.string().min(1),
+    // URL prefix — 전역 유일. `https://<HOSTING_BASE_HOST>/<contextPath>/`.
+    contextPath: z.string().min(1),
+    namespace: z.string().min(1),
+    deploymentName: z.string().min(1),
+    // 앱이 컨테이너 안에서 listen 하는 포트.
+    containerPort: z.int().positive(),
+    // Ingress 가 context-path prefix 를 strip 하는지 (기본 true).
+    stripPrefix: z.boolean(),
+    status: z.enum(hostedServiceStatuses),
+    // 접속 URL. status 가 PROVISIONING/REMOVED 등에서는 null 일 수 있다.
+    url: z.string().url().nullable(),
+    currentBuildId: z.string().uuid().nullable(),
+    imageRef: z.string().nullable(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    lastDeployedAt: z.string().datetime().nullable()
+  })
+  .meta({
+    id: "HostedService",
+    description:
+      "A durable hosted service for one app (one active per app). Returned by the admin hosting management API."
+  });
+
+export type HostedService = z.infer<typeof hostedServiceSchema>;
+
+export const hostedServiceListResponseSchema = z
+  .object({
+    services: z.array(hostedServiceSchema)
+  })
+  .meta({
+    id: "HostedServiceListResponse",
+    description: "GET /admin/hosted-services response."
+  });
+
+export type HostedServiceListResponse = z.infer<
+  typeof hostedServiceListResponseSchema
+>;
+
 export const buildStatusResponseSchema = z
   .object({
     build: buildSummarySchema,

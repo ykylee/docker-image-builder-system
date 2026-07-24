@@ -30,8 +30,8 @@ func TestExecutionStatusesCount(t *testing.T) {
 }
 
 func TestErrorCodesCount(t *testing.T) {
-	if got, want := len(ErrorCodes), 9; got != want {
-		t.Errorf("ErrorCodes size = %d, want %d (TASK-062: 9 = 8+DEPLOYMENT_FAILED)", got, want)
+	if got, want := len(ErrorCodes), 10; got != want {
+		t.Errorf("ErrorCodes size = %d, want %d (TASK-166: 10 = 9+CONTEXT_PATH_TAKEN)", got, want)
 	}
 }
 
@@ -113,7 +113,7 @@ func TestStatusConstLookup(t *testing.T) {
 	}
 }
 
-// TestErrorCodeConstLookup 는 ErrorCodes 9 종 모두 const 로 선언됐는지 확인.
+// TestErrorCodeConstLookup 는 ErrorCodes 10 종 모두 const 로 선언됐는지 확인.
 func TestErrorCodeConstLookup(t *testing.T) {
 	for _, v := range ErrorCodes {
 		found := false
@@ -122,7 +122,7 @@ func TestErrorCodeConstLookup(t *testing.T) {
 			ErrorCodeBuildNotFound, ErrorCodeLogsNotFound,
 			ErrorCodeQueueClaimFailed, ErrorCodeDockerBuildFailed,
 			ErrorCodeContainerTestFailed, ErrorCodeDeploymentFailed,
-			ErrorCodeUnknownError,
+			ErrorCodeContextPathTaken, ErrorCodeUnknownError,
 		} {
 			if decl == v {
 				found = true
