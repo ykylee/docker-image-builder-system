@@ -154,6 +154,35 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     hostingBaseHost
   });
 
+  // TASK-174 (v0.7.0): 호스팅 status 캐시 주기 sync. hosting opt-in
+  // (HOSTING_BASE_HOST 설정)이고 interval>0 일 때만 기동 — 미설정 배포에서는
+  // kubectl 호출을 만들지 않는다. 프로세스 최초의 background job: .unref() 로
+  // 이벤트 루프를 붙잡지 않고, onClose 에서 정리한다. 각 tick 은 격리되어
+  // (실패해도 다음 tick 계속) 관리 명령/desired status 와 충돌하지 않는다.
+  // HOSTING_STATUS_SYNC_INTERVAL_MS=0 으로 명시적 비활성 가능(기본 30s).
+  const syncIntervalMs = (() => {
+    const raw = process.env.HOSTING_STATUS_SYNC_INTERVAL_MS?.trim();
+    if (raw === undefined || raw === "") return 30_000;
+    const n = Number(raw);
+    return Number.isFinite(n) && n >= 0 ? n : 30_000;
+  })();
+  if (hostingBaseHost && syncIntervalMs > 0) {
+    const timer = setInterval(() => {
+      buildService.syncHostedServiceStatuses().then(
+        (r) => {
+          if (r.failed > 0) {
+            app.log.warn(r, "hosting status sync completed with failures");
+          }
+        },
+        (err) => app.log.error({ err }, "hosting status sync tick failed")
+      );
+    }, syncIntervalMs);
+    timer.unref();
+    app.addHook("onClose", async () => {
+      clearInterval(timer);
+    });
+  }
+
   void registerHealthRoute(app);
   void registerBuildRoutes(app, buildService);
 

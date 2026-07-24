@@ -247,7 +247,13 @@ describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () 
 
 function fakeK8sAdmin() {
   const calls: Array<{ op: string; ns: string; name: string; replicas?: number }> = [];
-  const admin: K8sAdmin & { calls: typeof calls; failNext?: boolean } = {
+  const admin: K8sAdmin & {
+    calls: typeof calls;
+    failNext?: boolean;
+    // TASK-174: availableReplicas 제어 — 반환값 override + name 기준 예외 발생.
+    replicas?: number;
+    failReplicasFor?: Set<string>;
+  } = {
     calls,
     async scale(ns, name, replicas) {
       if (admin.failNext) throw new Error("kubectl boom");
@@ -257,8 +263,12 @@ function fakeK8sAdmin() {
       if (admin.failNext) throw new Error("kubectl boom");
       calls.push({ op: "remove", ns, name });
     },
-    async availableReplicas() {
-      return 1;
+    async availableReplicas(ns, name) {
+      calls.push({ op: "availableReplicas", ns, name });
+      if (admin.failReplicasFor?.has(name)) {
+        throw new Error("kubectl get boom");
+      }
+      return admin.replicas ?? 1;
     }
   };
   return admin;
@@ -332,5 +342,116 @@ describe("호스팅 관리 라이프사이클 (TASK-168 / P3-M3)", () => {
     // k8s 실패 시 registry status 는 그대로 RUNNING
     const still = await svc.getHostedService("app-x");
     assert.equal(still!.status, "RUNNING");
+  });
+});
+
+async function seedNamed(
+  repo: ReturnType<typeof createMemoryBuildRepository>,
+  appName: string,
+  status = "RUNNING"
+) {
+  await repo.upsertHostedService({
+    appName,
+    contextPath: appName,
+    namespace: "dib-hosted",
+    deploymentName: `dib-${appName}`,
+    containerPort: 8080,
+    stripPrefix: true,
+    hostingScheme: "path",
+    status,
+    url: `http://h/${appName}/`,
+    currentBuildId: null,
+    imageRef: null
+  });
+}
+
+describe("호스팅 status 캐시 (TASK-174 / v0.7.0)", () => {
+  it("upsert 직후 live 캐시는 null (미sync)", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedNamed(repo, "app-x");
+    const svc = await repo.getHostedServiceByAppName("app-x");
+    assert.equal(svc!.availableReplicas, null);
+    assert.equal(svc!.lastSyncedAt, null);
+  });
+
+  it("updateHostedServiceLiveStatus — live 필드만 갱신, desired status 불변", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedNamed(repo, "app-x", "STOPPED");
+    const before = await repo.getHostedServiceByAppName("app-x");
+
+    const updated = await repo.updateHostedServiceLiveStatus("app-x", 3);
+    assert.equal(updated!.availableReplicas, 3);
+    assert.ok(updated!.lastSyncedAt);
+    // desired lifecycle status / updatedAt 은 건드리지 않는다.
+    assert.equal(updated!.status, "STOPPED");
+    assert.equal(updated!.updatedAt, before!.updatedAt);
+
+    assert.equal(await repo.updateHostedServiceLiveStatus("nope", 1), null);
+  });
+
+  it("syncHostedServiceStatuses — 실측 replica 를 전 서비스에 캐시", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedNamed(repo, "app-a");
+    await seedNamed(repo, "app-b");
+    const admin = fakeK8sAdmin();
+    admin.replicas = 2;
+    const svc = new BuildService(repo, { strictContentRange: false }, admin);
+
+    const result = await svc.syncHostedServiceStatuses();
+    assert.deepEqual(result, { synced: 2, failed: 0 });
+
+    const a = await repo.getHostedServiceByAppName("app-a");
+    const b = await repo.getHostedServiceByAppName("app-b");
+    assert.equal(a!.availableReplicas, 2);
+    assert.equal(b!.availableReplicas, 2);
+    assert.ok(a!.lastSyncedAt);
+  });
+
+  it("REMOVED 는 sync 대상에서 제외", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedNamed(repo, "gone", "REMOVED");
+    await seedNamed(repo, "live");
+    const admin = fakeK8sAdmin();
+    const svc = new BuildService(repo, { strictContentRange: false }, admin);
+
+    const result = await svc.syncHostedServiceStatuses();
+    assert.deepEqual(result, { synced: 1, failed: 0 });
+    // REMOVED 서비스에는 availableReplicas 조회조차 하지 않는다.
+    assert.equal(
+      admin.calls.some((c) => c.op === "availableReplicas" && c.name === "dib-gone"),
+      false
+    );
+  });
+
+  it("개별 서비스 k8s 조회 실패는 격리 — 나머지는 계속 sync", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedNamed(repo, "app-ok");
+    await seedNamed(repo, "app-bad");
+    const admin = fakeK8sAdmin();
+    admin.replicas = 1;
+    admin.failReplicasFor = new Set(["dib-app-bad"]);
+    const svc = new BuildService(repo, { strictContentRange: false }, admin);
+
+    const result = await svc.syncHostedServiceStatuses();
+    assert.deepEqual(result, { synced: 1, failed: 1 });
+
+    const ok = await repo.getHostedServiceByAppName("app-ok");
+    const bad = await repo.getHostedServiceByAppName("app-bad");
+    assert.equal(ok!.availableReplicas, 1);
+    // 실패한 서비스는 캐시가 stale(=null 유지).
+    assert.equal(bad!.availableReplicas, null);
+  });
+
+  it("재배포(upsert) 시 live 캐시 무효화", async () => {
+    const repo = createMemoryBuildRepository();
+    await seedNamed(repo, "app-x");
+    await repo.updateHostedServiceLiveStatus("app-x", 4);
+    assert.equal((await repo.getHostedServiceByAppName("app-x"))!.availableReplicas, 4);
+
+    // 같은 app 재배포 → 이전 replica 캐시는 무효(null)로 리셋.
+    await seedNamed(repo, "app-x");
+    const svc = await repo.getHostedServiceByAppName("app-x");
+    assert.equal(svc!.availableReplicas, null);
+    assert.equal(svc!.lastSyncedAt, null);
   });
 });

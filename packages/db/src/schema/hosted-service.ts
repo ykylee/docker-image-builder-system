@@ -34,7 +34,11 @@ export const hostedServiceTable = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .defaultNow()
       .notNull(),
-    lastDeployedAt: timestamp("last_deployed_at", { withTimezone: true })
+    lastDeployedAt: timestamp("last_deployed_at", { withTimezone: true }),
+    // TASK-174 (v0.7.0): live k8s status 캐시(주기 sync). desired `status` 와
+    // 분리된 read cache — 실측 available replica + 마지막 sync 시각.
+    availableReplicas: integer("available_replicas"),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true })
   },
   (table) => ({
     appNameUnique: uniqueIndex("hosted_service_app_name_idx").on(table.appName),

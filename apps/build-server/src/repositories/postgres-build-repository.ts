@@ -1687,7 +1687,10 @@ export class PostgresBuildRepository implements BuildRepository {
         currentBuildId: input.currentBuildId,
         imageRef: input.imageRef,
         updatedAt: now,
-        lastDeployedAt: now
+        lastDeployedAt: now,
+        // TASK-174: 재배포 시 live 캐시 무효화 — 다음 sync tick 에서 재수집.
+        availableReplicas: null,
+        lastSyncedAt: null
       })
       .onConflictDoUpdate({
         target: hostedServiceTable.appName,
@@ -1703,7 +1706,9 @@ export class PostgresBuildRepository implements BuildRepository {
           currentBuildId: input.currentBuildId,
           imageRef: input.imageRef,
           updatedAt: now,
-          lastDeployedAt: now
+          lastDeployedAt: now,
+          availableReplicas: null,
+          lastSyncedAt: null
         }
       })
       .returning();
@@ -1717,6 +1722,19 @@ export class PostgresBuildRepository implements BuildRepository {
     const [row] = await this.db
       .update(hostedServiceTable)
       .set({ status, updatedAt: new Date() })
+      .where(eq(hostedServiceTable.appName, appName))
+      .returning();
+    return row ? toHostedService(row) : null;
+  }
+
+  async updateHostedServiceLiveStatus(
+    appName: string,
+    availableReplicas: number
+  ): Promise<HostedService | null> {
+    // TASK-174 (v0.7.0): live 캐시만 갱신 — desired status/updatedAt 불변.
+    const [row] = await this.db
+      .update(hostedServiceTable)
+      .set({ availableReplicas, lastSyncedAt: new Date() })
       .where(eq(hostedServiceTable.appName, appName))
       .returning();
     return row ? toHostedService(row) : null;
@@ -1747,7 +1765,9 @@ function toHostedService(row: typeof hostedServiceTable.$inferSelect): HostedSer
     imageRef: row.imageRef,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
-    lastDeployedAt: row.lastDeployedAt ? row.lastDeployedAt.toISOString() : null
+    lastDeployedAt: row.lastDeployedAt ? row.lastDeployedAt.toISOString() : null,
+    availableReplicas: row.availableReplicas ?? null,
+    lastSyncedAt: row.lastSyncedAt ? row.lastSyncedAt.toISOString() : null
   };
 }
 

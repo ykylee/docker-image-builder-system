@@ -349,6 +349,40 @@ export class BuildService {
     return { kind: "ok", service: { ...svc, status: "REMOVED" } };
   }
 
+  // TASK-174 (v0.7.0): 호스팅 status 캐시 주기 sync. REMOVED 를 제외한 전
+  // HostedService 의 실측 availableReplicas 를 k8s 에서 읽어 registry live
+  // 필드에 캐시한다. desired lifecycle status 는 건드리지 않는다(관리 명령과
+  // 비충돌). 개별 서비스의 k8s 조회 실패는 격리 — 캐시를 stale 로 두고 나머지
+  // sync 를 계속한다. create-app 의 주기 스케줄러가 호출한다.
+  async syncHostedServiceStatuses(): Promise<{
+    synced: number;
+    failed: number;
+  }> {
+    const services = await this.repository.listHostedServices();
+    let synced = 0;
+    let failed = 0;
+    for (const svc of services) {
+      if (svc.status === "REMOVED") {
+        continue;
+      }
+      try {
+        const replicas = await this.k8sAdmin.availableReplicas(
+          svc.namespace,
+          svc.deploymentName
+        );
+        await this.repository.updateHostedServiceLiveStatus(
+          svc.appName,
+          replicas
+        );
+        synced += 1;
+      } catch {
+        // k8s 조회 실패 — 이전 캐시 유지(stale), 다음 tick 에 재시도.
+        failed += 1;
+      }
+    }
+    return { synced, failed };
+  }
+
   // TASK-077: admin-initiated runner registration. Distinct surface from
   // the self-register on first claim — admin UI's "Register Runner" button
   // creates a placeholder record so the admin can see which runner is

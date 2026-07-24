@@ -176,6 +176,9 @@ export type HostedServiceView = {
   createdAt: string;
   updatedAt: string;
   lastDeployedAt: string | null;
+  // TASK-174 (v0.7.0): live k8s status 캐시(주기 sync). null = 아직 sync 안 됨.
+  availableReplicas: number | null;
+  lastSyncedAt: string | null;
 };
 
 export async function listHostedServices(

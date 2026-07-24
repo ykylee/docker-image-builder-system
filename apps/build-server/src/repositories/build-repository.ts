@@ -466,6 +466,13 @@ export interface BuildRepository {
     appName: string,
     status: string
   ): Promise<HostedService | null>;
+  // TASK-174 (v0.7.0): 호스팅 status 캐시 — live 필드(availableReplicas +
+  // lastSyncedAt)만 갱신한다. desired lifecycle `status` 는 건드리지 않아
+  // 주기 sync 가 관리 명령과 충돌하지 않는다. lastSyncedAt 은 repo 가 stamp.
+  updateHostedServiceLiveStatus(
+    appName: string,
+    availableReplicas: number
+  ): Promise<HostedService | null>;
   deleteHostedService(appName: string): Promise<boolean>;
 }
 

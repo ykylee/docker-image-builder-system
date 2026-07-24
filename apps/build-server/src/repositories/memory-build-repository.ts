@@ -102,6 +102,9 @@ type StoredHostedService = {
   createdAt: string;
   updatedAt: string;
   lastDeployedAt: string | null;
+  // TASK-174 (v0.7.0): live status 캐시(주기 sync). null = 미sync.
+  availableReplicas: number | null;
+  lastSyncedAt: string | null;
 };
 
 // TASK-069: stored runner registry state. The in-memory repo keeps a
@@ -1278,7 +1281,10 @@ export function createMemoryBuildRepository(): BuildRepository {
         ...input,
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
-        lastDeployedAt: now
+        lastDeployedAt: now,
+        // 재배포 시 이전 replica 캐시는 무효 — 다음 sync tick 에서 다시 채운다.
+        availableReplicas: null,
+        lastSyncedAt: null
       };
       hostedServices.set(input.appName, stored);
       return toHostedService(stored);
@@ -1293,6 +1299,20 @@ export function createMemoryBuildRepository(): BuildRepository {
       }
       stored.status = status;
       stored.updatedAt = nowIsoString();
+      hostedServices.set(appName, stored);
+      return toHostedService(stored);
+    },
+    async updateHostedServiceLiveStatus(
+      appName: string,
+      availableReplicas: number
+    ): Promise<HostedService | null> {
+      const stored = hostedServices.get(appName);
+      if (!stored) {
+        return null;
+      }
+      // live 캐시만 갱신 — desired lifecycle status/updatedAt 은 불변.
+      stored.availableReplicas = availableReplicas;
+      stored.lastSyncedAt = nowIsoString();
       hostedServices.set(appName, stored);
       return toHostedService(stored);
     },
@@ -1319,7 +1339,9 @@ function toHostedService(s: StoredHostedService): HostedService {
     imageRef: s.imageRef,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
-    lastDeployedAt: s.lastDeployedAt
+    lastDeployedAt: s.lastDeployedAt,
+    availableReplicas: s.availableReplicas ?? null,
+    lastSyncedAt: s.lastSyncedAt ?? null
   };
 }
 

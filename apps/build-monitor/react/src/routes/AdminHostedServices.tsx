@@ -112,6 +112,7 @@ export function AdminHostedServices(): ReactElement {
               <th>App</th>
               <th>Context path</th>
               <th>Status</th>
+              <th>Replicas</th>
               <th>URL</th>
               <th>Actions</th>
             </tr>
@@ -125,6 +126,26 @@ export function AdminHostedServices(): ReactElement {
                 </td>
                 <td>
                   <StatusPill status={svc.status} />
+                  {svc.status === "RUNNING" &&
+                    svc.availableReplicas === 0 && (
+                      <span
+                        data-testid={`hosting-degraded-${svc.appName}`}
+                        title="Desired RUNNING 이나 available replica 0 — 파드 미기동(degraded)"
+                        style={{ marginLeft: "0.4rem", color: "#c0392b" }}
+                      >
+                        ⚠ degraded
+                      </span>
+                    )}
+                </td>
+                <td
+                  data-testid={`hosting-replicas-${svc.appName}`}
+                  title={
+                    svc.lastSyncedAt
+                      ? `last synced ${svc.lastSyncedAt}`
+                      : "아직 sync 안 됨"
+                  }
+                >
+                  {svc.availableReplicas ?? "—"}
                 </td>
                 <td>
                   {svc.url ? (

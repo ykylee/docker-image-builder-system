@@ -329,7 +329,13 @@ export const hostedServiceSchema = z
     imageRef: z.string().nullable(),
     createdAt: z.string().datetime(),
     updatedAt: z.string().datetime(),
-    lastDeployedAt: z.string().datetime().nullable()
+    lastDeployedAt: z.string().datetime().nullable(),
+    // TASK-174 (v0.7.0): live k8s status 캐시(주기 sync). desired lifecycle
+    // `status` 와 분리 — 실측 available replica 수 + 마지막 sync 시각. null =
+    // 아직 sync 안 됨. status=RUNNING 인데 availableReplicas=0 이면 degraded
+    // (파드 미기동)로 파생 표시한다. 관리 명령과 충돌하지 않도록 별도 필드.
+    availableReplicas: z.int().nonnegative().nullable(),
+    lastSyncedAt: z.string().datetime().nullable()
   })
   .meta({
     id: "HostedService",
