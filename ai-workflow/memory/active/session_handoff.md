@@ -6,6 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-25 (rev 163→164: **v0.8.0 minor + v0.8.1~v0.8.9 9연속 patch + 6종 release notes 정합 (v0.4.0 / v0.5.0 / v0.6.0 / v0.7.0 / v0.8.0 / v0.8.x) + CHANGELOG release history 6종 + PROJECT_PROFILE 운영 가이드 4종 reference**).
 - Updated: 2026-07-24 (rev 162→163: **Phase 3 완료 — 호스팅 능력 (P3-M1~M5, TASK-166~170) + v0.3.0 릴리스**).
 - Updated: 2026-07-24 (rev 161→162: **P2-M5 배포 능력 완료 → Phase 2 전체 완료 (TASK-165)**).
 - Updated: 2026-07-23 (rev 160→161: **원격 발산 조정 + k8s adapter 이식 (TASK-164)**).
