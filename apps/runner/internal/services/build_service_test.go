@@ -405,6 +405,8 @@ type fakeK8sDeployer struct {
 	result    *deploy.K8sResult
 	err       error
 	calls     []deploy.K8sDeployOptions
+	// TASK-175 (E2): Cleanup 위임 검증을 위한 기록 필드.
+	cleanupCalls []deploy.K8sCleanupOptions
 }
 
 func (f *fakeK8sDeployer) Deploy(ctx context.Context, opts deploy.K8sDeployOptions) (*deploy.K8sResult, error) {
@@ -430,6 +432,7 @@ func (f *fakeK8sDeployer) Apply(ctx context.Context, opts deploy.K8sApplyOptions
 }
 
 func (f *fakeK8sDeployer) Cleanup(ctx context.Context, opts deploy.K8sCleanupOptions) error {
+	f.cleanupCalls = append(f.cleanupCalls, opts)
 	return nil
 }
 
@@ -537,5 +540,113 @@ func TestBuildService_K8sDeployer_NilSkipsK8sPath(t *testing.T) {
 		if _, hasK8s := dr.ResponsePayloadJSON["k8s"]; hasK8s {
 			t.Errorf("ResponsePayloadJSON.k8s should not be set when k8s nil")
 		}
+	}
+}
+
+// TASK-175 (E1): RUNNER_K8S_NAMESPACE_PER_BUILD=true 면 buildID 별 namespace
+// 가 k8s Deploy 옵션으로 흘러간다. 기본값(false) 은 기존 공유 namespace
+// 가 그대로 쓰인다.
+func TestBuildService_K8sDeployer_PerBuildNamespace(t *testing.T) {
+	cases := []struct {
+		name      string
+		perBuild  string
+		sharedNS  string
+		wantNS    string
+	}{
+		{"default-shared", "", "builds", "builds"},
+		{"explicit-false", "false", "builds", "builds"},
+		{"per-build-true", "true", "", "dib-b-1"},
+		{"per-build-true-ignores-shared", "true", "ignored", "dib-b-1"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fc := &fakeClient{buildID: "b-1"}
+			svc := NewBuildService(fc, docker.NewClient(), nil, "r-1").WithHostPort(38125)
+			d := &fakeK8sDeployer{cluster: "kind", namespace: tc.sharedNS}
+			svc.WithK8sDeployer(d)
+			t.Setenv("RUNNER_K8S_CLUSTER", "kind")
+			t.Setenv("RUNNER_K8S_NAMESPACE", tc.sharedNS)
+			if tc.perBuild != "" {
+				t.Setenv("RUNNER_K8S_NAMESPACE_PER_BUILD", tc.perBuild)
+			} else {
+				t.Setenv("RUNNER_K8S_NAMESPACE_PER_BUILD", "")
+			}
+			if err := svc.ProcessClaim(context.Background(), &queue.ClaimedBuild{BuildID: "b-1", AppName: "todo-app"}); err != nil {
+				t.Fatalf("ProcessClaim: %v", err)
+			}
+			if len(d.calls) != 1 {
+				t.Fatalf("k8s Deploy calls = %d, want 1", len(d.calls))
+			}
+			if d.calls[0].Namespace != tc.wantNS {
+				t.Errorf("k8s Namespace = %q, want %q", d.calls[0].Namespace, tc.wantNS)
+			}
+		})
+	}
+}
+
+// TASK-175 (E2): Cleanup() 가 deployment + service + ingress 를 한 명령으로
+// 함께 삭제한다 (잠복 stale Ingress 결함 해소). 단위 테스트는 deploy
+// 패키지에 있고, 본 테스트는 BuildService 경유 호출 시 그대로 전파되는지
+// 확인한다.
+func TestBuildService_K8sDeployer_CleanupIncludesIngress(t *testing.T) {
+	fc := &fakeClient{buildID: "b-1"}
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1")
+	d := &fakeK8sDeployer{}
+	svc.WithK8sDeployer(d)
+	if err := svc.k8sDeployer.Cleanup(context.Background(), deploy.K8sCleanupOptions{BuildID: "b-1", Namespace: "builds"}); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	// fakeK8sDeployer.Cleanup 은 호출 사실만 기록하므로 deploy 패키지의
+	// kubectlDeployer 가 같은 입력에 "deployment,service,ingress" 를 내는지
+	// 가 별도 단위 테스트(k8s_kubectl_test.go) 가 단언한다. 본 테스트는
+	// BuildService.Cleanup 경로가 정상적으로 k8sDeployer 로 위임하는지만
+	// 확인한다.
+	if len(d.cleanupCalls) != 1 {
+		t.Errorf("Cleanup 위임 실패: %d 회", len(d.cleanupCalls))
+	}
+}
+
+// TASK-175 (E3): k8s Deploy 실패 시 docker registry 결과(targetRef +
+// resultRef) 가 payload.dockerRegistry 블록에 보존되어 단일 FAILED 보고에
+// 동봉된다. 이전엔 docker registry 결과가 사라졌다.
+func TestBuildService_K8sDeployer_FailurePreservesDockerRegistryPayload(t *testing.T) {
+	fc := &fakeClient{buildID: "b-1"}
+	svc := NewBuildService(fc, docker.NewClient(), nil, "r-1").WithHostPort(38126)
+	d := &fakeK8sDeployer{err: errors.New("rollout timeout")}
+	svc.WithK8sDeployer(d)
+
+	err := svc.ProcessClaim(context.Background(), &queue.ClaimedBuild{BuildID: "b-1", AppName: "todo-app"})
+	if err == nil {
+		t.Fatalf("expected error from k8s failure")
+	}
+
+	dr := lastDeployment(fc)
+	if dr.Status != contract.ExecutionStatusFailed {
+		t.Errorf("Status = %s, want FAILED", dr.Status)
+	}
+	if dr.TargetType != "K8S" {
+		t.Errorf("TargetType = %s, want K8S", dr.TargetType)
+	}
+	if !strings.Contains(dr.ErrorMessage, "rollout timeout") {
+		t.Errorf("ErrorMessage = %q, want to contain rollout timeout", dr.ErrorMessage)
+	}
+	if !strings.Contains(dr.ErrorMessage, "docker registry push survived") {
+		t.Errorf("ErrorMessage = %q, want to mention docker registry 보존", dr.ErrorMessage)
+	}
+	// docker registry 결과가 payload 에 보존되었는지
+	if dr.ResponsePayloadJSON == nil {
+		t.Fatalf("ResponsePayloadJSON nil — docker registry 결과 유실")
+	}
+	registry, ok := dr.ResponsePayloadJSON["dockerRegistry"].(map[string]any)
+	if !ok {
+		t.Fatalf("ResponsePayloadJSON.dockerRegistry not map: %+v", dr.ResponsePayloadJSON)
+	}
+	if registry["targetRef"] == "" || registry["targetRef"] == nil {
+		t.Errorf("dockerRegistry.targetRef 비어있음: %+v", registry)
+	}
+	// 단일 FAILED 보고 — 두 번째 보고가 더 안 따라오는지(setup 자체가
+	// 마지막 보고만 lastDeployment 가 잡으므로 간접 검증)
+	if len(fc.deployments) < 2 {
+		t.Errorf("expected IN_PROGRESS(K8S) + FAILED(K8S) 두 보고, got %d", len(fc.deployments))
 	}
 }

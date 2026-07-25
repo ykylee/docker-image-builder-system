@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,23 +26,44 @@ type Config struct {
 	// 이면 비활성 (기존 deploy.Client 만). K8sCluster / K8sNamespace /
 	// K8sManifest 는 adapter 의 입력. P2-M5 의 실제 구현체까지 skeleton
 	// 단계.
-	K8sMode      string
-	K8sCluster   string
-	K8sNamespace string
-	K8sManifest  string
+	K8sMode         string
+	K8sCluster      string
+	K8sNamespace    string
+	K8sManifest     string
+	// TASK-175 (v0.8.0, k8s adapter 확장 — 운영 결함 3종 해소):
+	// K8sNamespacePerBuild 가 true 면 buildID 별 namespace 를 새로 만들어
+	// 격리(deployment/ingress DNS 충돌 + audit 개선). 기본(false) 은 기존
+	// 공유 namespace (RUNNER_K8S_NAMESPACE=기본 dib-builds) 호환.
+	K8sNamespacePerBuild bool
 }
 
 func Load() Config {
 	return Config{
-		PollInterval:      parseDuration("RUNNER_POLL_INTERVAL", 5*time.Second),
-		HostServerBaseURL: parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
-		RunnerID:          parseString("RUNNER_ID", "runner-default"),
-		RegistryConfigDir: parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
-		K8sMode:           parseString("RUNNER_K8S_MODE", ""),
-		K8sCluster:        parseString("RUNNER_K8S_CLUSTER", ""),
-		K8sNamespace:      parseString("RUNNER_K8S_NAMESPACE", ""),
-		K8sManifest:       parseString("RUNNER_K8S_MANIFEST", ""),
+		PollInterval:         parseDuration("RUNNER_POLL_INTERVAL", 5*time.Second),
+		HostServerBaseURL:    parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
+		RunnerID:             parseString("RUNNER_ID", "runner-default"),
+		RegistryConfigDir:    parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
+		K8sMode:              parseString("RUNNER_K8S_MODE", ""),
+		K8sCluster:           parseString("RUNNER_K8S_CLUSTER", ""),
+		K8sNamespace:         parseString("RUNNER_K8S_NAMESPACE", ""),
+		K8sManifest:          parseString("RUNNER_K8S_MANIFEST", ""),
+		K8sNamespacePerBuild: parseBool("RUNNER_K8S_NAMESPACE_PER_BUILD", false),
 	}
+}
+
+// parseBool 는 env boolean 을 lenient 하게 받는다. "true"/"1"/"yes"/"on" (대소문자 무시) 만 true.
+func parseBool(key string, def bool) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(key)))
+	if v == "" {
+		return def
+	}
+	switch v {
+	case "true", "1", "yes", "on":
+		return true
+	case "false", "0", "no", "off":
+		return false
+	}
+	return def
 }
 
 func parseString(key, def string) string {

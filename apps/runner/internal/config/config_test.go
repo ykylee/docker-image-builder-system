@@ -92,3 +92,34 @@ func TestSetenvIsObservableWithinSameProcess(t *testing.T) {
 		t.Fatalf("setup: expected env to be set, got %q", v)
 	}
 }
+
+// TASK-175 (E1): RUNNER_K8S_NAMESPACE_PER_BUILD env 의 parse 행위.
+// lenient 한 true/1/yes/on, false/0/no/off 케이스 + default(false) +
+// 이상값(빈 문자열 제외) fallback 까지 단언.
+func TestLoadK8sNamespacePerBuild(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want bool
+	}{
+		{"", false},   // unset default
+		{"true", true},
+		{"TRUE", true},
+		{"1", true},
+		{"yes", true},
+		{"on", true},
+		{"false", false},
+		{"0", false},
+		{"no", false},
+		{"off", false},
+		{"nonsense", false}, // unrecognized → default false (안전)
+	}
+	for _, tc := range cases {
+		t.Run("raw="+tc.raw, func(t *testing.T) {
+			t.Setenv("RUNNER_K8S_NAMESPACE_PER_BUILD", tc.raw)
+			cfg := Load()
+			if cfg.K8sNamespacePerBuild != tc.want {
+				t.Errorf("K8sNamespacePerBuild for %q = %v, want %v", tc.raw, cfg.K8sNamespacePerBuild, tc.want)
+			}
+		})
+	}
+}

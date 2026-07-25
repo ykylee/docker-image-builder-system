@@ -234,6 +234,16 @@ func TestKubectlCleanup_DeletesWithIgnoreNotFound(t *testing.T) {
 	if !containsArg(del.args, "delete") || !containsArg(del.args, "--ignore-not-found") || !containsArg(del.args, "dib-b-1") {
 		t.Errorf("delete args = %v", del.args)
 	}
+	// TASK-175 (E2): Ingress 도 같은 deploymentName 으로 동시에 정리되어야
+	// 한다. 동명 재빌드 시 stale Ingress 가 라우팅을 잡아채는 잠복 결함 해소.
+	// kind 묶음이 `deployment,service,ingress` 한 원소로 들어가므로 containsArg
+	// 가 정확 일치를 요구하는 형태로는 잡히지 않는다 — argsAnySubstr 로 확인.
+	if !argsAnySubstr(del.args, "ingress") {
+		t.Errorf("Cleanup args missing ingress kind (TASK-175 E2): %v", del.args)
+	}
+	if !argsAnySubstr(del.args, "deployment,service,ingress") {
+		t.Errorf("Cleanup args should include all 3 kinds in one command: %v", del.args)
+	}
 }
 
 func TestDeploymentName_SanitizesToDNS1123(t *testing.T) {
@@ -252,6 +262,18 @@ func TestDeploymentName_SanitizesToDNS1123(t *testing.T) {
 func containsArg(args []string, want string) bool {
 	for _, a := range args {
 		if a == want {
+			return true
+		}
+	}
+	return false
+}
+
+// argsAnySubstr 는 args 의 어느 원소가 substr 을 포함하는지 본다.
+// kubectl 은 kind 묶음(`deployment,service,ingress`) 을 한 원소로 받기 때문에
+// 정확 일치 매처로 잡히지 않는 케이스가 있다.
+func argsAnySubstr(args []string, substr string) bool {
+	for _, a := range args {
+		if strings.Contains(a, substr) {
 			return true
 		}
 	}

@@ -111,3 +111,67 @@ Go e2e 테스트(`k8s_e2e_test.go`)는 `//go:build k8se2e` 태그라 기본 `go 
 - kind 기반 e2e 의 nightly CI 편입(현재 수동 실행).
 - k8s adapter 확장: Helm/ArgoCD, per-build namespace 정리 정책, Ingress/실 URL 회수.
 - webhook 확장: Slack/Nextcloud 어댑터(webhook 위에), 재시도/서명.
+
+## 6. k8s adapter 확장 (TASK-175, v0.8.0 후보)
+
+기존 1호 adapter `kubectlDeployer` 의 운영 결함 3종을 해소한 v0.8.0 후보 묶음.
+**외부 인터페이스(API/스키마/env opt-in) 변경만**, 기본 동작 불변.
+
+### 6.1 per-build namespace (E1)
+
+`RUNNER_K8S_NAMESPACE_PER_BUILD=true` 옵트인 시 buildID 별 namespace 로
+격리해 deployment/ingress DNS 충돌 + audit 개선. 기본값(`false`)은 종전
+공유 namespace(`RUNNER_K8S_NAMESPACE`, 기본 `dib-builds`) 유지.
+
+```
+# 공유 (기본 — 기존 호환)
+RUNNER_K8S_NAMESPACE=builds
+
+# 격리 (옵트인)
+RUNNER_K8S_NAMESPACE_PER_BUILD=true
+# → ns = "dib-<buildID>" (DNS-1123 정제, 최대 53자)
+```
+
+### 6.2 Ingress cleanup (E2)
+
+`kubectlDeployer.Cleanup()` 이 `delete deployment,service` 만 하던 것을
+`deployment,service,ingress` 3-kind 묶음으로 확장. 동명 재빌드 시 stale
+Ingress 가 라우팅을 잡아채는 잠복 결함 해소(기존엔 동명 Deployment 가
+새로 만들어져도 stale Ingress 의 `path`/`rewrite-target` 이 우선 → 새
+파드로 가지 않음).
+
+`--ignore-not-found` 는 유지되므로 Ingress 가 없는 정상 케이스에서도 안전.
+
+### 6.3 k8s 실패 시 docker registry 결과 보존 (E3)
+
+k8s 분기 진행을 **두 번의 보고** 로 분리:
+
+1. `IN_PROGRESS(K8S)` — k8s Deploy 시작 시점(best-effort).
+2. terminal:
+   - 성공 → `SUCCESS(K8S)`, payload `{k8s: {...}, deliveryMode: "POLLING"}` (종전).
+   - **실패** → `FAILED(K8S)`, payload에 `dockerRegistry` 블록 추가:
+     ```
+     {
+       "k8s": {...},  // (없으면 미포함)
+       "dockerRegistry": {
+         "targetRef": "localhost:5000/...:b-1",
+         "resultRef": "registry/localhost:5000/...:b-1",
+         "survivedAt": "2026-07-24T..."
+       }
+     }
+     ```
+     `errorMessage` 에 "k8s deploy failed: <원인> (docker registry push survived:
+     <ref>)" 포함. docker registry push 는 성공한 채로 k8s 배포가 실패한
+     케이스에서 registry 결과가 사라지지 않는다.
+
+### 6.4 설정 (env)
+
+| env | 의미 | 기본 |
+|---|---|---|
+| `RUNNER_K8S_NAMESPACE_PER_BUILD` | true 면 buildID 별 namespace | `false` |
+
+### 6.5 검증
+
+- `go test ./...` (runner) 8/8 pkg PASS — 단위 테스트 3건 신규(E1 4케이스 / E2 / E3).
+- kind/kubectl 실측 — 환경 부재로 미실측(다음 환경). k8s_e2e_test.go(`//go:build k8se2e`)는 기존과 동일하게 build 제외.
+- API/스키마 변경 0(env opt-in + payload 필드만 추가).

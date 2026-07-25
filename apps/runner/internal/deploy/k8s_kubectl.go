@@ -162,8 +162,11 @@ func (d *kubectlDeployer) Apply(ctx context.Context, opts K8sApplyOptions) (*K8s
 	}, nil
 }
 
-// Cleanup 은 buildID 로 만든 Deployment/Service 를 삭제한다. 없는 자원
-// 삭제는 무시(--ignore-not-found).
+// Cleanup 은 buildID 로 만든 Deployment/Service/Ingress 를 삭제한다. 없는
+// 자원 삭제는 무시(--ignore-not-found). TASK-175 (E2): Ingress 가
+// deploymentName 과 동일한 metadata.name 으로 생성되므로 동일 명령에
+// 포함한다 — 동명 재빌드 시 stale Ingress 가 라우팅을 잡아채는 잠복 결함
+// 해소. Ingress 가 없으면 ignore-not-found 로 즉시 통과.
 func (d *kubectlDeployer) Cleanup(ctx context.Context, opts K8sCleanupOptions) error {
 	if opts.BuildID == "" {
 		return nil
@@ -178,7 +181,7 @@ func (d *kubectlDeployer) Cleanup(ctx context.Context, opts K8sCleanupOptions) e
 
 	args := append(
 		contextArgs(opts.Cluster),
-		"delete", "deployment,service", name,
+		"delete", "deployment,service,ingress", name,
 		"-n", namespace, "--ignore-not-found",
 	)
 	if _, err := d.runCmd(timeoutCtx, "", args...); err != nil {

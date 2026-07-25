@@ -6,6 +6,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
@@ -382,10 +384,28 @@ func (s *BuildService) deployImage(
 	reportTargetType := deployResult.TargetType
 	var k8sResult *deploy.K8sResult
 	if s.k8sDeployer != nil {
+		// TASK-175 (v0.8.0, E1): per-build namespace 옵트인.
+		// RUNNER_K8S_NAMESPACE_PER_BUILD=true 면 buildID 별 namespace 로
+		// 격리(deployment/ingress DNS 충돌 + audit). 기본값(false) 은
+		// RUNNER_K8S_NAMESPACE 공유.
+		ns := os.Getenv("RUNNER_K8S_NAMESPACE")
+		if perBuild := os.Getenv("RUNNER_K8S_NAMESPACE_PER_BUILD"); perBuild == "true" {
+			ns = "dib-" + dns1123Label(buildID)
+		}
+		// TASK-175 (E3): k8s 분기 시작에 IN_PROGRESS(K8S) 를 보고한다.
+		// docker registry IN_PROGRESS(DOCKER_REGISTRY) 와 별도로 운영자가
+		// 빌드 조회로 두 adapter 의 진행을 분리해 본다. best-effort 보고
+		// (실패해도 kubernetes Deploy 자체를 막진 않음).
+		_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
+			Status:              contract.ExecutionStatusInProgress,
+			TargetType:          "K8S",
+			RunnerID:            s.runnerID,
+			ResponsePayloadJSON: map[string]any{"deliveryMode": "POLLING"},
+		})
 		kRes, kErr := s.k8sDeployer.Deploy(ctx, deploy.K8sDeployOptions{
 			SourceImage:   containerStatus.ImageTag,
 			Cluster:       os.Getenv("RUNNER_K8S_CLUSTER"),
-			Namespace:     os.Getenv("RUNNER_K8S_NAMESPACE"),
+			Namespace:     ns,
 			Manifest:      os.Getenv("RUNNER_K8S_MANIFEST"),
 			BuildID:       buildID,
 			ContextPath:   contextPath,
@@ -395,12 +415,26 @@ func (s *BuildService) deployImage(
 			BaseHost:      os.Getenv("RUNNER_HOSTING_BASE_HOST"),
 		})
 		if kErr != nil {
+			// TASK-175 (E3): k8s 실패 시 docker registry 결과(payload, targetRef)
+			// 를 단일 FAILED 보고에 동봉한다. registry push 는 성공했지만 k8s
+			// 배포가 실패한 케이스에서 docker registry 결과가 사라지지 않는다.
+			if reportPayload == nil {
+				reportPayload = map[string]any{}
+			}
+			reportPayload["dockerRegistry"] = map[string]any{
+				"targetRef":  deployResult.TargetRef,
+				"resultRef":  deployResult.ResultRef,
+				"survivedAt": time.Now().UTC(),
+			}
 			_ = s.hostClient.ReportDeployment(ctx, buildID, hostclient.DeploymentReportRequest{
-				Status:       contract.ExecutionStatusFailed,
-				TargetType:   "K8S",
-				ErrorCode:    contract.ErrorCodeDeploymentFailed,
-				ErrorMessage: kErr.Error(),
-				RunnerID:     s.runnerID,
+				Status:              contract.ExecutionStatusFailed,
+				TargetType:          "K8S",
+				ErrorCode:           contract.ErrorCodeDeploymentFailed,
+				ErrorMessage:        fmt.Sprintf("k8s deploy failed: %v (docker registry push survived: %s)", kErr, deployResult.TargetRef),
+				TargetRef:           deployResult.TargetRef,
+				ResultRef:           deployResult.ResultRef,
+				RunnerID:            s.runnerID,
+				ResponsePayloadJSON: reportPayload,
 			})
 			return &stageFailure{errorCode: contract.ErrorCodeDeploymentFailed, err: kErr}
 		}
@@ -471,5 +505,24 @@ func (s *BuildService) WithHostPort(port int) *BuildService {
 // 경우도 nil 로 안전 — worker 가 cfg.K8sMode 로 분기해 결정한다.
 func (s *BuildService) WithK8sDeployer(d deploy.K8sDeployer) *BuildService {
 	s.k8sDeployer = d
+	return s
+}
+
+// TASK-175 (v0.8.0, E1): per-build namespace 옵트인 시 buildID 를
+// DNS-1123 label 로 정제. deploy/deploymentName 규약과 일치(소문자 +
+// 비허용문자 '-' + 63자 제한 + 양끝 trim). 정규식이 패키지 내부 의존을
+// 피하기 위해 inline 으로 둔다.
+var dns1123InvalidRE = regexp.MustCompile(`[^a-z0-9-]`)
+
+func dns1123Label(buildID string) string {
+	s := strings.ToLower(buildID)
+	s = dns1123InvalidRE.ReplaceAllString(s, "-")
+	if len(s) > 53 { // "dib-"(4) + 53 = 57 + 여유 < 63
+		s = s[:53]
+	}
+	s = strings.Trim(s, "-")
+	if s == "" {
+		s = "build"
+	}
 	return s
 }
