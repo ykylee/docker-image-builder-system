@@ -1,9 +1,13 @@
-// TASK-091/092: BuildDetail (React) — /builds/:buildId 의 canonical 4 block +
-// PhaseTimeline + LogStream + Legacy preview 마이그레이션.
+// TASK-091/092 + TASK-160/161 + TASK-167/174/175: BuildDetail (React) —
+// /builds/:buildId 의 canonical 4 block + PhaseTimeline + LogStream + 호스팅
+// (TASK-167) + status cache (TASK-174) + k8s adapter (TASK-175).
 //
-// Svelte src/routes/BuildDetail.svelte 와 1:1 정합. canonical build/test/
-// deploy/result-delivery block 은 그대로 노출하고, legacy preview-* field 는
-// deprecated 배지와 함께 보존 (TASK-060 follow-up 에서 제거 예정).
+// Svelte src/routes/BuildDetail.svelte 와 1:1 정합 (TASK-101 폐기). canonical
+// build/test/deploy/result-delivery block + 호스팅 status cache 표시. legacy
+// preview-* field 는 v0.2.0~v0.3.0 P2-M1 단계에서 deprecated 배지 + 보존 후
+// TASK-160 (legacy 필드 + DB 컬럼 제거) + TASK-161 (엔드포인트 재설계,
+// previewUrl→runtimeUrl) 으로 청산 완료 — 본 파일의 "deprecated" 잔재
+// 주석은 v0.8.4 에서 정합.
 //
 // 데이터 흐름: react-router-dom useParams + Zustand useBuildDetailStore
 // (TASK-092) — useState 4개 + Promise.all lifecycle 을 store action 으로
@@ -202,9 +206,16 @@ export function BuildDetail(): ReactElement {
             <dt>Status</dt>
             <dd className="mono">{build.test?.status ?? "NOT_STARTED"}</dd>
           </div>
-          {/* TASK-160: deprecated "Legacy preview" 섹션을 제거하면서 런타임 URL 을
-              canonical 블록으로 옮겼다. TASK-161 (P2-M2) 에서 필드명도
-              previewUrl → runtimeUrl 로 정렬 완료. */}
+          {/* TASK-160: deprecated "Legacy preview" 섹션 제거 + 런타임 URL 을
+              canonical Container test 블록으로 이동. TASK-161 (P2-M2) 에서
+              previewUrl → runtimeUrl 정렬 완료. TASK-167 (P3-M2) 부터는
+              contextPath + runtimePort 가 build summary 에 함께 정합.
+              TASK-174 (v0.7.0) 부터는 호스팅 status cache + Replicas 컬럼
+              가 admin UI 에서 동봉 표시 — 본 화면은 빌드 단위 표시이므로
+              status cache 는 표시하지 않음(consumer 가 /admin/hosting
+              으로 진입해 확인). TASK-175 (v0.8.0) k8s adapter E1/E2/E3
+              는 본 화면의 k8s section 표시에만 영향(docker registry 결과
+              보존 payload.dockerRegistry). */}
           <div>
             <dt>Runtime URL</dt>
             <dd className="mono">{build.build.runtimeUrl ?? "—"}</dd>

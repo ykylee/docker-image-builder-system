@@ -3,7 +3,7 @@
 - 문서 목적: 본 프로젝트의 release version 별 누적 변경 + 운영 가이드 인덱스 + 회귀 baseline 종합
 - 범위: SemVer 정책, version 별 TASK 1-line 요약, 운영 가이드 인덱스, 회귀 baseline, follow-up 후보
 - 대상 독자: 운영자, release reviewer, AI agent, 프로젝트 온보딩 담당자
-- 상태: stable (v0.8.3 갱신 — release-checklist k8s 보강)
+- 상태: stable (v0.8.4 갱신 — PROJECT_PROFILE 신규 운영 가이드 reference + BuildDetail.tsx stale 주석 정합)
 - 최종 수정일: 2026-07-25
 - 관련 문서: [subdomain 설계](./docs/design/subdomain-hosting.md), [Phase 3 컨셉](./docs/PHASE-3-CONCEPT.md), [Phase 2 컨셉](./docs/PHASE-2-CONCEPT.md), [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md), [Release Notes v0.4.0](./docs/RELEASE_NOTES-v0.4.0-2026-07-24.md), [Release Notes v0.3.0](./docs/RELEASE_NOTES-2026-07-24.md), [Release Notes 2026-07-23](./docs/RELEASE_NOTES-2026-07-23.md), [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md), [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md), [Project Profile](./docs/PROJECT_PROFILE.md)
 
@@ -11,9 +11,10 @@
 
 본 프로젝트는 **SemVer (Semantic Versioning)** 정책을 따르며 단일 release stream (main branch only) 으로 운영합니다.
 
-- **MAJOR.MINOR.PATCH** — `v0.8.3` 형식
-- **현재 release**: `v0.8.3` (2026-07-25, release-checklist k8s 보강)
+- **MAJOR.MINOR.PATCH** — `v0.8.4` 형식
+- **현재 release**: `v0.8.4` (2026-07-25, PROJECT_PROFILE 신규 운영 가이드 reference + BuildDetail.tsx stale 주석 정합)
 - **release history**:
+  - `v0.8.4` (2026-07-25) — patch. PROJECT_PROFILE.md 가 2026-07-21 마지막 수정(v0.5.0~ 직전) 이라 v0.7.0/v0.8.x 신규 운영 가이드 4종( hosting-2026-07-24 / hosting-sub-path-2026-07-24 / k8s-deploy-webhook-2026-07-24 / release-checklist-2026-07-20 §3 k8s 보강) + k8s e2e nightly 가 reference 되지 않았던 사각지대 해소. §2 문서 구조에 운영 가이드 인덱스 + 설계 결정 reference 추가, §3 기본 명령 4 종 운영 가이드 reference + k8s e2e nightly 절차, §4 검증 포인트에 v0.7.0+/v0.8.0+ 회귀 baseline. 부수: BuildDetail.tsx 의 stale TASK-060/091 주석 + "TASK-160: deprecated Legacy preview" 잔재를 TASK-160/161/167/174/175 정합으로 갱신. 코드 변경 = 주석 19+/8-. 회귀 baseline: build-server 205 / build-monitor vitest 269(사전 환경 의존 1 fail v0.8.3 동일) / TS 5 clean / migration 0001~0012 / go 8 pkg.
   - `v0.8.3` (2026-07-25) — patch. release-checklist `docs/operations/release-checklist-2026-07-20.md` 보강 — v0.8.1 nightly 편입 + v0.7.0 status cache + v0.4.0+ Phase 3 자원이 release-checklist §1/§3/§4/§5/§7/§8 에 누락돼 있던 사각지대 해소. §1 Pre-deploy 에 k8s staging kind/kubectl env 점검 추가, §3 Verify #8 e2e-k8s-deploy.sh, §4 Post-deploy #5 hosted service status 캐시 검증, §5 Rollback #6 k8s 호스팅 자원 정리, §7/§8 follow-up 에 k8s e2e nightly 결과 운영 반영 + 자동화. 코드 변경 0.
   - `v0.8.2` (2026-07-25) — patch. k8s 운영 가이드 `docs/operations/k8s-deploy-webhook-2026-07-24.md` §6 보강: §4/§5 의 "kind 미가용 CI 편입 follow-up" → v0.8.1 해소 명시, §6.6 신규 — E1/E2/E3 실측 절차(per-build namespace / Ingress cleanup / k8s 실패 시 docker registry 결과 보존) + 회귀 baseline. 코드 변경 0.
   - `v0.8.1` (2026-07-25) — patch. k8s e2e 를 nightly CI 에 편입. .github/workflows/nightly-e2e.yml 에 k8s-deploy-e2e job 신규 — kind + kubectl + e2e-k8s-deploy.sh. 코드 변경 0(회귀 baseline 불변).
@@ -28,11 +29,24 @@
   - `v0.2.1` (2026-07-23) — Phase 1 후속 패치. 이미지 빌드 회귀 + chunked claim 제품 결함 수정 + e2e 13/13 전수 PASS.
   - `v0.2.0` (2026-07-22) — Phase 1 완료 baseline. React 19 + Astryx 프론트엔드 정식 도입 + 운영 가드 2계층 + 서버-프론트 계약 경화.
   - `v0.1.0` (2026-07-20, `53adb75`) — 백엔드/운영 성숙도 baseline. source archive scale-out + RFC 7233 + Postgres 동등성 + e2e.
-- **5 package.json 통일 정책**: `apps/build-server` / `apps/build-monitor` / `packages/shared-contract` / `packages/shared-config` / `packages/db` 의 version field 가 모두 동일하게 유지되어야 함. `apps/runner` 는 Go module 이라 version field 없이 git tag 로 버전 관리. 본 release 시점 5/5 `0.8.3` 로 통일.
+- **5 package.json 통일 정책**: `apps/build-server` / `apps/build-monitor` / `packages/shared-contract` / `packages/shared-config` / `packages/db` 의 version field 가 모두 동일하게 유지되어야 함. `apps/runner` 는 Go module 이라 version field 없이 git tag 로 버전 관리. 본 release 시점 5/5 `0.8.4` 로 통일.
 - **release staging anchor**: 각 version 의 tagged commit 이 운영 환경의 release staging 의 단일 anchor.
 - **standard_ai_workflow kit 의 version (`ai-workflow/workflow_kit/pyproject.toml`) 은 별도 stream** — 본 저장소가 의존하는 표준 워크플로우 키트의 자체 versioning 이며 본 프로젝트 release 와 무관 (TASK-121 정책).
 
-## 2. v0.8.3 (2026-07-25) — release-checklist k8s 보강 (patch)
+## 2. v0.8.4 (2026-07-25) — PROJECT_PROFILE 신규 운영 가이드 reference + BuildDetail.tsx stale 주석 정합 (patch)
+
+v0.7.0 / v0.8.x 의 운영 가이드 4종 + k8s e2e nightly 가 `docs/PROJECT_PROFILE.md` 에 reference 되지 않았던 사각지대 해소. **코드 변경 = 주석 19+/8-** (BuildDetail.tsx stale TASK-060/091/160 주석 정합), 회귀 영향 0.
+
+- **§2 문서 구조 — 운영 가이드 인덱스 신규** — `docs/operations/` 홈 reference + 호스팅 능력(`hosting-2026-07-24` / `hosting-sub-path-2026-07-24`) + k8s adapter(`k8s-deploy-webhook-2026-07-24`) + 운영 절차(`release-checklist-2026-07-20`) + 설계 결정(`subdomain-hosting`) 4 종 운영 가이드 + 1 설계 reference.
+- **§3 기본 명령 — 4종 운영 가이드 reference 신규** — 호스팅 능력 종합(v0.4.0 Phase 3 / TASK-166~170) + 호스팅 status 캐시(v0.7.0 / TASK-174) + k8s adapter 외부 배포 + webhook(P2-M5 / TASK-165 + TASK-175 / v0.8.0) + k8s e2e nightly(v0.8.1 / TASK-171 동형) — 각 운영 가이드의 anchor + 운영 권고 + follow-up 1-line. `bash apps/runner/scripts/e2e-k8s-deploy.sh` 명령 박스 단일 출처 명시.
+- **§4 검증 포인트 — v0.7.0+ / v0.8.0+ 회귀 baseline 단락 신규** — frontend vitest 279 / build-server 205 / TS 5 clean / migration 0001~0012 / 호스팅 e2e ALL PASS / 부팅 스모크 ALL PASS + API 호환 확장(HostedService 2 nullable 필드). v0.8.0+ 누적 baseline 명시 — k8s e2e nightly 는 `schedule(cron 04:00 UTC)` + `workflow_dispatch` 전용, 매 push 제외.
+- **BuildDetail.tsx stale 주석 정합** — "TASK-060 follow-up 에서 제거 예정" 잔재 + "TASK-160: deprecated Legacy preview" 잔재를 TASK-160/161/167/174/175 정합으로 갱신. 코드 동작 변경 0(빌드 산출물 / 단언 / 스타일 동일).
+
+**검증**: TS 5 clean / build-server 205 / build-monitor vitest 269 (사전 환경 의존 1 fail — v0.8.3 release commit `8b79a78` 시점과 동일, 우리 변경 회귀 0) / migration 0001~0012 / go 8 pkg 모두 baseline 정합. 운영 문서 cross-reference — PROJECT_PROFILE §2 / §3 / §4 가 `docs/operations/hosting-*` / `k8s-deploy-webhook` / `release-checklist` / `subdomain-hosting` 4 종 운영 가이드와 정합.
+
+**업그레이드 안내**: 운영 문서 보강 + BuildDetail.tsx 주석 정합. DB/API 계약 변경 0. 별도 조치 불요.
+
+## 3. v0.8.3 (2026-07-25) — release-checklist k8s 보강 (patch)
 
 `docs/operations/release-checklist-2026-07-20.md` 의 v0.4.0+ Phase 3 / v0.7.0 status cache / v0.8.1 nightly 편입 사각지대 4종을 보강한 patch release. **코드 변경 0** — 운영 가이드만.
 
@@ -46,7 +60,7 @@
 
 **업그레이드 안내**: 운영 가이드 보강만. DB/API 계약 변경 0. 별도 조치 불요.
 
-## 3. v0.8.2 (2026-07-25) — k8s 운영 가이드 §6.6 보강 (patch)
+## 4. v0.8.2 (2026-07-25) — k8s 운영 가이드 §6.6 보강 (patch)
 
 `docs/operations/k8s-deploy-webhook-2026-07-24.md` §6 을 보강해 **E1/E2/E3 실측 절차** 를 명문화한 patch release. **코드 변경 0** — 운영 문서 보강 + workflow meta 만.
 
@@ -62,7 +76,7 @@
 
 **업그레이드 안내**: 운영 문서 보강만. DB/API 계약 변경 0. 별도 조치 불요.
 
-## 4. v0.8.1 (2026-07-25) — k8s e2e nightly CI 편입 (patch)
+## 5. v0.8.1 (2026-07-25) — k8s e2e nightly CI 편입 (patch)
 
 수동 실행이던 k8s e2e(`apps/runner/scripts/e2e-k8s-deploy.sh` — TASK-165 P2-M5 의 산출물)를 nightly CI 에 편입. **코드 변경 0** — `.github/workflows/nightly-e2e.yml` 에 `k8s-deploy-e2e` job 추가만.
 
@@ -75,7 +89,7 @@
 
 **업그레이드 안내**: workflow 파일만 추가(사용자 코드 영향 0). DB/API 계약 변경 0. 별도 조치 불요.
 
-## 5. v0.8.0 (2026-07-25) — k8s adapter 운영 결함 3종 해소 (minor)
+## 6. v0.8.0 (2026-07-25) — k8s adapter 운영 결함 3종 해소 (minor)
 
 k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**한 minor release. `v0.7.0` 이후 코드 델타 = **TASK-175**. 외부 인터페이스는 env opt-in 1종 + payload 필드 1블록만 확장했고, 기본 동작은 완전히 불변.
 
@@ -87,7 +101,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: **DB/API 계약 변경 0**. **신규 env(선택)**: `RUNNER_K8S_NAMESPACE_PER_BUILD` (`true`/`1`/`yes`/`on` accept, 기본 `false`). k8s 분기 비활성 환경은 완전 무영향. 운영 문서 [`docs/operations/k8s-deploy-webhook-2026-07-24.md` §6](./docs/operations/k8s-deploy-webhook-2026-07-24.md) 신규.
 
-## 6. v0.7.0 (2026-07-24) — 호스팅 status 캐시 (minor)
+## 7. v0.7.0 (2026-07-24) — 호스팅 status 캐시 (minor)
 
 호스팅 서비스의 **live k8s 상태를 주기적으로 캐시**하는 minor release. `v0.6.0` 이후 코드 델타 = **TASK-174**. 종전 `HostedService.status`(desired lifecycle)는 관리 명령·배포 upsert 로만 갱신돼 실 k8s 상태(파드 crash/OOM 로 replica 0)와 drift 해도 알 방법이 없었다.
 
@@ -100,7 +114,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: **API 계약(호환 확장)** — HostedService 에 `availableReplicas`/`lastSyncedAt`(nullable, sync 전 null). **DB**: migration 0012(`available_replicas`/`last_synced_at`, `ADD COLUMN IF NOT EXISTS`) — 자동 bootstrap 경로에서 적용. **신규 env(선택)**: `HOSTING_STATUS_SYNC_INTERVAL_MS`.
 
-## 7. v0.6.0 (2026-07-24) — 실패 경로 e2e (minor)
+## 8. v0.6.0 (2026-07-24) — 실패 경로 e2e (minor)
 
 **빌드 실패 보고 경로를 실 인프라 e2e 로 처음 검증**한 minor release. `v0.5.1` 이후 코드 델타 = **TASK-173**. 기존 e2e 13종은 전부 happy path(COMPLETED)만 실측했고, 빌드가 canonical 하게 `FAILED` + 단계별 errorCode 로 보고되는 경로(P2-M3 `stageFailure` 채널)는 단위 테스트만 있었다.
 
@@ -113,7 +127,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: DB/API 계약 변경 **0**(테스트 자산만 추가). 별도 조치 불요.
 
-## 8. v0.5.1 (2026-07-24) — HTTPS 미도입 확정 (patch)
+## 9. v0.5.1 (2026-07-24) — HTTPS 미도입 확정 (patch)
 
 **HTTPS/TLS 를 시스템 범위에서 제외**하고 조립 URL 을 평문 http 로 정합시킨 patch release. `v0.5.0` 직후의 스코프 정정(사용자 결정).
 
@@ -122,7 +136,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **검증**: build-server **199 PASS**(url http 기대값), TS 5 clean. 계약/스키마 변경 **0**(url 은 값). DB/API 계약 변경 0 — 별도 조치 불요.
 
-## 9. v0.5.0 (2026-07-24) — subdomain 호스팅 스킴 (minor)
+## 10. v0.5.0 (2026-07-24) — subdomain 호스팅 스킴 (minor)
 
 호스팅에 **subdomain URL 스킴**을 더한 minor release. `v0.4.1` 이후 코드 델타 = **TASK-172**. path-prefix(`host/<cp>/`)와 **병존**하며 per-build 로 선택한다.
 
@@ -145,7 +159,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 - **API 계약(호환 확장)**: BuildRequest·BuildSummary·HostedService 에 optional `hostingScheme`(기본 path — 미지정 시 종전 동작).
 - **신규 env(선택)**: `RUNNER_HOSTING_BASE_HOST`(runner, subdomain Ingress host rule 렌더용). subdomain 사용 시 **wildcard DNS** 필수.
 
-## 10. v0.4.1 (2026-07-24) — 호스팅 e2e nightly CI 편입 (patch)
+## 11. v0.4.1 (2026-07-24) — 호스팅 e2e nightly CI 편입 (patch)
 
 `v0.4.0`(Phase 3) 직후, 수동 실행이던 **호스팅 e2e 를 nightly CI 에 편입**한 patch release. 코드 변경 0 — CI 워크플로우만 추가. (TASK-171)
 
@@ -157,7 +171,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: DB/API 계약 변경 0. 별도 조치 불요.
 
-## 11. v0.4.0 (2026-07-24) — Phase 3 완료 (호스팅 능력)
+## 12. v0.4.0 (2026-07-24) — Phase 3 완료 (호스팅 능력)
 
 **Phase 3 (호스팅 능력) 을 종결**하는 minor release. `v0.3.0` 이후 코드 델타 = **TASK-166 ~ TASK-170**. 빌드된 이미지가 k8s 에 **지속 호스팅**되고 `http(s)://<HOSTING_BASE_HOST>/<context-path>/` 로 접근·관리된다. 실 e2e(kind + ingress-nginx)로 라우팅+자산+관리를 실증. 컨셉/설계는 [Phase 3 컨셉](./docs/PHASE-3-CONCEPT.md)·[설계](./docs/PHASE-3-DESIGN.md) 참조.
 
@@ -191,7 +205,7 @@ Phase 3 완료 판정([PHASE-3-CONCEPT §9](./docs/PHASE-3-CONCEPT.md)) 5항 전
 - **API 계약(호환 확장)**: BuildRequest 에 optional `contextPath`/`runtimePort`/`stripPrefix` 추가(미지정 시 기본 동작 — 하위 호환). BuildSummary 에 `contextPath`/`runtimePort`/`stripPrefix`, DeploymentReportRequest 에 `contextPath`/`namespace`/`deploymentName` + targetType `K8S`, errorCode `CONTEXT_PATH_TAKEN` 추가. 신규 admin 엔드포인트 `/admin/hosted-services*`.
 - **신규 env(선택)**: `HOSTING_BASE_HOST`(설정해야 호스팅 upsert 활성)/`HOSTING_KUBE_CONTEXT`/`HOSTING_KUBECTL_BIN`(build-server 관리). 전제: 클러스터에 ingress-nginx, runner/build-server 에 kubectl+kubeconfig.
 
-## 12. v0.3.0 (2026-07-24) — Phase 2 완료 (preview-era 청산 → 배포 능력)
+## 13. v0.3.0 (2026-07-24) — Phase 2 완료 (preview-era 청산 → 배포 능력)
 
 **Phase 2 (preview-era 청산 → 배포 능력 완성) 를 종결**하는 minor release. `v0.2.1` 이후의 코드 델타 = **TASK-156 ~ TASK-165**. 제품 목적 4단계(`build → container test → deploy → result delivery`)가 모두 1급 phase 로 존재하고 실인프라 e2e 로 검증된다. 컨셉/서사는 [Phase 2 컨셉](./docs/PHASE-2-CONCEPT.md) 참조.
 
@@ -232,7 +246,7 @@ build phase **11 → 13** (result-delivery 2종 신설). Phase 2 완료 판정([
 - **API 계약 breaking**: preview-era 표면 제거 — 엔드포인트 `POST /builds/:id/preview`·`.../test-deployment/*`·`GET .../test-deployment` 삭제, `/builds/:id/container-test/{start,result}` 로 대체. 응답 `previewUrl`→`runtimeUrl`, `previewStatus`/`previewTtlMinutes` 제거. phase `PREVIEW_QUEUED`/`PREVIEW_READY` → `CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`. **외부 소비자 0 결정** 하에 하위 호환 없이 정리(runner·skill_mcp·build-monitor 동시 정렬).
 - **신규 env(선택)**: `RUNNER_K8S_MODE`/`RUNNER_K8S_CLUSTER`/`RUNNER_K8S_NAMESPACE`/`RUNNER_K8S_MANIFEST`/`RUNNER_KUBECTL_BIN`/`RUNNER_K8S_CONTAINER_PORT`/`RUNNER_K8S_ROLLOUT_TIMEOUT_SECONDS`(k8s 배포), `RESULT_WEBHOOK_URL`(결과 전달). 전부 미설정 시 기존 동작.
 
-## 13. v0.2.1 (2026-07-23) — Phase 1 후속 패치
+## 14. v0.2.1 (2026-07-23) — Phase 1 후속 패치
 
 `v0.2.0` 태깅 직후 **실이미지 빌드 e2e 를 처음 돌리면서** 드러난 결함들을 수정한 patch release. 코드 델타 = **TASK-153 ~ TASK-155** (5 commits).
 
@@ -273,7 +287,7 @@ RUNNER   container-run / deploy-push                                            
 - 빌드 명령 변경: `apps/build-monitor` 는 이제 플래그 없는 `vite` / `vite build` 를 쓴다(`--config vite.react.config.ts` 불필요). `vite.react.config.ts` / 루트 `index.html` / `svelte.config.js` 삭제됨.
 - 신규 env(선택): `DIBS_POSTGRES_HOST_PORT` — 로컬 native PostgreSQL 이 5432 를 점유한 환경에서 compose postgres 호스트 포트를 바꿀 때 사용.
 
-## 14. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
+## 15. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
 
 본 release 는 **Phase 1 (초기 시스템 구축 국면) 을 종결**하는 baseline anchor 다. `v0.1.0` (tagged `53adb75`) 이후의 코드 델타 = **TASK-124 ~ TASK-152** 를 한 자리에 누적한다. 전체 Phase 1 서사(백엔드 + runner + 프론트엔드 + 디자인 시스템 + 운영 가드)는 [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) 참조.
 
@@ -326,7 +340,7 @@ RUNNER   container-run / deploy-push                                            
 
 누적 운영 가이드 **37종** (v0.1.0 32종 + 5종 신규).
 
-## 15. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
+## 16. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
 
 `v0.1.0` 은 source archive scale-out + RFC 7233 Content-Range + Postgres 동등성 + e2e 를 봉인한 14 TASK (TASK-102~114 + TASK-122) 를 누적한다. 전체 상세는 [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md).
 
@@ -347,7 +361,7 @@ RUNNER   container-run / deploy-push                                            
 | 13 | TASK-114 | 종합 RELEASE_NOTES + 운영 가이드 인덱스 (10 섹션) | `d19038a` |
 | 14 | TASK-122 | untracked 52종 잔재 정리 (.gitignore 보강) | `53adb75` |
 
-## 16. 회귀 baseline 종합 (TASK-088 → v0.8.3)
+## 17. 회귀 baseline 종합 (TASK-088 → v0.8.4)
 
 Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-07-08) 대비 누적 변화:
 
@@ -368,7 +382,7 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 
 > **v0.2.0 초기 번들**: index js gzip 134.64 KB (AppShell 셸 + Astryx atomic 포함) / css gzip 24.08 KB. 라우트 지연 로드(TASK-139)로 BuildDetail(gzip 38.53) / buildColumns(9.85) / RegisterRunnerModal(5.74) 등은 필요 시 로드. 손 CSS 2,323 → 1,956줄.
 
-## 17. follow-up 후보
+## 18. follow-up 후보
 
 | # | 후보 | scope | reference |
 |---|------|-------|-----------|
@@ -385,15 +399,15 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 
 > ~~실이미지 빌드 e2e 검증~~ — **TASK-153 (2026-07-23) 에서 해소** (Dockerfile 회귀 수정 + `e2e-production-semantic.sh` ALL PASS).
 
-## 18. 다음 release 가이드
+## 19. 다음 release 가이드
 
-- `v0.8.4` — patch (회귀 baseline 변경 0 + 운영 가이드/CI 소폭)
+- `v0.8.5` — patch (회귀 baseline 변경 0 + 운영 가이드/CI 소폭)
 - `v0.9.0` — minor (신규 기능 표면 큼: k8s adapter 확장 잔여 — Helm·ArgoCD adapter / webhook 확장(Slack·재시도) / 실 k8s e2e sync 캐시 실측). **HTTPS/TLS 는 도입하지 않음(범위 밖).**
 - `v1.0.0` — major (breaking change 또는 정식 GA)
 
 운영자 release staging 검증 순서(5 phase)는 [`docs/operations/release-checklist-2026-07-20.md`](./docs/operations/release-checklist-2026-07-20.md) 참조.
 
-## 19. 관련 문서
+## 20. 관련 문서
 
 - [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) — Phase 1 전체 범위·성과·회귀 baseline·미결·교훈
 - [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md) — v0.2.0 종합 리뷰
