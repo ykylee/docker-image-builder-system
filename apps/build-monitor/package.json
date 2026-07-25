@@ -1,6 +1,6 @@
 {
   "name": "@docker-image-builder-system/build-monitor",
-  "version": "0.8.10",
+  "version": "0.8.11",
   "private": true,
   "type": "module",
   "description": "React 19 (Astryx) + Vite + TypeScript frontend for the Docker Image Builder Build Server Monitor. TASK-101 — Svelte scaffold 일괄 정리, React primary SPA 단일화.",
