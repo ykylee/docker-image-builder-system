@@ -104,11 +104,15 @@ bash apps/runner/scripts/e2e-k8s-deploy.sh
 2026-07-24 로컬 검증(kind v0.24.0 + kubectl v1.31.4): **ALL PASS**.
 
 Go e2e 테스트(`k8s_e2e_test.go`)는 `//go:build k8se2e` 태그라 기본 `go test ./...`
-에서 제외된다. kind 미가용 CI 편입은 별도 follow-up.
+에서 제외된다. **v0.8.1 에서 nightly CI 에 `k8s-deploy-e2e` 잡으로 편입
+완료** — `.github/workflows/nightly-e2e.yml` 가 `schedule(cron 04:00 UTC)` +
+`workflow_dispatch` 에서 kind + kubectl 설치 후 본 스크립트를 실행한다.
+호스팅 e2e 와 cluster 가 분리(`dib-e2e` vs `dib-hosting-e2e`)되어 동시
+실행 가능.
 
 ## 5. follow-up
 
-- kind 기반 e2e 의 nightly CI 편입(현재 수동 실행).
+- ~~kind 기반 e2e 의 nightly CI 편입(현재 수동 실행)~~ — **v0.8.1 에서 해소**.
 - k8s adapter 확장: Helm/ArgoCD, per-build namespace 정리 정책, Ingress/실 URL 회수.
 - webhook 확장: Slack/Nextcloud 어댑터(webhook 위에), 재시도/서명.
 
@@ -173,5 +177,59 @@ k8s 분기 진행을 **두 번의 보고** 로 분리:
 ### 6.5 검증
 
 - `go test ./...` (runner) 8/8 pkg PASS — 단위 테스트 3건 신규(E1 4케이스 / E2 / E3).
-- kind/kubectl 실측 — 환경 부재로 미실측(다음 환경). k8s_e2e_test.go(`//go:build k8se2e`)는 기존과 동일하게 build 제외.
+- kind/kubectl 실측 — v0.8.1 부터 nightly CI `k8s-deploy-e2e` 잡이 자동 검증(§4 참조).
+  로컬 수동 검증 절차는 §6.6 참조.
 - API/스키마 변경 0(env opt-in + payload 필드만 추가).
+
+### 6.6 실측 절차 (로컬 / nightly)
+
+E1/E2/E3 가 실제 kind 클러스터에서 의도대로 동작하는지 검증한다.
+nightly CI 가 자동화했지만 운영자가 재현하거나 디버깅할 때 쓰는 절차.
+
+**전제**: `docker` / `kind` / `kubectl` / `go` / `python3` 가 PATH 에 있고,
+`go install sigs.k8s.io/kind@v0.24.0` 후 `$(go env GOPATH)/bin` 이 PATH 에
+포함돼야 한다. `kubectl` 은 `v1.31.4` 권장.
+
+#### E1 per-build namespace 실측
+
+1. `RUNNER_K8S_NAMESPACE_PER_BUILD=true` 로 runner 환경변수 세팅 후
+   `bash apps/runner/scripts/e2e-k8s-deploy.sh` 실행.
+2. Phase A 직후 `kubectl get ns -l dib-build-id` 로 buildID 라벨 namespace
+   가 만들어졌는지 확인. 비활성 시 `dib-builds` 단일 namespace 에
+   deployment 가 들어간다(검증 단언은 cleanup trap 의 `kubectl delete
+   namespace ${NS}` 가 양쪽 모두 정리하므로 cluster 내부 상태로 판정).
+3. `RUNNER_K8S_NAMESPACE_PER_BUILD=false` (기본) 으로 재실행해 같은 build
+   가 단일 namespace 에 모이는지 비교.
+
+#### E2 Ingress cleanup 실측
+
+1. 한 build 를 배포 → Ingress 가 함께 만들어졌는지
+   `kubectl get ingress -A` 로 확인.
+2. `kubectlDeployer.Cleanup()` 시뮬레이션: 같은 buildID 로
+   `DIB_K8S_E2E_KEEP=1 bash apps/runner/scripts/e2e-k8s-deploy.sh` 실행 →
+   `kubectl delete deployment,service,ingress dib-<buildID> -n <ns>
+   --ignore-not-found` 가 3-kind 모두 정리하는지 확인.
+3. 동명 재빌드 시나리오: 같은 buildID 로 두 번 배포해 두 번째 배포가
+   새 pod 로 라우팅되는지 `curl http://localhost:8080/` 로 확인(stale
+   Ingress 가 잡아채지 않음).
+
+#### E3 k8s 실패 시 docker registry 결과 보존 실측
+
+1. k8s Deploy 가 실패하도록 buildID 또는 cluster 를 의도적으로 깨뜨린다
+   (예: `RUNNER_K8S_CLUSTER=kind-nonexistent` 로 잘못된 context 주입).
+2. `GET /builds/:id` 의 응답 `deploy` 블록이:
+   - `status: FAILED`
+   - `targetType: K8S`
+   - `errorMessage` 에 `k8s deploy failed: <원인> (docker registry push
+     survived: <ref>)` 포함
+   - `responsePayload.dockerRegistry.targetRef` 와 `resultRef` 가 채워져
+     있음
+3. 동일 build 의 `responsePayload.k8s` 는 실패 시 미포함(다음 k8s 분기
+   부재)이고 성공 시에만 채워진다.
+
+#### 회귀 baseline
+
+E1/E2/E3 모두 PASS 시 nightly `k8s-deploy-e2e` 잡이 자동 종료. 운영
+개입 불요. 실패 시 본 섹션 절차로 재현 후 `apps/runner/internal/services/`
+또는 `apps/runner/internal/deploy/` 의 단위 테스트로 격리해 회귀 가드를
+추가한다.
