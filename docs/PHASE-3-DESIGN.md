@@ -194,3 +194,58 @@ spec:
 5. **status 실측 주기** — **결정: MVP 는 조회 시(on-demand) kubectl.** 주기 sync + 캐시는 후속(목록이 커지면).
 
 > 역할 분리 요약: **runner = 배포(생성) + contextPath 보고**, **build-server = registry(SSOT) + 관리(scale/delete/status) kubectl + Ingress URL 조립**. 두 컴포넌트 모두 kubectl 을 쓰지만 책임이 다르다(생성 vs 수명).
+
+## 10. v0.9.0 진입 결정 (2026-07-25 작성)
+
+- **문서 목적**: v0.9.0 minor 의 신규 기능 표면 진영을 단일 entrypoint 로 노출. 12연속 운영 보강 patch(v0.8.1~v0.8.11) 가 운영 정합을 마친 시점에서 v0.8.0 의 잔여 follow-up 중 첫 마일스톤을 결정한다.
+- **범위**: v0.8.0 종합 release notes 가 §6 follow-up 윀로 분류한 4종 — Helm/ArgoCD adapter / webhook 확장(Slack·재시도) / 실 k8s e2e sync 캐시 실측 / kind e2e nightly CI 자동화. 본 section 은 4종의 우선순위 + 진입 결정 + follow-up 을 단락.
+- **대상 독자**: 운영자, release reviewer, AI agent
+- **상태**: stable (v0.8.12 patch 에서 v0.9.0 진입 결정 봉인)
+
+### 10.1 4 잔여 후보
+
+1. **Helm/ArgoCD adapter** (`mode="helm"` / `mode="argocd"` 분기) — k8s adapter 의 한계를 넘는 운영. Helm 차트로 패키지된 복잡한 차트 / ArgoCD Application CR / Argo Rollouts(Blue/Green, Canary) 운영. 1호 production adapter 인 `kubectlDeployer` 의 **확장 인터페이스** — 기존 1종 모드에서 다종 모드로 분기. **사용자 영향 표면 큼**.
+2. **webhook 확장** (Slack/Nextcloud 어댑터, 재시도, 서명) — v0.3.0 의 단일 webhook 위에 다종 알림 어댑터 + 백오프 재시도 + HMAC 서명. **운영 안정성** + **외부 시스템 통합 표면**.
+3. **실 k8s e2e sync 캐시 실측** — TASK-174 의 `availableReplicas` 주기 sync 가 실 k8s drift (파드 crash / OOM 으로 replica=0) 를 잡는 시나리오. 현재 단위 + 통합 + nightly `k8s-deploy-e2e` 로만 커버. 실 drift 실측 + degraded 단언 e2e 추가.
+4. **kind e2e nightly CI 자동화** — `k8s-deploy-e2e` + `hosting-e2e` 가 현재 schedule / workflow_dispatch 전용. PR 시 자동 게이트로 강제화하면 회귀를 PR 단계에서 잡을 수 있음. **운영 안전성**.
+
+### 10.2 우선순위 권고
+
+| # | 항목 | 사용자 영향 | 운영 안정성 | 신규 기능 표면 | 의존성 | 우선순위 |
+|---|---|---|---|---|---|---|
+| 1 | Helm/ArgoCD adapter | **높음** | 중간 | **높음** | K8sDeployer 인터페이스 확장 | **1순위** |
+| 2 | webhook 확장 | 중간 | **높음** | 중간 | resultDelivery (v0.3.0) | 2순위 |
+| 3 | 실 k8s e2e sync 캐시 실측 | 낮음 | 중간 | 낮음 | status cache (TASK-174) | 3순위 |
+| 4 | kind e2e nightly CI 자동화 | 낮음 | 중간 | 낮음 | e2e 14종 | 4순위 |
+
+**근거**:
+- Helm/ArgoCD adapter 는 v0.8.0 minor (TASK-175) 의 k8s adapter 1종이 운영의 한계(차트 패키지 / GitOps / 단계적 출시 미지원)에 부딪힐 때의 자연스러운 후속. **신규 기능 표면이 가장 큼** + **사용자 영향이 큼**.
+- webhook 확장은 v0.3.0 의 단일 webhook 이 운영 중 알림 채널 부족으로 외부 시스템 통합 한계. **운영 안정성 + 신규 기능 표면의 균형**.
+- 실 k8s e2e sync 캐시 실측은 TASK-174 status cache 의 신뢰도 보강 — 운영 안정성 ↑. 그러나 단일 어댑터 drift 시나리오라 신규 기능 표면 작음.
+- kind e2e nightly CI 자동화는 PR 단계 게이트. 운영 안정성 ↑. 그러나 nightly 결과는 이미 운영 중이라 중복 가치.
+
+### 10.3 v0.9.0 진입 결정 (추천)
+
+**v0.9.0 의 첫 마일스톤 = Helm/ArgoCD adapter** (`mode="helm"` / `mode="argocd"` 분기).
+
+**결정 근거**:
+- 신규 기능 표면이 가장 큼 (1호 adapter 의 한계 해소).
+- v0.8.0 의 k8s adapter 1호 (TASK-175) 가 단일 `kubectlDeployer` 였음. 운영하면서 **Helm chart 가 필요한 배포**(예: 복잡한 차트 + init container + sidecar) 와 **GitOps 환경**(ArgoCD / Flux) 에서 **외부 manifest 가 무시**되는 결손이 나타남.
+- 의존성 정리: v0.8.0 의 `K8sDeployer` 인터페이스(`Deploy` / `Apply` / `Cleanup`) 가 **manifest 렌더링**을 `kubectlDeployer` 내부에서 함. **adapter 모드 분기**는 이 렌더링을 다른 방식으로 대체하는 것 — 인터페이스 자체는 보존.
+- 사용자 영향: 빌드 요청 시 `deployMode: "helm"` / `"argocd"` 선택 옵션. 기존 `"k8s"`(기본)는 그대로.
+- 운영 안정성: 신규 adapter 1종 + 기존 1종 = 2종 운영. nightly e2e 가 양쪽 모드 검증.
+
+**v0.9.0 의 후속 마일스톤 권고**:
+1. **Helm/ArgoCD adapter** (1순위) — v0.9.0 의 첫 minor 마일스톤
+2. **webhook 확장** (2순위) — v0.9.1 또는 v0.9.0 의 후속 minor
+3. **실 k8s e2e sync 캐시 실측** (3순위) — 운영 안정성 보강 patch
+4. **kind e2e nightly CI 자동화** (4순위) — v1.0.0 GA 전 운영 안전장치
+
+### 10.4 follow-up (v1.0.0 / v0.10.0 후보)
+
+- **v1.0.0 GA** (breaking change 또는 정식 GA) — 4종 잔여가 모두 해소된 시점에서 결정. **HTTPS/TLS 도입은 범위 밖** (v0.5.1 명시).
+- **Breaking change** — 현재까지는 API 호환 확장만 누적. v1.0.0 에서 host / contextPath / runId 등 일부를 v2 contract 로 migrate 가능. 단, follow-up 시점에서 사용자 결정 대기.
+- **모니터링 / observability** — Prometheus / Grafana / OpenTelemetry. 운영 안정성. v0.10.0+ 후보.
+
+> 본 section 은 v0.8.12 patch 에서 신규. v0.9.0 minor 의 진입 결정은 운영자(또는 AI agent) 가 본 section 의 §10.3 을 따라서 v0.9.0 의 첫 마일스톤을 Helm/ArgoCD adapter 로 채택할 수 있다. 변경 결정 시 §10.2 의 우선순위 표 + §10.3 의 결정 근거를 본문 그대로 인용.
+
