@@ -50,6 +50,16 @@ grep "release-checklist" docs/PROJECT_PROFILE.md
 DATABASE_URL=postgres://staging-***:***@***/staging \
   scripts/db-migrate.sh --plan
 # → staging DB 에 적용 계획만 확인 (실제 SQL 미실행)
+
+# 6. k8s 호스팅/배포 환경 점검 (v0.4.0+ Phase 3 활성 시) — 신규 commit 이
+#    k8s adapter / hosted service / status cache 에 영향이 있다면 사전 점검.
+#    본 운영 가이드는 staging kind 클러스터를 전제로 검증. 운영자가 staging
+#    환경에 신규 commit 적용 전 같은 절차로 dry-run.
+command -v kind >/dev/null 2>&1 && kind version || echo "kind not installed (k8s e2e N/A)"
+command -v kubectl >/dev/null 2>&1 && kubectl version --client || echo "kubectl not installed"
+kubectl cluster-info --context kind-dib-staging 2>/dev/null | head -1 || echo "staging cluster not reachable"
+# → 모두 정상 응답 시 §3 Verify 의 e2e-k8s-deploy.sh 가 실행 가능. 미설치 /
+#   미접속 시 k8s 관련 가드는 skip 하고 §7 의 follow-up 으로 deferred.
 ```
 
 체크리스트 (Pre-deploy):
@@ -58,6 +68,7 @@ DATABASE_URL=postgres://staging-***:***@***/staging \
 - [ ] workflow meta 의 `purpose_digest_rev` / `current_focus` / 직전 commit 의 의도 본문 검토 완료
 - [ ] 회귀 baseline 의 4 종 명령 (TS / Go / vite build / postgres migration plan) 0 exit
 - [ ] postgres migration 신규 검증 dry-run ALL PASS
+- [ ] **k8s staging kind 클러스터 + kubectl** (v0.4.0+ Phase 3 영향 시): kind / kubectl / `kind-dib-staging` cluster-info 정상. 미설치 시 §3 의 k8s e2e 가드 skip + follow-up deferred.
 - [ ] 운영 환경에 적용할 신규 운영 가이드의 영향 / 회귀 baseline 본문 검토 완료
 - [ ] 운영자 본인이 신규 commit 들의 의도를 충분히 이해 (PR description / 운영 가이드 / state.json 3 종 source cross-check)
 
@@ -124,6 +135,16 @@ bash apps/build-server/scripts/e2e-single-port.sh
 DATABASE_URL=postgres://prod-***:***@***/prod \
   scripts/db-migrate.sh --status
 # → ALL applied, no pending — 신규 commit 의 migration 이 모두 적용된 상태
+
+# 8. k8s e2e 운영 가드 (v0.4.0+ Phase 3 / P2-M5 — v0.8.1 nightly 편입).
+#    신규 commit 이 k8s adapter / hosted service / status cache / webhook
+#    결과 전달에 영향이 있다면 staging kind 클러스터에서 실측. 미설치 /
+#    미접속 환경이면 skip 하고 follow-up deferred. 운영 절차는
+#    docs/operations/k8s-deploy-webhook-2026-07-24.md §6.6 참조.
+bash apps/runner/scripts/e2e-k8s-deploy.sh
+# → ALL PASS — busybox httpd 빌드 → kind load → kubectlDeployer 실배포
+#   (availableReplicas=1) + webhook 결과 전달 수신 검증. cluster 없으면
+#   자동 생성, 종료 시 자동 정리.
 ```
 
 체크리스트 (Verify):
@@ -136,6 +157,7 @@ DATABASE_URL=postgres://prod-***:***@***/prod \
 - [ ] `e2e-production-semantic.sh` ALL PASS (memory baseline)
 - [ ] `e2e-single-port.sh` ALL PASS
 - [ ] `scripts/db-migrate.sh --status` no pending
+- [ ] **`e2e-k8s-deploy.sh` ALL PASS** (v0.4.0+ 영향 시, k8s staging 환경 있는 경우). 미설치 시 skip + follow-up deferred.
 
 ### 4) Post-deploy Monitoring (배포 후 모니터링)
 
@@ -156,6 +178,16 @@ DATABASE_URL=postgres://prod-***:***@***/prod \
 
 # 4. source archive upload + bytea round-trip 정상 (TASK-066 follow-up batch 3 의 e2e-source-archive-postgres 패턴)
 # → 신규 source archive 가 upload 시 정상 bytea column 에 저장, GET 도 round-trip 정합
+
+# 5. hosted service status 캐시 정상 동기 (v0.7.0+). HOSTING_BASE_HOST 설정
+#    환경에서 background sync 가 `availableReplicas` / `lastSyncedAt` 을
+#    주기 갱신. status=RUNNING 인데 availableReplicas=0 이면 degraded 신호
+#    (UI 가 /admin/hosting 에서 degraded 배지 노출) — 즉시 운영자 확인.
+DATABASE_URL=postgres://prod-***:***@***/prod \
+  psql -c "SELECT app_name, status, available_replicas, last_synced_at FROM hosted_service WHERE status != 'REMOVED' ORDER BY app_name;"
+# → status=RUNNING 행의 available_replicas 가 0 초과이고 last_synced_at 이
+#   30s 이내면 정상. last_synced_at 이 NULL 이거나 1분 초과면 sync 정지 — §3
+#   의 health check + build-server logs 의 sync tick 단언 필요.
 ```
 
 체크리스트 (Post-deploy Monitoring):
@@ -163,6 +195,7 @@ DATABASE_URL=postgres://prod-***:***@***/prod \
 - [ ] 신규 build 가 운영 환경에서 정상 lifecycle (QUEUED → ... → terminal) 종결
 - [ ] runner 의 ACTIVE status 정상 (TASK-077 의 admin-initiated 등록 + runner 의 heartbeat)
 - [ ] source archive 의 bytea round-trip 정상 (psql direct verify)
+- [ ] **hosted service status 캐시 정상** (v0.7.0+, HOSTING_BASE_HOST 설정 환경): status=RUNNING 행의 `available_replicas` > 0 이고 `last_synced_at` < 1분. NULL/오래되면 sync 정지 — 즉시 §3 health + logs 단언.
 - [ ] 운영자 측 alerts / dashboards 정합 (운영 환경 모니터링 시스템에 따라)
 - [ ] 24 시간 내 신규 build 중 FAILED 비율이 baseline 대비 +5% 초과하면 즉시 rollback 검토 (§5 참조)
 
@@ -187,6 +220,18 @@ docker compose -f compose.dev.yaml up -d --build
 # 5. workflow meta sync — workflow meta 파일은 main HEAD 의 source-of-truth 와 정합이어야 함
 git checkout main
 # → 운영 환경은 직전 commit 사용, repo 작업 트리는 main 정합. 후속 결정 (roll-forward vs 추가 fix) 사용자 결정
+
+# 6. k8s 호스팅 자원 정리 (v0.4.0+ Phase 3 활성 시, 직전 commit 으로
+#    rollback 한 결과 새 commit 의 hosted service / Ingress 가 잘못된
+#    namespace 에 남는 경우). kubectlDeployer.Cleanup() 의 묶음 삭제와
+#    동일 — deployment,service,ingress 3-kind 를 buildID 별로 정리.
+kubectl --context <KUBE-CONTEXT> get deployment,service,ingress -A \
+  -l dib-rollback-orphan=true -o jsonpath='{range .items[*]}{.kind}/{.metadata.name} {.metadata.namespace}{"\n"}{end}'
+# → orphan 자원 목록 확인. 실 정리:
+# kubectl --context <KUBE-CONTEXT> delete deployment,service,ingress -n <ns> \
+#   -l dib-rollback-orphan=true --ignore-not-found
+# (per-build namespace 옵트인 사용 시 해당 namespace 자체를
+#  `kubectl delete ns dib-<buildID>` 로 통째로 정리해도 무방.)
 ```
 
 체크리스트 (Rollback):
@@ -212,12 +257,14 @@ git checkout main
 - **Release notes / CHANGELOG 신규** (옵션 B) — 운영자가 §3 Verify + §4 Post-deploy 의 결과를 release notes 로 한 자리에 누적. 후속 TASK 권장.
 - **git tag + version bump** (옵션 C) — 운영자가 release version 을 운영 환경의 commit SHA 에 tag + package.json version 동기화. 후속 TASK 권장.
 - **운영 환경 monitors / alerts 자동화** — 본 TASK 가 §4 의 운영 monitors 를 수동 점검으로 노출. 자동화는 운영 환경 monitoring 시스템에 따라 별도 TASK.
+- **k8s e2e nightly 결과 운영 반영** — v0.8.1 부터 `.github/workflows/nightly-e2e.yml` 의 `k8s-deploy-e2e` 잡이 자동 검증. 운영자는 nightly 결과(04:00 UTC) + dispatch 결과를 운영 환경에 반영하고, 실패 시 본 §3 / §5 절차로 roll-forward / rollback 결정. 운영 절차 단일 출처는 [`docs/operations/k8s-deploy-webhook-2026-07-24.md`](./k8s-deploy-webhook-2026-07-24.md) §6.6.
 
 ### 8) follow-up
 
 - **Release notes / CHANGELOG 신규** — 본 운영 가이드 운영 후 자연스러운 후속 결정 (운영자가 release version 노트 누적을 발견하면 옵션 B 권장).
 - **git tag + version bump** — 운영자가 release version 의 tagged commit 을 운영 환경과 동기화할 필요 발견 시 옵션 C 권장.
 - **운영 환경 monitors / alerts 자동화** — 운영자가 §4 Post-deploy Monitoring 의 수동 점검을 자동화하면 별도 TASK.
+- **k8s nightly 결과 운영 반영 자동화** — `k8s-deploy-e2e` nightly 결과를 §3 Verify 의 staging 회귀 가드로 자동 게이트. 운영자 개입 없이 PR 에서 k8s e2e 결과 단언 가능해지면 별도 TASK.
 
 ## 관련 문서
 
