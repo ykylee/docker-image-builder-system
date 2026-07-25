@@ -27,7 +27,7 @@
 
 설계 단일 출처 — 외부 인터페이스 (env opt-in 1종 + payload 필드 1블록) 만 확장, 기본 동작 불변. API/스키마/마이그레이션 변경 0. 운영 절차 단일 출처 = [k8s-deploy-webhook-2026-07-24.md §6](./operations/k8s-deploy-webhook-2026-07-24.md).
 
-## 3. 후속 patch 4종 (v0.8.1~0.8.4) 누적 운영 보강
+## 3. 후속 patch 6종 (v0.8.1~0.8.6) 누적 운영 보강
 
 | version | 모드 | 핵심 |
 |---|---|---|
@@ -35,8 +35,10 @@
 | v0.8.2 | patch | k8s 운영 가이드 §6.6 보강 — E1/E2/E3 실측 절차 (per-build namespace / Ingress cleanup / docker registry 결과 보존) |
 | v0.8.3 | patch | release-checklist k8s 보강 — §1/§3/§4/§5/§7/§8 에 status cache + e2e-k8s-deploy.sh + orphan cleanup |
 | v0.8.4 | patch | PROJECT_PROFILE 운영 가이드 reference — v0.7.0+/v0.8.x 신규 운영 가이드 4종 + BuildDetail.tsx stale 주석 정합 |
+| v0.8.5 | patch | v0.8.0 종합 RELEASE_NOTES — `docs/RELEASE_NOTES-v0.8.0-2026-07-25.md` 신규 6 섹션 95 줄 + CHANGELOG release history v0.8.0 entry 에 종합 리뷰 링크 추가 |
+| v0.8.6 | patch | v0.6.0 / v0.7.0 종합 RELEASE_NOTES — `docs/RELEASE_NOTES-v0.6.0-2026-07-24.md` + `docs/RELEASE_NOTES-v0.7.0-2026-07-24.md` 신규 각 7 섹션 ~80 줄. 5 종 release notes(v0.4.0 72줄 / v0.5.0 51줄 / v0.6.0 ~80줄 / v0.7.0 ~80줄 / v0.8.0 95줄) 형식 정합 완료 |
 
-모두 **코드 변경 0** (workflow / 운영 문서 / workflow meta / 주석 정합). 회귀 baseline 4종 모두 동일.
+모두 **코드 변경 0** (workflow / 운영 문서 / workflow meta / 주석 정합). 회귀 baseline 6종 모두 동일. v0.8.7 (2026-07-25) 가 본 §3 표의 6 종 누락(원래 v0.8.5 작성 시점엔 4종만 존재) 을 정합.
 
 ## 4. 검증
 
