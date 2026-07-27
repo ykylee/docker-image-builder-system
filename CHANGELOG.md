@@ -7,13 +7,14 @@
 - 최종 수정일: 2026-07-24
 - 관련 문서: [subdomain 설계](./docs/design/subdomain-hosting.md), [Phase 3 컨셉](./docs/PHASE-3-CONCEPT.md), [Phase 2 컨셉](./docs/PHASE-2-CONCEPT.md), [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md), [Release Notes v0.4.0](./docs/RELEASE_NOTES-v0.4.0-2026-07-24.md), [Release Notes v0.3.0](./docs/RELEASE_NOTES-2026-07-24.md), [Release Notes 2026-07-23](./docs/RELEASE_NOTES-2026-07-23.md), [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md), [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md), [Project Profile](./docs/PROJECT_PROFILE.md)
 
-## 1. Release model
+## 2. Release model
 
 본 프로젝트는 **SemVer (Semantic Versioning)** 정책을 따르며 단일 release stream (main branch only) 으로 운영합니다.
 
 - **MAJOR.MINOR.PATCH** — `v0.7.0` 형식
-- **현재 release**: `v0.7.0` (2026-07-24, 호스팅 status 캐시)
+- **현재 release**: `v0.7.1` (2026-07-27, 호스팅 e2e CI 운영 가이드 보강)
 - **release history**:
+  - `v0.7.1` (2026-07-27) — patch. 호스팅 e2e CI 운영 가이드 보강 — `.github/workflows/nightly-e2e.yml` 의 `hosting-e2e` 잡(schedule+workflow_dispatch, kind+ingress-nginx 실 라우팅+관리)에 대한 운영 가이드 부재 메우기. workflow / 스크립트 / SQL / schema / migration 변경 0.
   - `v0.7.0` (2026-07-24) — minor. 호스팅 status 캐시 — desired status 와 분리된 live replica read cache 를 주기 sync(availableReplicas + lastSyncedAt). UI degraded 파생.
   - `v0.6.0` (2026-07-24) — minor. 실패 경로 e2e 신설 — 빌드 실패가 canonical FAILED + 단계별 errorCode(DOCKER_BUILD_FAILED/CONTAINER_TEST_FAILED) 로 보고되는지 실 compose 왕복 검증. e2e 13→14종.
   - `v0.5.1` (2026-07-24) — patch. HTTPS 미도입 확정 — url 평문 http + 로드맵 TLS 제외.
@@ -28,7 +29,20 @@
 - **release staging anchor**: 각 version 의 tagged commit 이 운영 환경의 release staging 의 단일 anchor.
 - **standard_ai_workflow kit 의 version (`ai-workflow/workflow_kit/pyproject.toml`) 은 별도 stream** — 본 저장소가 의존하는 표준 워크플로우 키트의 자체 versioning 이며 본 프로젝트 release 와 무관 (TASK-121 정책).
 
-## 2. v0.7.0 (2026-07-24) — 호스팅 status 캐시 (minor)
+## 2. v0.7.1 (2026-07-27) — 호스팅 e2e CI 운영 가이드 보강 (patch)
+
+호스팅 실 e2e(`apps/runner/scripts/e2e-hosting.sh`, kind+ingress-nginx 라우팅+관리) 가 `.github/workflows/nightly-e2e.yml` 의 `hosting-e2e` 잡으로 봉인된 상태(TASK-171/v0.4.1)에서 운영자/AI agent 가 잡의 신호 강도·환경·트러블슈팅을 참조할 운영 가이드가 부재했다. 본 patch 는 **운영 가이드 1종 신규** 만으로 그 사각지대를 메운다. workflow / 스크립트 / SQL / schema / migration / version / git tag 모두 변경 0.
+
+- **산출물**: `docs/operations/hosting-e2e-ci-2026-07-27.md` 9 섹션 (§1 왜 / §2 트리거 구조 / §3 잡 7 step / §4 e2e-hosting.sh 사이클 / §5 신호 강도 / §6 env / §7 로컬 재현+트러블슈팅 5 case / §8 한계와 follow-up 3종 / §9 결정).
+- **잡 구조 (참고)**: `hosting-e2e` 는 `if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'` 로 main push 제외 — kind 셋업이 무거워 nightly + 수동 dispatch 만. step 5 의 `go install sigs.k8s.io/kind@v0.24.0` + kubectl v1.31.4 가 운영 환경과 동일.
+- **신호 강도**: 단위가 못 잡는 3종 결함 — (a) Ingress `rewrite-target` 미적용 / APP_BASE_PATH env 미주입, (b) `kubectl scale`/`delete` 호출 자체가 안 됨(컨텍스트/kubeconfig 오류), (c) HostedService registry 의 status 가 stale 로 남음 — 을 curl 200 + body grep + replicas=0 실측 + registry REMOVED 로 검출.
+- **로컬 재현**: `DIB_HOSTING_E2E_KEEP=1` 로 클러스터 보존 후 디버깅. host port **18080** (8080 점유 회피). 스크립트가 만든 클러스터만 trap `cleanup` 에서 삭제.
+
+**검증**: yaml safe_load + bash -n e2e-hosting.sh + doc-integrity staged PASS. 회귀 baseline 변경 0: TS 5 clean / build-server **205** / build-monitor **279** / migration **0001~0012** / go 8 pkg / 호스팅 e2e ALL PASS (TASK-176 봉인).
+
+**업그레이드 안내**: 신규 파일 1종(`docs/operations/hosting-e2e-ci-2026-07-27.md`)만 추가. 코드/스키마/마이그레이션/env 변경 0. 운영자가 release staging 시 본 운영 가이드를 통해 잡 내부 단계 + 트러블슈팅을 참조.
+
+## 3. v0.7.0 (2026-07-24) — 호스팅 status 캐시 (minor)
 
 호스팅 서비스의 **live k8s 상태를 주기적으로 캐시**하는 minor release. `v0.6.0` 이후 코드 델타 = **TASK-174**. 종전 `HostedService.status`(desired lifecycle)는 관리 명령·배포 upsert 로만 갱신돼 실 k8s 상태(파드 crash/OOM 로 replica 0)와 drift 해도 알 방법이 없었다.
 
@@ -41,7 +55,7 @@
 
 **업그레이드 안내**: **API 계약(호환 확장)** — HostedService 에 `availableReplicas`/`lastSyncedAt`(nullable, sync 전 null). **DB**: migration 0012(`available_replicas`/`last_synced_at`, `ADD COLUMN IF NOT EXISTS`) — 자동 bootstrap 경로에서 적용. **신규 env(선택)**: `HOSTING_STATUS_SYNC_INTERVAL_MS`.
 
-## 3. v0.6.0 (2026-07-24) — 실패 경로 e2e (minor)
+## 4. v0.6.0 (2026-07-24) — 실패 경로 e2e (minor)
 
 **빌드 실패 보고 경로를 실 인프라 e2e 로 처음 검증**한 minor release. `v0.5.1` 이후 코드 델타 = **TASK-173**. 기존 e2e 13종은 전부 happy path(COMPLETED)만 실측했고, 빌드가 canonical 하게 `FAILED` + 단계별 errorCode 로 보고되는 경로(P2-M3 `stageFailure` 채널)는 단위 테스트만 있었다.
 
@@ -54,7 +68,7 @@
 
 **업그레이드 안내**: DB/API 계약 변경 **0**(테스트 자산만 추가). 별도 조치 불요.
 
-## 4. v0.5.1 (2026-07-24) — HTTPS 미도입 확정 (patch)
+## 5. v0.5.1 (2026-07-24) — HTTPS 미도입 확정 (patch)
 
 **HTTPS/TLS 를 시스템 범위에서 제외**하고 조립 URL 을 평문 http 로 정합시킨 patch release. `v0.5.0` 직후의 스코프 정정(사용자 결정).
 
@@ -63,7 +77,7 @@
 
 **검증**: build-server **199 PASS**(url http 기대값), TS 5 clean. 계약/스키마 변경 **0**(url 은 값). DB/API 계약 변경 0 — 별도 조치 불요.
 
-## 5. v0.5.0 (2026-07-24) — subdomain 호스팅 스킴 (minor)
+## 6. v0.5.0 (2026-07-24) — subdomain 호스팅 스킴 (minor)
 
 호스팅에 **subdomain URL 스킴**을 더한 minor release. `v0.4.1` 이후 코드 델타 = **TASK-172**. path-prefix(`host/<cp>/`)와 **병존**하며 per-build 로 선택한다.
 
@@ -86,7 +100,7 @@
 - **API 계약(호환 확장)**: BuildRequest·BuildSummary·HostedService 에 optional `hostingScheme`(기본 path — 미지정 시 종전 동작).
 - **신규 env(선택)**: `RUNNER_HOSTING_BASE_HOST`(runner, subdomain Ingress host rule 렌더용). subdomain 사용 시 **wildcard DNS** 필수.
 
-## 6. v0.4.1 (2026-07-24) — 호스팅 e2e nightly CI 편입 (patch)
+## 7. v0.4.1 (2026-07-24) — 호스팅 e2e nightly CI 편입 (patch)
 
 `v0.4.0`(Phase 3) 직후, 수동 실행이던 **호스팅 e2e 를 nightly CI 에 편입**한 patch release. 코드 변경 0 — CI 워크플로우만 추가. (TASK-171)
 
@@ -98,7 +112,7 @@
 
 **업그레이드 안내**: DB/API 계약 변경 0. 별도 조치 불요.
 
-## 7. v0.4.0 (2026-07-24) — Phase 3 완료 (호스팅 능력)
+## 8. v0.4.0 (2026-07-24) — Phase 3 완료 (호스팅 능력)
 
 **Phase 3 (호스팅 능력) 을 종결**하는 minor release. `v0.3.0` 이후 코드 델타 = **TASK-166 ~ TASK-170**. 빌드된 이미지가 k8s 에 **지속 호스팅**되고 `http(s)://<HOSTING_BASE_HOST>/<context-path>/` 로 접근·관리된다. 실 e2e(kind + ingress-nginx)로 라우팅+자산+관리를 실증. 컨셉/설계는 [Phase 3 컨셉](./docs/PHASE-3-CONCEPT.md)·[설계](./docs/PHASE-3-DESIGN.md) 참조.
 
@@ -132,7 +146,7 @@ Phase 3 완료 판정([PHASE-3-CONCEPT §9](./docs/PHASE-3-CONCEPT.md)) 5항 전
 - **API 계약(호환 확장)**: BuildRequest 에 optional `contextPath`/`runtimePort`/`stripPrefix` 추가(미지정 시 기본 동작 — 하위 호환). BuildSummary 에 `contextPath`/`runtimePort`/`stripPrefix`, DeploymentReportRequest 에 `contextPath`/`namespace`/`deploymentName` + targetType `K8S`, errorCode `CONTEXT_PATH_TAKEN` 추가. 신규 admin 엔드포인트 `/admin/hosted-services*`.
 - **신규 env(선택)**: `HOSTING_BASE_HOST`(설정해야 호스팅 upsert 활성)/`HOSTING_KUBE_CONTEXT`/`HOSTING_KUBECTL_BIN`(build-server 관리). 전제: 클러스터에 ingress-nginx, runner/build-server 에 kubectl+kubeconfig.
 
-## 8. v0.3.0 (2026-07-24) — Phase 2 완료 (preview-era 청산 → 배포 능력)
+## 9. v0.3.0 (2026-07-24) — Phase 2 완료 (preview-era 청산 → 배포 능력)
 
 **Phase 2 (preview-era 청산 → 배포 능력 완성) 를 종결**하는 minor release. `v0.2.1` 이후의 코드 델타 = **TASK-156 ~ TASK-165**. 제품 목적 4단계(`build → container test → deploy → result delivery`)가 모두 1급 phase 로 존재하고 실인프라 e2e 로 검증된다. 컨셉/서사는 [Phase 2 컨셉](./docs/PHASE-2-CONCEPT.md) 참조.
 
@@ -173,7 +187,7 @@ build phase **11 → 13** (result-delivery 2종 신설). Phase 2 완료 판정([
 - **API 계약 breaking**: preview-era 표면 제거 — 엔드포인트 `POST /builds/:id/preview`·`.../test-deployment/*`·`GET .../test-deployment` 삭제, `/builds/:id/container-test/{start,result}` 로 대체. 응답 `previewUrl`→`runtimeUrl`, `previewStatus`/`previewTtlMinutes` 제거. phase `PREVIEW_QUEUED`/`PREVIEW_READY` → `CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`. **외부 소비자 0 결정** 하에 하위 호환 없이 정리(runner·skill_mcp·build-monitor 동시 정렬).
 - **신규 env(선택)**: `RUNNER_K8S_MODE`/`RUNNER_K8S_CLUSTER`/`RUNNER_K8S_NAMESPACE`/`RUNNER_K8S_MANIFEST`/`RUNNER_KUBECTL_BIN`/`RUNNER_K8S_CONTAINER_PORT`/`RUNNER_K8S_ROLLOUT_TIMEOUT_SECONDS`(k8s 배포), `RESULT_WEBHOOK_URL`(결과 전달). 전부 미설정 시 기존 동작.
 
-## 9. v0.2.1 (2026-07-23) — Phase 1 후속 패치
+## 10. v0.2.1 (2026-07-23) — Phase 1 후속 패치
 
 `v0.2.0` 태깅 직후 **실이미지 빌드 e2e 를 처음 돌리면서** 드러난 결함들을 수정한 patch release. 코드 델타 = **TASK-153 ~ TASK-155** (5 commits).
 
@@ -214,7 +228,7 @@ RUNNER   container-run / deploy-push                                            
 - 빌드 명령 변경: `apps/build-monitor` 는 이제 플래그 없는 `vite` / `vite build` 를 쓴다(`--config vite.react.config.ts` 불필요). `vite.react.config.ts` / 루트 `index.html` / `svelte.config.js` 삭제됨.
 - 신규 env(선택): `DIBS_POSTGRES_HOST_PORT` — 로컬 native PostgreSQL 이 5432 를 점유한 환경에서 compose postgres 호스트 포트를 바꿀 때 사용.
 
-## 10. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
+## 11. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
 
 본 release 는 **Phase 1 (초기 시스템 구축 국면) 을 종결**하는 baseline anchor 다. `v0.1.0` (tagged `53adb75`) 이후의 코드 델타 = **TASK-124 ~ TASK-152** 를 한 자리에 누적한다. 전체 Phase 1 서사(백엔드 + runner + 프론트엔드 + 디자인 시스템 + 운영 가드)는 [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) 참조.
 
@@ -267,7 +281,7 @@ RUNNER   container-run / deploy-push                                            
 
 누적 운영 가이드 **37종** (v0.1.0 32종 + 5종 신규).
 
-## 11. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
+## 12. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
 
 `v0.1.0` 은 source archive scale-out + RFC 7233 Content-Range + Postgres 동등성 + e2e 를 봉인한 14 TASK (TASK-102~114 + TASK-122) 를 누적한다. 전체 상세는 [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md).
 
@@ -288,7 +302,7 @@ RUNNER   container-run / deploy-push                                            
 | 13 | TASK-114 | 종합 RELEASE_NOTES + 운영 가이드 인덱스 (10 섹션) | `d19038a` |
 | 14 | TASK-122 | untracked 52종 잔재 정리 (.gitignore 보강) | `53adb75` |
 
-## 12. 회귀 baseline 종합 (TASK-088 → v0.7.0)
+## 13. 회귀 baseline 종합 (TASK-088 → v0.7.1)
 
 Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-07-08) 대비 누적 변화:
 
@@ -305,11 +319,13 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 | 운영 가이드 | 0 | 37 | 42 | 45 | **45** | +45 |
 | 운영 가드 (정적/실측) | 0 | 4종 | 4종 | 4종 | **4종** | +4 |
 
+> **v0.7.1 patch (2026-07-27, TASK-176)**: 호스팅 e2e CI 운영 가이드 보강(docs only) — 회귀 baseline 변경 0. 위 표의 **v0.5.0** 컬럼 = v0.7.1 = 동일 (`build-server 199 → 205 는 v0.7.0 status 캐시(2026-07-24) 의 +6 반영, 그 후 v0.7.1 patch 의 baseline 변경 0`). 운영 가이드 1종 신규 (`hosting-e2e-ci-2026-07-27.md`).
+
 > **TASK-153 (2026-07-23, post-tag 패치)**: `e2e-production-semantic.sh` 실이미지 빌드 e2e 를 검증하다가 루트 `Dockerfile` 이 build-monitor 를 `vite build`(config 미지정)로 빌드해 Svelte 잔재 config 를 잡던 회귀를 발견·수정 (`--config vite.react.config.ts` + `.dockerignore` 보강). 수정 후 실제 `docker build`/`docker run` 10 phase **ALL PASS**. v0.2.1 후보.
 
 > **v0.2.0 초기 번들**: index js gzip 134.64 KB (AppShell 셸 + Astryx atomic 포함) / css gzip 24.08 KB. 라우트 지연 로드(TASK-139)로 BuildDetail(gzip 38.53) / buildColumns(9.85) / RegisterRunnerModal(5.74) 등은 필요 시 로드. 손 CSS 2,323 → 1,956줄.
 
-## 13. follow-up 후보
+## 14. follow-up 후보
 
 | # | 후보 | scope | reference |
 |---|------|-------|-----------|
@@ -326,15 +342,15 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 
 > ~~실이미지 빌드 e2e 검증~~ — **TASK-153 (2026-07-23) 에서 해소** (Dockerfile 회귀 수정 + `e2e-production-semantic.sh` ALL PASS).
 
-## 14. 다음 release 가이드
+## 15. 다음 release 가이드
 
-- `v0.7.1` — patch (회귀 baseline 변경 0 + 운영 가이드/CI 소폭)
+- `v0.7.2` — patch (회귀 baseline 변경 0 + 운영 가이드/CI 소폭)
 - `v0.8.0` — minor (신규 기능 표면 큼: k8s adapter 확장(Helm·ArgoCD·per-build ns 정리) / webhook 확장(Slack·재시도)). **HTTPS/TLS 는 도입하지 않음(범위 밖).**
 - `v1.0.0` — major (breaking change 또는 정식 GA)
 
 운영자 release staging 검증 순서(5 phase)는 [`docs/operations/release-checklist-2026-07-20.md`](./docs/operations/release-checklist-2026-07-20.md) 참조.
 
-## 15. 관련 문서
+## 16. 관련 문서
 
 - [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) — Phase 1 전체 범위·성과·회귀 baseline·미결·교훈
 - [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md) — v0.2.0 종합 리뷰

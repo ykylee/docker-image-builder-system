@@ -6,6 +6,30 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-27 (rev 164→165: **v0.7.1 release — TASK-176 호스팅 e2e CI 운영 가이드 보강 봉인 (patch, docs only)**).
+
+  ## 핵심 (rev 165) — v0.7.1 release: TASK-176 봉인 + 5 package.json 0.7.0→0.7.1
+  사용자 선택: "v0.4.0 태그 확인" → 진단 결과 v0.4.0 은 이미 봉인 + v0.7.0 까지 main 에서 진행됨. v0.8.0~v0.8.12 12 commit 들은 origin/ykylee/surgeonfish branch 에만 존재하고 main 무관. user 결정: "main 기준 v0.7.0 → v0.7.1 patch (surgeonfish 무관)". v0.7.1 = TASK-176 호스팅 e2e CI 운영 가이드 보강을 정식 release anchor 로 봉인.
+
+  **변경 폭**: 5 package.json 0.7.0→0.7.1 (root 0.1.0 anchor 유지, TASK-121) / CHANGELOG §2 v0.7.1 entry + 기존 §2~§15 → §3~§16 재번호 + §13 heading `TASK-088 → v0.7.1` + §15 다음 release 가이드 v0.7.1→v0.7.2 갱신 / state.json `purpose_digest_rev 206→207` + `session.handoff_rev 121→122` + `session.index_rev 100→101` + `session.latest_rev 48→49` / session_handoff / work_backlog / backlog/2026-07-27.md 의 TASK-177 entry / git tag v0.7.1 (annotated).
+
+  **검증**: yaml safe_load + bash -n e2e-hosting.sh + doc-integrity staged PASS + state.json JSON valid. 회귀 baseline 변경 0: TS 5 clean / build-server 205 / build-monitor 279 / migration 0001~0012 / go 8 pkg / 호스팅 e2e ALL PASS.
+
+  **다음 세션 후보(사용자 결정 대기)**: `git push origin ykylee/salp --follow-tags` (release commit + v0.7.1 tag) / v0.7.2 patch 후보 (PROJECT_PROFILE baseline 표 동기화) / v0.8.0 minor (k8s adapter 확장) / v1.0.0 major 진입.
+
+- Updated: 2026-07-27 (rev 163→164: **TASK-176 — 호스팅 e2e CI 운영 가이드 보강 (docs only)**).
+
+  ## 핵심 (rev 164) — 호스팅 e2e 잡은 이미 봉인돼 있고, 운영 가이드만 보강했다
+  사용자 질문: "이전 세션 작업 확인" → 후보 4종 중 **호스팅 e2e nightly CI 편입** 선택.
+  진단 결과: `.github/workflows/nightly-e2e.yml` 의 `hosting-e2e` 잡은 이미 TASK-171 에서 봉인(`schedule`+`workflow_dispatch` 만, main push 제외 — kind 셋업이 무거워). 잡 내부 7 step(Checkout / Node / pnpm / Go / Install kind+kubectl / pnpm install / e2e-hosting.sh)도 이미 작동. 운영 가이드가 부재 → **옵션 A(운영 가이드 1종 신규)** 채택. workflow 변경 0.
+
+  **산출물**: `docs/operations/hosting-e2e-ci-2026-07-27.md` 9 섹션 — 트리거 구조(3 잡 표) / 잡 단계 / e2e-hosting.sh 사이클(전제 점검 → 클러스터 → ingress-nginx rollout 180s → Phase A path / Phase A2 subdomain / Phase B K8sAdmin) / 신호 강도(3 결함: Ingress rewrite-target·kubectl scale+delete·HostedService stale) / env 6.1~6.3 / 로컬 재현(`DIB_HOSTING_E2E_KEEP=1` 디버깅) + 7.1 트러블슈팅 5 case / 한계와 follow-up 3종.
+
+  **검증**: yaml safe_load PASS / bash -n e2e-hosting.sh PASS / doc-integrity staged PASS. SQL / schema / migration / version / git tag 변경 0.
+
+  **다음 세션 후보(사용자 결정 대기)**:
+  - v0.4.0 릴리스 태깅(Phase 3 = minor) / hosting-e2e-fast 잡(ingress-nginx 없이 main push) / kind 로그 GHA artifact 업로드 / 호스팅 status 캐시(TASK-174) 슬라이스 추가.
+
 - Updated: 2026-07-24 (rev 162→163: **Phase 3 완료 — 호스팅 능력 (P3-M1~M5, TASK-166~170) + v0.3.0 릴리스**).
 - Updated: 2026-07-24 (rev 161→162: **P2-M5 배포 능력 완료 → Phase 2 전체 완료 (TASK-165)**).
 - Updated: 2026-07-23 (rev 160→161: **원격 발산 조정 + k8s adapter 이식 (TASK-164)**).
