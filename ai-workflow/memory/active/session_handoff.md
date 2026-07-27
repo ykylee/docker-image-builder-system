@@ -6,6 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-27 (rev 167→168: **v0.8.15 release 봉인 — G3 drift 근본 원인 해소 (session_handoff.md historical 헤더 정합) + state.json schema 단일화 + meta 정합 (patch)**). 표준 ai-workflow 키트 session-end 가드 G3 의 진짜 근본 원인 해소 — session_handoff.md 본문에 남아 있던 historical `## 핵심 (rev N)` 헤더 6종을 `## §핵심 (historical, rev N)` 라벨로 변경 (본문 보존). 가드의 패턴 1 (`##\s*핵심[^(]*\(rev\s+(\d+)\)`) 매칭이 깨지면서 G3 정상화 (실측: rev=state:167 actual:163 → state:168 actual:168). state.json schema 위치 단일화 — `source_of_truth.latest_backlog_path` 제거, `backlog.latest_backlog_path` 단일 유지 (가드 G4 의 schema 위치 fallback 활용). CHANGELOG.md §26 회귀 baseline 표 v0.8.14 row 추가. PROJECT_PROFILE.md §4 baseline 표 v0.8.14 row 추가 (TASK-180). 5 package.json `0.8.14`→`0.8.15` 통일. workflow meta 갱신: state.json `purpose_digest_rev 207→208` / `handoff_rev 167→168` / `index_rev 129→130` / `latest_rev 3→4`. **코드 변경 0** (운영 메타 + 운영 가드 정합만). 회귀 baseline: TS 5 clean / build-server 205 / build-monitor vitest 278(사전 환경 의존 1 fail v0.8.3 동일) / migration 0001~0012 / go 8 pkg / **session-end 가드 5/5 PASS** (G2 drift는 release commit 시점 current_baseline first 줄 갱신으로 해소). workflow / 스크립트 / SQL / schema / migration 변경 0. follow-up: 가드 4종 확장 (G6 current_baseline ↔ CHANGELOG current release / G7 G3 ↔ HEAD commit subject / G8 session_handoff Updated: 헤더 / G9 state.json JSON semantic) / state.json schema 위치 단일화 follow-up (source_of_truth 의 latest_backlog_path historical 텍스트 정합은 TASK-116/115 본문 보존) / CHANGELOG §26 표 v0.8.15 row 추가 (v0.8.16 patch 후보) / v0.9.0 minor 진입 결정.
 - Updated: 2026-07-27 (rev 166→167: **v0.8.14 release 봉인 — session-end pre-push hook helper 신설 + PROJECT_PROFILE v0.8.13 baseline 정합 + CHANGELOG §26 표 v0.5.0→v0.8.13 확장 (patch)**). 표준 ai-workflow 키트 session-end 가드 5종을 pre-push hook으로 편입하는 운영 가드 — `scripts/pre-push-session-end.sh`(workflow meta drift 검출 wrapper) + `.grok/hooks/install-pre-push.sh`(`.git/hooks/pre-push` 설치 helper). 운영자가 `bash .grok/hooks/install-pre-push.sh` 로 hook 설치 후 `git push` 시점에 drift 자동 차단. 의도적 우회: `SKIP_SESSION_END_GUARD=1 git push ...`. **코드 변경 0** (운영 가드 + 운영 메타만). PROJECT_PROFILE.md §2 운영 가이드 인덱스 v0.7.0+ 4종→5종(`hosting-e2e-ci-2026-07-27.md` 신규), §3 기본 명령에 hosting-e2e CI 운영 가이드 + workflow meta drift 가드 항목 추가, §4 검증 포인트에 v0.8.13 회귀 baseline 단락 추가. CHANGELOG.md §26 회귀 baseline 표를 v0.5.0 row 에서 v0.6.0/v0.7.0/v0.8.0/**v0.8.13** row 까지 확장 (총 13 컬럼, 운영 가드 행에 `+session-end 5종 가드` 추가, 5 package.json version 행 추가). 5 package.json `0.8.13`→`0.8.14` 통일. workflow meta drift 해소(state.json handoff_rev 164→167 / index_rev 128→129 / latest_rev 2→3 / purpose_digest_rev 206→207 — 본 patch 에서 G3 drift 검출 + 보정). 회귀 baseline: TS 5 clean / build-server 205 / build-monitor vitest 278(사전 환경 의존 1 fail v0.8.3 동일) / migration 0001~0012 / go 8 pkg / session-end 가드 5종 통과(적용 후). follow-up: G3 drift 의 근본 원인(session_handoff.md 의 historical `## 핵심 (rev N)` 헤더) 정합 / 가드 4종 확장(헤더 일치) / state.json schema 위치 단일화 / CHANGELOG 회귀 baseline 표 v0.8.14 row 추가.
 - Updated: 2026-07-27 (rev 165→166: **v0.8.13 release 봉인 — 호스팅 e2e CI 운영 가이드 보강 (salp 라인 흡수) + 13연속 운영 patch 정합**). 본 patch 의 진원지는 2026-07-27 세션 시작 시 발견된 *워크트리 v0.7.0 vs HEAD v0.8.12* 사각지대 — 원격 `origin/main`(`5ff9939`, v0.7.0) 위에 `origin/ykylee/salp`(`becba33`, v0.7.1) 와 `origin/ykylee/surgeonfish`(`49f3e99`, v0.8.12) 가 갈라져 단일 release stream 이 깨져 있었음. **본 patch 결정**: (a) salp 라인의 운영 가이드 1종을 v0.8.13 으로 단일 라인에 흡수, (b) drift 의 구조적 원인(표준 키트 session-end skill 부재)을 표준 키트 차원에서 해소. 산출물: `docs/operations/hosting-e2e-ci-2026-07-27.md` 신규 1종(9 섹션 260줄, 잡 신호 강도 / 환경 8종 / 로컬 재현 + 트러블슈팅 5 case) + `ai-workflow/skills/session-end/{SKILL.md, scripts/run_session_end.py}` (G1~G5 모두 구현) + `core/session_end_skill_spec.md` 13 섹션 + `.claude/commands/workflow-session-end.md` + 표준 키트 cross-ref 3종. **코드 변경 0** (운영 가이드 + 워크플로우 메타만). 5 package.json `0.8.12`→`0.8.13` 통일. 회귀 baseline: TS 5 clean / build-server 205 / build-monitor vitest 269(사전 환경 의존 1 fail v0.8.3 동일) / migration 0001~0012 / go 8 pkg. follow-up: `git push origin main` 16+1 커밋 fast-forward / `origin/ykylee/salp` 별개 라인 유지(단일 release stream 정합) / session-end 가드 5종 pre-push hook 편입 / CHANGELOG 회귀 baseline 표 v0.8.x 까지 확장 검토.
 - Updated: 2026-07-25 (rev 163→164: **v0.8.0 minor + v0.8.1~v0.8.9 9연속 patch + 6종 release notes 정합 (v0.4.0 / v0.5.0 / v0.6.0 / v0.7.0 / v0.8.0 / v0.8.x) + CHANGELOG release history 6종 + PROJECT_PROFILE 운영 가이드 4종 reference**).
@@ -14,7 +15,7 @@
 - Updated: 2026-07-23 (rev 160→161: **원격 발산 조정 + k8s adapter 이식 (TASK-164)**).
 - Updated: 2026-07-23 (rev 159→160: **P2-M4 완료 — 소비자 정렬 + skill_mcp 실서버 검증 신설 (TASK-163)**).
 
-  ## 핵심 (rev 163) — Phase 3 완료: 호스팅 능력
+  ## §핵심 (historical, rev 163) — Phase 3 완료: 호스팅 능력
   이번 세션은 원격 충돌 조정(TASK-164) → **Phase 2 완료 + v0.3.0 릴리스**(TASK-165) → **Phase 3(호스팅) 전체**(TASK-166~170)까지 한 흐름으로 진행했다. 이제 빌드된 이미지가 k8s 에 **지속 호스팅**되고 `http(s)://<HOSTING_BASE_HOST>/<context-path>/` 로 접근·관리된다.
 
   **Phase 3 마일스톤 (각 sub-commit + workflow meta)**:
@@ -34,7 +35,7 @@
   - **v0.4.0 릴리스 태깅**(Phase 3 = minor. 5 package.json bump + git tag + CHANGELOG + RELEASE_NOTES).
   - 호스팅 e2e 의 nightly CI 편입 / status 주기 sync+캐시 / k8s adapter 확장(Helm·ArgoCD·per-build ns 정리) / subdomain 스킴(sub-path 대안) / `<base>` 주입 옵션.
 
-  ## 핵심 (rev 162) — Phase 2 완료: 배포 능력(k8s) + 결과 전달(webhook)
+  ## §핵심 (historical, rev 162) — Phase 2 완료: 배포 능력(k8s) + 결과 전달(webhook)
   P2-M5 로 Phase 2(preview-era 청산 → 배포 능력 완성)를 마무리했다. 제품 목적 4단계(`build → container test → deploy → result delivery`)가 모두 1급 phase 로 존재하고 **실인프라 e2e** 로 검증된다.
 
   **진입 결정 2종(사용자 확정)**: ① 배포 adapter = **k8s** / ② 결과 전달 = **webhook**.
@@ -53,7 +54,7 @@
   - k8s adapter 확장(Helm/ArgoCD, per-build namespace 정리, 실 URL 회수) / webhook 확장(Slack/Nextcloud, 재시도/서명).
   - 실패 경로 e2e(현 계약 e2e 13종 전부 happy path — P2-M3 이월).
 
-  ## 핵심 (rev 161) — 원격이 로컬과 다른 축으로 갈라져 있었고, k8s 어댑터만 건져 왔다
+  ## §핵심 (historical, rev 161) — 원격이 로컬과 다른 축으로 갈라져 있었고, k8s 어댑터만 건져 왔다
   원격 `origin/main` 이 P2-M1 완료(`060cc0b`) 이후 로컬과 **다른 축**으로 발산해 있었다(로컬 3커밋 vs 원격 12커밋, 33파일 충돌). 진단 결과 **같은 작업 중복이 아니라 설계 분기**였다:
   - **로컬 라인**: preview-era 완전 청산 — 엔드포인트 `/container-test/{start,result}` 통합 + errorCode 채널 + skill_mcp 실서버 검증 + NullableBuildError (M2→M3→M4)
   - **원격 라인**: preview 최소 rename(`/preview`+`/test-deployment/*` 유지) + 실제 **k8s 배포 어댑터** (M2 얕게 + M3=k8s)
@@ -68,7 +69,7 @@
   - k8s adapter 는 **skeleton(noop + ResultRef emit)** — P2-M5 에서 실제 k8s client-go 구현 + worker 배선(`cfg.K8sMode` 분기) 필요. P2-M5 결정 ①(배포 adapter 대상)은 사실상 **k8s 로 seed** 됨(원격도 §8 에서 k8s 로 봉인했었음).
   - 원격 엔드포인트/계약 라인은 폐기됨 — **협업자가 그 라인 기준으로 작업 중이었다면** 로컬 계약(`/container-test/*`)으로 재정렬이 필요하다.
 
-  ## 핵심 (rev 160) — 실서버 검증을 만들었더니 즉시 결함 3건이 나왔다
+  ## §핵심 (historical, rev 160) — 실서버 검증을 만들었더니 즉시 결함 3건이 나왔다
   Phase 2 컨셉 §7 의 리스크("skill_mcp 가 단위 테스트만 통과 — 실서버 미검증")가 P2-M4 의 완료 기준이었다. `apps/skill_mcp/scripts/verify-live-server.sh` 를 신설했다 — build-server 를 띄우고 HTTP 로 빌드를 몰아 **서버의 실제 응답을 그대로** 스킬 입력으로 넣는다(happy path + failure path).
 
   | # | 결함 | 증상 |
@@ -153,7 +154,7 @@
 
   두 엔드포인트 모두 응답이 canonical `BuildStatusResponse` 로 통일됐다 (202 / 200). 제거 2종은 런타임 소비자가 0 임을 먼저 확인하고 진행했다 — runner 가 실제로 부르던 건 `preview` 와 `test-deployment/ready` 둘뿐이다.
 
-  ## 핵심 — 왕복 변환 어댑터 제거
+  ## §핵심 (historical) — 왕복 변환 어댑터 제거
   runner 가 `READY`/`PROVISIONING`/`FAILED`/`EXPIRED`(previewStatuses)를 보내면 서버가 `executionToPreviewStatus` 로 **매번 ExecutionStatus 로 역매핑해 `build_test` 에 저장**하고 있었다. preview 어휘는 컨테이너 테스트에 쓰이지도 않는 상태(`EXPIRED`)를 포함했고 표현력 이득이 없었다. 이제 runner 가 `IN_PROGRESS`/`SUCCESS`/`FAILED` 를 그대로 보낸다.
 
   ## 함께 정리한 것
@@ -179,7 +180,7 @@
   ## 제거한 것
   `buildSummary.previewStatus` / `buildRequest.previewTtlMinutes` / DB 컬럼 `preview_status`·`preview_ttl_minutes`(**migration 0007**) / dead `packages/db/src/schema/test-deployment.ts`(사용처 0).
 
-  ## 핵심 설계 — buildTestResult 를 canonical 전용으로 축소
+  ## §핵심 (historical, 설계) — buildTestResult 를 canonical 전용으로 축소
   이전에는 `buildTest` 가 없으면 legacy `previewStatus` 로 폴백했다. **memory·postgres 양쪽 다 `build_test` 를 채우므로** 폴백이 불필요했다(근거: `test.healthCheckPassed` 는 canonical 분기에서만 나오는 값인데 e2e 가 True 를 실측한다). 이제 buildTest 부재 = 아직 테스트 시작 안 함 = `NOT_STARTED`.
 
   ## 의도적으로 남긴 것 → **P2-M2 로 이월**

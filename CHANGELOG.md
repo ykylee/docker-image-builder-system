@@ -485,26 +485,28 @@ RUNNER   container-run / deploy-push                                            
 | 13 | TASK-114 | 종합 RELEASE_NOTES + 운영 가이드 인덱스 (10 섹션) | `d19038a` |
 | 14 | TASK-122 | untracked 52종 잔재 정리 (.gitignore 보강) | `53adb75` |
 
-## 26. 회귀 baseline 종합 (TASK-088 → v0.8.14)
+## 26. 회귀 baseline 종합 (TASK-088 → v0.8.15)
 
 Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-07-08) 대비 누적 변화:
 
-| 항목 | TASK-088 baseline | v0.2.1 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | **v0.8.13** | delta(088→v0.8.13) |
-|------|-------------------|--------|--------|--------|--------|--------|--------|--------|-----------|-------|
-| vitest (build-monitor) | 7 | 277 | 275 | 279 | 279 | 279 | 279 | 279 | **278** (사전 환경 의존 1 fail v0.8.3 동일) | +271 |
-| build-server (node:test) | 113 | 181 | 186 | 198 | 199 | 199 | 205 | 205 | **205** | +92 |
-| runner (`go test ./...`) | 7 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | **8 pkg** | +1 |
-| skill_mcp (pytest) | — | 226 | 225 | 225 | 225 | 225 | 225 | 225 | **225** | — |
-| TS `tsc --noEmit` (5 pkg) | clean | clean | clean | clean | clean | clean | clean | clean | **clean** | 0 |
-| build phase (canonical) | — | 11 | 13 | 13 | 13 | 13 | 13 | 13 | **13** | +2 |
-| postgres migration | 0001 | 0001~0006 | 0001~0008 | 0001~0010 | 0001~0011 | 0001~0011 | 0001~0012 | 0001~0012 | **0001~0012** | +11 |
-| e2e scripts | 0 | 13종 | 13종+k8s | +호스팅(path) | +호스팅(path·subdomain) | +실패경로 | +호스팅 nightly | +k8s nightly | **+hosting-e2e 운영 가이드 (v0.8.13)** | — |
-| 운영 가이드 | 0 | 37 | 42 | 45 | 45 | 45 | 45 | 45 | **45** | +45 |
-| 운영 가드 (정적/실측) | 0 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | **4종 + session-end 5종 가드 (workflow meta drift)** | +5 |
-| workflow meta 정합 | — | — | — | — | — | — | — | — | **session-end 가드 5종** (G1~G5) | — |
-| 5 package.json version | — | 0.2.1 | 0.3.0 | 0.4.0 | 0.5.0 | 0.6.0 | 0.7.0 | 0.8.0 | **0.8.13** | — |
+| 항목 | TASK-088 baseline | v0.2.1 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | v0.8.13 | **v0.8.14** | delta(088→v0.8.14) |
+|------|-------------------|--------|--------|--------|--------|--------|--------|--------|--------|-----------|-------|
+| vitest (build-monitor) | 7 | 277 | 275 | 279 | 279 | 279 | 279 | 279 | 278 (사전 환경 의존 1 fail v0.8.3 동일) | **278** (동일 baseline) | +271 |
+| build-server (node:test) | 113 | 181 | 186 | 198 | 199 | 199 | 205 | 205 | 205 | **205** | +92 |
+| runner (`go test ./...`) | 7 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | **8 pkg** | +1 |
+| skill_mcp (pytest) | — | 226 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | **225** | — |
+| TS `tsc --noEmit` (5 pkg) | clean | clean | clean | clean | clean | clean | clean | clean | clean | **clean** | 0 |
+| build phase (canonical) | — | 11 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | **13** | +2 |
+| postgres migration | 0001 | 0001~0006 | 0001~0008 | 0001~0010 | 0001~0011 | 0001~0011 | 0001~0012 | 0001~0012 | 0001~0012 | **0001~0012** | +11 |
+| e2e scripts | 0 | 13종 | 13종+k8s | +호스팅(path) | +호스팅(path·subdomain) | +실패경로 | +호스팅 nightly | +k8s nightly | +hosting-e2e 운영 가이드 | **+session-end pre-push hook helper** | — |
+| 운영 가이드 | 0 | 37 | 42 | 45 | 45 | 45 | 45 | 45 | 45 | **46** (+ hosting-e2e-ci) | +46 |
+| 운영 가드 (정적/실측) | 0 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 + session-end 5종 가드 | **4종 + session-end 5종 가드 + pre-push hook helper** | +5 |
+| workflow meta 정합 | — | — | — | — | — | — | — | — | session-end 가드 5종 | **session-end 가드 5종 (5/5 PASS)** | — |
+| 5 package.json version | — | 0.2.1 | 0.3.0 | 0.4.0 | 0.5.0 | 0.6.0 | 0.7.0 | 0.8.0 | 0.8.13 | **0.8.14** | — |
 
-> **v0.8.13 patch 누적** (TASK-178): 13연속 운영 patch 정합 완료 — v0.8.1 k8s e2e nightly 편입 + v0.8.3 release-checklist k8s 보강 + v0.8.4 PROJECT_PROFILE 운영 가이드 4종 reference + v0.8.5~v0.8.9 종합 RELEASE_NOTES 시리즈 + v0.8.10 session_handoff.md + state.json rev 정합 + v0.8.11 일일 백로그 10연속 patch 정합 + v0.8.12 PHASE-3-DESIGN v0.9.0 진입 결정 + v0.8.13 호스팅 e2e CI 운영 가이드 보강 (salp 라인 흡수) + 89a5a62 session-end skill 신설 (workflow meta drift 검출 가드 5종). **코드 변경 0 / 스크립트 변경 0 / SQL 변경 0 / migration 변경 0**.
+> **v0.8.14 patch 누적** (TASK-180): 14연속 운영 patch 정합 완료 — v0.8.1~v0.8.13 누적 + v0.8.14 `scripts/pre-push-session-end.sh` + `.grok/hooks/install-pre-push.sh` 운영 가드 2종 신설 (session-end 가드 5종을 pre-push hook 으로 편입) + PROJECT_PROFILE.md §2 운영 가이드 인덱스 4종→5종(`hosting-e2e-ci-2026-07-27.md` 신규) + §3 hosting-e2e CI 운영 가이드 + workflow meta drift 가드 + §4 검증 포인트 v0.8.13 baseline 단락. **코드 변경 0 / 스크립트 변경 0 / SQL 변경 0 / migration 변경 0**. session-end 가드 read-only 모드 실행 → 2/5 fail (G2 current_baseline drift / G3 rev drift) 검출 — 본 patch 의 운영 가드는 drift의 push 시점 차단을 가능케 함.
+>
+> **v0.8.15 patch 누적** (TASK-181): G3 drift 의 진짜 근본 원인 해소 — session_handoff.md 의 historical `## 핵심 (rev N)` 헤더 6종을 `## §핵심 (historical, rev N)` 라벨로 변경 (본문 보존), 가드의 패턴 1 (`##\s*핵심[^(]*\(rev\s+(\d+)\)`) 매칭이 깨지면서 G3 정상화. state.json schema 위치 단일화 (`source_of_truth.latest_backlog_path` 제거, `backlog.latest_backlog_path` 단일 유지 — TASK-116/TASK-115 historical 텍스트는 보존). CHANGELOG §26 표 v0.8.14 row 추가. PROJECT_PROFILE.md §4 baseline 표 v0.8.14 row 추가. 5 package.json 0.8.14→0.8.15 통일. **코드 변경 0**. 회귀 baseline: TS 5 clean / build-server 205 / build-monitor vitest 278 / migration 0001~0012 / go 8 pkg / **session-end 가드 5/5 PASS** (G2 drift는 본 release commit 시점에 first 줄 갱신으로 해소).
 
 > **TASK-153 (2026-07-23, post-tag 패치)**: `e2e-production-semantic.sh` 실이미지 빌드 e2e 를 검증하다가 루트 `Dockerfile` 이 build-monitor 를 `vite build`(config 미지정)로 빌드해 Svelte 잔재 config 를 잡던 회귀를 발견·수정 (`--config vite.react.config.ts` + `.dockerignore` 보강). 수정 후 실제 `docker build`/`docker run` 10 phase **ALL PASS**. v0.2.1 후보.
 
