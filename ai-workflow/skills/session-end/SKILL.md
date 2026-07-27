@@ -3,7 +3,7 @@
 # Session-End Skill
 
 - 문서 목적: `session-end` skill 프로토타입의 역할과 구현 진입점을 정리한다.
-- 범위: 목적, 연결 스펙, 가드 5종, 예상 입력/출력, 권한 경계, 구현 메모
+- 범위: 목적, 연결 스펙, 가드 9종, 예상 입력/출력, 권한 경계, 구현 메모
 - 대상 독자: skill 구현자, AI agent 설계자, 운영자
 - 상태: draft (v0.15.19-beta 신규 도입)
 - 최종 수정일: 2026-07-27
@@ -11,7 +11,7 @@
 
 ## 1. 목적
 
-세션 종료 직전에 workflow 메타 정합성을 5종 가드로 검증하고 drift 를 사전 검출한다. `session-start` 가 *baseline 복원* 만 한다면, `session-end` 는 *drift 검출* 을 책임진다. 두 skill 이 시작-종료 쌍을 이루며 workflow memory 의 일관성을 닫힌다.
+세션 종료 직전에 workflow 메타 정합성을 9종 가드로 검증하고 drift 를 사전 검출한다. `session-start` 가 *baseline 복원* 만 한다면, `session-end` 는 *drift 검출* 을 책임진다. 두 skill 이 시작-종료 쌍을 이루며 workflow memory 의 일관성을 닫힌다.
 
 배경 — 2026-07-27 세션에서 *워크트리가 v0.7.0 인데 HEAD 가 v0.8.12* 인 사각지대가 발견됨. 단일 force-push 가 아니어도 발생할 수 있는 drift — `state.json` 의 baseline / rev / latest_backlog_path / package.json 버전이 HEAD 와 갈라지는 모든 경우를 종료 시점에 검출한다.
 
@@ -21,7 +21,7 @@
 - 카탈로그: [`../../core/workflow_skill_catalog.md`](../../core/workflow_skill_catalog.md)
 - session-start (쌍 skill): [`../../core/session_start_skill_spec.md`](../../core/session_start_skill_spec.md)
 
-## 3. 가드 5종 (Drift Detection Rules)
+## 3. 가드 9종 (Drift Detection Rules, v0.8.16 확장)
 
 | # | 가드 | 검출 항목 |
 |---|---|---|
@@ -30,8 +30,12 @@
 | **G3** | `state.session.rev_*` 정합 | `handoff_rev` / `index_rev` / `latest_rev` == 각 .md 파일의 `rev N` 헤더 |
 | **G4** | `state.backlog.latest_backlog_path` 정합 | `latest_backlog_path` == `backlog/` 의 실제 최신 YYYY-MM-DD.md |
 | **G5** | 5종 `package.json` 통일 | `apps/build-server` / `apps/build-monitor` / `packages/shared-contract` / `packages/shared-config` / `packages/db` 의 `"version"` field 동등 |
+| **G6** | `current_baseline` ↔ CHANGELOG.md latest release | `current_baseline` semver == CHANGELOG.md 의 가장 최신 `## N. vX.Y.Z (release entry)` |
+| **G7** | HEAD commit subject 정합 | HEAD commit subject 가 `release: vX.Y.Z ...` 형식이면 G3 잔존 여부 + handoff_rev 정합 확인 |
+| **G8** | `session_handoff.md` 첫 줄 `Updated:` 헤더 정합 | 본문 첫 줄의 `**vA.B.C ...**` 가 CHANGELOG.md latest release 와 일치 |
+| **G9** | state.json semantic 검증 | 필수 필드(schema_version / purpose_digest_rev / session.rev / current_baseline) / 타입 / `latest_backlog_path` 2중복 단일화 정합 |
 
-G1 은 hard fail (state.json 자체 깨짐 → 다음 세션 baseline 복원 불가), G2~G5 는 soft fail (drift 검출).
+G1 은 hard fail (state.json 자체 깨짐 → 다음 세션 baseline 복원 불가), G2~G9 는 soft fail (drift 검출). **v0.8.16 부터 G6~G9 추가** — 5종 → 9종 확장.
 
 ## 4. 예상 입력
 
@@ -45,9 +49,9 @@ G1 은 hard fail (state.json 자체 깨짐 → 다음 세션 baseline 복원 불
 
 ## 5. 예상 출력
 
-- `summary` — 가드 5종 결과 3~6줄 요약
-- `guards` — 5종 가드 각각의 `{id, status, message}` list
-- `passed` — 5종 모두 pass 면 true
+- `summary` — 가드 9종 결과 3~6줄 요약
+- `guards` — 9종 가드 각각의 `{id, status, message}` list
+- `passed` — 9종 모두 pass 면 true
 - `drift_items` — fail 인 가드 id list
 - `next_actions` — 권장 후속 행동 list
 - `warnings` — fail 항목 + 환경 노트
@@ -62,7 +66,7 @@ G1 은 hard fail (state.json 자체 깨짐 → 다음 세션 baseline 복원 불
 
 ## 7. 구현 메모
 
-- 가드 5종 모두 PASS 여도 *누락 가능성 0* 을 보장하지는 않음 (코드/문서 변경은 본 skill 범위 밖).
+- 가드 9종 모두 PASS 여도 *누락 가능성 0* 을 보장하지는 않음 (코드/문서 변경은 본 skill 범위 밖).
 - G3 의 rev 패턴은 `## 핵심 (rev N)` / `rev N→M` / `rev N:` 모두 지원.
 - G4 의 일일 백로그 부재 시 (신규 프로젝트) skip + advisory 1줄.
 - G5 의 5종 중 일부 파일 부재 시 partial fail 로 보고.

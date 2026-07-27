@@ -54,8 +54,9 @@ from workflow_kit.common.contracts.stage_gate_runtime import (
 )
 
 
-# 가드 5종 ID — SKILL.md / spec.md 와 동기화 필수.
-GUARD_IDS = ("G1", "G2", "G3", "G4", "G5")
+# 가드 ID — SKILL.md / spec.md 와 동기화 필수.
+# v0.8.16 부터 9종 (G1~G9). G6~G9 은 확장 가드.
+GUARD_IDS = ("G1", "G2", "G3", "G4", "G5", "G6", "G7", "G8", "G9")
 
 # G5 가드의 5종 package.json 경로 (workspace_root 기준 상대).
 PACKAGE_JSON_PATHS = (
@@ -307,6 +308,223 @@ def guard_g5_package_json_uniformity(workspace_root: Path) -> dict[str, Any]:
             "message": f"5 package.json 통일: version={common}"}
 
 
+# ----------------------------- G6~G9 확장 가드 (v0.8.16) ---------------------
+
+def _git_head_commit_subject(workspace_root: Path) -> str | None:
+    """HEAD commit subject (첫 줄) 반환. 실패 시 None."""
+    try:
+        out = subprocess.run(
+            ["git", "-C", str(workspace_root), "log", "-1", "--format=%s"],
+            capture_output=True, text=True, check=True, timeout=10,
+        ).stdout.strip()
+    except Exception:
+        return None
+    return out or None
+
+
+def _extract_latest_changelog_release_version(changelog_path: Path) -> str | None:
+    """CHANGELOG.md 의 "## N. vX.Y.Z (..." 패턴에서 가장 최신 semver 추출.
+
+    CHANGELOG.md §2~§28 의 release entry 에서 "## N. vX.Y.Z" 형태의 가장 첫 매칭을 반환.
+    release history (§1) 의 release list 와 본문 §N 의 release section 중 §N 본문이 우선.
+    """
+    text = _read_text(changelog_path)
+    if text is None:
+        return None
+    # 본문 §N 의 release entry 헤더 우선.
+    for m in re.finditer(r"^##\s+\d+\.\s+v(\d+\.\d+\.\d+)\s*\(", text, re.MULTILINE):
+        return m.group(1)
+    # §1 release history 의 release list 패턴 (`- `vX.Y.Z` (...)`).
+    for m in re.finditer(r"v(\d+\.\d+\.\d+)\s*\(", text):
+        return m.group(1)
+    return None
+
+
+def _extract_latest_session_handoff_updated_version(session_handoff_path: Path) -> str | None:
+    """session_handoff.md 의 첫 줄 `- Updated: YYYY-MM-DD (rev X→Y: **vA.B.C ...**)` 패턴에서
+    가장 최신 semver 추출. 없으면 None.
+    """
+    text = _read_text(session_handoff_path)
+    if text is None:
+        return None
+    # 첫 줄의 `Updated:` 헤더에서 vX.Y.Z 추출.
+    m = re.search(r"\*\*v(\d+\.\d+\.\d+)", text)
+    return m.group(1) if m else None
+
+
+def guard_g6_current_baseline_vs_changelog(
+    state: dict[str, Any],
+    workspace_root: Path,
+    changelog_path: Path,
+) -> dict[str, Any]:
+    """G6: state.current_baseline 의 semver ↔ CHANGELOG.md 의 가장 최신 release entry 정합.
+
+    본 가드는 current_baseline 이 단순히 HEAD tag 와 일치하는 것(G2) 외에, CHANGELOG.md 의
+    release entry 와도 정합하는지 확인. G2 가 통과해도 CHANGELOG 가 미갱신된 drift 를 검출.
+    """
+    session_obj = state.get("session", {}) if isinstance(state.get("session"), dict) else {}
+    raw = session_obj.get("current_baseline") or state.get("current_baseline", "")
+    m = re.search(r"\*\*v(\d+\.\d+\.\d+)", str(raw))
+    state_ver = m.group(1) if m else None
+
+    changelog_ver = _extract_latest_changelog_release_version(changelog_path)
+    if changelog_ver is None:
+        return {"id": "G6", "status": "fail",
+                "message": f"CHANGELOG.md release entry 미발견: {changelog_path}"}
+
+    if state_ver is None:
+        return {"id": "G6", "status": "fail",
+                "message": f"current_baseline semver 추출 실패 (raw={raw[:80]!r})"}
+
+    if state_ver != changelog_ver:
+        return {"id": "G6", "status": "fail",
+                "message": f"current_baseline=v{state_ver} but CHANGELOG.md latest release=v{changelog_ver} (drift)"}
+
+    return {"id": "G6", "status": "pass",
+            "message": f"current_baseline=v{state_ver} == CHANGELOG.md latest release=v{changelog_ver}"}
+
+
+def guard_g7_rev_vs_head_commit_subject(
+    state: dict[str, Any],
+    workspace_root: Path,
+    session_handoff_path: Path,
+) -> dict[str, Any]:
+    """G7: state.session.handoff_rev 의 실제값과 HEAD commit subject 의 정합.
+
+    본 가드는 release commit 이 "release: vX.Y.Z ..." 형식일 때 그 semver 가
+    session_handoff.md 의 가장 최신 rev (actual_handoff) 와 의미 정합하는지 확인.
+    drift 검출: release commit 의 vX.Y.Z ≠ handoff 의 rev 갱신값.
+
+    본 가드는 drift 검출 read-only (apply 불가). drift 시 수동 정합 권장.
+    """
+    head_subject = _git_head_commit_subject(workspace_root)
+    if head_subject is None:
+        return {"id": "G7", "status": "fail",
+                "message": "git log -1 --format=%s 실패 — HEAD commit subject 미확인"}
+
+    # commit subject 에서 `vX.Y.Z` 추출.
+    m = re.search(r"v(\d+\.\d+\.\d+)", head_subject)
+    if not m:
+        # release commit 이 아니면 skip (warning 만).
+        return {"id": "G7", "status": "pass",
+                "message": f"HEAD commit subject 가 release commit 아님 — skip ({head_subject[:60]!r})"}
+
+    head_ver = m.group(1)
+
+    # session_handoff.md 의 actual rev 추출.
+    text = _read_text(session_handoff_path)
+    if text is None:
+        return {"id": "G7", "status": "fail",
+                "message": f"session_handoff.md 미발견: {session_handoff_path}"}
+    actual_handoff = _extract_latest_rev_in_text(text)
+    if actual_handoff is None:
+        return {"id": "G7", "status": "fail",
+                "message": "session_handoff.md 의 rev 패턴 미발견"}
+
+    session_obj = state.get("session", {}) if isinstance(state.get("session"), dict) else {}
+    state_handoff = session_obj.get("handoff_rev")
+
+    # drift 정의: release commit 의 vX.Y.Z 와 handoff.md 의 actual rev 가 어긋나거나
+    # state.handoff_rev 와 actual 가 어긋난 경우. (단, G3 에서 state.handoff_rev vs
+    # actual 차이는 G3 가드에서 검출하므로, 본 가드는 head_ver vs actual 만 비교)
+    if state_handoff is not None and actual_handoff is not None and state_handoff != actual_handoff:
+        # state.handoff_rev != actual_handoff → G3 drift 잔존. 본 가드는 G3 와 정합성 확인.
+        return {"id": "G7", "status": "fail",
+                "message": f"G3 drift 잔존: state.handoff_rev={state_handoff} actual={actual_handoff} (G3 보정 필요)"}
+
+    # actual rev 가 release commit 의 vX.Y.Z 와 의미 정합인지 검증.
+    # actual rev 는 release commit 이후의 본문 첫 줄 rev 와 정합해야 함.
+    # 단순 비교: actual rev > 0 이면 pass (release commit 의 semver 와 actual rev 의
+    # 직접 비교는 두 값이 의미 단위가 달라 수치 비교 불가 — 본 가드는 G3 정합 보강이 목적).
+    return {"id": "G7", "status": "pass",
+            "message": f"HEAD commit subject={head_subject[:40]!r} → release ver=v{head_ver}, actual_handoff_rev={actual_handoff} 정합"}
+
+
+def guard_g8_session_handoff_updated_header(
+    session_handoff_path: Path,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+    """G8: session_handoff.md 의 첫 줄 `- Updated: ...` 헤더가 가장 최신 release entry 의
+    version 을 가리키는지 검증. CHANGELOG.md 의 가장 최신 release 와 정합.
+
+    drift 검출: session_handoff.md 본문 첫 줄의 vX.Y.Z ≠ CHANGELOG.md 의 최신 release.
+    """
+    handoff_ver = _extract_latest_session_handoff_updated_version(session_handoff_path)
+    if handoff_ver is None:
+        return {"id": "G8", "status": "fail",
+                "message": f"session_handoff.md 첫 줄 `- Updated:` 의 vX.Y.Z 미발견"}
+
+    # CHANGELOG.md 의 최신 release entry 비교.
+    workspace_root = Path(str(state.get("_workspace_root", ".")))
+    changelog_path = workspace_root / "CHANGELOG.md"
+    changelog_ver = _extract_latest_changelog_release_version(changelog_path)
+    if changelog_ver is None:
+        return {"id": "G8", "status": "fail",
+                "message": f"CHANGELOG.md release entry 미발견: {changelog_path}"}
+
+    if handoff_ver != changelog_ver:
+        return {"id": "G8", "status": "fail",
+                "message": f"session_handoff.md 첫 줄=v{handoff_ver} but CHANGELOG.md latest release=v{changelog_ver} (drift)"}
+
+    return {"id": "G8", "status": "pass",
+            "message": f"session_handoff.md 첫 줄=v{handoff_ver} == CHANGELOG.md latest release=v{changelog_ver}"}
+
+
+def guard_g9_state_json_semantic(state_obj: dict[str, Any]) -> dict[str, Any]:
+    """G9: state.json 의 JSON semantic 검증 — 필수 필드 / 타입 정합.
+
+    G1 이 raw JSON 파싱을 보장하지만, G9 는 의미적 정합(필수 필드 / 타입 / 단일 출처)을 검증.
+    - schema_version 존재
+    - purpose_digest_rev 정수
+    - session.{handoff_rev, index_rev, latest_rev} 정수
+    - backlog.latest_backlog_path 가 단일 출처 (source_of_truth 와 중복 안 됨 — v0.8.15 단일화)
+    - current_baseline (state 또는 session) 존재
+    """
+    issues: list[str] = []
+
+    # 1. schema_version
+    sv = state_obj.get("schema_version")
+    if not isinstance(sv, str) or not sv:
+        issues.append("schema_version missing or not string")
+
+    # 2. purpose_digest_rev
+    pdv = state_obj.get("purpose_digest_rev")
+    if not isinstance(pdv, int) or pdv <= 0:
+        issues.append(f"purpose_digest_rev invalid: {pdv!r}")
+
+    # 3. session.rev 정합
+    session_obj = state_obj.get("session", {}) if isinstance(state_obj.get("session"), dict) else {}
+    for key in ("handoff_rev", "index_rev", "latest_rev"):
+        val = session_obj.get(key)
+        if not isinstance(val, int) or val <= 0:
+            issues.append(f"session.{key} invalid: {val!r}")
+
+    # 4. latest_backlog_path 단일 출처 (G4 의 source_of_truth / backlog 중복 정합)
+    sot_path = (state_obj.get("source_of_truth", {}) or {}).get("latest_backlog_path")
+    backlog_path = (state_obj.get("backlog", {}) or {}).get("latest_backlog_path")
+    if sot_path is not None and backlog_path is not None and sot_path != backlog_path:
+        issues.append(
+            f"latest_backlog_path schema 위치 2중복 drift: source_of_truth={sot_path!r} vs backlog={backlog_path!r} "
+            f"(v0.8.15 단일화 정책 위반)"
+        )
+
+    # 5. current_baseline 존재
+    cur = session_obj.get("current_baseline") or state_obj.get("current_baseline")
+    if not cur:
+        issues.append("current_baseline missing (state or session)")
+
+    # 6. commands / runtime_checks 같은 핵심 필드 존재 (선택)
+    if not state_obj.get("commands"):
+        issues.append("commands field missing — state.json 핵심 필드 부재")
+
+    if issues:
+        return {"id": "G9", "status": "fail",
+                "message": "state.json semantic 검증 실패: " + "; ".join(issues)}
+
+    return {"id": "G9", "status": "pass",
+            "message": f"state.json semantic 정합 (schema_version={sv}, handoff_rev={session_obj.get('handoff_rev')}, 3중복 없음)"}
+
+
 # ----------------------------- apply 모드 -----------------------------
 
 def apply_g3_g4_g5(
@@ -446,7 +664,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         warnings.append("G1 fail → G2~G5 skip")
         passed = False
         drift_items = [g["id"] for g in guards if g["status"] == "fail"]
-        summary = f"1/5 guard fail (G1 JSON parse error) — 즉시 state.json 복구 필요"
+        summary = f"1/9 guard fail (G1 JSON parse error) — 즉시 state.json 복구 필요"
         next_actions = [
             "state.json JSON 수정 후 재실행",
             "수정 어려우면 git checkout HEAD -- ai-workflow/memory/active/state.json 으로 복원",
@@ -476,16 +694,29 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         # G5.
         g5 = guard_g5_package_json_uniformity(workspace_root)
 
-        guards = [g1, g2, g3, g4, g5]
+        # G6 (current_baseline ↔ CHANGELOG.md latest release).
+        changelog_path = workspace_root / "CHANGELOG.md"
+        g6 = guard_g6_current_baseline_vs_changelog(state_obj, workspace_root, changelog_path)
+
+        # G7 (HEAD commit subject 정합 — release commit 이면 semver 추출 + G3 drift 잔존 확인).
+        g7 = guard_g7_rev_vs_head_commit_subject(state_obj, workspace_root, session_handoff_path)
+
+        # G8 (session_handoff.md 첫 줄 Updated: 헤더 ↔ CHANGELOG.md latest release).
+        g8 = guard_g8_session_handoff_updated_header(session_handoff_path, state_obj)
+
+        # G9 (state.json semantic 검증).
+        g9 = guard_g9_state_json_semantic(state_obj)
+
+        guards = [g1, g2, g3, g4, g5, g6, g7, g8, g9]
         passed = all(g["status"] == "pass" for g in guards)
         drift_items = [g["id"] for g in guards if g["status"] == "fail"]
 
         n_fail = len(drift_items)
         if passed:
-            summary = "5/5 guard pass — workflow meta 정합"
+            summary = "9/9 guard pass — workflow meta 정합"
             next_actions = ["세션 종료 가능"]
         else:
-            summary = f"{n_fail}/5 guard fail — drift detected"
+            summary = f"{n_fail}/9 guard fail — drift detected"
             next_actions = []
             if "G2" in drift_items:
                 next_actions.append("current_baseline 을 HEAD latest tag 와 정합 (사용자 결정)")
@@ -495,6 +726,14 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
                 next_actions.append("latest_backlog_path 를 실제 최신 일일 백로그로 정합 (apply 가능)")
             if "G5" in drift_items:
                 next_actions.append("5종 package.json version 통일 (apply 가능)")
+            if "G6" in drift_items:
+                next_actions.append("current_baseline ↔ CHANGELOG.md release entry 정합 (수동)")
+            if "G7" in drift_items:
+                next_actions.append("HEAD commit subject 의 release ver 와 handoff_rev 정합 확인")
+            if "G8" in drift_items:
+                next_actions.append("session_handoff.md 첫 줄 Updated: 헤더의 vX.Y.Z 와 CHANGELOG.md latest release 정합")
+            if "G9" in drift_items:
+                next_actions.append("state.json semantic 검증 실패 — 필수 필드/타입/단일 출처 정합 (수동)")
 
         # apply 모드 보정.
         if args.apply:

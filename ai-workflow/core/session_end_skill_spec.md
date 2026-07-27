@@ -24,9 +24,9 @@
 - 검출 결과는 `stage_completion` + `warnings` 로 emit 한다. 다음 세션의 `session-start` 가 즉시 발견할 수 있도록 한다.
 - `done` 상태를 재판정하지 않는다 — 사용자가 명시적으로 close 하지 않은 in-progress 항목은 그대로 둔다.
 
-## 3. 가드 5종 (5 Drift Detection Rules)
+## 3. 가드 9종 (9 Drift Detection Rules, v0.8.16 확장)
 
-본 skill 은 다음 5종의 정합성 가드를 수행한다. 각 가드는 *PASS* 또는 *FAIL* 이며, FAIL 은 `warnings` 에 1줄로 적재된다.
+본 skill 은 다음 9종의 정합성 가드를 수행한다. 각 가드는 *PASS* 또는 *FAIL* 이며, FAIL 은 `warnings` 에 1줄로 적재된다. **v0.8.16 부터 5종 → 9종 확장** (G6~G9 추가).
 
 | # | 가드 | 검출 항목 | FAIL 시 warnings 1줄 예시 |
 |---|---|---|---|
@@ -35,6 +35,24 @@
 | **G3** | `state.session.rev_*` 정합 | `handoff_rev` == `session_handoff.md` 의 `## 핵심 (rev N)` N / `index_rev` == `work_backlog.md` 의 `rev N` / `latest_rev` == 최신 일일 백로그 의 `rev N` | `handoff_rev=121 but session_handoff.md latest rev=166 (drift)` |
 | **G4** | `state.backlog.latest_backlog_path` 정합 | `latest_backlog_path` 가 `ai-workflow/memory/active/backlog/` 의 실제 최신 YYYY-MM-DD.md 와 일치 | `latest_backlog_path=2026-07-24.md but actual latest=2026-07-25.md (drift)` |
 | **G5** | 5 package.json 버전 통일 | `apps/build-server` / `apps/build-monitor` / `packages/shared-contract` / `packages/shared-config` / `packages/db` 의 `"version"` field 가 모두 동일 | `package.json drift: build-server=0.7.0 build-monitor=0.8.12 ...` |
+| **G6** | `current_baseline` ↔ CHANGELOG.md latest release | `current_baseline` 의 semver 가 CHANGELOG.md 의 가장 최신 `## N. vX.Y.Z (release entry)` 와 일치 | `current_baseline=v0.8.13 but CHANGELOG.md latest release=v0.8.14 (drift)` |
+| **G7** | HEAD commit subject 정합 (release commit 검증) | HEAD 가 `release: vX.Y.Z ...` 형식이면 G3 잔존 여부 + handoff_rev 정합 확인 | `G3 drift 잔존: state.handoff_rev=X actual=Y (G3 보정 필요)` |
+| **G8** | `session_handoff.md` 첫 줄 `Updated:` 헤더 정합 | 본문 첫 줄 `- Updated: ... (rev X→Y: **vA.B.C ...**)` 의 vA.B.C 가 CHANGELOG.md latest release 와 일치 | `session_handoff.md 첫 줄=v0.8.15 but CHANGELOG.md latest release=v0.8.13 (drift)` |
+| **G9** | state.json semantic 검증 | 필수 필드(schema_version / purpose_digest_rev / session.rev / current_baseline) / 타입 / `latest_backlog_path` 2중복 단일화 정합 | `state.json semantic 검증 실패: schema_version missing; latest_backlog_path 2중복 drift ...` |
+
+9종 가드 중 **G1** 은 hard fail (state.json 자체가 깨지면 다른 가드도 무의미) 이고, G2~G9 는 soft fail (drift 검출) 이다.
+
+### 3.1 v0.8.16 확장 동기 (G6~G9 도입)
+
+- **G6**: G2 가 통과해도 CHANGELOG.md 의 release entry 가 미갱신된 drift 는 검출 불가. CHANGELOG.md 의 release anchor 와 current_baseline 의 의미 정합을 보장.
+- **G7**: release commit 의 semver (예: `release: v0.8.15 ...`) 가 session_handoff.md 의 rev 갱신과 의미 정합하는지 확인. G3 drift 잔존 시 자동 검출.
+- **G8**: session_handoff.md 본문 첫 줄의 `Updated:` 헤더가 CHANGELOG.md 의 최신 release 와 어긋난 drift 검출. release commit 시 본문 첫 줄 갱신 누락 / CHANGELOG 갱신 누락 모두 검출.
+- **G9**: state.json 의 의미적 정합 (필수 필드 / 타입 / 단일 출처) 을 G1 의 raw JSON 파싱 외에 검증. v0.8.15 의 schema 단일화 정책(`latest_backlog_path` 2중복 → 1중복) 의 회귀 방지.
+
+### 3.2 G6~G9 적용 범위
+
+- **G6~G9**: read-only 검출. apply 모드 자동 보정 없음 (의미 정합은 사용자 결정 영역).
+- G1~G5 의 apply 모드는 G3/G4/G5 보정만 허용 (G2/G1 은 자동 수정 불가). G6~G9 도 동일 정책 — read-only.itor=0.8.12 ...` |
 
 5종 가드 중 **G1** 은 hard fail (state.json 자체가 깨지면 다른 가드도 무의미) 이고, G2~G5 는 soft fail (drift 검출) 이다.
 
@@ -65,9 +83,9 @@
 
 ### 5.1 최소 출력 필드
 
-- `summary` — 가드 5종 결과를 3~6줄로 요약. 첫 줄에 PASS/FAIL 요약.
-- `guards` — 5종 가드 각각의 `{id, status: pass|fail, message}` 5 객체 list.
-- `passed` — `bool`. 5종 모두 pass 면 true.
+- `summary` — 가드 9종 결과를 3~6줄로 요약. 첫 줄에 PASS/FAIL 요약.
+- `guards` — 9종 가드 각각의 `{id, status: pass|fail, message}` 9 객체 list.
+- `passed` — `bool`. 9종 모두 pass 면 true.
 - `drift_items` — `guards` 중 fail 인 항목의 `id` list.
 - `next_actions` — 권장 후속 행동 list (예: "state.json 의 current_baseline 을 v0.8.12 로 갱신").
 - `warnings` — FAIL 항목 1줄 + 환경 노트 + drift 위험 등.
