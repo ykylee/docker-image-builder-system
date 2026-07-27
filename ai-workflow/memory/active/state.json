@@ -7,7 +7,7 @@
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
     "work_backlog_index_path": "ai-workflow/memory/active/work_backlog.md",
-    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-25.md",
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-27.md",
     "repository_assessment_path": "ai-workflow/memory/active/repository_assessment.md"
   },
   "project": {
@@ -153,14 +153,14 @@
       "TASK-078 container self-dogfood (PR #28)"
     ],
     "environment_constraints": [],
-    "handoff_rev": 166,
+    "handoff_rev": 163,
     "handoff_path": "ai-workflow/memory/active/session_handoff.md",
-    "index_rev": 103,
-    "latest_rev": 51,
+    "index_rev": 127,
+    "latest_rev": 1,
     "in_progress_items": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-25.md",
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-07-27.md",
     "task_count": 75,
     "in_progress_items": [],
     "blocked_items": [],

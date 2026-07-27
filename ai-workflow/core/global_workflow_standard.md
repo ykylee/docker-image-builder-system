@@ -135,7 +135,7 @@
    - `state.json`, `session_handoff.md`, `work_backlog.md` 등 active memory 갱신
    - 미검증 항목과 남은 리스크를 명시한다
    - **문서 정합성 동기화**: `maturity_matrix.json`을 업데이트하고 관련 계획 문서(Roadmap/Catalog)를 최신화한다
-2. **최종 검증**: `workflow-linter`를 실행하여 문서 간 불일치가 없는지 확인한다.
+2. **최종 검증**: `workflow-linter`를 실행하여 문서 간 불일치가 없는지 확인한다. **drift 검출** (v0.15.19-beta 신규) 은 `session-end` skill 을 사용 — `python3 ai-workflow/skills/session-end/scripts/run_session_end.py --workspace-root "$PWD"` 로 가드 5종 (G1~G5: state JSON / current_baseline / rev 정합 / latest_backlog_path / 5 package.json 통일) 을 검증한다. drift 검출 시 `apply` 모드는 G3/G4/G5 만 자동 보정 (G2 / G1 은 사용자 결정 영역).
 3. **다음 세션 시작 포인트** + **종료 요약** 을 handoff 에 짧게 적는다 (다음 세션이 바로 이어받는 데 필요한 핵심 사실만 간결하게).
 4. **commit + push**: memory 갱신이 *모두 포함된 상태* 로 단일 commit 작성 + push. (협업자가 push 시점에 memory 갱신까지 함께 본다)
 

@@ -6,6 +6,7 @@
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers
 - Status: stable (TASK-120 정합)
+- Updated: 2026-07-27 (rev 164→165: **session-end skill 신설 — workflow meta drift 검출 가드 5종**). 2026-07-27 세션 시작 시 발견된 *워크트리 v0.7.0 vs HEAD v0.8.12* 사각지대를 직접 대응. 표준 ai-workflow 키트에 session-start ↔ session-end 쌍 skill 의 부재가 구조적 원인. 신설: `core/session_end_skill_spec.md` + `skills/session-end/{SKILL.md,scripts/run_session_end.py}` (G1~G5 모두 구현, stage_completion 동형 schema, apply 모드 G3/G4/G5 안전 보정) + `workflow_skill_catalog.md` §1·§3 cross-ref + `.claude/commands/workflow-session-end.md` + `.grok/skills/standard-ai-workflow/SKILL.md` §3.4 절차 + `core/global_workflow_standard.md` §8.1. 검증: read-only 1/5 fail (G3 `rev drift: handoff_rev=state:166 actual:163; index_rev=state:103 actual:126; latest_rev=state:51 actual:1` — 가드가 main 의 v0.8.10 patch 가 잡지 못한 진짜 drift 까지 검출), apply 모드 5/5 pass + bak.<ts> 백업. exit code drift=1/pass=0. follow-up: 확장 가드 4종 / pre-push hook / nightly CI / state.json schema 위치 단일화.
 - Updated: 2026-07-25 (rev 163→164: **v0.8.0 minor + v0.8.1~v0.8.9 9연속 patch + 6종 release notes 정합 (v0.4.0 / v0.5.0 / v0.6.0 / v0.7.0 / v0.8.0 / v0.8.x) + CHANGELOG release history 6종 + PROJECT_PROFILE 운영 가이드 4종 reference**).
 - Updated: 2026-07-24 (rev 162→163: **Phase 3 완료 — 호스팅 능력 (P3-M1~M5, TASK-166~170) + v0.3.0 릴리스**).
 - Updated: 2026-07-24 (rev 161→162: **P2-M5 배포 능력 완료 → Phase 2 전체 완료 (TASK-165)**).
