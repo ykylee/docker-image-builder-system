@@ -26,14 +26,20 @@ type Config struct {
 	// 이면 비활성 (기존 deploy.Client 만). K8sCluster / K8sNamespace /
 	// K8sManifest 는 adapter 의 입력. P2-M5 의 실제 구현체까지 skeleton
 	// 단계.
-	K8sMode        string
-	K8sCluster     string
-	K8sNamespace   string
-	K8sManifest    string
-	HelmChart      string
-	HelmRelease    string
-	HelmValuesFile string
-	HelmSetValues  string
+	K8sMode               string
+	K8sCluster            string
+	K8sNamespace          string
+	K8sManifest           string
+	HelmChart             string
+	HelmRelease           string
+	HelmValuesFile        string
+	HelmSetValues         string
+	ArgoCDNamespace       string
+	ArgoCDProject         string
+	ArgoCDRepoURL         string
+	ArgoCDPath            string
+	ArgoCDTargetRevision  string
+	ArgoCDDestinationHost string
 	// TASK-175 (v0.8.0, k8s adapter 확장 — 운영 결함 3종 해소):
 	// K8sNamespacePerBuild 가 true 면 buildID 별 namespace 를 새로 만들어
 	// 격리(deployment/ingress DNS 충돌 + audit 개선). 기본(false) 은 기존
@@ -43,19 +49,25 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		PollInterval:         parseDuration("RUNNER_POLL_INTERVAL", 5*time.Second),
-		HostServerBaseURL:    parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
-		RunnerID:             parseString("RUNNER_ID", "runner-default"),
-		RegistryConfigDir:    parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
-		K8sMode:              parseString("RUNNER_K8S_MODE", ""),
-		K8sCluster:           parseString("RUNNER_K8S_CLUSTER", ""),
-		K8sNamespace:         parseString("RUNNER_K8S_NAMESPACE", ""),
-		K8sManifest:          parseString("RUNNER_K8S_MANIFEST", ""),
-		HelmChart:            parseString("RUNNER_HELM_CHART", ""),
-		HelmRelease:          parseString("RUNNER_HELM_RELEASE", "dib-build"),
-		HelmValuesFile:       parseString("RUNNER_HELM_VALUES_FILE", ""),
-		HelmSetValues:        parseString("RUNNER_HELM_SET_VALUES", ""),
-		K8sNamespacePerBuild: parseBool("RUNNER_K8S_NAMESPACE_PER_BUILD", false),
+		PollInterval:          parseDuration("RUNNER_POLL_INTERVAL", 5*time.Second),
+		HostServerBaseURL:     parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
+		RunnerID:              parseString("RUNNER_ID", "runner-default"),
+		RegistryConfigDir:     parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
+		K8sMode:               parseString("RUNNER_K8S_MODE", ""),
+		K8sCluster:            parseString("RUNNER_K8S_CLUSTER", ""),
+		K8sNamespace:          parseString("RUNNER_K8S_NAMESPACE", ""),
+		K8sManifest:           parseString("RUNNER_K8S_MANIFEST", ""),
+		HelmChart:             parseString("RUNNER_HELM_CHART", ""),
+		HelmRelease:           parseString("RUNNER_HELM_RELEASE", "dib-build"),
+		HelmValuesFile:        parseString("RUNNER_HELM_VALUES_FILE", ""),
+		HelmSetValues:         parseString("RUNNER_HELM_SET_VALUES", ""),
+		ArgoCDNamespace:       parseString("RUNNER_ARGOCD_NAMESPACE", "argocd"),
+		ArgoCDProject:         parseString("RUNNER_ARGOCD_PROJECT", "default"),
+		ArgoCDRepoURL:         parseString("RUNNER_ARGOCD_REPO_URL", ""),
+		ArgoCDPath:            parseString("RUNNER_ARGOCD_PATH", ""),
+		ArgoCDTargetRevision:  parseString("RUNNER_ARGOCD_TARGET_REVISION", "HEAD"),
+		ArgoCDDestinationHost: parseString("RUNNER_ARGOCD_DESTINATION_HOST", "https://kubernetes.default.svc"),
+		K8sNamespacePerBuild:  parseBool("RUNNER_K8S_NAMESPACE_PER_BUILD", false),
 	}
 }
 

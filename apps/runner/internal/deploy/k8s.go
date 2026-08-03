@@ -74,6 +74,14 @@ type K8sDeployOptions struct {
 	HelmRelease    string
 	HelmValuesFile string
 	HelmSetValues  []string
+	// ArgoCD adapter 입력. Application CR은 이 Git source를 sync하고
+	// 표준 image/hosting values를 Helm parameter로 전달한다.
+	ArgoCDNamespace       string
+	ArgoCDProject         string
+	ArgoCDRepoURL         string
+	ArgoCDPath            string
+	ArgoCDTargetRevision  string
+	ArgoCDDestinationHost string
 }
 
 // K8sApplyOptions 는 Apply 의 입력 (manifest 만 별도 호출하는 경우).
@@ -132,6 +140,8 @@ func NewK8sDeployer(mode string, opts K8sDeployOptions) (K8sDeployer, error) {
 		return newKubectlDeployer(opts), nil
 	case "helm":
 		return newHelmDeployer(opts), nil
+	case "argocd":
+		return newArgoCDDeployer(opts), nil
 	default:
 		return nil, fmt.Errorf("deploy: unsupported k8s mode %q", mode)
 	}

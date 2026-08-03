@@ -134,3 +134,16 @@ func TestLoadHelmSettings(t *testing.T) {
 		t.Fatalf("unexpected Helm config: %+v", cfg)
 	}
 }
+
+func TestLoadArgoCDSettings(t *testing.T) {
+	t.Setenv("RUNNER_ARGOCD_NAMESPACE", "argocd-system")
+	t.Setenv("RUNNER_ARGOCD_PROJECT", "platform")
+	t.Setenv("RUNNER_ARGOCD_REPO_URL", "https://git.example/app.git")
+	t.Setenv("RUNNER_ARGOCD_PATH", "charts/app")
+	t.Setenv("RUNNER_ARGOCD_TARGET_REVISION", "main")
+	t.Setenv("RUNNER_ARGOCD_DESTINATION_HOST", "https://kubernetes.default.svc")
+	cfg := Load()
+	if cfg.ArgoCDNamespace != "argocd-system" || cfg.ArgoCDProject != "platform" || cfg.ArgoCDRepoURL != "https://git.example/app.git" || cfg.ArgoCDPath != "charts/app" || cfg.ArgoCDTargetRevision != "main" || cfg.ArgoCDDestinationHost != "https://kubernetes.default.svc" {
+		t.Fatalf("unexpected ArgoCD config: %+v", cfg)
+	}
+}

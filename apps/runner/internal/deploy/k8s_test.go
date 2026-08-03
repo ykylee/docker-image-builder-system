@@ -15,6 +15,7 @@ func TestNewK8sDeployer_Modes(t *testing.T) {
 		{"noop", "noop", false},
 		{"skeleton", "skeleton", false},
 		{"k8s-real-kubectl", "k8s", false},
+		{"argocd", "argocd", false},
 		{"unsupported-empty", "", true},
 		{"unsupported-rubbish", "garbage", true},
 	}

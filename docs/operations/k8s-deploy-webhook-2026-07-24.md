@@ -23,7 +23,7 @@
 
 | env | 의미 | 기본값 |
 |---|---|---|
-| `RUNNER_K8S_MODE` | `k8s`=kubectl 실배포 / `noop`·`skeleton`=noop / `""`=비활성 | `""` |
+| `RUNNER_K8S_MODE` | `k8s`=kubectl 실배포 / `helm`=Helm chart / `argocd`=ArgoCD Application / `noop`·`skeleton`=noop / `""`=비활성 | `""` |
 | `RUNNER_K8S_CLUSTER` | kubeconfig context (예: `kind-dib`) | `""`(현재 context) |
 | `RUNNER_K8S_NAMESPACE` | 배포 namespace | `dib-builds` |
 | `RUNNER_K8S_MANIFEST` | (Apply 경로용) manifest 파일 | `""` |
@@ -274,5 +274,59 @@ bash apps/runner/scripts/e2e-helm-deploy.sh
 ```
 
 kind e2e는 실제 chart install 후 Deployment 1/1, Service, Ingress, `helm status`
-및 release uninstall을 확인한다. ArgoCD Application 생성/동기화는 아직 구현하지
-않았으며 별도 작업으로 남긴다.
+및 release uninstall을 확인한다. ArgoCD 연동은 아래 §8에서 별도 adapter로
+다룬다.
+
+## 8. ArgoCD adapter (GitOps 배포)
+
+`RUNNER_K8S_MODE=argocd`를 사용하면 runner가 ArgoCD `Application` CR을
+`kubectl apply`로 생성하고, ArgoCD가 `Synced` 및 `Healthy` 상태가 될 때까지
+기다린다. runner에는 `argocd` CLI가 필요하지 않으며, 기존 kubeconfig와
+`kubectl` 실행 환경을 사용한다.
+
+### 8.1 설정
+
+| env | 의미 | 기본값 |
+|---|---|---|
+| `RUNNER_ARGOCD_NAMESPACE` | Application CR namespace | `argocd` |
+| `RUNNER_ARGOCD_PROJECT` | ArgoCD project | `default` |
+| `RUNNER_ARGOCD_REPO_URL` | Git repository URL | 없음(필수) |
+| `RUNNER_ARGOCD_PATH` | repository 내부 chart path | 없음(필수) |
+| `RUNNER_ARGOCD_TARGET_REVISION` | Git revision/tag/branch | `HEAD` |
+| `RUNNER_ARGOCD_DESTINATION_HOST` | Application destination cluster | `https://kubernetes.default.svc` |
+| `RUNNER_ARGOCD_TIMEOUT_SECONDS` | apply/sync/health 대기 제한 | `120` |
+
+Git source가 Helm chart라면 chart는 Helm adapter와 동일한 values contract를
+사용해야 한다. runner는 다음 값을 Application의 `spec.source.helm.parameters`
+로 전달한다.
+
+`image.repository`, `image.tag`, `service.port`, `hosting.contextPath`,
+`hosting.basePath`, `hosting.stripPrefix`, `hosting.scheme`, `hosting.baseHost`,
+`build.id`
+
+### 8.2 lifecycle과 한계
+
+- Application 이름은 build ID에서 파생한 DNS-1123 이름이다.
+- 자동 sync, prune, self-heal을 활성화하고 resources finalizer를 설정한다.
+- cleanup은 같은 Application을 foreground cascade로 삭제한다.
+- `RUNNER_ARGOCD_REPO_URL`과 `RUNNER_ARGOCD_PATH`가 없으면 배포를 시작하지
+  않고 명확한 설정 오류를 반환한다.
+- 현재는 Application CR 생성/상태 대기 adapter다. ArgoCD 설치, repository
+  credential, project 정책, ingress controller는 클러스터 운영자가 준비해야 한다.
+
+### 8.3 검증
+
+기본 회귀 검증:
+
+```bash
+cd apps/runner
+go test ./...
+go vet ./...
+```
+
+실 클러스터 검증은 ArgoCD가 설치된 kind 또는 운영 클러스터에서 다음을
+추가로 확인한다.
+
+1. Application이 `argocd` namespace에 생성되는지
+2. `Synced`와 `Healthy` 대기 후 hosted Deployment/Service/Ingress가 생성되는지
+3. cleanup 시 Application과 managed resources가 함께 제거되는지

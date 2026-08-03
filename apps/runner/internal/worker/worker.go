@@ -57,13 +57,19 @@ func newWorkerWithDeps(cfg config.Config, client hostclient.BuildControlClient) 
 	// (배포 자체가 optional 이라 runner 부팅을 막지 않는다).
 	if cfg.K8sMode != "" {
 		k8sDeployer, err := deploy.NewK8sDeployer(cfg.K8sMode, deploy.K8sDeployOptions{
-			Cluster:        cfg.K8sCluster,
-			Namespace:      cfg.K8sNamespace,
-			Manifest:       cfg.K8sManifest,
-			HelmChart:      cfg.HelmChart,
-			HelmRelease:    cfg.HelmRelease,
-			HelmValuesFile: cfg.HelmValuesFile,
-			HelmSetValues:  splitHelmSetValues(cfg.HelmSetValues),
+			Cluster:               cfg.K8sCluster,
+			Namespace:             cfg.K8sNamespace,
+			Manifest:              cfg.K8sManifest,
+			HelmChart:             cfg.HelmChart,
+			HelmRelease:           cfg.HelmRelease,
+			HelmValuesFile:        cfg.HelmValuesFile,
+			HelmSetValues:         splitHelmSetValues(cfg.HelmSetValues),
+			ArgoCDNamespace:       cfg.ArgoCDNamespace,
+			ArgoCDProject:         cfg.ArgoCDProject,
+			ArgoCDRepoURL:         cfg.ArgoCDRepoURL,
+			ArgoCDPath:            cfg.ArgoCDPath,
+			ArgoCDTargetRevision:  cfg.ArgoCDTargetRevision,
+			ArgoCDDestinationHost: cfg.ArgoCDDestinationHost,
 		})
 		if err != nil {
 			log.Printf("runner %s: k8s adapter 비활성 (mode=%q): %v", cfg.RunnerID, cfg.K8sMode, err)
