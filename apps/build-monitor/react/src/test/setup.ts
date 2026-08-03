@@ -36,16 +36,29 @@ const storageFallback = (): Storage => {
   } as Storage;
 };
 
+const isUsableStorage = (value: unknown): value is Storage => {
+  if (!value || typeof value !== "object") return false;
+  const storage = value as Partial<Storage>;
+  return (
+    typeof storage.getItem === "function" &&
+    typeof storage.setItem === "function" &&
+    typeof storage.removeItem === "function" &&
+    typeof storage.clear === "function" &&
+    typeof storage.key === "function" &&
+    typeof storage.length === "number"
+  );
+};
+
 // jsdom 의 localStorage 가 부재하거나 깨졌을 때 안전망으로 강제 정의.
 if (typeof globalThis !== "undefined" && typeof window !== "undefined") {
-  if (!window.localStorage) {
+  if (!isUsableStorage(window.localStorage)) {
     Object.defineProperty(window, "localStorage", {
       value: storageFallback(),
       configurable: true,
       writable: true
     });
   }
-  if (!window.sessionStorage) {
+  if (!isUsableStorage(window.sessionStorage)) {
     Object.defineProperty(window, "sessionStorage", {
       value: storageFallback(),
       configurable: true,
@@ -69,6 +82,11 @@ if (typeof globalThis !== "undefined" && typeof window !== "undefined") {
       writable: true
     });
   }
+  Object.defineProperty(window, "scrollTo", {
+    value: vi.fn(),
+    configurable: true,
+    writable: true
+  });
 }
 
 // ── HTMLDialogElement 폴리필 (TASK-137, Astryx Dialog 이관) ──────────────
