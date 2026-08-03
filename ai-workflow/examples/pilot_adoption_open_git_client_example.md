@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # open_git_client 파일럿 적용 기록 예시
 

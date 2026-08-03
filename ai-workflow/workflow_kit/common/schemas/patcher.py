@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Pydantic models for robust-patcher skill (v0.11.21 stable 승격)."""
 

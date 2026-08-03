@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # 작업 백로그 인덱스
 

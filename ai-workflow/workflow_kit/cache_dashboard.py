@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.cache_dashboard - per-strategy cache dashboard (consolidated v0.7.52).
 

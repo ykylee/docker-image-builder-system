@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Extension Baseline Compliance Evaluator (v0.7.1+ / v0.7.3+).
 
@@ -35,11 +35,13 @@ from __future__ import annotations
 
 import importlib
 import re
+import tempfile
 import time
 import tracemalloc
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Literal, cast
+from workflow_kit.common.paths import state_path_for_workspace
 
 # Type alias
 Status = Literal["compliant", "non_compliant", "not_applicable", "advisory"]
@@ -87,7 +89,7 @@ class ComplianceSummary:
 
 def _read_state_json(project_root: Path) -> dict[str, Any]:
     """state.json 읽기 (없으면 빈 dict)."""
-    state_path = project_root / "ai-workflow" / "memory" / "active" / "state.json"
+    state_path = state_path_for_workspace(project_root)
     if not state_path.exists():
         return {}
     try:
@@ -325,7 +327,7 @@ def _eval_testing_baseline(project_root: Path, *, state: dict[str, Any] | None =
 
     # TST-WF-02: Round-Trip Properties for State Serialization
     # 검증: state.json round-trip helper 또는 test 존재
-    state_path = project_root / "ai-workflow" / "memory" / "active" / "state.json"
+    state_path = state_path_for_workspace(project_root)
     round_trip_ok = False
     if state_path.exists():
         # state.json + parse + serialize round-trip
@@ -414,17 +416,36 @@ def _eval_performance_baseline(project_root: Path, *, state: dict[str, Any] | No
     tests_dir = project_root / "workflow-source" / "tests"
 
     # PERF-WF-01: Smoke Test Execution Time (≤ 30초 per file)
+    #
+    # ⚠️ 본 rule 은 *실제 smoke 를 실행* 한다. 그런데 smoke 중에는 `workflow doctor` 를
+    # 호출하는 것이 있고(예: check_v0_7_4_followup.py), doctor 는 다시 본 rule 을 평가한다.
+    # `glob()` 은 정렬을 보장하지 않으므로 `[:3]` 표본에 *자기 자신* 이 들어갈 수 있고,
+    # 그 순간 doctor → smoke → doctor → smoke … 의 **무한 재귀 fork bomb** 이 된다
+    # (실측: python3 프로세스 수백 개, PPID 가 서로 같은 스크립트, OOM 으로 세션 kill).
+    # → 환경변수로 재귀 depth 를 1 로 제한하고, 표본은 정렬해 재현 가능하게 만든다.
     slow_tests = []
+    import os
+    import subprocess
+    if os.environ.get("WORKFLOW_KIT_PERF_PROBE") == "1":
+        results.append(RuleResult(
+            rule_id="PERF-WF-01",
+            title="Smoke Test Execution Time",
+            status="not_applicable",
+            notes="재귀 방지 — 이미 perf probe 안에서 실행 중",
+        ))
+        tests_dir = Path("/nonexistent")  # 아래 루프 skip
     if tests_dir.exists():
-        for tf in list(tests_dir.glob("check_*.py"))[:3]:  # 3개만 sample
+        probe_env = {**os.environ, "WORKFLOW_KIT_PERF_PROBE": "1"}
+        for tf in sorted(tests_dir.glob("check_*.py"))[:3]:  # 정렬 표본 3개
             start = time.time()
             try:
-                import subprocess
                 subprocess.run(
                     ["python3", str(tf)],
                     cwd=str(project_root),
                     capture_output=True,
                     timeout=30,
+                    env=probe_env,
+                    start_new_session=True,
                 )
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 pass
@@ -501,17 +522,27 @@ def _eval_performance_baseline(project_root: Path, *, state: dict[str, Any] | No
         results.append(RuleResult("PERF-WF-04", "Audit Log Append Latency", "not_applicable"))
 
     # PERF-WF-05: state.json Read/Write Latency (≤ 5ms)
-    state_path = project_root / "ai-workflow" / "memory" / "active" / "state.json"
+    state_path = state_path_for_workspace(project_root)
     if state_path.exists():
         rw_latencies = []
-        for _ in range(50):
-            start = time.time()
-            try:
-                data = state_path.read_text(encoding="utf-8")
-                state_path.write_text(data, encoding="utf-8")
-            except OSError:
-                pass
-            rw_latencies.append((time.time() - start) * 1000)
+        # v1.0.0 fix: 이전 구현은 *실제* state.json 을 50회 read/write 했다. `write_text` 는
+        # truncate 후 쓰기이므로 루프 도중 프로세스가 kill 되면 사용자의 작업 기억이
+        # **0바이트로 소실**된다 (실제로 반복 발생). 벤치마크는 동일 크기의 사본을
+        # temp 에서 수행하고 원본은 읽기만 한다.
+        try:
+            payload = state_path.read_text(encoding="utf-8")
+        except OSError:
+            payload = ""
+        with tempfile.TemporaryDirectory() as _bench_dir:
+            bench_path = Path(_bench_dir) / "state.json"
+            for _ in range(50):
+                start = time.time()
+                try:
+                    bench_path.write_text(payload, encoding="utf-8")
+                    bench_path.read_text(encoding="utf-8")
+                except OSError:
+                    pass
+                rw_latencies.append((time.time() - start) * 1000)
         avg_rw = sum(rw_latencies) / len(rw_latencies) if rw_latencies else 0
         results.append(RuleResult(
             rule_id="PERF-WF-05",

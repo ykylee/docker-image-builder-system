@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Session-Start Skill
 
@@ -85,9 +85,11 @@ python3 skills/session-start/scripts/run_session_start.py \
   --memory-query-tokens "adr,memora,retrieval"
 ```
 
-`--memory-index-dir` 와 `--memory-query-tokens` *둘 다* 지정해야 retrieval 활성.
-둘 중 하나만 지정 시 advisory emit + `memory_index_query_output=None`. 둘 다 부재 시
-zero-risk skip (default).
+v0.15.21+ 부터 두 flag 는 **override** 다. flag 부재 시에도 workspace 표준
+`ai-workflow/memory/active/memory_index` dir 이 존재하면 retrieval 이 **자동 활성**
+(default query token `session,handoff,workflow`) 되어 telemetry source `session-start`
+가 emit 된다 (Phase 13 AC2 source 다양성 ≥ 4 수렴). memory_index dir 이 없으면
+zero-risk skip (기존 caller 정합). flag 를 명시하면 dir/token override.
 
 ### Output 추가 field
 

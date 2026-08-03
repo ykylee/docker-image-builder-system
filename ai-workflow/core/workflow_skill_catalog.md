@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Workflow Skill Catalog
 
@@ -6,7 +6,7 @@
 - 범위: skill 후보, 역할, 입력 문서, 기대 출력, 도입 우선순위
 - 대상 독자: AI agent 설계자, 개발자, 운영자
 - 상태: draft
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `workflow_agent_topology.md`, `workflow_mcp_candidate_catalog.md`, `../templates/project_workflow_profile_template.md`, `./orchestrator_subagent_contract_v1.md`
 
 ## 1. 핵심 도입 skill (v0.5.10-beta 기준, 11종)
@@ -14,7 +14,6 @@
 | skill | 역할 | 주요 입력 | 기대 출력 | 구현 상태 | 수동 대체 |
 | --- | --- | --- | --- | --- | --- |
 | `session-start` | 세션 시작 기준선 복원 | handoff, 백로그, 프로젝트 프로파일 | 현재 상태 요약, 다음 문서 경로 | **Stable** (v0.11.19 stable 승격) | `global_workflow_standard.md` 의 세션 시작 순서를 수동 수행 |
-| `session-end` | 세션 종료 시 workflow meta drift 검출 (가드 9종, v0.8.16 확장) | workspace_root, state.json | 가드 9종 결과(G1~G9) + drift_items + next_actions + stage_completion | **Stable** (v0.15.19-beta 도입 → v0.8.16 5종→9종 확장) | `git describe --tags` vs `state.current_baseline` 등 9가지를 수동 대조 |
 | `backlog-update` | 작업 등록/갱신 | 오늘 날짜 백로그, 작업 브리핑 | 신규 작업 항목 초안, 상태 갱신 문안 | **Stable** (v0.11.20 stable 승격) | 백로그 템플릿을 복사해 수동 갱신 |
 | `doc-sync` | 문서 영향도와 허브 갱신 판단 | 변경 파일, 기준 문서, 허브 문서 | 영향 문서 후보, 허브 갱신 체크 | **Stable** (v0.11.19 stable 승격) | 변경 파일을 기준으로 관련 허브 문서를 수동 확인 |
 | `merge-doc-reconcile` | 병합 후 문서 정합성 복구 | 병합 결과, handoff, 인덱스 문서 | 병합 후 재확정 포인트 | **Stable** (v0.11.20 stable 승격) | 병합 후 handoff, 허브, 색인 문서를 수동 재정리 |
@@ -39,7 +38,6 @@
 ## 3. 최소 입력 계약
 
 - `session-start`: 현재 프로젝트의 handoff 문서, 백로그 인덱스, 프로젝트 프로파일 경로
-- `session-end`: workspace_root, state.json 경로 (선택: apply 모드 + approval_actor) — v0.8.16 부터 5종→9종 가드 (G6~G9 추가: current_baseline ↔ CHANGELOG latest / HEAD commit subject 정합 / session_handoff 첫 줄 Updated: 헤더 / state.json semantic 검증)
 - `backlog-update`: 오늘 날짜 백로그 경로 또는 생성 대상 날짜, 작업명, 작업 브리핑
 - `doc-sync`: 변경 파일 목록, 기준 문서 후보, 허브 문서 후보
 - `merge-doc-reconcile`: 병합 후 상태 문서와 허브 문서 경로

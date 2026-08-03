@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # 파일럿 후보 선정 체크리스트
 

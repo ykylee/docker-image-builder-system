@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 #!/usr/bin/env python3
 """Prototype runner for the backlog-update skill."""
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import datetime as dt
 import re
 import sys
 from datetime import date, datetime
@@ -22,12 +23,29 @@ from workflow_kit import __version__ as TOOL_VERSION
 from workflow_kit.common.errors import build_error_result
 from workflow_kit.common.contracts.stage_gate_runtime import build_stage_completion, merge_into_result
 from workflow_kit.common.normalize import normalize_backticked
-from workflow_kit.common.paths import resolve_existing_path, workflow_memory_dir, workflow_branch_dir
+from workflow_kit.common.paths import (
+    memory_active_dir,
+
+    workflow_state_path,
+    get_current_branch,
+    resolve_existing_path,
+    workflow_branch_dir,
+    workflow_memory_dir,
+)
 from workflow_kit.common.planning import determine_conservative_task_status
-from workflow_kit.common.project_docs import parse_backlog_task_entries, parse_project_profile_backlog
+from workflow_kit.common.project_docs import (
+    TASK_ID_CAPTURE_RE,
+    parse_backlog_task_entries,
+    parse_project_profile_backlog,
+)
 from workflow_kit.common.purpose_context import build_purpose_context, check_scope_creep
 from workflow_kit.common.workflow_state import build_state_cache_refresh_hint, refresh_workflow_state_cache
-from workflow_kit.common.workflow_writes import ensure_backlog_index_entry, sync_handoff_status, upsert_backlog_entry
+from workflow_kit.common.workflow_writes import (
+    ensure_backlog_index_entry,
+    render_task_file,
+    sync_handoff_status,
+    upsert_backlog_entry,
+)
 
 
 def infer_backlog_path(project_profile_path: Path, target_date: str) -> Path:
@@ -35,13 +53,49 @@ def infer_backlog_path(project_profile_path: Path, target_date: str) -> Path:
     return (branch_dir / "backlog" / f"{target_date}.md").resolve()
 
 
-def suggest_next_task_id(tasks: list[dict[str, Any]]) -> str:
+# task ID 문법은 project_docs 가 단일 출처 — 여기서 사본을 들면 갈라진다.
+TASK_ID_RE = TASK_ID_CAPTURE_RE
+
+
+def branch_slug(branch: str | None = None) -> str:
+    """브랜치명을 파일명에 안전한 slug 로 정규화 (`feature/x` → `feature-x`)."""
+    raw = branch or get_current_branch()
+    slug = re.sub(r"[^0-9A-Za-z._-]+", "-", raw.replace("/", "-")).strip("-")
+    return slug or "main"
+
+
+def suggest_next_task_id(
+    tasks: list[dict[str, Any]],
+    *,
+    target_date: str | None = None,
+    branch: str | None = None,
+) -> str:
+    """`TASK-<date>-<slug>-<NNN>` 형식의 다음 task ID.
+
+    **왜 slug 를 넣나**: 순번을 *브랜치 안에서만* 매기면 두 브랜치가 같은 날 동시에
+    작업해도 ID 가 겹치지 않는다. 아카이브로 합쳐진 뒤에도 전역 유일하므로 과거 이력
+    조회가 안전하다.
+
+    **버그 수정**: 이전 구현은 `TASK-(\\d+)` 로 매칭해 `TASK-2026-07-20-001` 에서 연도
+    `2026` 을 순번으로 오인, 다음 ID 가 `TASK-2027` 이 됐다. 이제 날짜/slug/순번을
+    분리해 파싱하고, **같은 날짜 + 같은 브랜치** 인 것만 순번 비교 대상으로 삼는다.
+    """
+    date = target_date or dt.date.today().isoformat()
+    slug = branch_slug(branch)
     max_num = 0
     for task in tasks:
-        match = re.match(r"TASK-(\d+)", task["task_id"])
-        if match:
-            max_num = max(max_num, int(match.group(1)))
-    return f"TASK-{max_num + 1:03d}"
+        raw = str(task.get("task_id") or "")
+        match = TASK_ID_RE.match(raw)
+        if not match:
+            continue
+        task_date, task_slug, num = match.group(1), match.group(2), match.group(3)
+        # 날짜가 있으면 같은 날만, slug 가 있으면 같은 브랜치만 비교 대상.
+        if task_date and task_date != date:
+            continue
+        if task_slug and task_slug != slug:
+            continue
+        max_num = max(max_num, int(num))
+    return f"TASK-{date}-{slug}-{max_num + 1:03d}"
 
 
 def build_draft_entry(
@@ -62,45 +116,68 @@ def build_draft_entry(
     next_step: str | None,
     risks: str | None,
     follow_up: str | None,
+    validation_result: str | None = None,
+    kind: str = "generic",
+    source_anchor: str | None = None,
+    source_path: str | None = None,
 ) -> list[str]:
-    lines = [
-        f"## {task_id} {task_name}",
+    """per-task SSOT 파일 본문 (v0.14.0+ append-only layout).
+
+    v1.0.1 이전에는 legacy 인라인 항목(`## TASK-… ` + `- 상태:` 나열)을 만들어 daily
+    index 에 통째로 넣었다. 현행 layout 은 index=link 모음 / 본문=`tasks/TASK-….md`
+    이므로, 여기서 만드는 것은 **task 파일 자체**다.
+
+    `- 상태:` 라인은 frontmatter 와 중복이지만 남긴다 — `BacklogParser` 가 task 본문을
+    읽어 상태를 뽑을 때 쓰는 라인이고, 이걸 빼면 update 모드가 상태를 못 읽는다.
+    """
+    detail: list[str] = [
+        "## 📝 Description",
         "",
         f"- 상태: {status}",
         f"- 우선순위: {priority}",
         f"- 요청일: {request_date}",
-        "- 완료일:",
-        "- 담당:",
-        f"- {owner}" if owner else "- ",
-        "- 호스트명:",
-        f"- {host_name}" if host_name else "- ",
-        "- 호스트 IP:",
-        f"- {host_ip}" if host_ip else "- ",
+        f"- 담당: {owner}" if owner else "- 담당:",
+        f"- 호스트명: {host_name}" if host_name else "- 호스트명:",
+        f"- 호스트 IP: {host_ip}" if host_ip else "- 호스트 IP:",
         "- 영향 문서:",
     ]
     if affected_documents:
-        lines.extend([f"- `{doc}`" for doc in affected_documents])
+        detail.extend([f"  - `{doc}`" for doc in affected_documents])
     else:
-        lines.append("- ")
-    lines.extend(
+        detail.append("  - ")
+    detail.extend(
         [
-            "- 작업 내용:",
-            f"- {task_summary}" if task_summary else "- ",
-            "- 진행 현황:",
-            f"- {progress_note}" if progress_note else "- ",
-            "- 완료 기준:",
-            f"- {done_criteria}" if done_criteria else "- ",
-            "- 작업 결과:",
-            f"- {result_note}" if result_note else "- ",
-            "- 다음 세션 시작 포인트:",
-            f"- {next_step}" if next_step else "- ",
-            "- 남은 리스크:",
-            f"- {risks}" if risks else "- ",
-            "- 후속 작업:",
-            f"- {follow_up}" if follow_up else "- ",
+            "",
+            f"- 작업 내용: {task_summary}" if task_summary else "- 작업 내용:",
+            f"- 완료 기준: {done_criteria}" if done_criteria else "- 완료 기준:",
+            "",
+            "## 🛠️ Implementation / Content",
+            "",
+            f"- 진행 현황: {progress_note}" if progress_note else "- 진행 현황:",
+            f"- 다음 세션 시작 포인트: {next_step}" if next_step else "- 다음 세션 시작 포인트:",
+            f"- 남은 리스크: {risks}" if risks else "- 남은 리스크:",
+            "",
+            "## ✅ Outcome",
+            "",
+            f"- 작업 결과: {result_note}" if result_note else "- 작업 결과:",
         ]
     )
-    return lines
+    # v1.0.2: `--validation-result` 를 산출물에 싣는다. 이전에는 이 값이 *result_note 가
+    # 비어 있을 때만* 그 자리를 대신했고, 둘 다 주면 **검증 결과가 조용히 버려졌다** —
+    # `done` 판정의 근거가 되는 값인데 정작 task SSOT 어디에도 남지 않았다.
+    if validation_result and validation_result != result_note:
+        detail.append(f"- 검증 결과: {validation_result}")
+    detail.append(f"- 후속 작업: {follow_up}" if follow_up else "- 후속 작업:")
+    return render_task_file(
+        task_id=task_id,
+        title=task_name,
+        status=status,
+        created_at=request_date,
+        kind=kind,
+        source_anchor=source_anchor or f"{kind}-{task_id.lower()}",
+        source_path=source_path or f"backlog/{request_date}.md",
+        body_lines=detail,
+    )
 
 
 def detect_confirmation_fields(data: dict[str, Any]) -> list[str]:
@@ -132,6 +209,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-date")
     parser.add_argument("--task-id")
     parser.add_argument("--mode", choices=["create", "update", "auto"], default="auto")
+    parser.add_argument("--kind", choices=["release", "session", "generic"], default="generic",
+                        help="task SSOT frontmatter 의 kind (daily index 의 [kind] marker).")
     parser.add_argument("--status")
     parser.add_argument("--priority", default="high")
     parser.add_argument("--owner")
@@ -163,20 +242,24 @@ def _build_memory_index_query_output(
 ) -> dict[str, Any] | None:
     """v0.11.22+ Phase 3d: optional ADR-005 memory_index retrieval 3-tuple 호출 (session-start / doc-sync 동일 패턴).
 
-    - 둘 다 미지정 → None (zero-risk skip).
-    - 한쪽만 지정 → advisory emit + None.
-    - 둘 다 지정 → helper 호출, `MemoryIndexQueryOutput` dict 변환 후 emit.
+    - flag 부재 + workspace memory_index dir 부재 → None (zero-risk skip).
+    - flag 부재 + workspace memory_index dir 존재 → 자동 활성 (v0.15.21+ AC2), default query token 사용.
+    - flag 명시 → override (외부 dir 지정 시 negative telemetry emit).
     - v0.13.1+ Phase 13 AC2: retrieval 성공/실패 후 telemetry sidecar 에 1 event append.
     """
-    if not args.memory_index_dir and not args.memory_query_tokens:
-        return None
-    if not args.memory_index_dir or not args.memory_query_tokens:
-        warnings.append(
-            "memory_index wiring: --memory-index-dir 와 --memory-query-tokens 둘 다 지정해야 retrieval 활성."
-        )
-        return None
-    memory_index_dir = Path(args.memory_index_dir)
-    query_tokens = [t.strip() for t in args.memory_query_tokens.split(",") if t.strip()]
+    # v0.15.21+ AC2 (telemetry source 다양성 ≥ 4): opt-in flag 부재 시에도
+    # workspace 표준 memory_index dir 이 존재하면 retrieval 자동 활성 (flag 는 override 유지).
+    # dir 부재 시 zero-risk skip — memory_index 없는 기존 caller 정합.
+    effective_dir = args.memory_index_dir
+    if not effective_dir:
+        _default_dir = memory_active_dir(workspace_root) / "memory_index"
+        if _default_dir.is_dir():
+            effective_dir = str(_default_dir)
+    if not effective_dir:
+        return None  # zero-risk default (memory_index 부재)
+    effective_tokens = args.memory_query_tokens or "backlog,task,workflow"
+    memory_index_dir = Path(effective_dir)
+    query_tokens = [t.strip() for t in effective_tokens.split(",") if t.strip()]
     if not query_tokens:
         warnings.append(
             "memory_index wiring: --memory-query-tokens 가 비어있음. retrieval skip."
@@ -327,7 +410,12 @@ def main() -> int:
 
         requested_mode = args.mode
         if requested_mode == "auto":
-            requested_mode = "update" if args.task_id else "create"
+            # v1.0.2 정정 — 이전에는 `--task-id` 가 있으면 **무조건 update** 였다.
+            # 그래서 아직 없는 ID 로 새 작업을 등록하려 하면 `cannot_determine` 이 되어
+            # 아무것도 쓰지 않은 채 `status: ok` 를 냈다. auto 의 뜻은 "있으면 갱신,
+            # 없으면 생성" 이다 — 존재 여부를 실제로 보고 정한다.
+            known_ids = {t["task_id"] for t in existing_tasks}
+            requested_mode = "update" if (args.task_id and args.task_id in known_ids) else "create"
 
         operation_type = "create_entry"
         if not daily_backlog_path.exists():
@@ -349,7 +437,8 @@ def main() -> int:
                     operation_type = "cannot_determine"
                     warnings.append(f"`{args.task_id}` 항목을 대상 backlog 에서 찾지 못했다.")
 
-        task_id = args.task_id or suggest_next_task_id(existing_tasks)
+        task_id = args.task_id or suggest_next_task_id(
+            existing_tasks, target_date=getattr(args, 'target_date', None))
         status, status_warnings = determine_conservative_task_status(args.status, args.validation_result, operation_type)
         warnings.extend(status_warnings)
 
@@ -392,6 +481,8 @@ def main() -> int:
             next_step=args.next_step,
             risks=args.risks,
             follow_up=args.follow_up,
+            validation_result=args.validation_result,
+            kind=args.kind,
         )
 
         if operation_type == "create_daily_backlog":
@@ -403,7 +494,7 @@ def main() -> int:
         from workflow_kit.common.schemas import BacklogUpdateOutput, BacklogUpdatePurposeContext
 
         workspace_root = project_workspace_root(project_profile_path)
-        state_json_path = workflow_memory_dir(project_profile_path) / "state.json"
+        state_json_path = workflow_state_path(project_profile_path)
         purpose_context_data = build_purpose_context(
             workspace_root=workspace_root,
             state_path=state_json_path,
@@ -484,12 +575,22 @@ def main() -> int:
                     backlog_path=daily_backlog_path,
                     task_id=task_id,
                     entry_lines=draft_entry,
+                    title=args.task_name,
+                    kind=args.kind,
+                    status=status,
                 )
                 apply_result["written_paths"].append(str(daily_backlog_path))
+                # v1.0.2: `upsert_backlog_entry` 는 daily index 와 **task SSOT 두 파일**을
+                # 쓴다. 보고에는 index 만 실려 있어서, 호출자가 무엇이 쓰였는지 알 수
+                # 없었다 (실측: 4개를 쓰고 2개만 보고). 쓴 것은 전부 보고한다.
+                task_ssot_path = daily_backlog_path.parent / "tasks" / f"{task_id}.md"
+                apply_result["written_paths"].append(str(task_ssot_path))
                 if backlog_action == "created":
                     apply_result["created_paths"].append(str(daily_backlog_path))
+                    apply_result["created_paths"].append(str(task_ssot_path))
                 else:
                     apply_result["updated_paths"].append(str(daily_backlog_path))
+                    apply_result["updated_paths"].append(str(task_ssot_path))
             except OSError as exc:
                 result = build_error_result(
                     tool_version=TOOL_VERSION,
@@ -532,13 +633,30 @@ def main() -> int:
 
             apply_result["status"] = "applied"
 
-        state_cache_refresh = refresh_workflow_state_cache(
-            project_profile_path=project_profile_path,
-            session_handoff_path=session_handoff_path if session_handoff_path.exists() else None,
-            work_backlog_index_path=work_backlog_index_path if work_backlog_index_path.exists() else None,
-            latest_backlog_path=daily_backlog_path if daily_backlog_path.exists() else None,
-            generated_at=date.today().isoformat(),
-        )
+        # v1.0.1 fix: state cache 재생성은 **write** 다. `--apply` 없이 부르면 초안만
+        # 달라는 호출이 저장소에 파일을 만든다 (skill 의 권한 경계 §5 "초안 생성 중심"
+        # 위반이자 dry-run 오염). draft 경로에서는 hint 만 내고 쓰지 않는다.
+        if args.apply:
+            state_cache_refresh = refresh_workflow_state_cache(
+                project_profile_path=project_profile_path,
+                session_handoff_path=session_handoff_path if session_handoff_path.exists() else None,
+                work_backlog_index_path=work_backlog_index_path if work_backlog_index_path.exists() else None,
+                latest_backlog_path=daily_backlog_path if daily_backlog_path.exists() else None,
+                generated_at=date.today().isoformat(),
+            )
+            # v1.0.2: state cache 재생성도 **write** 다. 이 경로가 보고에 빠져 있어서,
+            # state.json 이 갱신된(그리고 손상될 수 있는) 사실이 호출자에게 안 보였다.
+            refreshed_state_path = state_cache_refresh.get("state_path")
+            if state_cache_refresh.get("status") == "refreshed" and refreshed_state_path:
+                apply_result["written_paths"].append(str(refreshed_state_path))
+                apply_result["updated_paths"].append(str(refreshed_state_path))
+        else:
+            state_cache_refresh = {
+                "status": "skipped",
+                "state_path": state_cache_update["state_path"],
+                "refresh_command": state_cache_update["refresh_command"],
+                "missing_paths": [],
+            }
         warnings.extend(apply_result["warnings"])
 
         from workflow_kit.common.schemas import BacklogUpdateOutput
@@ -566,8 +684,8 @@ def main() -> int:
             state_cache_update_note=(
                 f"`--apply` 반영 결과를 포함한 현재 source-of-truth 문서를 기준으로 `{state_cache_update['state_path']}` 를 자동 재생성했다."
                 if args.apply and state_cache_refresh["status"] == "refreshed"
-                else f"현재 source-of-truth 문서를 기준으로 `{state_cache_update['state_path']}` 를 자동 재생성했다."
-                if state_cache_refresh["status"] == "refreshed"
+                else f"draft 모드라 `{state_cache_update['state_path']}` 를 쓰지 않았다 — 재생성하려면 `--apply` 또는 위 refresh command."
+                if not args.apply
                 else f"source-of-truth 문서가 아직 부족해 `{state_cache_update['state_path']}` 자동 재생성을 건너뛰었다."
             ),
             state_cache_refresh_command=state_cache_update["refresh_command"],

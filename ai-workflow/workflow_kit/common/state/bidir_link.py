@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Phase 13 AC4+ self-documenting wiki ↔ memory bidirectional link helper (v0.13.3+).
 

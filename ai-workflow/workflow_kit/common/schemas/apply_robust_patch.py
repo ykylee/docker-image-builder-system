@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Pydantic schemas for apply-robust-patch MCP (v0.14.2+ 2nd batch stable).
 

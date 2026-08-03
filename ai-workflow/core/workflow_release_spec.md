@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Workflow Release Spec
 
@@ -6,7 +6,7 @@
 - 범위: dist 구조, 하네스 패키지 manifest, export 기준, 검증 포인트
 - 대상 독자: 저장소 관리자, 배포 담당자, AI workflow 설계자
 - 상태: draft
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `./workflow_harness_distribution.md`, `./prototype_promotion_scope.md`, `../scripts/export_harness_package.py`, `../harnesses/README.md`, `../../docs/RELEASE.md`
 
 ## 1. release 목표

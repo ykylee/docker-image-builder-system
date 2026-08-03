@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.v_r13_commit_diff - V-R13 layer 2 commit-level diff (v0.7.47+).
 

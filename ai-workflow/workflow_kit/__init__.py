@@ -1,3 +1,5 @@
+# standard-ai-workflow-kit: v1.0.0-beta
+
 """Reusable library modules for the standard AI workflow kit.
 
 Public API surface (v0.8.0+ stable API frozen):
@@ -140,7 +142,7 @@ def _read_pyproject_version() -> str:
         pass
 
     # 3. Loud fallback (spec section 4.3)
-    return "v0.15.20-beta"
+    return "v1.0.0-beta"
 
 
 __version__: str = _read_pyproject_version()

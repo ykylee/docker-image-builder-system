@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 from workflow_kit.common.schemas.base import BaseOutput, Status, ErrorOutput
 from workflow_kit.common.schemas.backlog import (

@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Workflow Global Injection Policy
 
@@ -6,7 +6,7 @@
 - 범위: 전역 주입 원칙, 프로젝트 설정 최소화 원칙, 충돌 가능 항목, 언어/보고 정책, 컨텍스트 절약 원칙, 하네스별 적용 메모
 - 대상 독자: 저장소 관리자, 하네스 통합 담당자, AI workflow 설계자, 운영 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `./workflow_configuration_layers.md`, `./workflow_harness_distribution.md`, `../global-snippets/README.md`, `../harnesses/codex/apply_guide.md`, `../harnesses/opencode/apply_guide.md`
 
 ## 1. 기본 원칙

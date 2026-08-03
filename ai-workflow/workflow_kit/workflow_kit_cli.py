@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.workflow_kit_cli - unified CLI dispatcher (consolidated v0.7.52,
 extended v0.7.53 with okf-export / okf-import, v0.7.54 with okf-validate /
@@ -71,6 +71,7 @@ from __future__ import annotations
 import json
 import sys
 from typing import Any, Callable, Literal, cast
+from workflow_kit.common.paths import state_path_for_workspace
 
 
 COMMANDS: dict[str, Callable[[list[str]], int]] = {}
@@ -1475,7 +1476,7 @@ def cmd_ingest_purpose(argv: list[str]) -> int:
             # 미보유. purpose_context._read_state_digest_and_rev 로 직접 advisory 비교.
             try:
                 from workflow_kit.common.purpose_context import _read_state_digest_and_rev
-                state_json_path = workspace_root / "ai-workflow" / "memory" / "active" / "state.json"
+                state_json_path = state_path_for_workspace(workspace_root)
                 prev_digest, _prev_rev = _read_state_digest_and_rev(state_json_path)
                 digest_update["previous"] = prev_digest
                 digest_update["current"] = (

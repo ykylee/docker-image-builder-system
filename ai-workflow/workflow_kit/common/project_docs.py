@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Project workflow document parsers shared across skill prototypes."""
 
@@ -17,11 +17,65 @@ from workflow_kit.common.text import (
     normalize_inline_code,
 )
 
+# task 의 진행 상태 어휘 — **여기가 단일 출처다**. CLAUDE.md / global_workflow_standard
+# 이 선언하는 네 값이고, 아래 정규식들은 전부 이걸로 조립한다. 예전에는 같은 목록이
+# `STATUS_RE` 와 `WORK_STATUS_RE` 에 각각 리터럴로 박혀 있었고, builder 는 셋 중 어느
+# 것도 참조하지 않은 채 `in_progress`/`blocked`/`done` 만 비교해서 **그 밖의 값을 조용히
+# 버렸다** (실측: `status: recorded` 3건이 아무 목록에도 안 들어간 뒤 daily index
+# fallback 에 의해 done 으로 되살아났다).
+TASK_STATUSES: tuple[str, ...] = ("planned", "in_progress", "blocked", "done")
+_STATUS_ALT = "|".join(TASK_STATUSES)
+
+# `status` 는 **진행 상태 축**이고, 여기부터는 **출처 축**이다. 둘을 한 칸에 넣으면 둘 다
+# 망가진다 — `migrate_active_to_appendonly.py` 가 어휘 밖의 `recorded` 를 status 칸에
+# 적고 있었는데, 그 값이 뜻한 것은 진행 상태가 아니라 "legacy work_backlog.md 에서
+# 이관됐고 진행 상태는 모른다" 는 출처 사실이었다. 출처는 `provenance` 로 따로 적고,
+# 진행 상태는 **판정 근거가 있을 때만** 적는다.
+TASK_PROVENANCE_MIGRATED_LEGACY = "migrated-legacy"
+
+# frontmatter 에 `status:` 줄이 아예 없을 때 `unknown_status_items` 에 붙는 표식.
+# "판정하지 않았다" 와 "어휘 밖의 값을 적었다" 는 다른 사실이라 구분해서 드러낸다.
+MISSING_STATUS_MARKER = "<미기재>"
+
+# "최근 완료" 파생물의 상한 — **여기가 단일 출처다**.
+#
+# 이 값을 아는 자리가 셋이다: 쓰는 쪽(`sync_handoff_status` 가 handoff §4 에 append),
+# 조립하는 쪽(`build_workflow_state_payload` 의 `recent_done_items`), 보는 쪽
+# (`linter` 의 `handoff_bloat`). 상한이 조립 쪽에만 있어서 **쓰는 쪽은 무한히 쌓았고**,
+# 보는 쪽은 리터럴 `10` 을 따로 들고 있었다. 그래서 close-out 마다 handoff 가 11이 되고
+# 사람이 한 줄 지우는 수작업이 반복됐다 (2026-07-28 / 2026-07-31 연속 2회 실측).
+# 상한을 아는 곳은 전부 여기를 import 한다 — 리터럴을 다시 적지 않는다.
+RECENT_DONE_ITEMS_CAP = 10
+
 # Standard Regexes
-STATUS_RE = re.compile(r"- 상태:\s*(planned|in_progress|blocked|done)\s*$")
+STATUS_RE = re.compile(rf"- 상태:\s*({_STATUS_ALT})\s*$")
 MODE_RE = re.compile(r"- 모드:\s*(Analysis|Requirements|Design|Planning|Implementation|Refactoring)\s*$")
-TASK_HEADER_RE = re.compile(r"^#{1,2}\s+(TASK-[A-Z0-9-]+)\s+(.+)$")
-WORK_STATUS_RE = re.compile(r"^-\s+((?:TASK|WF)-[A-Z0-9-]+)\s+(.+?):\s*(planned|in_progress|blocked|done)\s*$")
+
+# 정본 task ID 패턴 — `TASK-<date>[-<branch-slug>]-<NNN>` (v1.0.0 branch-scoped).
+# 브랜치 slug 는 소문자를 포함할 수 있으므로(`main`, `feature-x`) 문자집합을 대문자로
+# 제한하면 안 된다. slug 없는 legacy(`TASK-2026-07-20-001`)도 같은 패턴으로 매칭된다.
+# **여기가 단일 출처다** — builder / layout check / skill 이 각자 정규식을 들고 있으면
+# 조용히 갈라진다 (실제로 갈라져서 slug ID 가 daily index 에서 인식되지 않았다).
+TASK_ID_PATTERN = r"TASK-\d{4}-\d{2}-\d{2}(?:-[A-Za-z0-9._-]+?)?-\d{3}"
+TASK_HEADER_RE = re.compile(r"^#{1,2}\s+(TASK-[A-Za-z0-9._-]+)\s+(.+)$")
+
+# 순번 채번용 분해 정규식 — (date, branch-slug, NNN). `TASK-021` 같은 초기 legacy 도
+# 받아야 하므로 `TASK_ID_PATTERN` 보다 관대하다. **문법의 정의는 여기 한 곳**이고,
+# backlog-update 가 이걸 import 한다 (skill 이 자기 사본을 들고 있어서 갈라졌었다).
+TASK_ID_CAPTURE_RE = re.compile(r"^TASK-(?:(\d{4}-\d{2}-\d{2})-)?(?:(.+?)-)?(\d{1,3})$")
+# handoff 의 `- <ID> <제목>: <상태>` 줄에서 쓰는 **작업 항목 ID** 문법.
+#
+# v1.0.2 정정: 이전에는 `[A-Z0-9-]+` 라 **대문자만** 받았는데, `TASK_ID_PATTERN` 은
+# branch slug 세그먼트에 `[A-Za-z0-9._-]` 를 허용한다. 그래서 `TASK-2026-07-27-main-001`
+# 처럼 *정본 문법에 맞는 ID* 를 handoff 의 Work Status 줄에서 인식하지 못했다. 같은
+# 규약의 두 정규식이 갈라져 있던 것이다 (§2.24 가 등록한 부류와 같은 모양).
+#
+# 셋의 관계: `TASK_ID_PATTERN`(정본 문법) ⊂ `WORK_ITEM_ID_PATTERN`(느슨, WF- 와 legacy
+# `TASK-021` 까지) 이고, `TASK_ID_CAPTURE_RE` 는 채번용 분해다.
+WORK_ITEM_ID_PATTERN = r"(?:TASK|WF)-[A-Za-z0-9._-]+"
+WORK_STATUS_RE = re.compile(
+    rf"^-\s+({WORK_ITEM_ID_PATTERN})\s+(.+?):\s*({_STATUS_ALT})\s*$"
+)
 
 
 class WorkflowDocParser:

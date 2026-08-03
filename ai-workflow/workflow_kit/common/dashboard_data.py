@@ -1,3 +1,5 @@
+# standard-ai-workflow-kit: v1.0.0-beta
+
 """workflow_kit.common.dashboard_data - Quality Dashboard 5-panel data collector (v0.13.0).
 
 Phase 13 (Operational Intelligence v1.0) 의 sub-milestone v0.13.0 첫 deliverable.
@@ -36,7 +38,8 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, NamedTuple
+from workflow_kit.common.paths import state_path_for_workspace, memory_active_dir
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -69,32 +72,99 @@ DRIFT_GUARD_SUMMARY: Final[re.Pattern[str]] = re.compile(
 # drift smoke 의 inline 실행 timeout (default: 30초 — git log + 6 case subprocess 호출)
 DRIFT_GUARD_INLINE_TIMEOUT: Final[int] = 30
 
+# maturity 선언(`maturity_matrix.json`)이 *따라가야 하는* 실제 surface.
+# 이 경로들이 `last_updated` 이후에 바뀌었다면 선언이 뒤처진 것 = 진짜 drift.
+# (v1.0.1 재정의 이전에는 `last_updated != 오늘` 을 stale 로 봤다 — 파일을 매일
+#  스탬프하지 않는 한 영구히 red 인, 구조적으로 초록이 될 수 없는 판정이었다.)
+MATURITY_SURFACE_PATHS: Final[tuple[str, ...]] = (
+    "workflow-source/core/maturity_matrix.json",
+    "workflow-source/skills",
+    "workflow-source/mcp_servers",
+    "workflow-source/harnesses",
+)
+
+# Phase 13 AC1 north-star 의 원장 (append-only JSONL, release cycle 당 1 line).
+# release pipeline 이 self-recover 결과를 여기에 기록하고, dashboard 는 *읽기만* 한다.
+DRIFT_LEDGER_RELPATH: Final[str] = "ai-workflow/memory/release/drift_ledger.jsonl"
+
+
+class MetricContract(NamedTuple):
+    """판정 지표 하나가 지켜야 하는 계약.
+
+    Attributes:
+        panel: snapshot 의 panel key
+        metric: 값 field 이름
+        source: 판정 **근거** field 이름 (무엇을 보고 그 값을 냈는가)
+        measured: 측정 여부 field 이름 (north-star 만; 없으면 빈 문자열)
+    """
+    panel: str
+    metric: str
+    source: str
+    measured: str
+
+
+# **판정 지표는 값만 내지 않는다 — 무엇을 보고 그렇게 판정했는지 함께 낸다.**
+#
+# v0.14.0~v1.0.0 동안 north-star 자리에 freshness proxy 가 앉아 있어도 아무도 몰랐다.
+# 값의 타입은 맞았고, 근거를 말하지 않으니 대조할 것이 없었기 때문이다 (노트 §2.19).
+# 근거를 강제하면 "무엇을 재고 있는지" 가 payload 에 드러나고, proxy/placeholder 로
+# 때운 지표는 `check_metric_source_contract.py` 가 즉시 잡는다.
+JUDGMENT_METRICS: Final[tuple[MetricContract, ...]] = (
+    MetricContract("drift_prevention", "maturity_stale", "maturity_staleness_source", ""),
+    MetricContract("drift_prevention", "silent_failing_cycles_count",
+                   "silent_failing_cycles_source", "silent_failing_cycles_measured"),
+    MetricContract("multi_agent_concurrent_write_conflict", "conflict_count",
+                   "conflict_count_source", "conflict_count_measured"),
+    MetricContract("memory_index_utilization", "retrieval_hit_rate",
+                   "retrieval_hit_rate_source", ""),
+)
+
+# 근거 자리에 오면 안 되는 말들 — "아직 안 정했다" 를 값처럼 흘려보내는 표현.
+FORBIDDEN_SOURCE_TOKENS: Final[tuple[str, ...]] = (
+    "proxy", "placeholder", "pending", "tbd", "todo", "fixme",
+)
+
 
 # ---------------------------------------------------------------------------
 # Path helpers
 # ---------------------------------------------------------------------------
 
 
-def _repo_root(workspace_root: Path | str | None) -> Path:
-    """workspace_root 가 주어지지 않으면 REPO 부모 디렉토리로 fallback.
+#: workspace root 를 **어디서 얻었는지**. 판정이 아니라 출처다 (§2.51).
+WORKSPACE_SOURCE_ARGUMENT: Final[str] = "argument"
+WORKSPACE_SOURCE_CWD: Final[str] = "cwd"
 
-    표준화 정공법: caller 가 명시한 workspace_root 가 우선 (테스트 용이성).
-    caller 가 미지정 시 ``workflow-source`` 의 부모 디렉토리 (REPO_ROOT) 를 반환.
-    str path 도 허용 (test caller 용이성).
 
-    Args:
-        workspace_root: REPO_ROOT (Path) / git repo root 또는 "string path" / None.
+def resolve_workspace_root(workspace_root: Path | str | None) -> tuple[Path, str]:
+    """측정 대상 workspace 와 **그것을 어디서 얻었는지** 를 함께 돌려준다.
+
+    v1.0.7(§2.51) 이전에는 미지정 시 ``Path(__file__).resolve().parents[3]`` 로
+    떨어졌다. 이 저장소는 editable install 이라 그 값이 우연히 저장소 루트였지만,
+    **설치본에서는 workspace 가 아니다** — 실측:
+
+        모듈: <venv>/lib/python3.13/site-packages/workflow_kit/common/dashboard_data.py
+        parents[3] → <venv>/lib/python3.13     (실재하는 디렉터리, ai-workflow/ 없음)
+
+    그러면 8 panel 이 전부 빈 값을 내고, 그 빈 값이 **그 경로의 측정 결과처럼** 보고된다.
+    오류가 아니라 조용히 틀린 측정이다. 모듈 위치로 사용자의 workspace 를 추측할 수
+    있다는 전제 자체가 틀렸다 (doctor 의 §2.49 와 같은 축).
+
+    이제 (명시 인자 → cwd) 두 갈래뿐이고, 어느 쪽이었는지는 snapshot 의
+    ``workspace_root_source`` 에 남는다.
     """
-    if isinstance(workspace_root, str):
-        candidate: Path | None = Path(workspace_root)
-    elif workspace_root is None:
-        candidate = None
-    else:
-        candidate = workspace_root
-    if candidate is not None:
-        return candidate
-    # workflow-source/workflow_kit/common/dashboard_data.py → 4 단계 위 = REPO_ROOT
-    return Path(__file__).resolve().parents[3]
+    if workspace_root is None:
+        return Path.cwd(), WORKSPACE_SOURCE_CWD
+    return Path(workspace_root), WORKSPACE_SOURCE_ARGUMENT
+
+
+def _repo_root(workspace_root: Path | str | None) -> Path:
+    """`resolve_workspace_root` 의 값만 필요한 자리 (panel 내부용).
+
+    출처까지 필요하면 `resolve_workspace_root` 를 쓴다 — 보고하는 경로와 실제로 쓰는
+    경로가 갈라지면 보고가 사실이 아니게 된다.
+    """
+    root, _source = resolve_workspace_root(workspace_root)
+    return root
 
 
 # ---------------------------------------------------------------------------
@@ -129,7 +199,11 @@ def collect_drift_prevention(
         harness_supported_count: harness.supported 리스트 길이
         head_commit_date: HEAD commit 의 ISO date (subprocess git log -1)
         last_updated_delta_days: maturity_last_updated ↔ head_commit_date 의 일수 차이
-        silent_failing_cycles_count: Phase 13 AC1 의 north-star metric (현 release 까지 0)
+        maturity_surface_changed_at: maturity surface 를 마지막으로 바꾼 commit 의 ISO date
+        maturity_staleness_source: 'maturity_surface_commit' | 'unknown' (판정 근거)
+        silent_failing_cycles_count: Phase 13 AC1 north-star (원장 기반, 미측정이면 0 + measured=False)
+        silent_failing_cycles_measured: 원장에 cycle 이 1건 이상 기록됐는가
+        silent_failing_cycles_measured_cycles: 원장에 기록된 총 release cycle 갯수
 
     Returns:
         dict — Panel 1 의 data shape. field 누락 시 *unknown* marker 사용.
@@ -156,14 +230,28 @@ def collect_drift_prevention(
     head_commit_date = _head_commit_date(root)
     last_updated_delta_days = _date_diff_days(maturity_last_updated, head_commit_date)
 
-    # Phase 14 dashboard freshness 보강 (v0.14.0):
-    # `maturity_last_updated` 가 head_commit_date 와 N+ 일 차이 → stale. 자동
-    # 갱신 helper (`workflow_kit.common.state.cache.refresh_maturity_last_updated`)
-    # 가 별도 dispatcher 로 존재. 본 호출은 *hint 만* emit, auto-mutation ❌
-    # (dashboard 는 read-only).
+    # v1.0.1 재정의 — stale 은 *달력* 이 아니라 *drift* 다.
+    #
+    # 기존: `maturity_last_updated != 오늘` → 파일을 매일 스탬프하지 않는 한 항상 True.
+    #       지표를 초록으로 만드는 유일한 방법이 "날짜만 찍기" 였고, 그건 실질 없는
+    #       초록불이다 (Beta-v1.0.0.md §2.18 의 maturity_stale 경고 참조).
+    # 현재: maturity surface (skills / mcp_servers / harnesses / matrix 자신) 가
+    #       `last_updated` **이후** commit 으로 바뀌었으면 선언이 뒤처진 것 → stale.
+    #       surface 가 그대로면 며칠이 지나도 stale 아님. 스탬프로는 못 속이고,
+    #       선언을 실제로 갱신해야만 초록이 된다.
+    #
+    # git 을 못 읽거나 last_updated 가 비면 **stale 로 단정하지 않는다** (source=unknown).
+    # 판정 근거가 없을 때 red 를 내는 체크는 위양성으로 무시당한다.
     from datetime import date as _date
     today_iso = _date.today().isoformat()
-    maturity_stale = bool(maturity_last_updated) and maturity_last_updated != today_iso
+    maturity_surface_changed_at = _last_commit_date_for_paths(root, MATURITY_SURFACE_PATHS)
+    if maturity_last_updated and maturity_surface_changed_at:
+        # ISO date 는 사전순 = 시간순.
+        maturity_stale = maturity_surface_changed_at > maturity_last_updated
+        maturity_staleness_source = "maturity_surface_commit"
+    else:
+        maturity_stale = False
+        maturity_staleness_source = "unknown"
     maturity_refresh_hint = (
         "python3 -c \"from workflow_kit.common.state.cache import refresh_maturity_last_updated; "
         "from pathlib import Path; "
@@ -184,21 +272,30 @@ def collect_drift_prevention(
         guard_result = run_drift_prevention_guard_inline(root)
         guard_panel.update(guard_result)
 
-    # silent_failing_cycles_count: maturity_stale 일 때 +1 (north-star proxy)
-    # 본 release 의 v0.14.0 dashboard 의 freshness drift 가 north-star 에 반영되도록
-    silent_failing_cycles_count = 1 if maturity_stale else 0
+    # north-star 는 freshness proxy 가 아니다 (v1.0.1 분리).
+    # 정의(wiki/topics/phase-13-definition-north-star.md §2.2): "drift 를 guard 가
+    # 검출했으나 manual fix 까지 걸린 release cycle 의 누적 갯수". maturity 날짜
+    # 스탬프와는 아무 상관이 없다 — v0.14.0 에서 임시 proxy 로 붙였던 것을 떼어내고
+    # 실제 원장(`DRIFT_LEDGER_RELPATH`)에서 읽는다. 원장이 비면 0 이 아니라
+    # **미측정** 으로 표시한다 (measured=False).
+    north_star = collect_silent_failing_cycles(root)
 
     return {
         **guard_panel,
         "maturity_last_updated": maturity_last_updated,
         "maturity_last_updated_source": "maturity_matrix.json",
         "maturity_stale": maturity_stale,
+        "maturity_staleness_source": maturity_staleness_source,
+        "maturity_surface_changed_at": maturity_surface_changed_at,
         "maturity_refresh_hint": maturity_refresh_hint,
         "today_iso": today_iso,
         "harness_supported_count": harness_supported_count,
         "head_commit_date": head_commit_date,
         "last_updated_delta_days": last_updated_delta_days,
-        "silent_failing_cycles_count": silent_failing_cycles_count,  # Phase 14 freshness proxy
+        "silent_failing_cycles_count": north_star["count"],  # Phase 13 AC1 north-star
+        "silent_failing_cycles_measured": north_star["measured"],
+        "silent_failing_cycles_measured_cycles": north_star["measured_cycles"],
+        "silent_failing_cycles_source": north_star["source"],
         "phase": "Phase 12 (done, v0.15.20) → Phase 13 (planned, v1.0.0 stable 진입 후)",
     }
 
@@ -330,6 +427,97 @@ def _head_commit_date(workspace_root: Path) -> str:
     return ""
 
 
+def _last_commit_date_for_paths(workspace_root: Path, paths: tuple[str, ...]) -> str:
+    """주어진 경로들을 마지막으로 건드린 commit 의 ISO date. git 실패 시 empty string.
+
+    실재하지 않는 pathspec 이 섞여도 git 이 나머지로 계산하도록 ``--`` 뒤에 그대로
+    넘긴다 (`--ignore-unmatch` 는 log 에 없으므로 존재하는 경로만 추려서 전달).
+    """
+    existing = [p for p in paths if (workspace_root / p).exists()]
+    if not existing:
+        return ""
+    try:
+        completed = subprocess.run(
+            ["git", "log", "-1", "--format=%cd", "--date=short", "--", *existing],
+            cwd=str(workspace_root),
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=5,
+        )
+        if completed.returncode == 0:
+            return completed.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return ""
+
+
+def collect_silent_failing_cycles(workspace_root: Path | str | None = None) -> dict[str, Any]:
+    """Phase 13 AC1 north-star — drift 를 manual fix 해야 했던 release cycle 의 누적 갯수.
+
+    원장(`DRIFT_LEDGER_RELPATH`)은 release pipeline 이 release 시도마다 1 line 씩
+    append 하는 JSONL 이다. 본 함수는 **읽기만** 한다.
+
+    **line 과 cycle 은 1:1 이 아니다.** manual_required drift 가 나오면 release 는
+    중단되고, 사람이 고친 뒤 *같은 version 으로* 다시 돌린다 — 이 재시도는 한 cycle
+    안의 두 시도다. line 을 그대로 세면 정상 운영 흐름이 분모를 계속 부풀린다
+    (1 cycle 이 "1/2" 로 보인다). 그래서 ``version`` 으로 묶고, 한 cycle 안에서
+    **한 번이라도** manual 개입이 필요했으면 그 cycle 을 분자로 센다.
+
+    원장이 없거나 비어 있으면 ``count=0`` 이되 ``measured=False`` 로 emit 한다.
+    "아직 안 재봤다" 와 "재봤더니 0" 은 다른 상태이고, 둘을 같은 0 으로 보여주면
+    실질 없는 초록불이 된다.
+
+    Returns:
+        dict {count, measured, measured_cycles, source, ledger_path}
+    """
+    root = _repo_root(workspace_root)
+    ledger = root / DRIFT_LEDGER_RELPATH
+    out: dict[str, Any] = {
+        "count": 0,
+        "measured": False,
+        "measured_cycles": 0,
+        "source": DRIFT_LEDGER_RELPATH,
+        "ledger_path": str(ledger),
+    }
+    if not ledger.is_file():
+        return out
+    # version → "이 cycle 에서 manual 개입이 있었나". version 없는 line 은 묶을 근거가
+    # 없으므로 각자 별개 cycle 로 (합치면 서로 다른 cycle 을 하나로 눌러버린다).
+    cycles: dict[str, bool] = {}
+    unkeyed = 0
+    try:
+        for line in ledger.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                # malformed line 은 skip (telemetry summarize 와 동일 정공법).
+                continue
+            if not isinstance(entry, dict):
+                continue
+            version = entry.get("version")
+            if isinstance(version, str) and version:
+                key = version
+            else:
+                unkeyed += 1
+                key = f"__unkeyed_{unkeyed}"
+            try:
+                dirty = int(entry.get("manual_required_count", 0)) > 0
+            except (TypeError, ValueError):
+                # 셀 수 없는 값은 판정하지 않는다 — cycle 자체는 분모에 남긴다.
+                dirty = False
+            cycles[key] = cycles.get(key, False) or dirty
+    except OSError:
+        return out
+    out["count"] = sum(1 for is_dirty in cycles.values() if is_dirty)
+    out["measured_cycles"] = len(cycles)
+    out["measured"] = len(cycles) > 0
+    return out
+
+
 def _date_diff_days(date_a: str, date_b: str) -> int | None:
     """두 ISO date (YYYY-MM-DD) 사이의 일수 차이. 한쪽이라도 invalid 면 None."""
     if not date_a or not date_b:
@@ -373,7 +561,7 @@ def collect_multi_agent_concurrent_write_conflict(workspace_root: Path) -> dict[
     import subprocess as _subprocess
 
     root = _repo_root(workspace_root)
-    active_dir = root / "ai-workflow" / "memory" / "active"
+    active_dir = memory_active_dir(root)
     working_tree_conflict_count = 0
     conflict_locations: list[str] = []
     if active_dir.is_dir():
@@ -394,13 +582,18 @@ def collect_multi_agent_concurrent_write_conflict(workspace_root: Path) -> dict[
                     conflict_locations.append(str(f))
 
     # git log --all --merges 의 conflict keyword count (historical)
+    #
+    # git 을 못 읽었을 때 0 을 그대로 두면 "충돌 없음" 과 "못 셌음" 이 같은 0 이 된다.
+    # 어느 측정원이 실제로 돌았는지를 `conflict_count_source` 로 함께 낸다 (§2.19 규칙).
     git_log_conflict_count = 0
+    git_log_measured = False
     try:
         proc = _subprocess.run(
             ["git", "log", "--all", "--merges", "--pretty=format:%H %s"],
             cwd=str(root), capture_output=True, text=True, timeout=10, check=False,
         )
         if proc.returncode == 0:
+            git_log_measured = True
             git_log_conflict_count = sum(
                 1
                 for line in proc.stdout.splitlines()
@@ -409,14 +602,25 @@ def collect_multi_agent_concurrent_write_conflict(workspace_root: Path) -> dict[
     except (_subprocess.TimeoutExpired, FileNotFoundError, OSError):
         pass
 
+    measured_sources = []
+    if active_dir.is_dir():
+        measured_sources.append("working_tree")
+    if git_log_measured:
+        measured_sources.append("git_log")
+
     conflict_count = working_tree_conflict_count + git_log_conflict_count
+    measured = bool(measured_sources)
     return {
         "north_star": "multi_agent_concurrent_write_conflict_count",
         "working_tree_conflict_count": working_tree_conflict_count,
         "git_log_conflict_count": git_log_conflict_count,
+        "git_log_measured": git_log_measured,
         "conflict_count": conflict_count,
+        "conflict_count_source": "+".join(measured_sources) if measured_sources else "unknown",
+        "conflict_count_measured": measured,
         "conflict_locations": conflict_locations,
-        "status": "pass" if conflict_count == 0 else "fail",
+        # 측정원이 하나도 안 돌았으면 pass 라고 말하지 않는다.
+        "status": ("pass" if conflict_count == 0 else "fail") if measured else "unknown",
         "threshold": 0,
     }
 
@@ -448,7 +652,7 @@ def collect_deprecation_cycle_progress(workspace_root: Path) -> dict[str, Any]:
         }
     """
     root = _repo_root(workspace_root)
-    memory_dir = root / "ai-workflow" / "memory" / "active"
+    memory_dir = memory_active_dir(root)
     bak = memory_dir / "work_backlog.md.bak"
     legacy = memory_dir / "work_backlog.md"
 
@@ -532,7 +736,7 @@ def collect_memory_index_utilization_v2(workspace_root: Path) -> dict[str, Any]:
     import json as _json
 
     root = _repo_root(workspace_root)
-    memory_dir = root / "ai-workflow" / "memory" / "active"
+    memory_dir = memory_active_dir(root)
     memory_index_dir = memory_dir / "memory_index"
 
     # 1. entries count by merge_state
@@ -752,7 +956,7 @@ def collect_memory_index_utilization(workspace_root: Path) -> dict[str, Any]:
         dict — Panel 3 의 data shape.
     """
     root = _repo_root(workspace_root)
-    memory_index_dir = root / "ai-workflow" / "memory" / "active" / "memory_index"
+    memory_index_dir = memory_active_dir(root) / "memory_index"
     entries_dir = memory_index_dir / "entries"
 
     if not entries_dir.is_dir():
@@ -951,6 +1155,11 @@ def collect_smoke_trend(
     # 가장 최근 (첫 번째) entry 의 pass/total
     if recent:
         latest = recent[0]
+        excluded = _parse_self_gate_excluded(
+            root / str(latest["release_note_path"])
+        )
+        eff_total = max(int(latest["total"]) - excluded, 0)
+        eff_pass = min(int(latest["pass"]), eff_total)
         return {
             "cumulative_total": int(latest["total"]),
             "cumulative_pass": int(latest["pass"]),
@@ -959,6 +1168,12 @@ def collect_smoke_trend(
                 if int(latest["total"]) > 0
                 else 0.0
             ),
+            # 자기참조 게이트를 뺀 실효 지표. 원 수치(cumulative_*)는 그대로 남긴다 —
+            # 무엇을 왜 뺐는지 감사 가능해야 하므로 숫자를 줄여 적지 않는다.
+            "self_referential_excluded": excluded,
+            "effective_total": eff_total,
+            "effective_pass": eff_pass,
+            "effective_pass_rate": (eff_pass / eff_total if eff_total > 0 else 0.0),
             "recent_releases": recent,
             "smoke_files_count": smoke_files_count,
         }
@@ -968,9 +1183,23 @@ def collect_smoke_trend(
         "cumulative_total": 0,
         "cumulative_pass": 0,
         "cumulative_pass_rate": 0.0,
+        "self_referential_excluded": 0,
+        "effective_total": 0,
+        "effective_pass": 0,
+        "effective_pass_rate": 0.0,
         "recent_releases": recent,
         "smoke_files_count": smoke_files_count,
     }
+
+
+def _parse_self_gate_excluded(release_path: Path) -> int:
+    """release note 의 자기참조 게이트 제외 수 (없으면 0)."""
+    try:
+        content = release_path.read_text(encoding="utf-8")
+    except OSError:
+        return 0
+    m = SMOKE_SELF_GATE_PATTERN.search(content)
+    return int(m.group(1)) if m else 0
 
 
 def _parse_smoke_count_from_release(release_path: Path) -> tuple[int, int] | None:
@@ -1000,6 +1229,20 @@ def _parse_smoke_count_from_release(release_path: Path) -> tuple[int, int] | Non
         return None
 
 
+# 자기참조 게이트 제외 표기 파서.
+# `quality_dashboard` Panel 4 와 `smoke_trend_cross` case_5 는 "전량 PASS" 를 요구하는데
+# **자기 자신도 전량에 포함**되어 있다. 따라서 두 게이트가 red 인 한 pass != total 이고,
+# pass == total 이 되려면 두 게이트가 green 이어야 하는 순환이 생긴다. 실제로 과거
+# release note 들이 이 게이트를 통과했던 것은 전량이 아니라 *일부만* 세어 적었기
+# 때문이며, 전량을 정직하게 기록한 순간 게이트는 만족 불가능해졌다.
+#
+# 해결: 원 수치(N/M)는 그대로 두고, **제외 대상을 note 에 명시**해 실효 지표를 따로 낸다.
+# 숫자를 줄여 적는 것이 아니라 무엇을 왜 뺐는지 감사 가능하게 남기는 방식이다.
+SMOKE_SELF_GATE_PATTERN: Final[re.Pattern[str]] = re.compile(
+    r"^-\s*smoke\s*자기참조\s*게이트\s*제외:\s*(\d+)", re.MULTILINE
+)
+
+
 _VERSION_PATTERN: Final[re.Pattern[str]] = re.compile(r"v(\d+(?:\.\d+)*)")
 
 
@@ -1023,6 +1266,19 @@ def _release_version_key(path: Path) -> tuple[int, ...]:
 # ---------------------------------------------------------------------------
 
 
+def _branch_state_paths(root: Path) -> list[Path]:
+    """`active/<branch>/state.json` 을 모두 반환 (branch-scoped 집계용).
+
+    브랜치별 메모리에서는 각 브랜치가 자기 state.json 을 가지므로, 프로젝트 전체의
+    "현재 상태"는 이들을 합친 *뷰* 로 계산한다. 별도 집계 파일을 커밋하지 않으므로
+    protected main 에서도 merge 마다 갱신할 대상이 생기지 않는다.
+    """
+    active = memory_active_dir(Path(root))
+    if not active.is_dir():
+        return []
+    return sorted(p for p in active.rglob("state.json") if p.is_file())
+
+
 def collect_recent_releases(
     workspace_root: Path,
     *,
@@ -1039,24 +1295,30 @@ def collect_recent_releases(
         dict — Panel 5 의 data shape.
     """
     root = _repo_root(workspace_root)
-    state_path = root / "ai-workflow" / "memory" / "active" / "state.json"
+    # v1.0.0 branch-scoped: 메모리가 `active/<branch>/` 로 분리되므로 Panel 5 는 **모든
+    # 브랜치의 state.json 을 집계** 한 뷰로 만든다. 이렇게 하면 main 전용 집계 파일을
+    # 따로 커밋할 필요가 없어, protected main 에서도 merge 마다 갱신할 대상이 없다.
+    state_paths = _branch_state_paths(root)
+    if not state_paths:
+        legacy = state_path_for_workspace(root)
+        state_paths = [legacy] if legacy.is_file() else []
 
-    if not state_path.is_file():
+    if not state_paths:
         return {"items_total": 0, "top_n": top_n, "timeline": []}
 
-    try:
-        with state_path.open("r", encoding="utf-8") as fp:
-            state = json.load(fp)
-    except (OSError, json.JSONDecodeError):
-        return {"items_total": 0, "top_n": top_n, "timeline": []}
-
-    session = state.get("session", {})
-    if not isinstance(session, dict):
-        return {"items_total": 0, "top_n": top_n, "timeline": []}
-
-    items = session.get("recent_done_items", [])
-    if not isinstance(items, list):
-        return {"items_total": 0, "top_n": top_n, "timeline": []}
+    items: list[Any] = []
+    for path in state_paths:
+        try:
+            with path.open("r", encoding="utf-8") as fp:
+                state = json.load(fp)
+        except (OSError, json.JSONDecodeError):
+            continue
+        session = state.get("session", {})
+        if not isinstance(session, dict):
+            continue
+        branch_items = session.get("recent_done_items", [])
+        if isinstance(branch_items, list):
+            items.extend(branch_items)
 
     timeline: list[dict[str, Any]] = []
     for idx, item in enumerate(items[:top_n]):
@@ -1090,16 +1352,21 @@ def collect_dashboard_snapshot(
     """5 panel 의 data 를 1 dict 로 집계. read-only, atomic.
 
     Args:
-        workspace_root: REPO_ROOT (None 이면 자동 탐색)
+        workspace_root: workspace root. None 이면 **cwd** (v1.0.7+, 모듈 위치 추측 ❌).
+            어느 쪽이었는지는 결과의 `workspace_root_source` 에 남는다.
         inline_guard: True 면 Panel 1 의 drift guard 를 subprocess 로 inline 실행.
             False 면 legacy v0.13.0 behavior (guard_status='unknown').
     """
-    ws_root = _repo_root(workspace_root) if workspace_root is None else workspace_root
+    ws_root, ws_source = resolve_workspace_root(workspace_root)
     return {
         "schema_version": "1.1",  # v0.14.3 Phase 15 — Panel 6/7/8 추가
         "tool_version": _workflow_kit_version(),
         "generated_at": _utcnow_iso(),
         "workspace_root": str(ws_root),
+        # v1.0.7(§2.51): 값 옆에 출처. 어디를 쟀는지가 명시였는지 cwd 였는지 모르면
+        # 빈 panel 이 "그 workspace 에 아무것도 없다" 인지 "엉뚱한 데를 쟀다" 인지
+        # 구별되지 않는다.
+        "workspace_root_source": ws_source,
         "panels": {
             "drift_prevention": collect_drift_prevention(ws_root, inline_guard=inline_guard),
             "maturity_distribution": collect_maturity_distribution(ws_root),
@@ -1164,17 +1431,35 @@ def _render_panel_1(p: dict[str, Any]) -> list[str]:
     lines.append(f"- guard_status: `{p.get('guard_status', 'unknown')}`")
     lines.append(f"- guard_cases: `{p.get('guard_cases', 0)} / {p.get('expected_cases', 0)}`")
     lines.append(f"- maturity_last_updated: `{p.get('maturity_last_updated', '')}`")
-    lines.append(f"- maturity_stale: `{p.get('maturity_stale', False)}`")
+    lines.append(f"- maturity_surface_changed_at: `{p.get('maturity_surface_changed_at', '')}`")
+    lines.append(
+        f"- maturity_stale: `{p.get('maturity_stale', False)}` "
+        f"(source: `{p.get('maturity_staleness_source', 'unknown')}`)"
+    )
     lines.append(f"- harness_supported_count: `{p.get('harness_supported_count', 0)}`")
     lines.append(f"- head_commit_date: `{p.get('head_commit_date', '')}`")
     delta = p.get("last_updated_delta_days")
     lines.append(f"- last_updated_delta_days: `{delta if delta is not None else 'unknown'}`")
-    lines.append(f"- silent_failing_cycles_count: `{p.get('silent_failing_cycles_count', 0)}`")
+    if p.get("silent_failing_cycles_measured"):
+        lines.append(
+            f"- silent_failing_cycles_count: `{p.get('silent_failing_cycles_count', 0)}` "
+            f"(측정 cycle {p.get('silent_failing_cycles_measured_cycles', 0)}건)"
+        )
+    else:
+        # 0 을 초록으로 오독하지 않도록 *미측정* 임을 값 자리에 그대로 쓴다.
+        lines.append(
+            "- silent_failing_cycles_count: `미측정` "
+            f"(원장 `{p.get('silent_failing_cycles_source', DRIFT_LEDGER_RELPATH)}` 에 cycle 0건)"
+        )
     if p.get("maturity_stale") and p.get("maturity_refresh_hint"):
         lines.append("")
         lines.append(
-            "> ⚠️ **maturity_last_updated stale**: "
-            f"refresh hint → `python3 -c \"{p.get('maturity_refresh_hint', '')}\"`"
+            "> ⚠️ **maturity 선언이 surface 보다 뒤처짐** "
+            f"(surface `{p.get('maturity_surface_changed_at', '')}` > 선언 "
+            f"`{p.get('maturity_last_updated', '')}`): "
+            # hint 자체가 이미 완결된 `python3 -c "..."` 명령이다 — 접두사를 다시
+            # 붙이면 `python3 -c "python3 -c "..."` 로 깨진 명령이 나간다.
+            f"refresh hint → `{p.get('maturity_refresh_hint', '')}`"
         )
     return lines + [""]
 
@@ -1283,7 +1568,14 @@ def _render_panel_6(p: dict[str, Any]) -> list[str]:
     """Panel 6 — Multi-Agent Concurrent Write Conflict (Phase 15 north-star)."""
     lines: list[str] = ["## Panel 6 — Multi-Agent Concurrent Write Conflict", ""]
     lines.append(f"- north_star: `{p.get('north_star', 'unknown')}`")
-    lines.append(f"- conflict_count: `{p.get('conflict_count', 0)}`")
+    if p.get("conflict_count_measured"):
+        lines.append(
+            f"- conflict_count: `{p.get('conflict_count', 0)}` "
+            f"(source: `{p.get('conflict_count_source', 'unknown')}`)"
+        )
+    else:
+        # 측정원이 하나도 안 돌았으면 0 을 초록으로 보여주지 않는다.
+        lines.append("- conflict_count: `미측정` (측정원 없음 — working_tree / git_log 모두 불가)")
     lines.append(f"- threshold: `{p.get('threshold', 0)}`")
     lines.append(f"- status: `{p.get('status', 'unknown')}`")
     locations = p.get("conflict_locations", [])
@@ -1489,6 +1781,15 @@ def _render_html_panel_1(p: dict[str, Any]) -> str:
     delta = p.get("last_updated_delta_days")
     harness_supported_count = int(p.get("harness_supported_count", 0))
     silent_failing = int(p.get("silent_failing_cycles_count", 0))
+    silent_failing_measured = bool(p.get("silent_failing_cycles_measured", False))
+    silent_failing_cycles = int(p.get("silent_failing_cycles_measured_cycles", 0))
+    silent_failing_text = (
+        f"{silent_failing} (측정 cycle {silent_failing_cycles}건)"
+        if silent_failing_measured
+        else "미측정 (원장 cycle 0건)"
+    )
+    surface_changed_at = str(p.get("maturity_surface_changed_at", ""))
+    staleness_source = str(p.get("maturity_staleness_source", "unknown"))
     phase = str(p.get("phase", ""))
 
     status_class = status if status in ("pass", "fail", "error") else "unknown"
@@ -1498,10 +1799,11 @@ def _render_html_panel_1(p: dict[str, Any]) -> str:
     <p>guard: {guard_cases_pass}/{guard_cases} pass (expected {expected})</p>
     <p>guard_runtime_ms: {runtime_ms}</p>
     <p>maturity_last_updated: <code>{_html_escape(maturity_last_updated)}</code></p>
+    <p>maturity_surface_changed_at: <code>{_html_escape(surface_changed_at)}</code> (source: {_html_escape(staleness_source)})</p>
     <p>head_commit_date: <code>{_html_escape(head_commit_date)}</code></p>
     <p>last_updated_delta_days: {delta if delta is not None else 'unknown'}</p>
     <p>harness_supported_count: {harness_supported_count}</p>
-    <p><strong>silent_failing_cycles_count: {silent_failing}</strong> (Phase 13 AC1 north-star)</p>
+    <p><strong>silent_failing_cycles_count: {_html_escape(silent_failing_text)}</strong> (Phase 13 AC1 north-star)</p>
     <p class="meta">{_html_escape(phase)}</p>
   </section>"""
 
@@ -1803,6 +2105,9 @@ __all__: list[str] = [
     "collect_smoke_trend",
     "collect_recent_releases",
     "collect_dashboard_snapshot",
+    "resolve_workspace_root",
+    "WORKSPACE_SOURCE_ARGUMENT",
+    "WORKSPACE_SOURCE_CWD",
     "render_dashboard_markdown",
     "render_dashboard_html",
     "run_drift_prevention_guard_inline",

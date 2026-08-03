@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Existing Project Onboarding Contract
 
@@ -6,7 +6,7 @@
 - 범위: 입력 인자, 단계별 호출 순서, 각 단계의 핵심 출력, 생략/경고 조건, 후속 사용 지점
 - 대상 독자: AI workflow 설계자, 구현자, 프로젝트 온보딩 담당자, 하네스 통합 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `./workflow_adoption_entrypoints.md`, `./output_schema_guide.md`, `./workflow_kit_roadmap.md`, `../scripts/run_existing_project_onboarding.py`, `../tests/check_existing_project_onboarding.py`
 - 실제 파일럿 예시: `../examples/pilot_adoption_open_git_client_example.md`
 

@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Workflow Harness Distribution
 
@@ -6,7 +6,7 @@
 - 범위: 공통 코어와 하네스 오버레이의 관계, 타겟별 생성 파일, 배포 전략, 확장 포인트
 - 대상 독자: 저장소 관리자, AI workflow 설계자, 하네스 통합 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-20
+- 최종 수정일: 2026-07-21
 - 관련 문서: `./global_workflow_standard.md`, `./workflow_adoption_entrypoints.md`, `./workflow_configuration_layers.md`, `./workflow_global_injection_policy.md`, `../scripts/bootstrap_workflow_kit.py`, `../scripts/bootstrap_lib/harnesses/__init__.py`
 
 ## 1. 기본 원칙

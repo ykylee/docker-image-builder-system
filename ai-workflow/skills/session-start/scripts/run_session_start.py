@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 #!/usr/bin/env python3
 """Prototype runner for the session-start skill."""
@@ -20,7 +20,7 @@ from workflow_kit import __version__ as TOOL_VERSION
 from workflow_kit.common.errors import build_error_result
 from workflow_kit.common.contracts.stage_gate_runtime import build_stage_completion, merge_into_result
 from workflow_kit.common.normalize import dedupe_normalized_backticked
-from workflow_kit.common.paths import resolve_existing_path
+from workflow_kit.common.paths import resolve_existing_path, workflow_state_path, memory_active_dir
 from workflow_kit.common.project_docs import (
     find_latest_backlog_path,
     parse_backlog,
@@ -39,21 +39,25 @@ def _build_memory_index_query_output(
 ) -> dict[str, Any] | None:
     """v0.11.22+ Phase 3b: optional ADR-005 memory_index retrieval 3-tuple 호출.
 
-    - 둘 다 미지정 → None (zero-risk skip, 기존 caller 정합).
-    - 한쪽만 지정 → advisory emit + None.
-    - 둘 다 지정 → helper 호출, `MemoryIndexQueryOutput` dict 변환 후 emit.
+    - flag 부재 + workspace memory_index dir 부재 → None (zero-risk skip, 기존 caller 정합).
+    - flag 부재 + workspace memory_index dir 존재 → 자동 활성 (v0.15.21+ AC2), default query token 사용.
+    - flag 명시 → override (외부 dir 지정 시 negative telemetry emit).
     - v0.13.1+ Phase 13 AC2: retrieval 성공/실패 후 telemetry sidecar 에 1 event append.
     """
-    if not args.memory_index_dir and not args.memory_query_tokens:
-        return None  # zero-risk default
-    if not args.memory_index_dir or not args.memory_query_tokens:
-        warnings.append(
-            "memory_index wiring: --memory-index-dir 와 --memory-query-tokens 둘 다 지정해야 retrieval 활성."
-        )
-        return None
+    # v0.15.21+ AC2 (telemetry source 다양성 ≥ 4): opt-in flag 부재 시에도
+    # workspace 표준 memory_index dir 이 존재하면 retrieval 자동 활성 (flag 는 override 유지).
+    # dir 부재 시 zero-risk skip — memory_index 없는 기존 caller 정합.
+    effective_dir = args.memory_index_dir
+    if not effective_dir:
+        _default_dir = memory_active_dir(workspace_root) / "memory_index"
+        if _default_dir.is_dir():
+            effective_dir = str(_default_dir)
+    if not effective_dir:
+        return None  # zero-risk default (memory_index 부재)
+    effective_tokens = args.memory_query_tokens or "session,handoff,workflow"
 
-    memory_index_dir = Path(args.memory_index_dir)
-    query_tokens = [t.strip() for t in args.memory_query_tokens.split(",") if t.strip()]
+    memory_index_dir = Path(effective_dir)
+    query_tokens = [t.strip() for t in effective_tokens.split(",") if t.strip()]
     if not query_tokens:
         warnings.append(
             "memory_index wiring: --memory-query-tokens 가 비어있음. retrieval skip."
@@ -125,6 +129,55 @@ def _build_memory_index_query_output(
         return None
 
 
+
+def _detect_stale_branch_memories(
+    project_profile_path: Path,
+    warnings: list[str],
+    *,
+    apply: bool = False,
+) -> dict[str, Any] | None:
+    """v1.0.0: 종료된 브랜치의 메모리를 탐지(선택적으로 아카이브)한다.
+
+    브랜치별 메모리(`active/<branch>/`)는 브랜치가 사라져도 남아 **고아** 가 되므로,
+    세션 진입 시 역방향 점검한다 — git 에 없는 브랜치의 디렉터리를 찾는다.
+
+    기본은 **탐지 + 안내** 만 한다. session-start 는 read 중심 스킬이라 무단으로 파일을
+    옮기면 위험하기 때문이다. `--archive-stale-branches` 를 주면 실제 이동까지 수행한다.
+    도구는 commit/push 를 하지 않으므로 protected main 과 호환되며, 변경은 작업 브랜치의
+    PR 에 실려 나간다(piggyback).
+    """
+    try:
+        from workflow_kit.common.paths import memory_root_dir
+        memory_root = memory_root_dir(project_profile_path)
+    except Exception:  # noqa: BLE001
+        return None
+    tool = SOURCE_ROOT / "tools" / "archive_branch_memory.py"
+    if not tool.is_file() or not (memory_root / "active").is_dir():
+        return None
+    cmd = [sys.executable, str(tool), "--memory-root", str(memory_root), "--json"]
+    if apply:
+        cmd.append("--apply")
+    try:
+        import subprocess
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        payload = json.loads(proc.stdout) if proc.stdout.strip() else {}
+    except Exception as exc:  # noqa: BLE001
+        warnings.append(f"stale branch memory 점검 실패: {type(exc).__name__}")
+        return None
+    stale = [c["branch"] for c in payload.get("candidates", []) if c.get("action") == "archive"]
+    if stale:
+        if apply:
+            warnings.append(
+                f"종료된 브랜치 메모리 {len(stale)}건을 archived/ 로 이동했다: {', '.join(stale)}. "
+                f"이 변경을 현재 작업 브랜치의 commit 에 포함시켜라."
+            )
+        else:
+            warnings.append(
+                f"종료된 브랜치 메모리 {len(stale)}건이 active/ 에 남아 있다: {', '.join(stale)}. "
+                f"`python3 workflow-source/tools/archive_branch_memory.py --apply` 로 아카이브하라."
+            )
+    return {"stale_branches": stale, "archived": bool(apply and stale)}
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run the session-start prototype.")
     parser.add_argument("--session-handoff-path", required=True)
@@ -138,6 +191,9 @@ def main() -> int:
                         help="memory_index 절대 path. 부재 시 skip.")
     parser.add_argument("--memory-query-tokens",
                         help="comma-separated query tokens. 예: 'adr,memora,retrieval'. 부재 시 skip.")
+    parser.add_argument("--archive-stale-branches", action="store_true",
+                        dest="archive_stale_branches",
+                        help="종료된 브랜치 메모리를 archived/ 로 실제 이동 (기본: 탐지+안내만)")
     args = parser.parse_args()
 
     source_context = {
@@ -166,6 +222,11 @@ def main() -> int:
         return 1
 
     warnings: list[str] = []
+    # v1.0.0: 종료된 브랜치 메모리 역방향 점검 (고아 방지). 실패해도 세션 진입을 막지 않는다.
+    _detect_stale_branch_memories(
+        project_profile_path, warnings,
+        apply=getattr(args, "archive_stale_branches", False),
+    )
     try:
         handoff = parse_handoff(session_handoff_path)
         warnings.extend(handoff.get("warnings", []))
@@ -207,7 +268,7 @@ def main() -> int:
         from workflow_kit.common.schemas import SessionStartOutput, SessionStartPurposeContext
 
         workspace_root = project_workspace_root(project_profile_path)
-        state_json_path = workflow_memory_dir(project_profile_path) / "state.json"
+        state_json_path = workflow_state_path(project_profile_path)
         purpose_context_data = build_purpose_context(
             workspace_root=workspace_root,
             state_path=state_json_path,

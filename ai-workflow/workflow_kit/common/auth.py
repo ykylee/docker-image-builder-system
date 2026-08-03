@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.common.auth — v0.7.3 SEC-AUTH-01~06 runtime evaluator.
 
@@ -23,6 +23,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from workflow_kit.common.paths import memory_active_dir
 
 # Rule result types
 Status = str  # "compliant" | "non_compliant" | "not_applicable" | "advisory"
@@ -275,7 +276,7 @@ def evaluate_compliance(
 ) -> dict[str, Any]:
     """6 SEC-AUTH rule 의 compliance 평가."""
     if audit_log_path is None:
-        audit_log_path = project_root / "ai-workflow" / "memory" / "active" / "audit.md"
+        audit_log_path = memory_active_dir(project_root) / "audit.md"
     if oauth_scopes is None:
         oauth_scopes = []
 

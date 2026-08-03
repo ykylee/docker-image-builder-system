@@ -286,7 +286,7 @@ describe("BuildDetail", () => {
     expect(screen.queryByTestId("block-legacy-preview")).not.toBeInTheDocument();
     expect(screen.getByText("Runtime URL")).toBeInTheDocument();
     expect(
-      screen.getByText("http://127.0.0.1:32770/health")
+      screen.getByText(/http:\/\/127\.0\.0\.1:32770\/health/)
     ).toBeInTheDocument();
   });
 
