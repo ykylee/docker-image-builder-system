@@ -10,7 +10,7 @@
 //   /builds        → BuildsList (TASK-090)
 //   /builds/:id    → BuildDetail (TASK-091)
 //   /build-request → BuildRequest (TASK-099) — Skill → Host POST /builds
-//   /api-console   → ApiConsole (TASK-099) — Swagger UI iframe 임베드
+//   /api-console   → ApiConsole — Scalar API Reference iframe 임베드
 //   /admin/builds    → AdminBuilds (TASK-098)
 //   /admin/users     → AdminUsers (TASK-098)
 //   /admin/admins    → AdminAdmins (TASK-098)

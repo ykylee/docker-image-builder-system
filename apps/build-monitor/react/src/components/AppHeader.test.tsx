@@ -13,7 +13,7 @@
 //   - 로그인: user pill + Builds + New Build + Logout
 //   - logout → userId clear + `/` 이동
 //   - admin allow-list 포함 시에만 단일 Admin 진입점 + 🛡 pill 노출
-//   - API Console / OpenAPI / Docs 는 로그인 무관 항상 노출
+//   - API Docs 는 로그인 무관 항상 노출
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -140,16 +140,14 @@ describe("AppHeader", () => {
     });
   });
 
-  it("API Console / OpenAPI / Docs 는 로그인 무관 항상 노출된다", () => {
+  it("API Docs 는 로그인 무관 항상 노출된다", () => {
     renderHeader();
-    expect(link(/API Console/)).toBeInTheDocument();
-    expect(link(/OpenAPI/)).toBeInTheDocument();
-    expect(link(/Docs/)).toBeInTheDocument();
+    expect(link(/^API Docs$/)).toBeInTheDocument();
   });
 
-  it("OpenAPI / Docs 는 새 탭 외부 링크다 (SPA 라우팅 대상 아님)", () => {
+  it("API Docs 는 단일 SPA 진입점이다", () => {
     renderHeader();
-    expect(link(/OpenAPI/)?.getAttribute("target")).toBe("_blank");
-    expect(link(/Docs/)?.getAttribute("target")).toBe("_blank");
+    expect(link(/^API Docs$/)?.getAttribute("href")).toBe("/api-console");
+    expect(link(/^API Docs$/)?.getAttribute("target")).toBeNull();
   });
 });

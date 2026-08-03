@@ -30,7 +30,7 @@ function renderPage(): void {
 describe("ApiConsole (React) — TASK-099", () => {
   it("renders an iframe pointing to /docs/", () => {
     renderPage();
-    const iframe = screen.getByTitle("Build Server Swagger UI") as HTMLIFrameElement;
+    const iframe = screen.getByTitle("Build Server Scalar API Reference") as HTMLIFrameElement;
     expect(iframe.src.endsWith("/docs/")).toBe(true);
   });
 
@@ -71,9 +71,9 @@ describe("ApiConsole (React) — TASK-099", () => {
     // 가 fire 되어 overlay 노출).
     // 단, 컴포넌트 자체의 error 핸들링 로직이 정상임을 검증하기 위해 직접 호출.
     renderPage();
-    const iframe = screen.getByTitle("Build Server Swagger UI") as HTMLIFrameElement;
+    const iframe = screen.getByTitle("Build Server Scalar API Reference") as HTMLIFrameElement;
     // native dispatch 가 React 까지 도달하지 않아 assert 자체를 우회.
     expect(iframe).toBeInTheDocument();
-    expect(iframe.getAttribute("title")).toBe("Build Server Swagger UI");
+    expect(iframe.getAttribute("title")).toBe("Build Server Scalar API Reference");
   });
 });

@@ -1,5 +1,3 @@
-import { createRequire } from "node:module";
-
 import {
   OpenAPIRegistry,
   OpenApiGeneratorV3
@@ -7,15 +5,7 @@ import {
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { ZodTypeAny } from "zod";
-
-// CJS plugins (@fastify/cors, @fastify/swagger, @fastify/swagger-ui) expose
-// their fastify-plugin wrapped function as `module.exports` itself, not
-// under a separate `default` field when loaded from CJS. Dynamic ESM
-// import wraps them in a namespace where `.default` works, but the
-// fastify plugin then sees the namespace object instead of the function
-// and silently drops the `opts` argument. `createRequire` gives us a
-// CJS-style require that returns the function directly.
-const projectRequire = createRequire(import.meta.url);
+import scalarApiReference from "@scalar/fastify-api-reference";
 
 import {
   adminListBuildsQuerySchema,
@@ -498,26 +488,19 @@ export async function registerOpenApiRoutes(
     });
   }
 
-  const swagger = projectRequire("@fastify/swagger");
-  await app.register(swagger, {
-    openapi: {
-      openapi: "3.0.3",
-      info: {
-        title: "Docker Image Builder — Build Server API",
-        version: "0.1.0"
-      }
-    }
-  });
-
-  const swaggerUi = projectRequire("@fastify/swagger-ui");
-  await app.register(swaggerUi, {
+  // Scalar is the single interactive API documentation surface. The
+  // generated document remains the contract SSOT at `/openapi.json`;
+  // Scalar only renders that document and does not generate a second spec.
+  await app.register(scalarApiReference, {
     routePrefix: "/docs",
-    uiConfig: {
-      docExpansion: "list",
-      deepLinking: true,
-      displayRequestDuration: true
+    configuration: {
+      title: "Docker Image Builder — API Reference",
+      content: getOpenApiDocument() as Record<string, unknown>,
+      layout: "modern",
+      hideModels: false,
+      hideDownloadButton: false
     },
-    staticCSP: true
+    logLevel: "silent"
   });
 
   // The full document is rebuilt from the registry on each request so route

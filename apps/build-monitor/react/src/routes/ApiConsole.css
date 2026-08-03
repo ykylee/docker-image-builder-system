@@ -104,7 +104,7 @@
 
 /* TASK-145: bare `iframe {}` → `.frame-wrap iframe` 스코프.
  * element 셀렉터는 앱 전체 iframe(미래 도입 포함)에 새므로 이 페이지의
- * Swagger 프레임에만 한정한다. */
+ * API Reference 프레임에만 한정한다. */
 .frame-wrap iframe {
   width: 100%;
   height: 100%;
