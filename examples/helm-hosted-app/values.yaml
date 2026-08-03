@@ -1,0 +1,11 @@
+image:
+  repository: busybox
+  tag: latest
+service:
+  port: 8080
+hosting:
+  contextPath: app
+  basePath: /app/
+  stripPrefix: true
+build:
+  id: local

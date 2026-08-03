@@ -1,0 +1,12 @@
+services:
+  build-server:
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      BUILD_REPOSITORY_BACKEND: postgres
+      DATABASE_URL: postgres://dibs:dibs@postgres:5432/dibs
+      DB_AUTO_BOOTSTRAP: "true"
+      BUILD_MONITOR_REACT_DIST_PATH: /app/apps/build-monitor/dist
+  runner:
+    user: "0:0"

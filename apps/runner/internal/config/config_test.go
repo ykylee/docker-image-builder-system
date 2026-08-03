@@ -101,7 +101,7 @@ func TestLoadK8sNamespacePerBuild(t *testing.T) {
 		raw  string
 		want bool
 	}{
-		{"", false},   // unset default
+		{"", false}, // unset default
 		{"true", true},
 		{"TRUE", true},
 		{"1", true},
@@ -121,5 +121,16 @@ func TestLoadK8sNamespacePerBuild(t *testing.T) {
 				t.Errorf("K8sNamespacePerBuild for %q = %v, want %v", tc.raw, cfg.K8sNamespacePerBuild, tc.want)
 			}
 		})
+	}
+}
+
+func TestLoadHelmSettings(t *testing.T) {
+	t.Setenv("RUNNER_HELM_CHART", "/charts/app")
+	t.Setenv("RUNNER_HELM_RELEASE", "app-release")
+	t.Setenv("RUNNER_HELM_VALUES_FILE", "/etc/dib/values.yaml")
+	t.Setenv("RUNNER_HELM_SET_VALUES", "foo=bar,service.port=8080")
+	cfg := Load()
+	if cfg.HelmChart != "/charts/app" || cfg.HelmRelease != "app-release" || cfg.HelmValuesFile != "/etc/dib/values.yaml" || cfg.HelmSetValues != "foo=bar,service.port=8080" {
+		t.Fatalf("unexpected Helm config: %+v", cfg)
 	}
 }

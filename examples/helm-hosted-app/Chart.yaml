@@ -1,0 +1,6 @@
+apiVersion: v2
+name: dib-hosted-app
+description: Minimal Helm chart implementing the docker-image-builder-system runner values contract.
+type: application
+version: 0.1.0
+appVersion: "1.0"

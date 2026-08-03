@@ -67,6 +67,13 @@ type K8sDeployOptions struct {
 	// subdomain 이면 Ingress host rule = `<cp>.<BaseHost>`.
 	HostingScheme string
 	BaseHost      string
+	// Helm adapter 입력. Chart 는 chart directory/archive 경로이며, chart 는
+	// 표준 values contract(image.repository/image.tag/service.port/hosting.*)
+	// 을 소비해야 한다.
+	HelmChart      string
+	HelmRelease    string
+	HelmValuesFile string
+	HelmSetValues  []string
 }
 
 // K8sApplyOptions 는 Apply 의 입력 (manifest 만 별도 호출하는 경우).
@@ -116,6 +123,8 @@ func NewK8sDeployer(mode string, opts K8sDeployOptions) (K8sDeployer, error) {
 		// rollout status 대기. cluster 연결성/kubectl 가용은 런타임에
 		// kubectl 이 판정한다(실패 시 Deploy 가 에러 반환 → 배포 FAILED).
 		return newKubectlDeployer(opts), nil
+	case "helm":
+		return newHelmDeployer(opts), nil
 	default:
 		return nil, fmt.Errorf("deploy: unsupported k8s mode %q", mode)
 	}
