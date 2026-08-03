@@ -495,6 +495,45 @@ export function BuildRequest(): ReactElement {
           })}
         </div>
 
+        <div className="hosting-options" data-testid="req-hosting-options">
+          <label className="hosting-option" htmlFor="req-stripPrefix">
+            <input
+              id="req-stripPrefix"
+              type="checkbox"
+              checked={form.stripPrefix}
+              data-testid="req-stripPrefix"
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, stripPrefix: event.target.checked }))
+              }
+            />
+            <span>
+              <strong>stripPrefix</strong>
+              <small>Remove the hosting prefix before forwarding requests.</small>
+            </span>
+          </label>
+
+          <label className="hosting-option" htmlFor="req-hostingScheme">
+            <span>
+              <strong>hostingScheme</strong>
+              <small>Choose path or subdomain routing for the hosted service.</small>
+            </span>
+            <select
+              id="req-hostingScheme"
+              value={form.hostingScheme}
+              data-testid="req-hostingScheme"
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  hostingScheme: event.target.value as FormState["hostingScheme"]
+                }))
+              }
+            >
+              <option value="path">path</option>
+              <option value="subdomain">subdomain</option>
+            </select>
+          </label>
+        </div>
+
         <div className="actions">
           <Button
             type="submit"

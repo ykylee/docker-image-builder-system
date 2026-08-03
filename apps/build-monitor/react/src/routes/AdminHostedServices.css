@@ -8,6 +8,20 @@
   font-family: var(--dib-font-sans);
 }
 
+.hosting-page .muted {
+  color: var(--dib-color-text-muted);
+  margin: 0;
+}
+
+.hosting-page .err {
+  color: var(--dib-color-accent-danger, #dc2626);
+  margin: 0;
+}
+
+.hosting-page .mono {
+  font-family: var(--dib-font-mono, ui-monospace, monospace);
+}
+
 .hosting-title {
   margin: var(--dib-space-md, 12px) 0;
   font-size: var(--dib-size-xl, 20px);
