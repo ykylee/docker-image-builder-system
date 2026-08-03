@@ -233,3 +233,46 @@ E1/E2/E3 모두 PASS 시 nightly `k8s-deploy-e2e` 잡이 자동 종료. 운영
 개입 불요. 실패 시 본 섹션 절차로 재현 후 `apps/runner/internal/services/`
 또는 `apps/runner/internal/deploy/` 의 단위 테스트로 격리해 회귀 가드를
 추가한다.
+
+## 7. Helm adapter (v0.9.0 첫 구현)
+
+`RUNNER_K8S_MODE=helm`을 사용하면 runner가 `helm upgrade --install`로 차트를
+배포한다. 차트가 Deployment, Service, Ingress와 sidecar/initContainer 구성을
+소유하고 runner는 표준 values contract를 전달한다.
+
+### 7.1 설정과 values contract
+
+| env | 의미 | 기본값 |
+|---|---|---|
+| `RUNNER_HELM_BIN` | Helm 실행 파일 | `helm` |
+| `RUNNER_HELM_CHART` | 기본 chart 경로/아카이브 | 없음(필수) |
+| `RUNNER_HELM_RELEASE` | 기본 release 이름 | `dib-build` |
+| `RUNNER_HELM_VALUES_FILE` | 공통 values 파일 | 없음 |
+| `RUNNER_HELM_SET_VALUES` | 쉼표로 구분한 추가 `--set` 값 | 없음 |
+| `RUNNER_HELM_TIMEOUT_SECONDS` | install/upgrade 대기 제한 | `120` |
+
+chart는 `image.repository`, `image.tag`, `service.port`,
+`hosting.contextPath`, `hosting.basePath`, `hosting.stripPrefix`,
+`hosting.scheme`, `hosting.baseHost`, `build.id`를 소비해야 한다.
+
+예제 chart `examples/helm-hosted-app`는 Deployment/Service/Ingress를 생성한다.
+`hosting.stripPrefix=true`이면 nginx rewrite annotation과 regex path를 사용하고,
+`false`이면 Prefix path를 upstream에 그대로 전달한다.
+
+### 7.2 lifecycle과 검증
+
+- `Deploy` 결과의 `DeploymentID`와 `ResultRef`는 실제 Helm release 이름을 사용한다.
+- cleanup 시 release 이름이 BuildID와 다를 수 있으므로 `HelmRelease`를 명시할
+  수 있으며, 생략하면 `BuildID`를 fallback으로 사용한다.
+- `Apply`도 같은 release 선택 규칙과 `--wait` timeout을 사용한다.
+- Ingress controller 설치와 DNS/host 라우팅은 클러스터 운영 범위다.
+
+```bash
+helm lint examples/helm-hosted-app
+helm template dib-build examples/helm-hosted-app
+bash apps/runner/scripts/e2e-helm-deploy.sh
+```
+
+kind e2e는 실제 chart install 후 Deployment 1/1, Service, Ingress, `helm status`
+및 release uninstall을 확인한다. ArgoCD Application 생성/동기화는 아직 구현하지
+않았으며 별도 작업으로 남긴다.

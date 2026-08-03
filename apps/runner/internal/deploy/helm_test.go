@@ -36,6 +36,7 @@ func TestHelmDeploy_UpgradeInstallAndValues(t *testing.T) {
 		Cluster:   "kind-dib-helm-e2e",
 		Namespace: "dib-hosted", HelmChart: "./chart", HelmRelease: "app-release",
 		ContextPath: "demo-app", ContainerPort: 3000, StripPrefix: true,
+		HostingScheme: "subdomain", BaseHost: "apps.example.test",
 	})
 	if err != nil {
 		t.Fatalf("Deploy: %v", err)
@@ -44,7 +45,7 @@ func TestHelmDeploy_UpgradeInstallAndValues(t *testing.T) {
 		t.Fatalf("expected one helm call, got %d", len(*calls))
 	}
 	args := (*calls)[0].args
-	for _, want := range []string{"upgrade", "--install", "app-release", "./chart", "--namespace", "dib-hosted", "--wait", "--kube-context", "kind-dib-helm-e2e", "image.repository=localhost:5000/demo/app", "image.tag=build-1", "service.port=3000", "hosting.contextPath=demo-app", "hosting.basePath=/demo-app/", "hosting.stripPrefix=true", "build.id=build-1", "extra.enabled=true"} {
+	for _, want := range []string{"upgrade", "--install", "app-release", "./chart", "--namespace", "dib-hosted", "--wait", "--kube-context", "kind-dib-helm-e2e", "image.repository=localhost:5000/demo/app", "image.tag=build-1", "service.port=3000", "hosting.contextPath=demo-app", "hosting.basePath=/", "hosting.stripPrefix=true", "hosting.scheme=subdomain", "hosting.baseHost=apps.example.test", "build.id=build-1", "extra.enabled=true"} {
 		if !containsArg(args, want) {
 			t.Errorf("helm args = %v, missing %q", args, want)
 		}
@@ -67,11 +68,22 @@ func TestHelmDeploy_RequiresChart(t *testing.T) {
 
 func TestHelmCleanupUninstallsRelease(t *testing.T) {
 	d, calls := newRecordingHelm(K8sDeployOptions{Namespace: "dib-hosted"})
-	if err := d.Cleanup(context.Background(), K8sCleanupOptions{Namespace: "dib-hosted", BuildID: "app-release"}); err != nil {
+	if err := d.Cleanup(context.Background(), K8sCleanupOptions{Namespace: "dib-hosted", BuildID: "build-1", HelmRelease: "app-release"}); err != nil {
 		t.Fatalf("Cleanup: %v", err)
 	}
 	if len(*calls) != 1 || !containsArg((*calls)[0].args, "uninstall") || !containsArg((*calls)[0].args, "app-release") || !containsArg((*calls)[0].args, "--ignore-not-found") {
 		t.Errorf("unexpected cleanup args: %+v", *calls)
+	}
+}
+
+func TestHelmCleanupFallsBackToBuildID(t *testing.T) {
+	d, calls := newRecordingHelm(K8sDeployOptions{Namespace: "dib-hosted"})
+	if err := d.Cleanup(context.Background(), K8sCleanupOptions{Namespace: "dib-hosted", BuildID: "build-1"}); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	args := (*calls)[0].args
+	if !containsArg(args, "build-1") {
+		t.Fatalf("cleanup args = %v, want build-1 release", args)
 	}
 }
 

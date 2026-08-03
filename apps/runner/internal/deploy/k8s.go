@@ -82,6 +82,9 @@ type K8sApplyOptions struct {
 	Namespace string
 	Manifest  string
 	BuildID   string
+	// HelmRelease 는 Helm Apply 경로에서 사용할 release 이름이다. 비어
+	// 있으면 BuildID, 그마저 비어 있으면 adapter 기본값을 사용한다.
+	HelmRelease string
 }
 
 // K8sCleanupOptions 는 Cleanup 의 입력.
@@ -89,6 +92,10 @@ type K8sCleanupOptions struct {
 	Cluster   string
 	Namespace string
 	BuildID   string
+	// HelmRelease 는 Deploy 때 사용한 release 이름을 명시한다. Helm
+	// adapter는 BuildID와 release 이름이 다를 수 있으므로 cleanup 시
+	// 같은 식별자를 전달해야 한다.
+	HelmRelease string
 }
 
 // K8sResult 는 Deploy / Apply 의 결과. 기존 deploy.Result 와 분리

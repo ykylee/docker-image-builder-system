@@ -33,12 +33,22 @@ func TestHelmE2E_RealDeploy(t *testing.T) {
 	if result.ResultRef != "helm/"+release {
 		t.Fatalf("ResultRef = %q", result.ResultRef)
 	}
-	defer deployer.Cleanup(context.Background(), K8sCleanupOptions{Namespace: ns, BuildID: release})
+	defer deployer.Cleanup(context.Background(), K8sCleanupOptions{Namespace: ns, BuildID: release, HelmRelease: release})
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := runHelmE2ECommand(ctx, "kubectl", "--context", cluster, "get", "deployment", "-n", ns); err != nil {
 		t.Fatalf("kubectl deployment verification: %v", err)
+	}
+	resourceName := release + "-dib-hosted-app"
+	if err := runHelmE2ECommand(ctx, "kubectl", "--context", cluster, "get", "service", resourceName, "-n", ns); err != nil {
+		t.Fatalf("kubectl service verification: %v", err)
+	}
+	if err := runHelmE2ECommand(ctx, "kubectl", "--context", cluster, "get", "ingress", resourceName, "-n", ns); err != nil {
+		t.Fatalf("kubectl ingress verification: %v", err)
+	}
+	if err := runHelmE2ECommand(ctx, "helm", "status", release, "--namespace", ns, "--kube-context", cluster); err != nil {
+		t.Fatalf("helm status verification: %v", err)
 	}
 }
 

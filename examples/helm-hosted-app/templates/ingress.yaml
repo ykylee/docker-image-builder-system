@@ -1,0 +1,44 @@
+{{- if .Values.ingress.enabled }}
+{{- $contextPath := trimSuffix "/" (trimPrefix "/" .Values.hosting.contextPath) }}
+{{- $host := .Values.hosting.baseHost }}
+{{- if and (eq .Values.hosting.scheme "subdomain") $host }}
+{{- $host = printf "%s.%s" $contextPath $host }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "dib-hosted-app.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "dib-hosted-app.name" . }}
+  annotations:
+    {{- if .Values.hosting.stripPrefix }}
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- if $host }}
+  rules:
+    - host: {{ $host | quote }}
+      http:
+        paths:
+          - path: {{ printf "/%s(/|$)(.*)" $contextPath | quote }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "dib-hosted-app.fullname" . }}
+                port:
+                  name: http
+  {{- else }}
+  rules:
+    - http:
+        paths:
+          - path: {{ if .Values.hosting.stripPrefix }}{{ printf "/%s(/|$)(.*)" $contextPath | quote }}{{ else }}{{ printf "/%s" $contextPath | quote }}{{ end }}
+            pathType: {{ if .Values.hosting.stripPrefix }}ImplementationSpecific{{ else }}Prefix{{ end }}
+            backend:
+              service:
+                name: {{ include "dib-hosted-app.fullname" . }}
+                port:
+                  name: http
+  {{- end }}
+{{- end }}

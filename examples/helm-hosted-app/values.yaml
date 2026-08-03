@@ -7,5 +7,10 @@ hosting:
   contextPath: app
   basePath: /app/
   stripPrefix: true
+  scheme: path
+  baseHost: ""
+ingress:
+  enabled: true
+  className: nginx
 build:
   id: local

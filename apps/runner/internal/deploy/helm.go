@@ -118,6 +118,8 @@ func (d *helmDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K8sR
 		"--set-string", "hosting.contextPath="+contextPath,
 		"--set-string", "hosting.basePath="+helmBasePath(contextPath, opts.HostingScheme),
 		"--set-string", "hosting.stripPrefix="+strconv.FormatBool(opts.StripPrefix),
+		"--set-string", "hosting.scheme="+defaultHostingScheme(opts.HostingScheme),
+		"--set-string", "hosting.baseHost="+opts.BaseHost,
 		"--set-string", "build.id="+opts.BuildID,
 	)
 	args = append(args, d.setValues...)
@@ -141,7 +143,10 @@ func (d *helmDeployer) Apply(ctx context.Context, opts K8sApplyOptions) (*K8sRes
 	if ns == "" {
 		ns = d.defaultNS
 	}
-	release := opts.BuildID
+	release := opts.HelmRelease
+	if release == "" {
+		release = opts.BuildID
+	}
 	if release == "" {
 		release = d.defaultRelease
 	}
@@ -156,7 +161,10 @@ func (d *helmDeployer) Apply(ctx context.Context, opts K8sApplyOptions) (*K8sRes
 }
 
 func (d *helmDeployer) Cleanup(ctx context.Context, opts K8sCleanupOptions) error {
-	release := opts.BuildID
+	release := opts.HelmRelease
+	if release == "" {
+		release = opts.BuildID
+	}
 	if release == "" {
 		return nil
 	}
@@ -205,4 +213,11 @@ func helmBasePath(contextPath, scheme string) string {
 		return "/"
 	}
 	return "/" + contextPath + "/"
+}
+
+func defaultHostingScheme(scheme string) string {
+	if scheme == "subdomain" {
+		return scheme
+	}
+	return "path"
 }
