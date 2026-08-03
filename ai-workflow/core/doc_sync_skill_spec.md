@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Doc-Sync Skill Spec
 
@@ -6,7 +6,7 @@
 - 범위: 목표, 입력 계약, 출력 계약, 영향 문서 추천 규칙, 허브 갱신 판단 규칙, 실패 규칙, 쓰기 권한 제한, 수동 대체 절차
 - 대상 독자: AI agent 설계자, skill 구현자, 운영자, 프로젝트 온보딩 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `./workflow_skill_catalog.md`, `./workflow_mcp_candidate_catalog.md`, `./global_workflow_standard.md`, `./workflow_agent_topology.md`, `../templates/project_workflow_profile_template.md`, `./llm_wiki_concept_purpose_spec.md` (v0.9.5 part 2)
 
 ## 1. 목적

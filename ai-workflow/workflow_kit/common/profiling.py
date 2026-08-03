@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.common.profiling — v0.7.3 PERF-MEM-01~06 runtime evaluator.
 
@@ -184,8 +184,10 @@ def check_reference_cycle(fn: Callable[[], object]) -> RuleResult:
     # v0.7.4: objgraph package 가용성 (optional — reference chain 시각화)
     objgraph_installed = False
     try:
-        # objgraph 는 optional dependency — mypy 의 import-untyped ignore
-        import objgraph  # type: ignore[import-untyped]  # noqa: F401
+        # objgraph 는 optional dependency. v1.0.2: import-untyped ignore 제거 —
+        # config 의 ignore_missing_imports=true 가 import-untyped 까지 덮으므로 unused 였다
+        # (profiling extra 설치/미설치 양쪽에서 동일 확인).
+        import objgraph  # noqa: F401
         objgraph_installed = True
     except ImportError:
         pass

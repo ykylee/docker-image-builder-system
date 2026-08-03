@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.phishing_keywords — V-R11 phishing keyword list with external feed support (v0.7.39+).
 

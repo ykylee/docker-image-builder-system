@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 
 import { Table } from "@astryxdesign/core";
 
+import { FilterChips } from "@/components/FilterChips";
 import { buildColumns } from "@/components/buildColumns";
 import { matchesChip, type StatusFilter } from "@/lib/chipFilter";
 import { useBuildsListStore } from "@/lib/stores/buildsListStore";
@@ -72,21 +73,12 @@ export function BuildsList(): ReactElement {
     <section className="list-page">
       <header className="page-head">
         <h1>Builds</h1>
-        <div className="chips" role="group" aria-label="Status filter">
-          {filterChips.map((chip) => (
-            <button
-              key={chip}
-              type="button"
-              className={`chip${filter === chip ? " chip--active" : ""}`}
-              onClick={() => {
-                setFilter(chip);
-              }}
-              aria-pressed={filter === chip}
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
+        <FilterChips
+          options={filterChips}
+          selected={filter}
+          onSelect={(chip) => setFilter(chip)}
+          ariaLabel="Status filter"
+        />
       </header>
 
       {loading ? (

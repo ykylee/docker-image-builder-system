@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 #!/usr/bin/env python3
 """Export harness-specific workflow packages into a dist directory."""
@@ -20,6 +20,7 @@ if str(SOURCE_ROOT) not in sys.path:
 
 from workflow_kit import __version__ as WORKFLOW_KIT_VERSION
 from workflow_kit.common.doc_transformer import DocTransformer
+from workflow_kit.common.paths import memory_active_dir
 
 
 SUPPORTED_HARNESSES = (
@@ -85,15 +86,123 @@ def copy_file(source: Path, destination: Path) -> None:
     shutil.copyfile(source, destination)
 
 
+# Heavy / transient directories that must NEVER be copied into bundle outputs.
+# Without this guard, callers that stage a working tree under a temp dir end up
+# pulling the full Python virtualenv (~72MB/site-packages) into each export,
+# and if the temp dir lives under /var/tmp (default for mkdtemp on Linux) the
+# 2.2GB of leaked copies survive reboots.
+EXCLUDED_TREE_DIRS: frozenset[str] = frozenset(
+    {
+        ".venv",
+        "venv",
+        ".git",
+        "__pycache__",
+        ".mypy_cache",
+        ".pytest_cache",
+        "node_modules",
+        "dist",
+        "build",
+        ".omo",
+    }
+)
+
+
 def copy_tree(source: Path, destination: Path) -> list[Path]:
     copied: list[Path] = []
     for path in sorted(source.rglob("*")):
         if path.is_dir():
             continue
+        # Skip anything nested under a heavy/transient directory so the bundle
+        # never accidentally ships a full virtualenv or build artefact.
+        if any(part in EXCLUDED_TREE_DIRS for part in path.relative_to(source).parts):
+            continue
         target = destination / path.relative_to(source)
         copy_file(path, target)
         copied.append(target)
     return copied
+
+
+def leaked_tempdir_roots() -> list[Path]:
+    """누수 temp dir 을 찾을 후보 root 목록 (존재하는 것만, 중복 제거).
+
+    v1.0.0 bug fix: 이전 impl 은 ``Path(os.environ.get("TMPDIR", "/tmp"))`` 하나만
+    훑었다. `TMPDIR` 이 미설정이면 `/tmp` 만 보는데, CPython `tempfile` 은 후보를
+    (`TMPDIR`/`TEMP`/`TMP` → `/tmp` → `/var/tmp` → `/usr/tmp`) 순으로 *쓰기 가능한
+    첫 번째* 를 고르므로, `/tmp` 가 가득 차면 (다수 배포판에서 `/tmp` 는 RAM 기반
+    tmpfs 다) 실제 누수는 `/var/tmp` 에 쌓인다. docstring 은 `/var/tmp` 라고 적혀
+    있었지만 코드는 `/tmp` 를 보고 있어서 가드가 통째로 헛돌았다 — 실측으로
+    `/var/tmp` 에 1431개 / 약 211GB 가 남아 루트 파일시스템이 100% 찼다.
+    """
+    import os
+    import tempfile
+
+    candidates = [
+        Path(tempfile.gettempdir()),
+        Path(os.environ.get("TMPDIR", "/tmp")),
+        Path("/tmp"),
+        Path("/var/tmp"),
+    ]
+    roots: list[Path] = []
+    seen: set[Path] = set()
+    for c in candidates:
+        try:
+            resolved = c.resolve()
+        except OSError:
+            continue
+        if resolved in seen or not resolved.is_dir():
+            continue
+        seen.add(resolved)
+        roots.append(resolved)
+    return roots
+
+
+def cleanup_leaked_tempdirs(prefixes: tuple[str, ...] = ("tmp",)) -> int:
+    """Best-effort cleanup of orphaned temp dirs (``/tmp`` + ``/var/tmp``).
+
+    ``tempfile.TemporaryDirectory`` cleans up on context exit, but if a process
+    is killed mid-export (Ctrl-C, OOM, harness crash, runner timeout) the temp
+    dir survives — and ``/var/tmp`` is *not* wiped on reboot. This helper
+    removes dirs matching ``prefixes`` that carry a ``repo/`` staging leaf so
+    they don't accumulate across release cycles.
+
+    Returns the number of directories removed. Safe to call repeatedly: it only
+    touches ``<temp-root>/<prefix>*/repo`` style leaves owned by the current
+    user, never user-owned top-level directories or other users' temp dirs.
+    """
+    import os
+
+    try:
+        my_uid = os.getuid()
+    except AttributeError:  # pragma: no cover - non-POSIX
+        my_uid = -1
+
+    removed = 0
+    for base in leaked_tempdir_roots():
+        try:
+            entries = sorted(base.iterdir())
+        except OSError:
+            continue
+        for entry in entries:
+            if entry.is_symlink() or not entry.is_dir():
+                continue
+            if not any(entry.name.startswith(p) for p in prefixes):
+                continue
+            if not (entry / "repo").is_dir():
+                continue
+            # 다른 사용자 소유의 temp dir 은 절대 건드리지 않는다.
+            try:
+                if my_uid >= 0 and entry.stat().st_uid != my_uid:
+                    continue
+            except OSError:
+                continue
+            try:
+                shutil.rmtree(entry)
+                removed += 1
+            except OSError:
+                # Never fail the calling tool because of cleanup — leak is
+                # annoying, an exception is worse.
+                continue
+    return removed
 
 
 def workflow_common_sources() -> list[Path]:
@@ -176,8 +285,30 @@ def bootstrap_export_sources(harness: str, temp_repo: Path) -> list[Path]:
     if completed is None:
         raise RuntimeError("python3 is required to export harness packages.")
     import subprocess
+    import os
 
-    subprocess.run(args, cwd=REPO_ROOT, check=True, capture_output=True, text=True)
+    # Signal to the child bootstrap process that this is a *transient export*
+    # and that it must not stage heavy artefacts (.venv, build/, dist/, ...)
+    # under ``temp_repo``. The child honours SAW_EXPORT_MODE=ephemeral by
+    # skipping any side effects that would otherwise leak into the temp
+    # staging directory; see bootstrap_lib/__main__.py.
+    child_env = {**os.environ, "SAW_EXPORT_MODE": "ephemeral"}
+
+    subprocess.run(
+        args,
+        cwd=REPO_ROOT,
+        env=child_env,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    # Defensive belt-and-braces: even if a future child process ignores the
+    # SAW_EXPORT_MODE signal, remove any heavy dirs that snuck into temp_repo.
+    for heavy in EXCLUDED_TREE_DIRS:
+        leaked = temp_repo / heavy
+        if leaked.exists():
+            shutil.rmtree(leaked, ignore_errors=True)
 
     sources = [
         temp_repo / "ai-workflow",
@@ -375,7 +506,7 @@ def render_package_contents(
     }[harness]
     source_docs_state = "포함됨" if include_source_docs else "기본 제외"
     global_snippets_state = "포함됨" if include_global_snippets else "기본 제외"
-    backlog_dir = bundle_root / "ai-workflow" / "memory" / "active" / "backlog"
+    backlog_dir = memory_active_dir(bundle_root) / "backlog"
     if backlog_dir.is_dir():
         backlog_entries = sorted(
             f"- `bundle/ai-workflow/memory/active/backlog/{path.name}`"
@@ -726,6 +857,10 @@ def export_harness(
 def main() -> int:
     args = parse_args()
     output_root = Path(args.output_dir).resolve()
+    # Best-effort cleanup of orphaned temp dirs left behind by previous
+    # crashed/killed export runs. Only touches /tmp/tmp*/ and
+    # /var/tmp/tmp*/ leaves with a "repo/" subdir, never user data.
+    leaked = cleanup_leaked_tempdirs()
     exports = [
         export_harness(
             harness,
@@ -740,6 +875,7 @@ def main() -> int:
         "output_root": str(output_root),
         "package_version": args.version,
         "exports": exports,
+        "cleaned_leaked_tempdirs": leaked,
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0

@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Project Status Assessment (Standard AI Workflow)
 
@@ -6,7 +6,7 @@
 - 범위: 저장소 구조, 문서 완성도, 구현 공백, 적용 가능성, 다음 단계 권고안
 - 대상 독자: 저장소 관리자, AI workflow 설계자, 도입 검토자, 프로젝트 온보딩 담당자
 - 상태: v0.11.22-beta 기준
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `../README.md`, `./global_workflow_standard.md`, `./workflow_skill_catalog.md`, `./workflow_mcp_candidate_catalog.md`, `./workflow_agent_topology.md`, `./workflow_kit_roadmap.md`, `./prototype_promotion_scope.md`, `./maturity_matrix.json`
 
 ## 1. 총평

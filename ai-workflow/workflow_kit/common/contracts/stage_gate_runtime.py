@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Stage Gate Runtime (v0.6.5) — runtime helper for skill output integration.
 

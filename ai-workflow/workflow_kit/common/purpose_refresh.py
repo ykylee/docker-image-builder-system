@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Purpose refresh (R-A follow-up part 3, v0.9.6 chapter 10).
 

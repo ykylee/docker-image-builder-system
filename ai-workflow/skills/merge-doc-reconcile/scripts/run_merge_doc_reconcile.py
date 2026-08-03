@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 #!/usr/bin/env python3
 """Prototype runner for the merge-doc-reconcile skill."""

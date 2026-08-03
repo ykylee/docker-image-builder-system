@@ -96,8 +96,51 @@
   margin-bottom: var(--dib-space-lg);
 }
 
+.hosting-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--dib-space-lg);
+  margin-bottom: var(--dib-space-lg);
+  padding-top: var(--dib-space-md);
+  border-top: 1px solid var(--dib-color-border-subtle);
+}
+
+.hosting-option {
+  display: flex;
+  align-items: center;
+  gap: var(--dib-space-sm);
+  color: var(--dib-color-text-primary);
+  font-size: var(--dib-size-sm);
+}
+
+.hosting-option > span {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dib-space-xs);
+}
+
+.hosting-option small {
+  color: var(--dib-color-text-muted);
+  font-size: var(--dib-size-xs);
+}
+
+.hosting-option input[type="checkbox"] {
+  accent-color: var(--dib-color-accent-primary);
+}
+
+.hosting-option select {
+  min-width: 9rem;
+  padding: var(--dib-space-sm);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-sm);
+  background: var(--dib-color-bg-surface-elevated);
+  color: var(--dib-color-text-primary);
+  font: inherit;
+}
+
 @media (max-width: 640px) {
-  .grid { grid-template-columns: 1fr; }
+  .grid,
+  .hosting-options { grid-template-columns: 1fr; }
 }
 
 /* TASK-138: 폼 필드 스타일 제거 — Astryx TextInput / NumberInput 이 담당한다.

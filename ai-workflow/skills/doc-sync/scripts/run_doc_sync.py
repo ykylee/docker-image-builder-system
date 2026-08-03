@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 #!/usr/bin/env python3
 """Prototype runner for the doc-sync skill."""
@@ -21,7 +21,7 @@ from workflow_kit.common.doc_sync import build_doc_sync_candidates
 from workflow_kit.common.errors import build_error_result
 from workflow_kit.common.contracts.stage_gate_runtime import build_stage_completion, merge_into_result
 from workflow_kit.common.markdown import rel_link_from_doc
-from workflow_kit.common.paths import project_workspace_root, resolve_existing_path, workflow_memory_dir
+from workflow_kit.common.paths import project_workspace_root, resolve_existing_path, workflow_memory_dir, workflow_state_path, memory_active_dir
 from workflow_kit.common.project_docs import parse_project_profile_core
 from workflow_kit.common.purpose_context import build_purpose_context
 from workflow_kit.common.workflow_writes import append_unique_bullets_under_heading, update_next_documents_section
@@ -72,20 +72,24 @@ def _build_memory_index_query_output(
 ) -> dict[str, Any] | None:
     """v0.11.22+ Phase 3c: optional ADR-005 memory_index retrieval 3-tuple 호출 (session-start 와 동일 패턴).
 
-    - 둘 다 미지정 → None (zero-risk skip).
-    - 한쪽만 지정 → advisory emit + None.
-    - 둘 다 지정 → helper 호출, `MemoryIndexQueryOutput` dict 변환 후 emit.
+    - flag 부재 + workspace memory_index dir 부재 → None (zero-risk skip).
+    - flag 부재 + workspace memory_index dir 존재 → 자동 활성 (v0.15.21+ AC2), default query token 사용.
+    - flag 명시 → override (외부 dir 지정 시 negative telemetry emit).
     - v0.13.1+ Phase 13 AC2: retrieval 성공/실패 후 telemetry sidecar 에 1 event append.
     """
-    if not args.memory_index_dir and not args.memory_query_tokens:
-        return None
-    if not args.memory_index_dir or not args.memory_query_tokens:
-        warnings.append(
-            "memory_index wiring: --memory-index-dir 와 --memory-query-tokens 둘 다 지정해야 retrieval 활성."
-        )
-        return None
-    memory_index_dir = Path(args.memory_index_dir)
-    query_tokens = [t.strip() for t in args.memory_query_tokens.split(",") if t.strip()]
+    # v0.15.21+ AC2 (telemetry source 다양성 ≥ 4): opt-in flag 부재 시에도
+    # workspace 표준 memory_index dir 이 존재하면 retrieval 자동 활성 (flag 는 override 유지).
+    # dir 부재 시 zero-risk skip — memory_index 없는 기존 caller 정합.
+    effective_dir = args.memory_index_dir
+    if not effective_dir:
+        _default_dir = memory_active_dir(project_root) / "memory_index"
+        if _default_dir.is_dir():
+            effective_dir = str(_default_dir)
+    if not effective_dir:
+        return None  # zero-risk default (memory_index 부재)
+    effective_tokens = args.memory_query_tokens or "doc,sync,workflow"
+    memory_index_dir = Path(effective_dir)
+    query_tokens = [t.strip() for t in effective_tokens.split(",") if t.strip()]
     if not query_tokens:
         warnings.append(
             "memory_index wiring: --memory-query-tokens 가 비어있음. retrieval skip."
@@ -206,7 +210,7 @@ def main() -> int:
         # doc-sync 가 PURPOSE.md + state.json.purpose_digest 자동 read (directional intent 참조)
         from workflow_kit.common.schemas import DocSyncPurposeContext
 
-        state_json_path = workflow_memory_dir(project_profile_path) / "state.json"
+        state_json_path = workflow_state_path(project_profile_path)
         purpose_context_data = build_purpose_context(
             workspace_root=project_root,
             state_path=state_json_path,

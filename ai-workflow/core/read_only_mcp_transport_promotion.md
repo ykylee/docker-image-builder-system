@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Read-Only MCP Transport Promotion Spec
 
@@ -6,7 +6,7 @@
 - 범위: descriptor 단일 출처, JSON-RPC fixture 기준선, SDK 승격 시 유지/변경 필드, 검증 경로
 - 대상 독자: MCP server 구현자, 하네스 적용 담당자, AI workflow 설계자
 - 상태: draft
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `./prototype_promotion_scope.md`, `../mcp_servers/read_only_bundle.md`, `../schemas/README.md`, `../workflow_kit/README.md`
 
 ## 1. 목적

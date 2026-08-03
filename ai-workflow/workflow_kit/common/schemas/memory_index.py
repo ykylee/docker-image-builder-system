@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Pydantic models for ADR-005 Memora-inspired Memory Index (v0.11.22+ Phase 1).
 

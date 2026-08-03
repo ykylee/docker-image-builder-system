@@ -20,6 +20,8 @@ import {
 import { ensureAdminAccess } from "@/lib/admin-guard";
 import { useUserId } from "@/lib/useUserId";
 
+import "./AdminHostedServices.css";
+
 export function AdminHostedServices(): ReactElement {
   const [userId] = useUserId();
   const navigate = useNavigate();
@@ -90,23 +92,23 @@ export function AdminHostedServices(): ReactElement {
   }
 
   return (
-    <section data-testid="admin-hosted-services">
+    <section className="hosting-page" data-testid="admin-hosted-services">
       <AdminTabs />
-      <h1>Hosted Services</h1>
+      <h1 className="hosting-title">Hosted Services</h1>
 
-      {loading && <p data-testid="hosting-loading">Loading…</p>}
+      {loading && <p className="muted" data-testid="hosting-loading">Loading…</p>}
       {error && (
-        <p role="alert" data-testid="hosting-error">
+        <p className="err" role="alert" data-testid="hosting-error">
           {error}
         </p>
       )}
 
       {!loading && services.length === 0 && (
-        <p data-testid="hosting-empty">No hosted services.</p>
+        <p className="muted" data-testid="hosting-empty">No hosted services.</p>
       )}
 
       {services.length > 0 && (
-        <table data-testid="hosting-table">
+        <table className="hosting-table" data-testid="hosting-table">
           <thead>
             <tr>
               <th>App</th>
@@ -120,24 +122,25 @@ export function AdminHostedServices(): ReactElement {
           <tbody>
             {services.map((svc) => (
               <tr key={svc.appName} data-testid={`hosting-row-${svc.appName}`}>
-                <td>{svc.appName}</td>
+                <td className="mono">{svc.appName}</td>
                 <td>
-                  <code>/{svc.contextPath}/</code>
+                  <code className="mono">/{svc.contextPath}/</code>
                 </td>
                 <td>
                   <StatusPill status={svc.status} />
                   {svc.status === "RUNNING" &&
                     svc.availableReplicas === 0 && (
                       <span
+                        className="degraded-badge"
                         data-testid={`hosting-degraded-${svc.appName}`}
                         title="Desired RUNNING 이나 available replica 0 — 파드 미기동(degraded)"
-                        style={{ marginLeft: "0.4rem", color: "#c0392b" }}
                       >
                         ⚠ degraded
                       </span>
                     )}
                 </td>
                 <td
+                  className="mono"
                   data-testid={`hosting-replicas-${svc.appName}`}
                   title={
                     svc.lastSyncedAt
@@ -149,7 +152,12 @@ export function AdminHostedServices(): ReactElement {
                 </td>
                 <td>
                   {svc.url ? (
-                    <a href={svc.url} target="_blank" rel="noreferrer">
+                    <a
+                      href={svc.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hosting-url-link"
+                    >
                       {svc.url}
                     </a>
                   ) : (
@@ -157,30 +165,35 @@ export function AdminHostedServices(): ReactElement {
                   )}
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    disabled={busyApp === svc.appName || svc.status === "STOPPED"}
-                    data-testid={`hosting-stop-${svc.appName}`}
-                    onClick={() => runAction(svc.appName, stopHostedService)}
-                  >
-                    Stop
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyApp === svc.appName || svc.status === "RUNNING"}
-                    data-testid={`hosting-start-${svc.appName}`}
-                    onClick={() => runAction(svc.appName, startHostedService)}
-                  >
-                    Start
-                  </button>
-                  <button
-                    type="button"
-                    disabled={busyApp === svc.appName}
-                    data-testid={`hosting-delete-${svc.appName}`}
-                    onClick={() => runAction(svc.appName, removeHostedService)}
-                  >
-                    Delete
-                  </button>
+                  <div className="hosting-actions">
+                    <button
+                      type="button"
+                      className="btn-action"
+                      disabled={busyApp === svc.appName || svc.status === "STOPPED"}
+                      data-testid={`hosting-stop-${svc.appName}`}
+                      onClick={() => runAction(svc.appName, stopHostedService)}
+                    >
+                      Stop
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-action"
+                      disabled={busyApp === svc.appName || svc.status === "RUNNING"}
+                      data-testid={`hosting-start-${svc.appName}`}
+                      onClick={() => runAction(svc.appName, startHostedService)}
+                    >
+                      Start
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-action danger"
+                      disabled={busyApp === svc.appName}
+                      data-testid={`hosting-delete-${svc.appName}`}
+                      onClick={() => runAction(svc.appName, removeHostedService)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

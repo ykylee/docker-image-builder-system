@@ -64,7 +64,7 @@ describe("StatusPill — 배지 정책", () => {
     // legacy TEST_READY(info) 는 TEST_SUCCESS 가 되어 정책상 평문이다.
     ["PROVISIONING", "info"],
     ["CONTAINER_TEST_STARTED", "info"],
-    ["CONTAINER_TEST_PASSED", "info"],
+    ["RESULT_DELIVERY_STARTED", "info"],
     ["FAILED", "error"],
     ["DISABLED", "error"]
   ])("%s 는 %s 배지로 강조된다", (status, variant) => {
@@ -79,6 +79,8 @@ describe("StatusPill — 배지 정책", () => {
     "BUILD_SUCCESS",
     "TEST_SUCCESS",
     "DEPLOY_SUCCESS",
+    "CONTAINER_TEST_PASSED",
+    "RESULT_DELIVERED",
     "COMPLETED",
     "CANCELLED",
     "EXPIRED",

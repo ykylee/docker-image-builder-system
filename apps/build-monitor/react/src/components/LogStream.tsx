@@ -110,12 +110,21 @@ export function LogStream({
   return (
     <div data-testid="log-stream" style={wrapStyle}>
       <div style={toolbarStyle}>
-        <label style={{ display: "flex", gap: "var(--dib-space-sm)" }}>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--dib-space-sm)",
+            cursor: "pointer",
+            userSelect: "none"
+          }}
+        >
           <input
             type="checkbox"
             data-testid="log-stream-wrap"
             checked={wrap}
             onChange={(e) => setWrap(e.target.checked)}
+            style={{ cursor: "pointer" }}
           />
           wrap
         </label>

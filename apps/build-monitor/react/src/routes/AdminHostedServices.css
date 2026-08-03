@@ -1,0 +1,120 @@
+/* AdminHostedServices 디자인 토큰 기반 스타일링 — docs/DESIGN.md 정합 */
+
+.hosting-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dib-space-lg, 16px);
+  color: var(--dib-color-text-primary);
+  font-family: var(--dib-font-sans);
+}
+
+.hosting-page .muted {
+  color: var(--dib-color-text-muted);
+  margin: 0;
+}
+
+.hosting-page .err {
+  color: var(--dib-color-accent-danger, #dc2626);
+  margin: 0;
+}
+
+.hosting-page .mono {
+  font-family: var(--dib-font-mono, ui-monospace, monospace);
+}
+
+.hosting-title {
+  margin: var(--dib-space-md, 12px) 0;
+  font-size: var(--dib-size-xl, 20px);
+  font-weight: var(--dib-weight-semibold);
+  color: var(--dib-color-text-primary);
+}
+
+.hosting-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--dib-space-md, 12px);
+  border: 1px solid var(--dib-color-border-subtle, #242936);
+  border-radius: var(--dib-radius-md, 8px);
+  overflow: hidden;
+  background: var(--dib-color-bg-surface, #13151c);
+}
+
+.hosting-table th {
+  padding: var(--dib-space-md, 12px) var(--dib-space-lg, 16px);
+  text-align: left;
+  font-size: var(--dib-size-xs, 11px);
+  font-weight: var(--dib-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--dib-color-text-muted, #7d8593);
+  background: var(--dib-color-bg-surface-elevated, #1a1d27);
+  border-bottom: 1px solid var(--dib-color-border-subtle, #242936);
+}
+
+.hosting-table td {
+  padding: var(--dib-space-md, 12px) var(--dib-space-lg, 16px);
+  font-size: var(--dib-size-sm, 13px);
+  border-bottom: 1px solid var(--dib-color-border-subtle, #242936);
+  color: var(--dib-color-text-primary, #f8f9fa);
+  vertical-align: middle;
+}
+
+.hosting-table tbody tr:hover {
+  background: var(--dib-color-bg-surface-elevated, #1a1d27);
+}
+
+.hosting-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--dib-space-xs, 6px);
+}
+
+.degraded-badge {
+  margin-left: var(--dib-space-xs, 6px);
+  padding: 2px 6px;
+  font-size: var(--dib-size-xs, 11px);
+  color: var(--dib-color-accent-danger, #f15656);
+  background: color-mix(in srgb, var(--dib-color-accent-danger, #f15656) 15%, transparent);
+  border-radius: var(--dib-radius-sm, 4px);
+  border: 1px solid color-mix(in srgb, var(--dib-color-accent-danger, #f15656) 30%, transparent);
+  font-weight: var(--dib-weight-medium);
+}
+
+.hosting-url-link {
+  color: var(--dib-color-accent-primary, #7e81f3);
+  text-decoration: none;
+  font-family: var(--dib-font-mono, monospace);
+  font-size: var(--dib-size-sm, 13px);
+}
+
+.hosting-url-link:hover {
+  text-decoration: underline;
+}
+
+.btn-action {
+  padding: 4px 10px;
+  font-size: var(--dib-size-xs, 12px);
+  border-radius: var(--dib-radius-sm, 6px);
+  border: 1px solid var(--dib-color-border-strong, #566282);
+  background: var(--dib-color-bg-surface-elevated, #1a1d27);
+  color: var(--dib-color-text-primary, #f8f9fa);
+  cursor: pointer;
+  transition: all var(--dib-motion-duration-fast, 150ms);
+}
+
+.btn-action:hover:not(:disabled) {
+  background: var(--dib-color-accent-primary, #7e81f3);
+  color: var(--dib-color-on-accent, #0b0c10);
+  border-color: var(--dib-color-accent-primary, #7e81f3);
+}
+
+.btn-action:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-action.danger:hover:not(:disabled) {
+  background: var(--dib-color-accent-danger, #f15656);
+  color: #ffffff;
+  border-color: var(--dib-color-accent-danger, #f15656);
+}

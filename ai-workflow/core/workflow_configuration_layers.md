@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Workflow Configuration Layers
 
@@ -6,7 +6,7 @@
 - 범위: global config, shared workflow package, project-local override, 충돌 해결 원칙, 하네스별 적용 관점
 - 대상 독자: 저장소 관리자, 하네스 통합 담당자, AI workflow 설계자, 운영 담당자
 - 상태: draft
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `./workflow_harness_distribution.md`, `./workflow_adoption_entrypoints.md`, `./workflow_global_injection_policy.md`, `../harnesses/codex/apply_guide.md`, `../harnesses/opencode/apply_guide.md`
 - 상태 문서/프로젝트 문서 경계: `./workflow_state_vs_project_docs.md`
 

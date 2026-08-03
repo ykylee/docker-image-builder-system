@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.common.testing — v0.7.3 PBT-WF-01~06 runtime evaluator.
 
@@ -216,8 +216,10 @@ def check_generator_present(test_files: list[Path]) -> RuleResult:
     # v0.7.4: hypothesis package 가용성 확인 (optional dependency)
     hypothesis_installed = False
     try:
-        # hypothesis 는 optional dependency — mypy 의 import-not-found ignore
-        import hypothesis  # type: ignore[import-not-found]  # noqa: F401
+        # hypothesis 는 optional dependency. v1.0.2: import-not-found ignore 제거 —
+        # config 의 ignore_missing_imports=true 가 이미 덮으므로 unused 였다
+        # (pbt extra 설치/미설치 양쪽에서 동일 확인).
+        import hypothesis  # noqa: F401
         hypothesis_installed = True
     except ImportError:
         pass

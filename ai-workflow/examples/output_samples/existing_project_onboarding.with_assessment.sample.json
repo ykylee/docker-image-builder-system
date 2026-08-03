@@ -1,6 +1,6 @@
 {
   "status": "ok",
-  "tool_version": "v0.15.18-beta",
+  "tool_version": "v1.0.0-beta",
   "warnings": [
     "blocked 항목이 handoff 와 backlog 사이에서 다를 수 있으므로 수동 재확인이 필요하다.",
     "staging 검증은 사내 VPN 연결 상태에서만 수행 가능하다."

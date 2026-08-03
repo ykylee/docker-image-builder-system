@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """Pydantic schemas for git-history-summarizer MCP (v0.14.0+ 1st batch stable).
 

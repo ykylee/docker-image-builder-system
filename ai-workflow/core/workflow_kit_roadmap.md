@@ -1,15 +1,24 @@
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
+
 # Workflow Kit Roadmap
 
 - 문서 목적: `standard_ai_workflow` 저장소의 현재 성숙도와 다음 단계 작업을 상위 로드맵 형태로 정리한다.
 - 범위: 현재 단계 평가, 단계별 목표, 우선순위 로드맵, 완료 기준, 권장 작업 순서
 - 대상 독자: 저장소 관리자, AI workflow 설계자, 구현자, 프로젝트 온보딩 담당자
-- 상태: **v0.15.20-beta 기준 (Phase 12 close-out `done`, v1.0.0 pre-release final anchor; Phase 13 follow-up 정의, planned 진입 대기)**
-- 최종 수정일: 2026-07-20
+- 상태: **v1.0.0 기준 (Phase 12 close-out `done`; Phase 13 follow-up `in_progress` — 2026-07-21 start)**
+- 최종 수정일: 2026-07-31
 - 관련 문서: `./project_status_assessment.md`, `./workflow_skill_catalog.md`, `./workflow_mcp_candidate_catalog.md`, `./output_schema_guide.md`, `./prototype_promotion_scope.md`, `./read_only_mcp_transport_promotion.md`, `./phase_13_followup.md`, `./stable_guarantee.md`, `./v1_0_0_entry_evaluation.md`, `../skills/README.md`, `../mcp_servers/README.md`, `../examples/end_to_end_skill_demo.md`, `../examples/end_to_end_mcp_demo.md`, `../examples/output_samples/README.md`, `./maturity_matrix.json`
 
-## 1. 현재 단계 (Phase 12 done, Phase 13 planned 진입 대기)
+## 1. 현재 단계 (Phase 12 done, Phase 13 in_progress)
 
-현재 저장소는 아래 12단계 중 **Phase 1–12 done, Phase 13 planned 진입 대기** 상태다. v1.0.0 stable 진입 시점부터 Phase 13 의 2-year SemVer guarantee follow-up 이 정식 시작된다. 정식 phase / skill / harness 상태는 `workflow-source/core/maturity_matrix.json` 을 SSOT 로 참조한다.
+현재 저장소는 아래 13단계 중 **Phase 1–12 done, Phase 13 `in_progress`** 상태다. Phase 13 (2-year SemVer guarantee follow-up) 은 **v1.0.0 진입(2026-07-21 start, 2026-07-22 발행)과 함께 시작됐다**. 정식 phase / skill / harness 상태는 `workflow-source/core/maturity_matrix.json` 을 SSOT 로 참조한다.
+
+> **`-beta` suffix 에 대하여**: 릴리스 tag 는 `v1.0.0-beta` 이고 GitHub Release 도
+> pre-release 로 발행됐지만, 그 suffix 는 **기존 명명 관례를 유지한 것**이다
+> (릴리스 노트 `Beta-v1.0.0.md` 머리말이 명시). v1.0.0 entry gate 6영역은 전부 PASS 로
+> 판정됐고, matrix 의 `Phase 13.started = 2026-07-21` 이 그 판정을 따른다. 이 문서와
+> `phase_13_followup.md` 는 **릴리스 하루 전(2026-07-21) 상태에서 멈춰 있었고**,
+> `--maturity` 린터가 2026-07-31 에 그 드리프트를 잡았다 (§2.48).
 
 1. 개념 정리 단계 — Phase 1 (완료)
 2. 표준 문서와 템플릿 분리 단계 — Phase 2 (완료)
@@ -23,7 +32,7 @@
 10. 문서 및 링크 위생 단계 — Phase 10 (완료)
 11. **실전 파일럿 검증 단계 — Phase 11 (v0.9.0 2026-06-18 완료)**: DevHub 실전 파일럿 + contract v1 검증 + stable API frozen + generated JSON Schema SSOT + mypy strict 단계적 격상 + read-only MCP transport + release-dist 1-command + deprecation 1st cycle 적용 + SSOT 정합 + mypy config 정합
 12. **운영 지능화 + deprecation 운영 안정화 단계 — Phase 12 (v0.15.20 2026-07-20 완료, commit `ab202d8`)**: Phase 11 의 *외부 consumer 정합* 위에서 *내부 운영 품질* 심화 — mypy strict cumulative 누적 19 → 109 file (v0.11.18 FULL strict 도달) + 11종 skill → 9 stable (v0.11.19~v0.11.21 3 batch) + ADR-005 Memora-inspired Memory Index Phase 1~3d 8 release 완료 (v0.11.22) + CodeWhale 10번째 하네스 (v0.10.4) + release pipeline 자동화 + deprecation 1st/2nd cycle 운영 검증 + Quality Dashboard 8 panel (v0.13.0) + telemetry sidecar (v0.13.1) + self-recover orchestrator (v0.13.2) + wiki↔memory bidir-link (v0.13.3) + append-only memory layout (v0.14.0) + MCP 1st/2nd batch stable (v0.14.1~v0.14.2) + Phase 15 dashboard Panel 6/7/8 (v0.14.3) + 2-cycle deprecation 종결 (v0.15.0 ⚠️ BREAKING `.bak` drop) + cross-check discipline anchor 확장 (v0.15.1~v0.15.15) + Grok Build 11번째 하네스 (v0.15.16) + release memory cycle close-out (v0.15.17) + TST-WF-01 historical smoke 보강 (v0.15.18) + cross-panel final 정합 (v0.15.19) + v1.0.0 pre-release final (v0.15.20, stable API 25/25 frozen + SemVer 2-year guarantee 문서 + 24 smoke PASS + Panel 1~8 정합)
-13. **안정성 + 2-year SemVer guarantee follow-up 단계 — Phase 13 (planned, v1.0.0 stable 진입 후 ~ 2028-07-20)**: Phase 12 의 *운영 지능화 + deprecation 안정화* 위에서 *안정성 + backward compat 보장 + north-star metric 수렴* — stable API 25 entries frozen 운영 (SemVer 2-year 2026-07-20 ~ 2028-07-20) + Phase 13 AC1~AC6 (silent_failing 0 / telemetry hit_rate ≥ 0.9 / self-recover ≥ 95% auto-fix / bidir-link symmetric / 2-year backward compat / ADR-007 회귀) + 누적 smoke 24종 PASS + Panel 1~8 정합 + telemetry source 다양성 ≥ 4 + automated-repro-scaffold / git-conflict-resolver beta/stable 승격 + CHANGELOG auto-gen + ADR-006 Memory Index 회고 + long-running CI 안정성 + v2.0.0_entry_evaluation 후속. 상세 follow-up: [`./phase_13_followup.md`](./phase_13_followup.md) + guarantee: [`./stable_guarantee.md`](./stable_guarantee.md)
+13. **안정성 + 2-year SemVer guarantee follow-up 단계 — Phase 13 (`in_progress`, 2026-07-21 start ~ 2028-07-20), matrix 상 이름 `Operational Intelligence v1.0 + 2-Year Guarantee Follow-up`**: Phase 12 의 *운영 지능화 + deprecation 안정화* 위에서 *안정성 + backward compat 보장 + north-star metric 수렴* — stable API 25 entries frozen 운영 (SemVer 2-year 2026-07-20 ~ 2028-07-20) + Phase 13 AC1~AC6 (silent_failing 0 / telemetry hit_rate ≥ 0.9 / self-recover ≥ 95% auto-fix / bidir-link symmetric / 2-year backward compat / ADR-007 회귀) + 누적 smoke 24종 PASS + Panel 1~8 정합 + telemetry source 다양성 ≥ 4 + automated-repro-scaffold / git-conflict-resolver beta/stable 승격 + CHANGELOG auto-gen + ADR-006 Memory Index 회고 + long-running CI 안정성 + v2.0.0_entry_evaluation 후속. 상세 follow-up: [`./phase_13_followup.md`](./phase_13_followup.md) + guarantee: [`./stable_guarantee.md`](./stable_guarantee.md)
 
 ### 1.1 Phase 12 누적 성과 (v0.11.18 ~ v0.11.22, 2026-07-03 기준)
 
@@ -39,7 +48,7 @@
 - v0.11.19 1st batch (4): session-start, doc-sync, validation-plan, code-index-update.
 - v0.11.20 2nd batch (4): backlog-update, merge-doc-reconcile, workflow-linter, project-status-assessment.
 - v0.11.21 3rd batch (1): robust-patcher.
-- 누적 stable=9 / beta=2 (automated-repro-scaffold, git-conflict-resolver) / prototype=4. task-modes 별도 stable.
+- 누적 stable=9 / beta=2 (automated-repro-scaffold, git-conflict-resolver) / prototype=4. task-modes 별도 stable. (이후 v0.11.24 4th batch 에서 automated-repro-scaffold + git-conflict-resolver 도 stable 승격 → **최종 12 skill 전량 stable**, beta/prototype 0.)
 - 안정화 정합 조건 6 종 (CLI argparse / Pydantic schema / error_code 4종 / 단일 명령 / 예시 실행 섹션 / smoke test PASS) 모두 충족.
 
 **ADR-005 Memory Index** (v0.11.22, 8 release, Phase 1~3d):
@@ -58,9 +67,10 @@
 
 v0.11.x 누적 mypy strict 격상 (1 release = 1-2 file) 정책이 그대로 유지됐다. v0.11.10 의 35 file 도달 후, v0.11.18 에서 12 file 일괄 격상 (잔여 모두 정리) 으로 FULL strict 도달. 후속 release 부터는 신규 file 추가 시 *동시에 strict 격상* 정책 유지.
 
-### 1.3 현재 판단 근거 (v0.15.20, 2026-07-20):
+### 1.3 현재 판단 근거 (v1.0.0, 2026-07-22 발행 / 2026-07-31 갱신):
 
-- **Phase 1–12 done, Phase 13 planned 진입 대기**: `maturity_matrix.json` SSOT 의 milestones 가 1–12 done + Phase 13 planned.
+- **Phase 1–12 done, Phase 13 `in_progress`**: `maturity_matrix.json` SSOT 의 milestones 가 1–12 done + Phase 13 `in_progress` (`started: 2026-07-21`, `started_in_release: v1.0.0`).
+- **Phase 13 실작업 근거**: v0.15.21 에서 AC2 (telemetry source 다양성 ≥ 4) 선행 close-out, v1.0.0 발행 이후 §2.38~§2.48 이 전부 안정성·정합 축 작업이다.
 - **Phase 12 close-out (v0.15.20)**: Operational Intelligence (Quality Dashboard 8 panel + telemetry + self-recover + bidir-link) + Deprecation Stabilization (2-cycle 종결 + ADR-007 3rd cycle no-op accepted) 모두 완료. v1.0.0 pre-release final package (v0.15.17 + v0.15.18 + v0.15.19 + v0.15.20) 로 Phase 12 close-out. Phase 13 follow-up 정의: `phase_13_followup.md` + `stable_guarantee.md`.
 - **v0.15.20-beta 기준 (package: standard-ai-workflow 0.15.20, runtime `__version__` = v0.15.20-beta)**:
   - FULL mypy strict 도달: 109 file clean, 0 errors (v0.11.18 commit `4253eed`).
@@ -354,17 +364,17 @@ v0.11.x 누적 mypy strict 격상 (1 release = 1-2 file) 정책이 그대로 유
 - [ ] **deprecation 2nd cycle 적용** (Phase 11 1st cycle 의 정책 운영 검증 후 영향 symbol 식별 + DeprecationWarning 추가 — `phishing_federation_v4.build_default_sources_v4` 후속 candidate)
 - [x] **Phase 12 close-out** (v0.15.20 commit `ab202d8`, 2026-07-20) — Operational Intelligence + Deprecation Stabilization 완료. 상세: [`./v1_0_0_entry_evaluation.md`](./v1_0_0_entry_evaluation.md).
 - [x] **v1.0.0 pre-release final package** (v0.15.17 + v0.15.18 + v0.15.19 + v0.15.20) — Break Point #1~#3 + cross-panel final 정합. 24 smoke PASS + Panel 1~8 정합 + stable API 25/25 importable.
-- [ ] **Phase 13 follow-up 진입** — v1.0.0 stable 진입 시점부터 정식 start. 상세: [`./phase_13_followup.md`](./phase_13_followup.md).
+- [x] **Phase 13 follow-up 진입** — v1.0.0 진입과 함께 정식 start (2026-07-21). 상세: [`./phase_13_followup.md`](./phase_13_followup.md).
 
-## 8. 현재 권장 다음 작업 (v1.0.0 stable 진입 → Phase 13 follow-up)
+## 8. 현재 권장 다음 작업 (Phase 13 follow-up 운영 중)
 
-현재 시점에서 가장 권장하는 다음 작업은 아래 순서다 (Phase 13 follow-up 진입 → 2-year SemVer guarantee 운영). 상세: [`./phase_13_followup.md`](./phase_13_followup.md) §3.
+현재 시점에서 가장 권장하는 다음 작업은 아래 순서다 (2-year SemVer guarantee 운영). 상세: [`./phase_13_followup.md`](./phase_13_followup.md) §3.
 
-1. **(P0-1, 즉시) mypy strict venv 직접 verify (Break Point #3 close-out)** — `.venv` 활성화 후 `mypy workflow-source/ --strict --extra mcp-sdk` 0 errors 확인. expected cycle: v1.0.0 stable 진입 1 release 전.
-2. **(P0-2, 즉시) telemetry source 다양성 ≥ 4 (AC2 수렴)** — 3 skill (session-start / doc-sync / backlog-update) 의 `memory-index-query` dispatcher 호출 활성화. expected cycle: v1.0.x 첫 patch release.
-3. **(P1-1, 단기) CHANGELOG.md auto-gen lockdown** — `tools/release_pipeline.py release --apply` 의 changelog-gen pre-step + Unreleased 본문 v0.7.10 ~ v0.15.20 누적 backfill.
-4. **(P1-2, 단기) automated-repro-scaffold stable 승격** — beta 에서 stable 로. 5/6 정합 조건 충족.
-5. **(P1-3, 단기) git-conflict-resolver alpha → beta** — smoke test + error_code 4종 + spec layer 동기화.
+1. **(P0-1 ✅ DONE — 2026-07-21) mypy strict venv 직접 verify (Break Point #3 close-out)** — `.venv` (mypy 2.1.0) 에서 CI 게이트와 동일한 `mypy --no-incremental --strict workflow-source/workflow_kit/` = **117 source files, 0 errors** 확인 완료. (workflow-source dir 기준 4건 `unused-ignore` 는 optional import 방어용 non-gate 아티팩트.) v1.0.0 Gate 3 ✅ PASS 로 갱신.
+2. **(P0-2 ✅ DONE — v0.15.21-beta, 2026-07-21) telemetry source 다양성 ≥ 4 (AC2 수렴)** — 3 skill (session-start / doc-sync / backlog-update) 의 memory_index retrieval 게이트를 opt-in → **workspace memory_index 존재 시 자동 활성** 으로 전환 완료 (flag override 유지, 부재 시 zero-risk skip). AC2 는 신규 자립형 smoke `check_telemetry_source_diversity.py` (temp workspace 4-source fixture → `by_source` ≥ 4 + hit_rate sanity, 5/5 PASS) 로 CI 강제 (events.jsonl 은 gitignore 런타임 데이터라 live-file 의존 대신 self-contained fixture). live events.jsonl 4 source (dispatcher + 3 skill) + hit_rate 1.0 수렴 (dashboard Panel 8).
+3. **(P1-1 ✅ DONE — v0.15.21-beta, 2026-07-21) CHANGELOG.md auto-gen lockdown** — `cmd_release` drift-prevention 블록에 `changelog-gen` pre-step 자동 wiring 완료 (`--skip-changelog-gen` escape hatch) + `RELEASE_RE_BARE` 신규 (bare `vX.Y.Z —` commit 형식 인식) + version 정렬을 semver key (`_changelog_version_sort_key`) 로 교체 (두 자리 minor 뒤섞임 bug 해소) → v0.7.10 ~ v0.15.20 누적 backfill 정상 재생성 (146 version section).
+4. **(P1-2, ✅ v0.11.24 — 완료됨)** ~~automated-repro-scaffold stable 승격~~ — 이미 v0.11.24 4th batch 에서 stable 승격 완료 (`tests/check_automated_repro_scaffold_v0_11_24.py` 5/5 PASS, maturity_matrix `stage: stable`). 본 로드맵 텍스트가 stale 였음.
+5. **(P1-3, ✅ v0.11.24 — 완료됨)** ~~git-conflict-resolver alpha → beta~~ — 이미 v0.11.24 에서 beta → **stable** 승격 완료 (`--apply` 구현 + 8 case smoke). 본 로드맵 텍스트가 stale 였음.
 6. **(P2-1, 장기) ADR-006 Memory Index 회고 본문** — 2026-08-19 이후 (v0.11.22 + 30일) 작성.
 7. **(P2-2, 장기) long-running CI 안정성 검증** — 1+ month 누적 PASS + 누적 release ≥ 3.
 8. **(P2-3, 장기) 2-year 종료 후 v2.0.0_entry_evaluation.md** — 2028-07-20 시점 ADR-008 + Phase 14+ 정의.

@@ -49,6 +49,10 @@ interface FormState {
   sizeBytes: number;
   entrypointPath: string;
   dockerfilePath: string;
+  contextPath: string;
+  runtimePort: number;
+  stripPrefix: boolean;
+  hostingScheme: "path" | "subdomain";
 }
 
 const DEFAULT_FORM: FormState = {
@@ -59,18 +63,14 @@ const DEFAULT_FORM: FormState = {
   sizeBytes: 0,
   entrypointPath: "src/index.ts",
   dockerfilePath: "Dockerfile",
+  contextPath: "",
+  runtimePort: 8080,
+  stripPrefix: true,
+  hostingScheme: "path",
 };
 
 /**
  * 폼 필드 선언 — TASK-138 (Astryx Field 이관).
- *
- * 이전에는 8개 필드가 `<label><span><input><small>` 를 각각 손으로 반복해
- * 약 130줄이었다. 라벨/힌트/필수 표시/에러 결속이 필드마다 흩어져 있어
- * 하나를 고치면 나머지 7개와 어긋나기 쉬웠다.
- *
- * `errorPath` 는 서버(zod)와 클라이언트 검증이 쓰는 경로 문자열이며, 이
- * 값으로 해당 필드에 에러를 **결속**한다 — 이전에는 에러가 폼 아래 배너에만
- * 모여 있어 어느 입력의 문제인지 스크린리더가 알 수 없었다.
  */
 const FIELDS: readonly {
   key: keyof FormState;
@@ -150,10 +150,26 @@ const FIELDS: readonly {
     placeholder: "Dockerfile",
     hint: "Default 'Dockerfile'.",
     testId: "req-dockerfile"
+  },
+  {
+    key: "contextPath",
+    label: "contextPath (Hosting)",
+    errorPath: "contextPath",
+    kind: "text",
+    required: false,
+    placeholder: "hello-world",
+    hint: "Optional hosting URL sub-path (e.g. hello-world). Defaults to normalized appName.",
+    testId: "req-contextPath"
+  },
+  {
+    key: "runtimePort",
+    label: "runtimePort (Container Port)",
+    errorPath: "runtimePort",
+    kind: "number",
+    required: false,
+    hint: "Container port listening inside. Default 8080.",
+    testId: "req-runtimePort"
   }
-  // TASK-160 (P2-M1 Step 3): previewTtlMinutes 필드 제거. preview 런타임의
-  // 보존 시간 knob 이었으나 canonical build/test/deploy 모델에 대응 개념이
-  // 없고 서버 계약(BuildRequest)에서도 사라졌다.
 ];
 
 function makePreset(
@@ -171,6 +187,10 @@ function makePreset(
       sizeBytes: 12345,
       entrypointPath: "src/index.ts",
       dockerfilePath: "Dockerfile",
+      contextPath: `hello-${ts}`,
+      runtimePort: 8080,
+      stripPrefix: true,
+      hostingScheme: "path",
     };
   }
   if (kind === "minimal") {
@@ -182,6 +202,10 @@ function makePreset(
       sizeBytes: 4096,
       entrypointPath: "main.py",
       dockerfilePath: "Dockerfile",
+      contextPath: `minimal-${ts}`,
+      runtimePort: 5000,
+      stripPrefix: true,
+      hostingScheme: "path",
     };
   }
   return {
@@ -192,6 +216,10 @@ function makePreset(
     sizeBytes: 102400,
     entrypointPath: "src/server.ts",
     dockerfilePath: "Dockerfile",
+    contextPath: `ts-app-${ts}`,
+    runtimePort: 3000,
+    stripPrefix: true,
+    hostingScheme: "path",
   };
 }
 
@@ -245,6 +273,10 @@ export function BuildRequest(): ReactElement {
         },
         entrypointPath: form.entrypointPath,
         dockerfilePath: form.dockerfilePath,
+        ...(form.contextPath ? { contextPath: form.contextPath } : {}),
+        ...(form.runtimePort ? { runtimePort: Number(form.runtimePort) } : {}),
+        stripPrefix: form.stripPrefix,
+        hostingScheme: form.hostingScheme,
       },
       null,
       2
@@ -267,12 +299,6 @@ export function BuildRequest(): ReactElement {
     setSubmitError(null);
     setSubmitFieldErrors([]);
 
-    // TASK-138: 이전에는 input ref 로 native DOM value 를 직접 읽었다
-    // (TASK-099 가 "React state batching 회피" 로 도입). Astryx TextInput 은
-    // controlled 컴포넌트라 ref 패턴을 그대로 쓸 수 없어 state 읽기로
-    // 되돌렸고, **기존 회귀 18건이 그대로 통과하는지로 그 우회가 실제로
-    // 필요했는지 확인했다** — 통과했으므로 필요 없었다. fireEvent 각각이
-    // 별개의 discrete event 라 submit 시점에는 이미 flush 되어 있다.
     const appNameValue = form.appName;
     const requestedByValue = form.requestedBy;
     const objectKeyValue = form.objectKey;
@@ -338,6 +364,10 @@ export function BuildRequest(): ReactElement {
         },
         entrypointPath: entrypointValue,
         dockerfilePath: dockerfileValue,
+        ...(form.contextPath ? { contextPath: form.contextPath } : {}),
+        ...(form.runtimePort ? { runtimePort: Math.trunc(form.runtimePort) } : {}),
+        stripPrefix: form.stripPrefix,
+        hostingScheme: form.hostingScheme,
         metadata: {}
       };
       const result = await submitBuildRequest(payload);
@@ -463,6 +493,45 @@ export function BuildRequest(): ReactElement {
               />
             );
           })}
+        </div>
+
+        <div className="hosting-options" data-testid="req-hosting-options">
+          <label className="hosting-option" htmlFor="req-stripPrefix">
+            <input
+              id="req-stripPrefix"
+              type="checkbox"
+              checked={form.stripPrefix}
+              data-testid="req-stripPrefix"
+              onChange={(event) =>
+                setForm((prev) => ({ ...prev, stripPrefix: event.target.checked }))
+              }
+            />
+            <span>
+              <strong>stripPrefix</strong>
+              <small>Remove the hosting prefix before forwarding requests.</small>
+            </span>
+          </label>
+
+          <label className="hosting-option" htmlFor="req-hostingScheme">
+            <span>
+              <strong>hostingScheme</strong>
+              <small>Choose path or subdomain routing for the hosted service.</small>
+            </span>
+            <select
+              id="req-hostingScheme"
+              value={form.hostingScheme}
+              data-testid="req-hostingScheme"
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  hostingScheme: event.target.value as FormState["hostingScheme"]
+                }))
+              }
+            >
+              <option value="path">path</option>
+              <option value="subdomain">subdomain</option>
+            </select>
+          </label>
         </div>
 
         <div className="actions">

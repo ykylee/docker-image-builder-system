@@ -8,6 +8,7 @@
     "check": "pnpm -r check",
     "dev:build-server": "pnpm --filter @docker-image-builder-system/build-server dev",
     "test:host": "pnpm --filter @docker-image-builder-system/build-server test",
+    "test:e2e": "pnpm --filter @docker-image-builder-system/build-monitor test:e2e",
     "test:all": "pnpm --filter @docker-image-builder-system/build-server test && python3 -m unittest discover -s apps/skill_mcp/tests -t ."
   },
   "devDependencies": {

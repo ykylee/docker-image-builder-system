@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 #!/usr/bin/env python3
 """Smoke test the workflow bootstrap scaffold."""
@@ -16,6 +16,10 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SOURCE_ROOT = REPO_ROOT / "workflow-source"
 BOOTSTRAP_SCRIPT = SOURCE_ROOT / "scripts" / "bootstrap_workflow_kit.py"
 BACKLOG_UPDATE_SCRIPT = SOURCE_ROOT / "skills" / "backlog-update" / "scripts" / "run_backlog_update.py"
+
+# 배포 대상 core 문서의 **정본 목록**. 개수를 test 에 손으로 적지 않는다.
+sys.path.insert(0, str(SOURCE_ROOT / "scripts"))
+from bootstrap_lib.__main__ import DEFAULT_CORE_DOCS  # noqa: E402
 
 
 def run_bootstrap(args: list[str]) -> dict[str, object]:
@@ -70,10 +74,27 @@ def check_new_project_mode() -> None:
             assert_exists(str(generated[key]))
 
         copied_core_docs = payload["copied_core_docs"]
-        if len(copied_core_docs) != 7:
-            raise AssertionError("Expected seven copied core docs in new project mode.")
+        # v1.0.2: 손으로 적은 숫자(7)를 쓰면 배포 목록을 늘릴 때마다 이 test 가 깨지고,
+        # 그때 숫자만 고치면 *무엇이 늘었는지* 는 아무도 안 본다. 선언 목록에서 끌어와
+        # **목록과 산출물이 일치하는지** 를 본다.
+        if len(copied_core_docs) != len(DEFAULT_CORE_DOCS):
+            raise AssertionError(
+                f"copied core docs {len(copied_core_docs)}건이 DEFAULT_CORE_DOCS "
+                f"{len(DEFAULT_CORE_DOCS)}건과 다르다: {sorted(copied_core_docs)}"
+            )
+        copied_names = {Path(rel).name for rel in copied_core_docs}
+        if copied_names != set(DEFAULT_CORE_DOCS):
+            raise AssertionError(
+                f"선언 목록과 산출물 이름이 다르다: 누락={set(DEFAULT_CORE_DOCS) - copied_names}, "
+                f"초과={copied_names - set(DEFAULT_CORE_DOCS)}"
+            )
+        # `copied_core_docs` 는 **target root 기준 상대경로**다 (`generated_files` 만
+        # 절대경로). 이전에는 그대로 assert_exists 에 넘겨 CWD(=저장소 루트) 기준으로
+        # 해석했고, 그 결과 *생성된 사본이 아니라 저장소 자신의 파일*을 검사해 늘
+        # 통과했다. `check_source_without_runtime_layer` 가 `ai-workflow/` 를 숨기자
+        # 비로소 드러났다.
         for raw_path in copied_core_docs:
-            assert_exists(str(raw_path))
+            assert_exists(str(target_root / raw_path))
         for relative_path in (
             "ai-workflow/templates/project_workflow_profile_template.md",
             "ai-workflow/templates/session_handoff_template.md",
@@ -271,7 +292,7 @@ def check_opencode_only_mode() -> None:
         agents_text = Path(str(harness_files["codex_agents"])).read_text(encoding="utf-8")
         if "사용자에게 직접 보이는 작업 보고" not in agents_text:
             raise AssertionError("AGENTS.md should include the Korean reporting rule.")
-        if "ai-workflow/memory/active/state.json" not in agents_text:
+        if "ai-workflow/memory/active/<branch>/state.json" not in agents_text:
             raise AssertionError("AGENTS.md should direct agents to the workflow state cache.")
         if "프로젝트 코드나 프로젝트 문서를 탐색할 때는 이 경로를 기본 탐색 범위에 넣지 말고" not in agents_text:
             raise AssertionError("AGENTS.md should exclude ai-workflow from normal project exploration.")
@@ -281,7 +302,7 @@ def check_opencode_only_mode() -> None:
         skill_text = Path(str(harness_files["opencode_skill"])).read_text(encoding="utf-8")
         if "Write user-facing status updates, work reports, and document drafts in Korean by default." not in skill_text:
             raise AssertionError("OpenCode skill should include the Korean reporting rule.")
-        if "ai-workflow/memory/active/state.json" not in skill_text:
+        if "ai-workflow/memory/active/<branch>/state.json" not in skill_text:
             raise AssertionError("OpenCode skill should read the workflow state cache.")
         if "Treat `ai-workflow/` as workflow metadata only." not in skill_text:
             raise AssertionError("OpenCode skill should exclude ai-workflow from normal project exploration.")
@@ -291,7 +312,7 @@ def check_opencode_only_mode() -> None:
             raise AssertionError("OpenCode agent should include the Korean reporting rule.")
         if "read-mostly coordinator" not in agent_text:
             raise AssertionError("OpenCode orchestrator should describe the coordinator role.")
-        if "ai-workflow/memory/active/state.json" not in agent_text:
+        if "ai-workflow/memory/active/<branch>/state.json" not in agent_text:
             raise AssertionError("OpenCode orchestrator should read the workflow state cache.")
         if "Do not call direct tools yourself. Use only task delegation" not in agent_text:
             raise AssertionError("OpenCode orchestrator should require task delegation instead of direct tool calls.")
@@ -648,12 +669,27 @@ def check_enable_wiki_emission() -> None:
             if proto_name == "SCHEMA.md":
                 if "page type" not in emitted_text.lower():
                     raise AssertionError("Emitted SCHEMA.md missing 'page type' references")
+            # index.md / log.md 는 신규 프로젝트용 **빈 스켈레톤**이다. 항목이 들어
+            # 있는지를 요구하면 "본 저장소의 실제 wiki 데이터(concept 목록 / 2,000+
+            # line ingest 이력)를 신규 프로젝트에 복사한다" 는 버그를 계약으로 굳히게
+            # 된다. 검증 대상은 *구조* 여야 한다.
             elif proto_name == "index.md":
-                if "### [[" not in emitted_text:
-                    raise AssertionError("Emitted index.md missing ### [[ entry format")
+                for heading in ("# Master Knowledge Index", "## Concepts"):
+                    if heading not in emitted_text:
+                        raise AssertionError(f"Emitted index.md missing heading: {heading}")
+                if "### [[" in emitted_text:
+                    raise AssertionError(
+                        "Emitted index.md should start empty — source repo 의 wiki 항목이 "
+                        "신규 프로젝트로 복사되면 안 된다."
+                    )
             elif proto_name == "log.md":
-                if "## [" not in emitted_text:
-                    raise AssertionError("Emitted log.md missing ## [ date entry format")
+                if "# Wiki Ingest/Query Log" not in emitted_text:
+                    raise AssertionError("Emitted log.md missing title heading")
+                if "## [" in emitted_text:
+                    raise AssertionError(
+                        "Emitted log.md should start empty — source repo 의 ingest 이력이 "
+                        "신규 프로젝트로 복사되면 안 된다."
+                    )
     finally:
         if target_root.exists():
             import shutil

@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Workflow Agent Topology
 
@@ -6,7 +6,7 @@
 - 범위: 추천 agent 목록, 책임, 입력/출력, 상태 문서 수정 원칙
 - 대상 독자: AI agent 설계자, 개발자, 운영자
 - 상태: stable
-- 최종 수정일: 2026-07-18
+- 최종 수정일: 2026-07-21
 - 관련 문서: `workflow_skill_catalog.md`, `workflow_mcp_candidate_catalog.md`, `../templates/project_workflow_profile_template.md`, **외부 contract: [./orchestrator_subagent_contract_v1.md](./orchestrator_subagent_contract_v1.md)**
 
 ## 1. 1차 필수 agent

@@ -218,7 +218,23 @@ export function BuildDetail(): ReactElement {
               보존 payload.dockerRegistry). */}
           <div>
             <dt>Runtime URL</dt>
-            <dd className="mono">{build.build.runtimeUrl ?? "—"}</dd>
+            <dd className="mono">
+              {build.build.runtimeUrl ? (
+                <div className="runtime-url-box">
+                  <a
+                    href={build.build.runtimeUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="runtime-url-link"
+                    data-testid="runtime-url-link"
+                  >
+                    🚀 {build.build.runtimeUrl} ↗
+                  </a>
+                </div>
+              ) : (
+                "—"
+              )}
+            </dd>
           </div>
           <div>
             <dt>Container running</dt>

@@ -1,4 +1,4 @@
-# standard-ai-workflow-kit: v0.15.19-beta
+# standard-ai-workflow-kit: v1.0.0-beta
 
 """workflow_kit.cli.doctor — v0.7.4 CLI wrapper for 7 baseline compliance evaluation.
 
@@ -8,6 +8,7 @@ Usage:
     python -m workflow_kit.cli.doctor --json                # JSON output
     python -m workflow_kit.cli.doctor --pretty              # pretty table
     python -m workflow_kit.cli.doctor --exit-on-fail        # exit per config.fail_on
+    python -m workflow_kit.cli.doctor --config-path workflow-source   # 설정 위치 명시
 
 v0.7.3 의 7 baseline dispatcher (security / testing / performance / security-auth /
 testing-property-based / performance-memory / resiliency) 를 CLI 로 expose.
@@ -16,6 +17,15 @@ v0.7.7 추가: load_config() integration (v0.7.6 의 [tool.workflow-doctor] 5 fi
   - fail_on (CI threshold) 의 *enum* 적용: compliant | advisory | non_compliant
   - partial_rules / opt_in / thresholds / excluded_paths 의 *summary 표시* (deferred follow-up: state-aware variant)
   - --show-config flag: 현재 load 된 config 의 to_dict() 출력
+v1.0.5 (§2.49) 수정: **기준 경로와 설정 출처**.
+  - `--project-root` default 가 모듈 위치 기반(`parent × 5`)이라 이 저장소에서
+    `/home/yklee/repos` = 저장소 루트의 **두 단계 위** 를 가리켰다. 설치본에서는 아예
+    사용자 프로젝트와 무관한 경로다. 이제 **cwd** 가 기본.
+  - `--config-path` 신설. `[tool.workflow-doctor]` 가 workspace root 가 아닌 곳에 있는
+    저장소(이 저장소가 그렇다 — `workflow-source/pyproject.toml`)를 위해.
+  - 출력 3종(`--show-config` / `--json` / pretty)에 **config_provenance** 를 싣는다.
+    설정이 적용된 것과 조용히 기본값으로 떨어진 것이 구별되지 않아 위 결함이 오래
+    살아남았다 (§2.47 과 같은 축).
 """
 
 from __future__ import annotations
@@ -28,8 +38,16 @@ from typing import Any
 
 from workflow_kit.common.metadata import DoctorConfig
 
-# Resolve project_root default
-DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+# v1.0.5(§2.49): 예전 default 는 `Path(__file__).resolve().parent × 5` 였다.
+# 이 저장소에서 그 값은 `/home/yklee/repos` — **저장소 루트의 두 단계 위**다. 그리고
+# kit 이 site-packages 에 설치되면 그 경로는 사용자의 프로젝트와 아무 관계도 없다.
+# 모듈 위치로 사용자의 workspace 를 추측할 수 있다는 전제 자체가 틀렸다.
+#
+# 이제 **cwd** 를 기본으로 쓴다. 추측이 아니라 호출자가 서 있는 자리이고, 틀렸을 때
+# 산출물의 provenance 로 곧바로 드러난다.
+def default_project_root() -> Path:
+    """`--project-root` 기본값 — 모듈 위치가 아니라 **cwd**."""
+    return Path.cwd()
 
 # 7 baseline dispatcher
 ALL_BASELINES = [
@@ -107,12 +125,19 @@ def evaluate(project_root: Path, baseline: str | None = None, config: DoctorConf
     return {name: cs.to_dict() for name, cs in all_summaries.items()}
 
 
-def render_pretty(results: dict[str, Any], config: DoctorConfig | None = None) -> str:
+def render_pretty(
+    results: dict[str, Any],
+    config: DoctorConfig | None = None,
+    provenance: dict[str, str] | None = None,
+) -> str:
     """7 baseline 결과를 사람이 읽기 좋은 table 로.
 
     v0.7.7+: config (DoctorConfig) 인자 추가. config 있으면:
     - footer 에 fail_on threshold 명시
     - config 의 partial_rules / opt_in 표시 (deferred: 실제 적용은 follow-up)
+
+    v1.0.5(§2.49): provenance 인자 추가. **설정이 어디서 왔는지를 footer 첫 줄에 적는다** —
+    기본값으로 떨어진 것을 읽는 사람이 알아야 표의 숫자를 해석할 수 있다.
     """
     from workflow_kit.common.metadata import DoctorConfig
 
@@ -181,6 +206,20 @@ def render_pretty(results: dict[str, Any], config: DoctorConfig | None = None) -
         f"{advisory} advisory, "
         f"{non_compliant} non_compliant"
     )
+    # v1.0.5+ 출처 먼저 — 기본값으로 떨어졌으면 그 사실을 숫자보다 먼저 본다.
+    if provenance is not None:
+        source = provenance.get("config_source", "?")
+        consulted = provenance.get("config_consulted_path", "?")
+        if source == "default":
+            reason = provenance.get("config_default_reason", "?")
+            lines.append(
+                f" Config source: default ({reason}) — {consulted} → "
+                f"**선언한 설정이 적용되지 않았다**. --config-path 로 명시할 수 있다."
+            )
+        else:
+            lines.append(f" Config source: {source} — {consulted}")
+        lines.append(f" Project root: {provenance.get('project_root', '?')} (state.json 기준)")
+
     # v0.7.7+ config footer
     if config is not None:
         lines.append(f" Config: fail_on={config.fail_on} (severity ≥ {config.fail_on} → exit 1)")
@@ -195,7 +234,7 @@ def render_pretty(results: dict[str, Any], config: DoctorConfig | None = None) -
 
 
 def main(argv: list[str] | None = None) -> int:
-    from workflow_kit.common.metadata import load_config, should_fail
+    from workflow_kit.common.metadata import load_config_with_provenance, should_fail
 
     parser = argparse.ArgumentParser(
         prog="workflow-doctor",
@@ -204,8 +243,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--project-root",
         type=Path,
-        default=DEFAULT_PROJECT_ROOT,
-        help=f"프로젝트 루트 경로 (default: {DEFAULT_PROJECT_ROOT})",
+        default=None,
+        help="workspace root (state.json 을 찾는 기준). default: cwd",
+    )
+    parser.add_argument(
+        "--config-path",
+        type=Path,
+        default=None,
+        help="[tool.workflow-doctor] 를 담은 pyproject.toml (또는 그것이 있는 디렉터리). "
+             "생략하면 --project-root 를 묻는다. 어느 파일을 물었고 설정을 얻었는지는 "
+             "--show-config / --json 산출물의 config_provenance 에 남는다.",
     )
     parser.add_argument(
         "--baseline",
@@ -229,31 +276,42 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     baseline = None if args.baseline == "all" else args.baseline
+    project_root = args.project_root if args.project_root is not None else default_project_root()
 
     # v0.7.7+ load_config integration
-    config = load_config(args.project_root)
+    # v1.0.5(§2.49): **무엇을 물었고 얻었는지를 함께 낸다.** load_config 는 어떤 경우에도
+    # 실패하지 않아서, 선언한 설정이 적용된 것과 조용히 기본값으로 떨어진 것이 출력에서
+    # 구별되지 않았다 — 잘못된 기본 경로가 그래서 오래 살아남았다 (§2.47 과 같은 축).
+    config, provenance = load_config_with_provenance(args.config_path or project_root)
+    provenance_out = {"project_root": str(project_root), **provenance.to_dict()}
 
     # --show-config: config 만 출력하고 종료
     if args.show_config:
-        print(json.dumps(config.to_dict(), indent=2, ensure_ascii=False))
+        # 기존 5 field 는 **top-level 그대로** 둔다 (v0.7.7 계약). 출처는 옆에 붙인다 —
+        # 소비자를 깨지 않으면서 "이 값이 어디서 왔는지" 를 같은 산출물에서 읽게 한다.
+        print(json.dumps(
+            {**config.to_dict(), "config_provenance": provenance_out},
+            indent=2, ensure_ascii=False,
+        ))
         return 0
 
     try:
-        results = evaluate(args.project_root, baseline, config=config)
+        results = evaluate(project_root, baseline, config=config)
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
 
     if args.json:
-        # v0.7.7+ JSON output 에 config 추가
+        # v0.7.7+ JSON output 에 config 추가. v1.0.5: 출처도 함께.
         out = {
             "config": config.to_dict(),
+            "config_provenance": provenance_out,
             "results": results,
         }
         print(json.dumps(out, indent=2, ensure_ascii=False))
     else:
         # pretty = default
-        print(render_pretty(results, config=config))
+        print(render_pretty(results, config=config, provenance=provenance_out))
 
     if args.exit_on_fail:
         # v0.7.7+ should_fail() integration — config.fail_on enum 기반

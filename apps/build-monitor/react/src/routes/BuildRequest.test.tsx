@@ -124,6 +124,26 @@ describe("BuildRequest (React) — TASK-099", () => {
     expect((screen.getByTestId("req-appName") as HTMLInputElement).value).toMatch(/^minimal-/);
   });
 
+  it("호스팅 옵션을 변경하면 제출 payload에 반영한다", async () => {
+    localStorage.setItem("userId", "yklee");
+    submitBuildRequestMock.mockResolvedValueOnce(acceptedResponse("hello-abc"));
+    renderPage();
+    await waitFor(() =>
+      expect((screen.getByTestId("req-appName") as HTMLInputElement).value).toMatch(/^hello-/)
+    );
+
+    fireEvent.click(screen.getByTestId("req-stripPrefix"));
+    fireEvent.change(screen.getByTestId("req-hostingScheme"), {
+      target: { value: "subdomain" }
+    });
+    fireEvent.submit(screen.getByTestId("req-form"));
+
+    await waitFor(() => expect(submitBuildRequestMock).toHaveBeenCalledTimes(1));
+    expect(submitBuildRequestMock).toHaveBeenCalledWith(
+      expect.objectContaining({ stripPrefix: false, hostingScheme: "subdomain" })
+    );
+  });
+
   it("'Random appName' 버튼이 appName 만 갱신 (다른 필드는 유지)", async () => {
     localStorage.setItem("userId", "yklee");
     renderPage();
