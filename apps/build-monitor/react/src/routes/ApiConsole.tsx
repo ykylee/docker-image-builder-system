@@ -1,7 +1,7 @@
-// TASK-099 (M4.5 Group E): ApiConsole (React) — Swagger UI iframe 임베드.
+// API Console — Scalar API Reference iframe 임베드.
 //
 // Svelte src/routes/ApiConsole.svelte 와 1:1 정합. Build Server 의 `/docs/`
-// (trailing slash) 가 Swagger UI HTML 을 서빙하고, React 측 SPA 의
+// (trailing slash) 가 Scalar API Reference HTML 을 서빙하고, React 측 SPA 의
 // `/api-console` 라우트가 iframe 으로 임베드. SPA fallback (`/*` → React
 // index.html) 와 격리되어 iframe 내부 layout 이 깨지지 않음.
 //
@@ -16,7 +16,7 @@ import "./ApiConsole.css";
 
 // iframe URL. trailing slash 가 빠지면 fastify redirect 가 발생하므로
 // 명시적으로 포함 (Svelte ApiConsole.svelte 와 동일).
-const SWAGGER_URL = "/docs/";
+const API_DOCS_URL = "/docs/";
 
 export function ApiConsole(): ReactElement {
   const [iframeError, setIframeError] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function ApiConsole(): ReactElement {
   }
 
   function handleIframeError(): void {
-    setIframeError("Failed to load Swagger UI. Is the build server running?");
+    setIframeError("Failed to load API documentation. Is the build server running?");
   }
 
   function refreshIframe(): void {
@@ -46,8 +46,8 @@ export function ApiConsole(): ReactElement {
         <div>
           <h1>API Console</h1>
           <p className="muted">
-            Build Server 의 OpenAPI contract 를 Swagger UI 로 렌더링합니다.
-            iframe 안의 Swagger UI 의 <strong>좌측 endpoint list</strong> 에서
+            Build Server 의 OpenAPI contract 를 Scalar API Reference 로 렌더링합니다.
+            iframe 안의 API Reference 의 <strong>좌측 endpoint list</strong> 에서
             endpoint 를 선택하고, <strong>우측 detail panel</strong> 에서
             <strong>Try it out</strong> 으로 직접 호출해볼 수 있습니다.
           </p>
@@ -82,8 +82,8 @@ export function ApiConsole(): ReactElement {
       <div className="frame-wrap" data-testid="api-console-frame">
         <iframe
           key={reloadKey}
-          src={SWAGGER_URL}
-          title="Build Server Swagger UI"
+          src={API_DOCS_URL}
+          title="Build Server Scalar API Reference"
           onLoad={handleIframeLoad}
           onError={handleIframeError}
         />
@@ -101,7 +101,7 @@ export function ApiConsole(): ReactElement {
       <details className="hint-block">
         <summary>About this view</summary>
         <p>
-          Swagger UI 는 build server 가 직접 서빙합니다 (<code>{SWAGGER_URL}</code>).
+          Scalar API Reference 는 build server 가 직접 서빙합니다 (<code>{API_DOCS_URL}</code>).
           본 페이지에서는 같은 SPA 안에서 navigation 흐름을 깨지 않도록 iframe 으로
           임베드합니다. 네트워크 오류 또는 backend down 시 iframe 이 빈 화면으로
           남을 수 있어, 그 경우 "Refresh" 버튼 또는 우측 상단 "Raw OpenAPI JSON"

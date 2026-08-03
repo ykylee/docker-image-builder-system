@@ -73,7 +73,7 @@ function parseStrictContentRangeFlag(env: NodeJS.ProcessEnv): boolean {
 // consumer 가 잘못된 path 호출을 신뢰성 있게 인지.
 const API_REWRITE_ALLOWED_PREFIXES = ["/builds", "/admin/"];
 
-// API/Swagger prefix. SPA fallback 에서 제외 — Build Server 가 자체
+// API documentation prefix. SPA fallback 에서 제외 — Build Server 가 자체
 // 응답하지 못한 GET path 만 wildcard 가 잡으므로 사실상 catch-all 404
 // 케이스에서 JSON 응답을 보장하기 위함. `/api/` 는 별도 분기 (위
 // setNotFoundHandler 안에서 307 transparent redirect 로 rewrite) — 본
@@ -83,7 +83,7 @@ const API_REWRITE_ALLOWED_PREFIXES = ["/builds", "/admin/"];
 // wildcard 제외에서 제외한다.
 const API_JSON_PREFIXES = ["/openapi", "/docs", "/health"];
 
-// 브라우저 문서 내비게이션이어도 SPA 로 가로채지 않을 prefix. Swagger UI
+// 브라우저 문서 내비게이션이어도 SPA 로 가로채지 않을 prefix. Scalar API Reference
 // (`/docs`) 와 OpenAPI 문서는 운영자가 주소창으로 직접 여는 대상이고,
 // `/api/*` 는 프론트엔드 fetch 의 정식 진입점이라 리다이렉트 계약을
 // 유지해야 한다. `/assets/` 는 빌드 산출물 정적 경로.
@@ -111,7 +111,7 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     (_request, payload, done) => done(null, payload)
   );
 
-  // OpenAPI / Swagger UI / CORS are registered before any data layer so
+  // OpenAPI / Scalar API Reference / CORS are registered before any data layer so
   // /docs and /openapi.json are available even when the database is
   // unreachable. When corsOrigin is `false` (CORS disabled) we still keep
   // the OpenAPI routes but skip the @fastify/cors plugin entirely.

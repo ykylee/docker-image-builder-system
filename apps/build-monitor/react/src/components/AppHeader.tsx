@@ -83,9 +83,7 @@ export function AppHeader(): ReactElement {
               ) : null}
             </>
           ) : null}
-          <TopNavItem href="/api-console" label="API Console" />
-          <TopNavItem href="/openapi.json" target="_blank" label="OpenAPI" />
-          <TopNavItem href="/docs/" target="_blank" label="Docs" />
+          <TopNavItem href="/api-console" label="API Docs" />
         </>
       }
       // endContent = 세션 컨트롤만 (user 식별 + logout + theme). mobile-bar

@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/config"
@@ -56,9 +57,13 @@ func newWorkerWithDeps(cfg config.Config, client hostclient.BuildControlClient) 
 	// (배포 자체가 optional 이라 runner 부팅을 막지 않는다).
 	if cfg.K8sMode != "" {
 		k8sDeployer, err := deploy.NewK8sDeployer(cfg.K8sMode, deploy.K8sDeployOptions{
-			Cluster:   cfg.K8sCluster,
-			Namespace: cfg.K8sNamespace,
-			Manifest:  cfg.K8sManifest,
+			Cluster:        cfg.K8sCluster,
+			Namespace:      cfg.K8sNamespace,
+			Manifest:       cfg.K8sManifest,
+			HelmChart:      cfg.HelmChart,
+			HelmRelease:    cfg.HelmRelease,
+			HelmValuesFile: cfg.HelmValuesFile,
+			HelmSetValues:  splitHelmSetValues(cfg.HelmSetValues),
 		})
 		if err != nil {
 			log.Printf("runner %s: k8s adapter 비활성 (mode=%q): %v", cfg.RunnerID, cfg.K8sMode, err)
@@ -73,6 +78,17 @@ func newWorkerWithDeps(cfg config.Config, client hostclient.BuildControlClient) 
 		claimer: queue.NewHostServerClaimer(client),
 		svc:     svc,
 	}
+}
+
+func splitHelmSetValues(raw string) []string {
+	var values []string
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			values = append(values, item)
+		}
+	}
+	return values
 }
 
 // claimBackoff 는 연속 claim 실패에 대한 exponential backoff.

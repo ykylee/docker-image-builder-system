@@ -206,7 +206,7 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
     assert.match(health.headers.get("content-type") ?? "", /application\/json/);
     assert.deepEqual(await health.json(), { status: "ok" });
 
-    // Swagger UI 는 운영자가 주소창으로 직접 여는 대상 — SPA 로 대체되면 안 된다.
+    // Scalar API Reference 는 운영자가 주소창으로 직접 여는 대상 — SPA 로 대체되면 안 된다.
     const docs = await fetch(`${baseUrl}/docs`, { headers: NAV_HEADERS });
     assert.doesNotMatch(await docs.text(), new RegExp(REACT_STUB));
   });
