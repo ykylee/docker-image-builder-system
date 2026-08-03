@@ -48,7 +48,7 @@ export function FilterChips<T extends string>({
           borderRadius: "var(--dib-radius-pill)",
           background: "transparent",
           color: isActive
-            ? "white"
+            ? "var(--dib-color-on-accent)"
             : "var(--dib-color-text-secondary)",
           fontSize: "var(--dib-size-sm)",
           fontWeight: "var(--dib-weight-medium)",

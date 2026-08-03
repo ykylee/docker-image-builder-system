@@ -47,7 +47,7 @@ const ATTENTION_VARIANT: Readonly<Record<string, BadgeVariant>> = {
   //                ("성공은 기대되는 결과이므로 강조할 이유가 없다") — 배지에서 뺀다.
   PROVISIONING: "info",
   CONTAINER_TEST_STARTED: "info",
-  CONTAINER_TEST_PASSED: "info",
+  RESULT_DELIVERY_STARTED: "info",
   // 실패 — 사용자의 행동이 필요하다
   FAILED: "error",
   DISABLED: "error"

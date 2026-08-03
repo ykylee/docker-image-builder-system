@@ -30,6 +30,8 @@ apps/build-monitor/tests/visual/baseline/
 # console-log 일회성 산출물 — workspace root 에만 떨어지며 같은 이름이
 # agent session 간 충돌나지 않도록 local-only.
 .playwright-cli/
+playwright-report/
+test-results/
 
 # TASK-122: Svelte → React 마이그레이션 (TASK-094/101) 후 apps/build-monitor/src/
 # 의 Vite/tsc emit 산출물 (.js + .map, Svelte 시절 testing-library/vitest 산출물) 과
