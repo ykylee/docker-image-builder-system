@@ -11,6 +11,9 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   HostedService,
+  ServiceManifest,
+  ServiceManifestResponse,
+  ServiceManifestRevisionListResponse,
   DeploymentReportRequest,
   ErrorCode,
   RunnerStatus,
@@ -483,6 +486,13 @@ export interface BuildRepository {
     availableReplicas: number
   ): Promise<HostedService | null>;
   deleteHostedService(appName: string): Promise<boolean>;
+  getServiceManifest(appName: string): Promise<ServiceManifestResponse | null>;
+  updateServiceManifest(
+    appName: string,
+    manifest: ServiceManifest,
+    updatedBy: string
+  ): Promise<ServiceManifestResponse>;
+  listServiceManifestRevisions(appName: string): Promise<ServiceManifestRevisionListResponse>;
   getHostingCapacityUsage(): Promise<import("../services/hosting-capacity.js").HostingCapacity>;
   reserveHostingCapacity(
     reservation: import("../services/hosting-capacity.js").HostingCapacityReservation

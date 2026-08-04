@@ -16,6 +16,8 @@ import type {
   BuildStatusResponse,
   BuildSummary,
   HostedService,
+  ServiceManifest,
+  ServiceManifestResponse,
   DeploymentReportRequest,
   ExecutionStatus,
   SourceArchive,
@@ -154,6 +156,13 @@ export function createMemoryBuildRepository(
   const hostingReservations = new Map<string, HostingCapacityReservation>();
   // TASK-166 (P3-M1): 호스팅 registry — appName 기준(앱당 1개).
   const hostedServices = new Map<string, StoredHostedService>();
+  const serviceManifests = new Map<string, ServiceManifestResponse>();
+  const serviceManifestRevisions = new Map<string, Array<{
+    revision: number;
+    manifest: ServiceManifest;
+    updatedBy: string;
+    createdAt: string;
+  }>>();
 
   return {
     async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
@@ -1415,6 +1424,28 @@ export function createMemoryBuildRepository(
     },
     async deleteHostedService(appName: string): Promise<boolean> {
       return hostedServices.delete(appName);
+    },
+    async getServiceManifest(appName: string): Promise<ServiceManifestResponse | null> {
+      return serviceManifests.get(appName) ?? null;
+    },
+    async updateServiceManifest(
+      appName: string,
+      manifest: ServiceManifest,
+      updatedBy: string
+    ): Promise<ServiceManifestResponse> {
+      const now = nowIsoString();
+      const revision = (serviceManifests.get(appName)?.currentRevision ?? 0) + 1;
+      const response: ServiceManifestResponse = {
+        appName, currentRevision: revision, manifest, updatedBy, updatedAt: now
+      };
+      serviceManifests.set(appName, response);
+      const revisions = serviceManifestRevisions.get(appName) ?? [];
+      revisions.unshift({ revision, manifest, updatedBy, createdAt: now });
+      serviceManifestRevisions.set(appName, revisions);
+      return response;
+    },
+    async listServiceManifestRevisions(appName: string) {
+      return { revisions: serviceManifestRevisions.get(appName) ?? [] };
     },
     async getHostingCapacityUsage() {
       return [...hostingReservations.values()].reduce(

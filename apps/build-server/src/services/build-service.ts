@@ -12,6 +12,9 @@ import type {
   ClaimResponse,
   DeploymentReportRequest,
   HostedService,
+  ServiceManifest,
+  ServiceManifestResponse,
+  ServiceManifestRevisionListResponse,
   RunnerStatus,
 } from "@docker-image-builder-system/shared-contract";
 
@@ -323,6 +326,22 @@ export class BuildService {
 
   getHostedService(appName: string) {
     return this.repository.getHostedServiceByAppName(appName);
+  }
+
+  getServiceManifest(appName: string): Promise<ServiceManifestResponse | null> {
+    return this.repository.getServiceManifest(appName);
+  }
+
+  updateServiceManifest(
+    appName: string,
+    manifest: ServiceManifest,
+    updatedBy: string
+  ): Promise<ServiceManifestResponse> {
+    return this.repository.updateServiceManifest(appName, manifest, updatedBy);
+  }
+
+  listServiceManifestRevisions(appName: string): Promise<ServiceManifestRevisionListResponse> {
+    return this.repository.listServiceManifestRevisions(appName);
   }
 
   async getHostingCapacity() {

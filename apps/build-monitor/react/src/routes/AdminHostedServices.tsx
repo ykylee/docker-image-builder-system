@@ -16,6 +16,9 @@ import {
   startHostedService,
   stopHostedService,
   removeHostedService,
+  getHostedServiceManifest,
+  updateHostedServiceManifest,
+  type ServiceManifestView,
   type HostedServiceView
   , type HostingCapacityView
 } from "@/lib/api";
@@ -32,6 +35,9 @@ export function AdminHostedServices(): ReactElement {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyApp, setBusyApp] = useState<string | null>(null);
+  const [manifestApp, setManifestApp] = useState<string | null>(null);
+  const [manifestText, setManifestText] = useState("");
+  const [manifestRevision, setManifestRevision] = useState<number | null>(null);
   const [accessDenied, setAccessDenied] = useState<
     null | { reason: "NO_USER" | "FORBIDDEN" | "NOT_IN_ALLOW_LIST" }
   >(null);
@@ -87,6 +93,35 @@ export function AdminHostedServices(): ReactElement {
     try {
       await action(userId, appName);
       await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyApp(null);
+    }
+  }
+
+  async function openManifest(appName: string): Promise<void> {
+    if (!userId) return;
+    setError(null);
+    try {
+      const result = await getHostedServiceManifest(userId, appName);
+      setManifestApp(appName);
+      setManifestRevision(result.currentRevision);
+      setManifestText(JSON.stringify(result.manifest, null, 2));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function saveManifest(): Promise<void> {
+    if (!userId || !manifestApp) return;
+    setBusyApp(manifestApp);
+    setError(null);
+    try {
+      const parsed = JSON.parse(manifestText) as ServiceManifestView;
+      const result = await updateHostedServiceManifest(userId, manifestApp, parsed);
+      setManifestRevision(result.currentRevision);
+      setManifestText(JSON.stringify(result.manifest, null, 2));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -233,12 +268,46 @@ export function AdminHostedServices(): ReactElement {
                     >
                       Delete
                     </button>
+                    <button
+                      type="button"
+                      className="btn-action"
+                      disabled={busyApp === svc.appName}
+                      data-testid={`hosting-manifest-${svc.appName}`}
+                      onClick={() => void openManifest(svc.appName)}
+                    >
+                      Manifest
+                    </button>
                   </div>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+      )}
+
+      {manifestApp && (
+        <section className="capacity-panel" data-testid="hosting-manifest-editor">
+          <div className="capacity-summary">
+            <strong>{manifestApp} manifest</strong>
+            <span className="muted">revision {manifestRevision ?? "—"}</span>
+          </div>
+          <textarea
+            value={manifestText}
+            onChange={(event) => setManifestText(event.target.value)}
+            rows={20}
+            spellCheck={false}
+            className="manifest-editor"
+            data-testid="hosting-manifest-text"
+          />
+          <div className="hosting-actions">
+            <button type="button" className="btn-action" onClick={() => void saveManifest()} disabled={busyApp === manifestApp}>
+              Save revision
+            </button>
+            <button type="button" className="btn-action" onClick={() => setManifestApp(null)}>
+              Close
+            </button>
+          </div>
+        </section>
       )}
     </section>
   );

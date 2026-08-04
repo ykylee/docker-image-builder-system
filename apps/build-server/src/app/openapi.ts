@@ -20,6 +20,9 @@ import {
   adminUserBuildSummarySchema,
   adminUserListResponseSchema,
   hostingCapacityResponseSchema,
+  serviceManifestSchema,
+  serviceManifestResponseSchema,
+  serviceManifestRevisionListResponseSchema,
   apiErrorIssueSchema,
   apiErrorResponseSchema,
   buildErrorSchema,
@@ -103,7 +106,10 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   // expected to start, even before the runner process boots.
   { id: "AdminRunnerRegisterRequest", schema: adminRunnerRegisterRequestSchema },
   { id: "AdminRunnerRegisterResponse", schema: adminRunnerRegisterResponseSchema },
-  { id: "HostingCapacityResponse", schema: hostingCapacityResponseSchema }
+  { id: "HostingCapacityResponse", schema: hostingCapacityResponseSchema },
+  { id: "ServiceManifest", schema: serviceManifestSchema },
+  { id: "ServiceManifestResponse", schema: serviceManifestResponseSchema },
+  { id: "ServiceManifestRevisionListResponse", schema: serviceManifestRevisionListResponseSchema }
 ];
 
 // Component registry. We keep a Map from canonical component id to a
@@ -359,6 +365,48 @@ registry.registerPath({
   }
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/admin/hosted-services/{appName}/manifest",
+  description: "Admin-only. Return the current canonical service manifest.",
+  tags: ["Admin"],
+  request: { params: z.object({ appName: z.string().min(1) }) },
+  responses: {
+    200: { description: "Current manifest.", content: { "application/json": { schema: component("ServiceManifestResponse") as never } } },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." },
+    404: { description: "Manifest not found." }
+  }
+});
+registry.registerPath({
+  method: "put",
+  path: "/admin/hosted-services/{appName}/manifest",
+  description: "Admin-only. Validate and save a new immutable service manifest revision.",
+  tags: ["Admin"],
+  request: {
+    params: z.object({ appName: z.string().min(1) }),
+    body: { content: { "application/json": { schema: component("ServiceManifest") as never } } }
+  },
+  responses: {
+    200: { description: "Manifest revision saved.", content: { "application/json": { schema: component("ServiceManifestResponse") as never } } },
+    400: { description: "Invalid manifest." },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." }
+  }
+});
+registry.registerPath({
+  method: "get",
+  path: "/admin/hosted-services/{appName}/manifest/revisions",
+  description: "Admin-only. List immutable manifest revisions, newest first.",
+  tags: ["Admin"],
+  request: { params: z.object({ appName: z.string().min(1) }) },
+  responses: {
+    200: { description: "Manifest revision history.", content: { "application/json": { schema: component("ServiceManifestRevisionListResponse") as never } } },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." }
+  }
+});
+
 // TASK-069: runner registry admin endpoints. Self-register on first claim
 // (Runner 가 별도 등록 절차 없이 첫 POST /builds/claim 호출 시 자동으로
 // ACTIVE record 생성). Admin 이 DISABLE 로 토글하면 다음 claim 부터
@@ -482,8 +530,8 @@ export async function registerOpenApiRoutes(
     // methods we expose, and short-circuit OPTIONS preflight with 204.
     const allowOrigin =
       options.corsOrigin === true ? "*" : options.corsOrigin;
-    const allowMethods = "GET,POST,DELETE,OPTIONS";
-    const allowHeaders = "Content-Type,Authorization";
+    const allowMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+    const allowHeaders = "Content-Type,Authorization,X-Admin-Id";
 
     app.addHook("onRequest", async (request, reply) => {
       // Set the CORS headers on every request as early as possible so they

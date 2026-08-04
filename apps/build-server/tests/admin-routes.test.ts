@@ -124,6 +124,69 @@ describe("GET /admin/hosting-capacity", () => {
   });
 });
 
+describe("service manifest management", () => {
+  const manifest = (tag: string) => ({
+    version: 1 as const,
+    service: { appName: "manifest-app", image: { repository: "registry/manifest-app", tag } },
+    runtime: { port: 8080, command: "npm start", healthPath: "/health", basePathEnv: "APP_BASE_PATH" },
+    hosting: { scheme: "path" as const, contextPath: "manifest-app", stripPrefix: true, tier: "sandbox" as const, replicas: 1 },
+    deployment: { adapter: "helm" as const, namespace: "dib-hosted" }
+  });
+
+  it("stores, reads, and lists immutable manifest revisions", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+
+    const first = await app.inject({
+      method: "PUT",
+      url: "/admin/hosted-services/manifest-app/manifest",
+      headers: { "x-admin-id": "admin" },
+      payload: manifest("build-1")
+    });
+    assert.equal(first.statusCode, 200);
+    assert.equal(first.json().currentRevision, 1);
+
+    const second = await app.inject({
+      method: "PUT",
+      url: "/admin/hosted-services/manifest-app/manifest",
+      headers: { "x-admin-id": "admin" },
+      payload: manifest("build-2")
+    });
+    assert.equal(second.statusCode, 200);
+    assert.equal(second.json().currentRevision, 2);
+
+    const current = await app.inject({
+      method: "GET",
+      url: "/admin/hosted-services/manifest-app/manifest",
+      headers: { "x-admin-id": "admin" }
+    });
+    assert.equal(current.statusCode, 200);
+    assert.equal(current.json().manifest.service.image.tag, "build-2");
+
+    const revisions = await app.inject({
+      method: "GET",
+      url: "/admin/hosted-services/manifest-app/manifest/revisions",
+      headers: { "x-admin-id": "admin" }
+    });
+    assert.equal(revisions.statusCode, 200);
+    assert.deepEqual(revisions.json().revisions.map((r: { revision: number }) => r.revision), [2, 1]);
+    await app.close();
+  });
+
+  it("rejects manifest updates from non-admin callers", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const res = await app.inject({
+      method: "PUT",
+      url: "/admin/hosted-services/manifest-app/manifest",
+      headers: { "x-admin-id": "alice" },
+      payload: manifest("build-1")
+    });
+    assert.equal(res.statusCode, 403);
+    await app.close();
+  });
+});
+
 describe("GET /admin/users", () => {
   it("returns per-owner buildCount and lastBuildAt for an admin caller", async () => {
     const service = new BuildService(createMemoryBuildRepository());

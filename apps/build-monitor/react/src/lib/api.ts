@@ -111,7 +111,7 @@ export type AdminAllowListResponse = {
 };
 
 function apiSend(
-  method: "POST" | "DELETE" | "PATCH",
+  method: "POST" | "PUT" | "DELETE" | "PATCH",
   path: string,
   callerId: string,
   body?: unknown
@@ -121,6 +121,18 @@ function apiSend(
     headers: { "X-Admin-Id": callerId },
     body
   });
+}
+
+async function apiPut(path: string, callerId: string, body: unknown): Promise<unknown> {
+  const fn = (api as unknown as Record<string, (p: string, init: unknown) => Promise<unknown>>).PUT;
+  const result = (await fn(path, {
+    headers: { "X-Admin-Id": callerId },
+    body
+  })) as { data?: unknown; error?: unknown; response?: { status?: number } };
+  if (result.data === undefined) {
+    throw new Error(`PUT ${path} failed: ${result.response?.status ?? 0} ${JSON.stringify(result.error)}`);
+  }
+  return result.data;
 }
 
 export async function listAdminAllowList(
@@ -252,6 +264,45 @@ export async function removeHostedService(
     `/admin/hosted-services/${encodeURIComponent(appName)}`,
     callerId
   )) as HostedServiceView;
+}
+
+export type ServiceManifestView = {
+  version: 1;
+  service: { appName: string; image: { repository: string; tag: string } };
+  runtime: { port: number; command?: string; healthPath: string; basePathEnv: string };
+  hosting: { scheme: "path" | "subdomain"; contextPath: string; stripPrefix: boolean; tier: "sandbox" | "standard" | "production"; replicas: number };
+  deployment: { adapter: "kubectl" | "helm" | "argocd"; namespace: string };
+};
+
+export type ServiceManifestResponseView = {
+  appName: string;
+  currentRevision: number;
+  manifest: ServiceManifestView;
+  updatedBy: string;
+  updatedAt: string;
+};
+
+export async function getHostedServiceManifest(
+  callerId: string,
+  appName: string
+): Promise<ServiceManifestResponseView> {
+  return (await apiGet(
+    "/admin/hosted-services/{appName}/manifest",
+    `/admin/hosted-services/${appName}/manifest`,
+    { headers: { "X-Admin-Id": callerId }, params: { path: { appName } } }
+  )) as ServiceManifestResponseView;
+}
+
+export async function updateHostedServiceManifest(
+  callerId: string,
+  appName: string,
+  manifest: ServiceManifestView
+): Promise<ServiceManifestResponseView> {
+  return (await apiPut(
+    `/admin/hosted-services/${encodeURIComponent(appName)}/manifest`,
+    callerId,
+    manifest
+  )) as ServiceManifestResponseView;
 }
 
 // TASK-098: admin 페이지 endpoint helpers.

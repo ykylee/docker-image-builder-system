@@ -11,6 +11,8 @@ import {
   desc,
   deploymentAttemptTable,
   hostedServiceTable,
+  serviceManifestRevisionTable,
+  serviceManifestTable,
   runnerTable,
   sql,
   type DatabaseClient
@@ -42,6 +44,9 @@ import type {
   BuildStatus,
   BuildStatusResponse,
   HostedService,
+  ServiceManifest,
+  ServiceManifestResponse,
+  ServiceManifestRevisionListResponse,
   BuildSummary,
   DeploymentReportRequest,
   ErrorCode,
@@ -1858,6 +1863,69 @@ export class PostgresBuildRepository implements BuildRepository {
       .where(eq(hostedServiceTable.appName, appName))
       .returning({ id: hostedServiceTable.id });
     return rows.length > 0;
+  }
+
+  async getServiceManifest(appName: string): Promise<ServiceManifestResponse | null> {
+    const [row] = await this.db
+      .select()
+      .from(serviceManifestTable)
+      .where(eq(serviceManifestTable.appName, appName))
+      .limit(1);
+    if (!row) return null;
+    return {
+      appName: row.appName,
+      currentRevision: row.currentRevision,
+      manifest: row.manifest as ServiceManifest,
+      updatedBy: row.updatedBy,
+      updatedAt: row.updatedAt.toISOString()
+    };
+  }
+
+  async updateServiceManifest(
+    appName: string,
+    manifest: ServiceManifest,
+    updatedBy: string
+  ): Promise<ServiceManifestResponse> {
+    return this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select()
+        .from(serviceManifestTable)
+        .where(eq(serviceManifestTable.appName, appName))
+        .limit(1);
+      const now = new Date();
+      const revision = (existing?.currentRevision ?? 0) + 1;
+      if (existing) {
+        await tx
+          .update(serviceManifestTable)
+          .set({ currentRevision: revision, manifest, updatedBy, updatedAt: now })
+          .where(eq(serviceManifestTable.appName, appName));
+      } else {
+        await tx.insert(serviceManifestTable).values({
+          id: randomUUID(), appName, currentRevision: revision, manifest, updatedBy,
+          createdAt: now, updatedAt: now
+        });
+      }
+      await tx.insert(serviceManifestRevisionTable).values({
+        id: randomUUID(), appName, revision, manifest, updatedBy, createdAt: now
+      });
+      return { appName, currentRevision: revision, manifest, updatedBy, updatedAt: now.toISOString() };
+    });
+  }
+
+  async listServiceManifestRevisions(appName: string): Promise<ServiceManifestRevisionListResponse> {
+    const rows = await this.db
+      .select()
+      .from(serviceManifestRevisionTable)
+      .where(eq(serviceManifestRevisionTable.appName, appName))
+      .orderBy(desc(serviceManifestRevisionTable.revision));
+    return {
+      revisions: rows.map((row) => ({
+        revision: row.revision,
+        manifest: row.manifest as ServiceManifest,
+        updatedBy: row.updatedBy,
+        createdAt: row.createdAt.toISOString()
+      }))
+    };
   }
 
   async getHostingCapacityUsage() {

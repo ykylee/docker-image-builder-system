@@ -10,3 +10,4 @@ export * from "./schema/build-test.js";
 export * from "./schema/deployment-attempt.js";
 export * from "./schema/hosted-service.js";
 export * from "./schema/runner.js";
+export * from "./schema/service-manifest.js";

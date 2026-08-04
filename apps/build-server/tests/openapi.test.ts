@@ -33,6 +33,8 @@ describe("openapi document", () => {
     const pathKeys = Object.keys(document.paths).sort();
     assert.deepEqual(pathKeys, [
       "/admin/builds",
+      "/admin/hosted-services/{appName}/manifest",
+      "/admin/hosted-services/{appName}/manifest/revisions",
       "/admin/hosting-capacity",
       "/admin/runners",
       "/admin/runners/{runnerId}",
@@ -96,6 +98,12 @@ describe("openapi document", () => {
     assert.ok(
       schemaKeys.includes("HostingCapacityResponse"),
       "HostingCapacityResponse schema must be registered"
+    );
+    assert.ok(schemaKeys.includes("ServiceManifest"), "ServiceManifest schema must be registered");
+    assert.ok(schemaKeys.includes("ServiceManifestResponse"), "ServiceManifestResponse schema must be registered");
+    assert.ok(
+      schemaKeys.includes("ServiceManifestRevisionListResponse"),
+      "ServiceManifestRevisionListResponse schema must be registered"
     );
     assert.ok(
       schemaKeys.includes("AdminRunner"),

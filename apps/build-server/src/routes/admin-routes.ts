@@ -17,6 +17,9 @@ import {
   errorBody,
   hostedServiceListResponseSchema,
   hostedServiceSchema,
+  serviceManifestResponseSchema,
+  serviceManifestRevisionListResponseSchema,
+  serviceManifestSchema,
   hostingCapacityResponseSchema,
   notFoundBody,
   validationErrorBody,
@@ -247,6 +250,45 @@ export async function registerAdminRoutes(
       return reply.status(404).send(notFoundBody("Hosted service not found."));
     }
     return reply.status(200).send(hostedServiceSchema.parse(service));
+  });
+
+  app.get("/admin/hosted-services/:appName/manifest", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success || !isAdmin(callerId.data)) {
+      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    }
+    const { appName } = request.params as { appName?: string };
+    const manifest = await buildService.getServiceManifest((appName ?? "").trim());
+    if (!manifest) return reply.status(404).send(notFoundBody("Service manifest not found."));
+    return reply.status(200).send(serviceManifestResponseSchema.parse(manifest));
+  });
+
+  app.get("/admin/hosted-services/:appName/manifest/revisions", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success || !isAdmin(callerId.data)) {
+      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    }
+    const { appName } = request.params as { appName?: string };
+    const revisions = await buildService.listServiceManifestRevisions((appName ?? "").trim());
+    return reply.status(200).send(serviceManifestRevisionListResponseSchema.parse(revisions));
+  });
+
+  app.put("/admin/hosted-services/:appName/manifest", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success || !isAdmin(callerId.data)) {
+      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    }
+    const { appName } = request.params as { appName?: string };
+    const normalizedAppName = (appName ?? "").trim();
+    const parsed = serviceManifestSchema.safeParse(request.body);
+    if (!parsed.success) {
+      return reply.status(400).send(validationErrorBody("Invalid service manifest.", parsed.error.issues));
+    }
+    if (parsed.data.service.appName !== normalizedAppName) {
+      return reply.status(400).send(errorBody("Manifest appName does not match the URL.", { errorCode: "INVALID_REQUEST" }));
+    }
+    const saved = await buildService.updateServiceManifest(normalizedAppName, parsed.data, callerId.data);
+    return reply.status(200).send(serviceManifestResponseSchema.parse(saved));
   });
 
   // 관리 라이프사이클 (TASK-168 / P3-M3): stop/start/delete → kubectl.

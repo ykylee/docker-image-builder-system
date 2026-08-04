@@ -115,6 +115,18 @@
   text-decoration: underline;
 }
 
+.manifest-editor {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 16px 0;
+  padding: 12px;
+  border: 1px solid var(--dib-color-border-subtle, #242936);
+  border-radius: 8px;
+  background: var(--dib-color-bg-surface-elevated, #1a1d27);
+  color: inherit;
+  font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 .btn-action {
   padding: 4px 10px;
   font-size: var(--dib-size-xs, 12px);
