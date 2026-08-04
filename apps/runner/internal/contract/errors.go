@@ -2,7 +2,8 @@ package contract
 
 // Canonical error codes. Mirrors
 // `packages/shared-contract/src/build/errors.ts` `errorCodes`.
-// 9 values (TASK-062 extended from 8 by adding DEPLOYMENT_FAILED).
+// 13 values (TASK-062 extended from 8 by adding DEPLOYMENT_FAILED; hosting
+// policy and capacity errors were added to the shared contract afterward).
 //
 // Runner 의 `apps/runner/internal/services/build_service.go` 가 외부 배포
 // 단계 실패를 보고할 때 (ErrorCode "DEPLOYMENT_FAILED") 본 enum 의 상수를
@@ -23,10 +24,16 @@ const (
 	ErrorCodeDeploymentFailed = "DEPLOYMENT_FAILED"
 	// TASK-166 (P3-M1): 호스팅 context path 가 다른 앱에 이미 할당됨.
 	ErrorCodeContextPathTaken = "CONTEXT_PATH_TAKEN"
-	ErrorCodeUnknownError     = "UNKNOWN_ERROR"
+	// Hosting admission/policy failures. These are emitted by the build server
+	// before a runner can start the deployment, but remain part of the shared
+	// error contract so Go consumers can decode every canonical error code.
+	ErrorCodeHostingTierUpgradeRequired   = "HOSTING_TIER_UPGRADE_REQUIRED"
+	ErrorCodeHostingResourceLimitExceeded = "HOSTING_RESOURCE_LIMIT_EXCEEDED"
+	ErrorCodeHostingCapacityExceeded      = "HOSTING_CAPACITY_EXCEEDED"
+	ErrorCodeUnknownError                 = "UNKNOWN_ERROR"
 )
 
-// ErrorCodes — canonical 10-value list. Mirrors
+// ErrorCodes — canonical 13-value list. Mirrors
 // `apps.skill_mcp.contract.canonical.ERROR_CODES` (Python) /
 // `errorCodes` (TS).
 var ErrorCodes = []string{
@@ -39,5 +46,8 @@ var ErrorCodes = []string{
 	ErrorCodeContainerTestFailed,
 	ErrorCodeDeploymentFailed,
 	ErrorCodeContextPathTaken,
+	ErrorCodeHostingTierUpgradeRequired,
+	ErrorCodeHostingResourceLimitExceeded,
+	ErrorCodeHostingCapacityExceeded,
 	ErrorCodeUnknownError,
 }
