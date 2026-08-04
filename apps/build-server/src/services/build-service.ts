@@ -167,6 +167,9 @@ export class BuildService {
     if (result.kind === "hosting_capacity_exceeded") {
       return result;
     }
+    if (result.kind === "context_path_taken") {
+      return result;
+    }
 
     return {
       kind: "accepted",

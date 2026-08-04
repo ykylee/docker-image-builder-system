@@ -239,6 +239,48 @@ export class PostgresBuildRepository implements BuildRepository {
         };
       }
 
+      if (input.contextPath) {
+        // Repeat the availability check under a context-specific advisory
+        // lock. The service-level probe is only an early response; this
+        // transaction is the race-safe boundary for different app names.
+        await tx.execute(
+          sql`SELECT pg_advisory_xact_lock(hashtext(${`hosting-context:${input.contextPath}`}))`
+        );
+
+        const [hostedService] = await tx
+          .select({ appName: hostedServiceTable.appName })
+          .from(hostedServiceTable)
+          .where(eq(hostedServiceTable.contextPath, input.contextPath))
+          .limit(1);
+        if (hostedService && hostedService.appName !== input.appName) {
+          return {
+            kind: "context_path_taken",
+            contextPath: input.contextPath,
+            appName: hostedService.appName
+          };
+        }
+
+        const [activeContextBuild] = await tx
+          .select({ appName: buildRequestTable.appName })
+          .from(buildRequestTable)
+          .where(
+            and(
+              eq(buildRequestTable.contextPath, input.contextPath),
+              sql`${buildRequestTable.appName} <> ${input.appName}`,
+              inArray(buildRequestTable.status, activeBuildStatuses)
+            )
+          )
+          .orderBy(desc(buildRequestTable.createdAt))
+          .limit(1);
+        if (activeContextBuild) {
+          return {
+            kind: "context_path_taken",
+            contextPath: input.contextPath,
+            appName: activeContextBuild.appName
+          };
+        }
+      }
+
       await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('hosting-capacity-v1'))`);
       const reservation = reservationForResources(
         buildId,

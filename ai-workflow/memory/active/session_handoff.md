@@ -2,6 +2,11 @@
 
 # Session Handoff
 
+- Updated: 2026-08-04 (TASK-177: Hosting context path 충돌 예약 보강 완료). PostgreSQL
+  createBuild 트랜잭션에 context별 advisory lock과 hosted service/다른 앱의 active build
+  점유 검사를 추가하고 Memory backend도 정렬했다. build-server 전체 테스트 230건 PASS.
+  다음: IP 기반 path-only 공개 URL 정책과 Ingress canonical redirect/asset 회귀 e2e.
+
 - Purpose: Compact restore context for the next AI agent session.
 - Scope: current focus, task status, key changes, next actions, risks
 - Audience: AI agents, maintainers

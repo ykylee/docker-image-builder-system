@@ -184,6 +184,34 @@ export function createMemoryBuildRepository(
         };
       }
 
+      if (input.contextPath) {
+        const hosted = [...hostedServices.values()].find(
+          (service) => service.contextPath === input.contextPath
+        );
+        if (hosted && hosted.appName !== input.appName) {
+          return {
+            kind: "context_path_taken",
+            contextPath: input.contextPath,
+            appName: hosted.appName
+          };
+        }
+
+        const activeContextBuild = [...builds.values()].find((entry) => {
+          return (
+            entry.summary.contextPath === input.contextPath &&
+            entry.summary.appName !== input.appName &&
+            ["QUEUED", "PREPARING_SOURCE", "BUILDING", "TEST_SUCCESS"].includes(entry.summary.status)
+          );
+        });
+        if (activeContextBuild) {
+          return {
+            kind: "context_path_taken",
+            contextPath: input.contextPath,
+            appName: activeContextBuild.summary.appName
+          };
+        }
+      }
+
       const timestamp = nowIsoString();
       const buildId = randomUUID();
       const reservation = reservationForResources(

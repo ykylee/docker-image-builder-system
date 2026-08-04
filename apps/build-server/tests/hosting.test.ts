@@ -130,6 +130,20 @@ describe("createBuild — context-path 할당", () => {
     const same = await createBuild(svc, "app-a", "shared");
     assert.equal(same.kind, "accepted");
   });
+
+  it("다른 앱의 진행 중 build가 점유한 context-path도 차단한다", async () => {
+    const repo = createMemoryBuildRepository();
+    const svc = new BuildService(repo);
+    const first = await createBuild(svc, "app-a", "shared-active");
+    assert.equal(first.kind, "accepted");
+
+    const second = await createBuild(svc, "app-b", "shared-active");
+    assert.deepEqual(second, {
+      kind: "context_path_taken",
+      contextPath: "shared-active",
+      appName: "app-a"
+    });
+  });
 });
 
 describe("배포 성공 보고 → HostedService upsert (TASK-167 / P3-M2)", () => {

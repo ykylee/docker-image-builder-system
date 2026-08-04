@@ -28,6 +28,11 @@ export type CreateBuildResult =
   | {
       kind: "hosting_capacity_exceeded";
       tier: "sandbox" | "standard" | "production";
+    }
+  | {
+      kind: "context_path_taken";
+      contextPath: string;
+      appName: string;
     };
 
 export type ClaimNextBuildResult =
