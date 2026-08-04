@@ -17,7 +17,11 @@ type ClaimedBuild struct {
 	// TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
 	StripPrefix bool
 	// TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path).
-	HostingScheme string
+	HostingScheme        string
+	EffectiveTier        string
+	ServiceSize          string
+	HostingPolicyVersion string
+	Resources            *hostclient.ResourceProfile
 }
 
 type Claimer interface {
@@ -45,13 +49,17 @@ func (c *HostServerClaimer) ClaimNext(ctx context.Context) (*ClaimedBuild, error
 	}
 
 	return &ClaimedBuild{
-		BuildID:       response.BuildID,
-		AppName:       response.AppName,
-		Status:        response.Status,
-		Phase:         response.Phase,
-		ContextPath:   response.ContextPath,
-		RuntimePort:   response.RuntimePort,
-		StripPrefix:   response.StripPrefix,
-		HostingScheme: response.HostingScheme,
+		BuildID:              response.BuildID,
+		AppName:              response.AppName,
+		Status:               response.Status,
+		Phase:                response.Phase,
+		ContextPath:          response.ContextPath,
+		RuntimePort:          response.RuntimePort,
+		StripPrefix:          response.StripPrefix,
+		HostingScheme:        response.HostingScheme,
+		EffectiveTier:        response.EffectiveTier,
+		ServiceSize:          response.ServiceSize,
+		HostingPolicyVersion: response.HostingPolicyVersion,
+		Resources:            response.Resources,
 	}, nil
 }

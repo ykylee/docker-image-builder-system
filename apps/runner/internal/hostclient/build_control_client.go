@@ -51,7 +51,19 @@ type ClaimedBuildResponse struct {
 	// TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
 	StripPrefix bool `json:"stripPrefix"`
 	// TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path).
-	HostingScheme string `json:"hostingScheme"`
+	HostingScheme        string           `json:"hostingScheme"`
+	EffectiveTier        string           `json:"effectiveTier"`
+	ServiceSize          string           `json:"serviceSize"`
+	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
+	Resources            *ResourceProfile `json:"resources"`
+}
+
+type ResourceProfile struct {
+	CPURequest    string `json:"cpuRequest"`
+	MemoryRequest string `json:"memoryRequest"`
+	CPULimit      string `json:"cpuLimit"`
+	MemoryLimit   string `json:"memoryLimit"`
+	Replicas      int    `json:"replicas"`
 }
 
 type claimResponseBody struct {
@@ -71,16 +83,20 @@ type buildStatusResponseBody struct {
 }
 
 type buildSummaryBody struct {
-	BuildID         string `json:"buildId"`
-	AppName         string `json:"appName"`
-	Status          string `json:"status"`
-	Phase           string `json:"phase"`
-	LifecycleStatus string `json:"lifecycleStatus"`
-	UpdatedAt       string `json:"updatedAt"`
-	ContextPath     string `json:"contextPath"`
-	RuntimePort     int    `json:"runtimePort"`
-	StripPrefix     bool   `json:"stripPrefix"`
-	HostingScheme   string `json:"hostingScheme"`
+	BuildID              string           `json:"buildId"`
+	AppName              string           `json:"appName"`
+	Status               string           `json:"status"`
+	Phase                string           `json:"phase"`
+	LifecycleStatus      string           `json:"lifecycleStatus"`
+	UpdatedAt            string           `json:"updatedAt"`
+	ContextPath          string           `json:"contextPath"`
+	RuntimePort          int              `json:"runtimePort"`
+	StripPrefix          bool             `json:"stripPrefix"`
+	HostingScheme        string           `json:"hostingScheme"`
+	EffectiveTier        string           `json:"effectiveTier"`
+	ServiceSize          string           `json:"serviceSize"`
+	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
+	Resources            *ResourceProfile `json:"resources"`
 }
 
 // PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
@@ -145,16 +161,20 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 	inner := resp.Build.Build
 
 	return &ClaimedBuildResponse{
-		BuildID:         inner.BuildID,
-		AppName:         inner.AppName,
-		Status:          inner.Status,
-		Phase:           inner.Phase,
-		LifecycleStatus: inner.LifecycleStatus,
-		UpdatedAt:       inner.UpdatedAt,
-		ContextPath:     inner.ContextPath,
-		RuntimePort:     inner.RuntimePort,
-		StripPrefix:     inner.StripPrefix,
-		HostingScheme:   inner.HostingScheme,
+		BuildID:              inner.BuildID,
+		AppName:              inner.AppName,
+		Status:               inner.Status,
+		Phase:                inner.Phase,
+		LifecycleStatus:      inner.LifecycleStatus,
+		UpdatedAt:            inner.UpdatedAt,
+		ContextPath:          inner.ContextPath,
+		RuntimePort:          inner.RuntimePort,
+		StripPrefix:          inner.StripPrefix,
+		HostingScheme:        inner.HostingScheme,
+		EffectiveTier:        inner.EffectiveTier,
+		ServiceSize:          inner.ServiceSize,
+		HostingPolicyVersion: inner.HostingPolicyVersion,
+		Resources:            inner.Resources,
 	}, nil
 }
 

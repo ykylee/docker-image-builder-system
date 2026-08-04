@@ -147,7 +147,8 @@ func (d *argoCDDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K8
 		ImageRepository: repo, ImageTag: tag, ServicePort: opts.ContainerPort,
 		ContextPath: contextPath, StripPrefix: opts.StripPrefix,
 		HostingScheme: defaultHostingScheme(opts.HostingScheme), BaseHost: opts.BaseHost,
-		BuildID: opts.BuildID,
+		Resources: opts.Resources,
+		BuildID:   opts.BuildID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("deploy: render ArgoCD application: %w", err)
@@ -224,6 +225,7 @@ type argoApplicationOptions struct {
 	ContextPath, HostingScheme                            string
 	StripPrefix                                           bool
 	BaseHost, BuildID                                     string
+	Resources                                             *ResourceProfile
 }
 
 func renderArgoCDApplication(opts argoApplicationOptions) (string, error) {
@@ -241,6 +243,22 @@ func renderArgoCDApplication(opts argoApplicationOptions) (string, error) {
 		{"name": "hosting.scheme", "value": defaultHostingScheme(opts.HostingScheme), "forceString": true},
 		{"name": "hosting.baseHost", "value": opts.BaseHost, "forceString": true},
 		{"name": "build.id", "value": opts.BuildID, "forceString": true},
+	}
+	if opts.Resources != nil {
+		quota := quotaForTier(opts.Resources.Tier)
+		parameters = append(parameters,
+			map[string]any{"name": "replicaCount", "value": strconv.Itoa(maxInt(opts.Resources.Replicas, 1)), "forceString": true},
+			map[string]any{"name": "hosting.tier", "value": opts.Resources.Tier, "forceString": true},
+			map[string]any{"name": "resources.requests.cpu", "value": opts.Resources.CPURequest, "forceString": true},
+			map[string]any{"name": "resources.requests.memory", "value": opts.Resources.MemoryRequest, "forceString": true},
+			map[string]any{"name": "resources.limits.cpu", "value": opts.Resources.CPULimit, "forceString": true},
+			map[string]any{"name": "resources.limits.memory", "value": opts.Resources.MemoryLimit, "forceString": true},
+			map[string]any{"name": "quota.requestsCpu", "value": quota.cpu, "forceString": true},
+			map[string]any{"name": "quota.requestsMemory", "value": quota.memory, "forceString": true},
+			map[string]any{"name": "quota.limitsCpu", "value": quota.cpuLimit, "forceString": true},
+			map[string]any{"name": "quota.limitsMemory", "value": quota.memoryLimit, "forceString": true},
+			map[string]any{"name": "quota.pods", "value": quota.pods, "forceString": true},
+		)
 	}
 	application := map[string]any{
 		"apiVersion": "argoproj.io/v1alpha1",

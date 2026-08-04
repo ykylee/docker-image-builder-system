@@ -67,6 +67,7 @@ type K8sDeployOptions struct {
 	// subdomain 이면 Ingress host rule = `<cp>.<BaseHost>`.
 	HostingScheme string
 	BaseHost      string
+	Resources     *ResourceProfile
 	// Helm adapter 입력. Chart 는 chart directory/archive 경로이며, chart 는
 	// 표준 values contract(image.repository/image.tag/service.port/hosting.*)
 	// 을 소비해야 한다.
@@ -82,6 +83,15 @@ type K8sDeployOptions struct {
 	ArgoCDPath            string
 	ArgoCDTargetRevision  string
 	ArgoCDDestinationHost string
+}
+
+type ResourceProfile struct {
+	Tier          string
+	CPURequest    string
+	MemoryRequest string
+	CPULimit      string
+	MemoryLimit   string
+	Replicas      int
 }
 
 // K8sApplyOptions 는 Apply 의 입력 (manifest 만 별도 호출하는 경우).

@@ -485,6 +485,16 @@ export type UpsertHostedServiceInput = {
   containerPort: number;
   stripPrefix: boolean;
   hostingScheme: string;
+  serviceSize?: string;
+  effectiveTier?: string;
+  hostingPolicyVersion?: string;
+  resources?: {
+    cpuRequest: string;
+    memoryRequest: string;
+    cpuLimit: string;
+    memoryLimit: string;
+    replicas: number;
+  };
   status: string;
   url: string | null;
   currentBuildId: string | null;

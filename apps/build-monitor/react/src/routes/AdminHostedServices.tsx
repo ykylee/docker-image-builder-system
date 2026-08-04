@@ -113,6 +113,8 @@ export function AdminHostedServices(): ReactElement {
             <tr>
               <th>App</th>
               <th>Context path</th>
+              <th>Tier</th>
+              <th>Resources</th>
               <th>Status</th>
               <th>Replicas</th>
               <th>URL</th>
@@ -125,6 +127,15 @@ export function AdminHostedServices(): ReactElement {
                 <td className="mono">{svc.appName}</td>
                 <td>
                   <code className="mono">/{svc.contextPath}/</code>
+                </td>
+                <td data-testid={`hosting-tier-${svc.appName}`}>
+                  <strong>{svc.effectiveTier ?? "sandbox"}</strong>
+                  <small className="muted">{svc.serviceSize ?? "small"}</small>
+                </td>
+                <td className="mono" data-testid={`hosting-resources-${svc.appName}`}>
+                  {svc.resources
+                    ? `${svc.resources.cpuRequest} / ${svc.resources.memoryRequest} · ${svc.resources.replicas}r`
+                    : "default"}
                 </td>
                 <td>
                   <StatusPill status={svc.status} />

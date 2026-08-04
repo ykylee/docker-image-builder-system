@@ -50,6 +50,15 @@ function svc(over: Partial<Record<string, unknown>> = {}) {
     deploymentName: "dib-todo-app",
     containerPort: 8080,
     stripPrefix: true,
+    effectiveTier: "standard",
+    serviceSize: "medium",
+    resources: {
+      cpuRequest: "250m",
+      memoryRequest: "512Mi",
+      cpuLimit: "1",
+      memoryLimit: "1Gi",
+      replicas: 1
+    },
     status: "RUNNING",
     url: "https://apps.example.com/todo-app/",
     currentBuildId: null,
@@ -84,6 +93,13 @@ function renderPage(): void {
 }
 
 describe("AdminHostedServices", () => {
+  it("호스팅 서비스의 effective tier와 자원 프로파일을 표시", async () => {
+    listMock.mockResolvedValueOnce({ services: [svc()] });
+    renderPage();
+    expect(await screen.findByTestId("hosting-tier-todo-app")).toHaveTextContent("standard");
+    expect(screen.getByTestId("hosting-resources-todo-app")).toHaveTextContent("250m / 512Mi · 1r");
+  });
+
   it("호스팅 서비스 목록을 렌더한다", async () => {
     renderPage();
     await waitFor(() =>

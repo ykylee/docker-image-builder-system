@@ -53,6 +53,13 @@ interface FormState {
   runtimePort: number;
   stripPrefix: boolean;
   hostingScheme: "path" | "subdomain";
+  serviceSize: "small" | "medium" | "large";
+  requestedTier: "" | "sandbox" | "standard" | "production";
+  cpuRequest: string;
+  memoryRequest: string;
+  cpuLimit: string;
+  memoryLimit: string;
+  replicas: number;
 }
 
 const DEFAULT_FORM: FormState = {
@@ -67,6 +74,13 @@ const DEFAULT_FORM: FormState = {
   runtimePort: 8080,
   stripPrefix: true,
   hostingScheme: "path",
+  serviceSize: "small",
+  requestedTier: "",
+  cpuRequest: "",
+  memoryRequest: "",
+  cpuLimit: "",
+  memoryLimit: "",
+  replicas: 0,
 };
 
 /**
@@ -191,6 +205,13 @@ function makePreset(
       runtimePort: 8080,
       stripPrefix: true,
       hostingScheme: "path",
+      serviceSize: "small",
+      requestedTier: "",
+      cpuRequest: "",
+      memoryRequest: "",
+      cpuLimit: "",
+      memoryLimit: "",
+      replicas: 0,
     };
   }
   if (kind === "minimal") {
@@ -206,6 +227,13 @@ function makePreset(
       runtimePort: 5000,
       stripPrefix: true,
       hostingScheme: "path",
+      serviceSize: "small",
+      requestedTier: "",
+      cpuRequest: "",
+      memoryRequest: "",
+      cpuLimit: "",
+      memoryLimit: "",
+      replicas: 0,
     };
   }
   return {
@@ -220,6 +248,13 @@ function makePreset(
     runtimePort: 3000,
     stripPrefix: true,
     hostingScheme: "path",
+    serviceSize: "small",
+    requestedTier: "",
+    cpuRequest: "",
+    memoryRequest: "",
+    cpuLimit: "",
+    memoryLimit: "",
+    replicas: 0,
   };
 }
 
@@ -277,6 +312,19 @@ export function BuildRequest(): ReactElement {
         ...(form.runtimePort ? { runtimePort: Number(form.runtimePort) } : {}),
         stripPrefix: form.stripPrefix,
         hostingScheme: form.hostingScheme,
+        serviceSize: form.serviceSize,
+        ...(form.requestedTier ? { requestedTier: form.requestedTier } : {}),
+        ...(form.cpuRequest || form.memoryRequest || form.cpuLimit || form.memoryLimit || form.replicas
+          ? {
+              resources: {
+                ...(form.cpuRequest ? { cpuRequest: form.cpuRequest } : {}),
+                ...(form.memoryRequest ? { memoryRequest: form.memoryRequest } : {}),
+                ...(form.cpuLimit ? { cpuLimit: form.cpuLimit } : {}),
+                ...(form.memoryLimit ? { memoryLimit: form.memoryLimit } : {}),
+                ...(form.replicas ? { replicas: Math.trunc(form.replicas) } : {})
+              }
+            }
+          : {}),
       },
       null,
       2
@@ -368,6 +416,19 @@ export function BuildRequest(): ReactElement {
         ...(form.runtimePort ? { runtimePort: Math.trunc(form.runtimePort) } : {}),
         stripPrefix: form.stripPrefix,
         hostingScheme: form.hostingScheme,
+        serviceSize: form.serviceSize,
+        ...(form.requestedTier ? { requestedTier: form.requestedTier } : {}),
+        ...(form.cpuRequest || form.memoryRequest || form.cpuLimit || form.memoryLimit || form.replicas
+          ? {
+              resources: {
+                ...(form.cpuRequest ? { cpuRequest: form.cpuRequest } : {}),
+                ...(form.memoryRequest ? { memoryRequest: form.memoryRequest } : {}),
+                ...(form.cpuLimit ? { cpuLimit: form.cpuLimit } : {}),
+                ...(form.memoryLimit ? { memoryLimit: form.memoryLimit } : {}),
+                ...(form.replicas ? { replicas: Math.trunc(form.replicas) } : {})
+              }
+            }
+          : {}),
         metadata: {}
       };
       const result = await submitBuildRequest(payload);
@@ -496,6 +557,75 @@ export function BuildRequest(): ReactElement {
         </div>
 
         <div className="hosting-options" data-testid="req-hosting-options">
+          <div className="hosting-option">
+            <span>
+              <strong>hosting tier</strong>
+              <small>Tier is resolved from size and resources. Auto keeps the server policy default.</small>
+            </span>
+            <select
+              value={form.requestedTier}
+              data-testid="req-requestedTier"
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  requestedTier: event.target.value as FormState["requestedTier"]
+                }))
+              }
+            >
+              <option value="">auto</option>
+              <option value="sandbox">sandbox</option>
+              <option value="standard">standard</option>
+              <option value="production">production</option>
+            </select>
+          </div>
+
+          <div className="hosting-option">
+            <span>
+              <strong>service size</strong>
+              <small>Declared service size used as a tier sizing signal.</small>
+            </span>
+            <select
+              value={form.serviceSize}
+              data-testid="req-serviceSize"
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  serviceSize: event.target.value as FormState["serviceSize"]
+                }))
+              }
+            >
+              <option value="small">small</option>
+              <option value="medium">medium</option>
+              <option value="large">large</option>
+            </select>
+          </div>
+
+          {(["cpuRequest", "memoryRequest", "cpuLimit", "memoryLimit"] as const).map((key) => (
+            <TextInput
+              key={key}
+              label={key}
+              description="Optional Kubernetes quantity; blank uses the resolved tier default."
+              isOptional
+              htmlName={key}
+              value={form[key]}
+              data-testid={`req-${key}`}
+              onChange={(value) => setForm((prev) => ({ ...prev, [key]: value }))}
+            />
+          ))}
+
+          <NumberInput
+            label="replicas"
+            description="Optional desired replicas; blank uses the resolved tier default."
+            isOptional
+            htmlName="replicas"
+            value={form.replicas}
+            data-testid="req-replicas"
+            step={1}
+            onChange={(value) =>
+              setForm((prev) => ({ ...prev, replicas: value === null || !Number.isFinite(value) ? 0 : value }))
+            }
+          />
+
           <label className="hosting-option" htmlFor="req-stripPrefix">
             <input
               id="req-stripPrefix"

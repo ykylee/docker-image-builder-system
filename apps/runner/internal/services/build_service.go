@@ -131,7 +131,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return s.fail(ctx, buildID, failure)
 	}
 
-	if failure := s.deployImage(ctx, buildID, containerStatus, claim.ContextPath, claim.RuntimePort, claim.StripPrefix, claim.HostingScheme); failure != nil {
+	if failure := s.deployImage(ctx, buildID, containerStatus, claim.ContextPath, claim.RuntimePort, claim.StripPrefix, claim.HostingScheme, claim.EffectiveTier, claim.Resources); failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
 
@@ -341,6 +341,8 @@ func (s *BuildService) deployImage(
 	runtimePort int,
 	stripPrefix bool,
 	hostingScheme string,
+	effectiveTier string,
+	resources *hostclient.ResourceProfile,
 ) *stageFailure {
 	// 컨테이너는 컨테이너 테스트가 끝난 뒤 정리한다. e2e script 가
 	// RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 cleanup 을 검증한다.
@@ -413,6 +415,7 @@ func (s *BuildService) deployImage(
 			StripPrefix:   stripPrefix,
 			HostingScheme: hostingScheme,
 			BaseHost:      os.Getenv("RUNNER_HOSTING_BASE_HOST"),
+			Resources:     resourceProfile(effectiveTier, resources),
 		})
 		if kErr != nil {
 			// TASK-175 (E3): k8s 실패 시 docker registry 결과(payload, targetRef)
@@ -476,6 +479,17 @@ func (s *BuildService) deployImage(
 		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
 	return nil
+}
+
+func resourceProfile(tier string, input *hostclient.ResourceProfile) *deploy.ResourceProfile {
+	if input == nil {
+		return nil
+	}
+	return &deploy.ResourceProfile{
+		Tier:       tier,
+		CPURequest: input.CPURequest, MemoryRequest: input.MemoryRequest,
+		CPULimit: input.CPULimit, MemoryLimit: input.MemoryLimit, Replicas: input.Replicas,
+	}
 }
 
 func (s *BuildService) reportPhase(ctx context.Context, buildID, phase string) error {

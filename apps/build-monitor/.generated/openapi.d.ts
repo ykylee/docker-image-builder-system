@@ -897,6 +897,18 @@ export interface components {
              * @enum {string}
              */
             hostingScheme?: "path" | "subdomain";
+            /** @enum {string} */
+            effectiveTier?: "sandbox" | "standard" | "production";
+            /** @enum {string} */
+            serviceSize?: "small" | "medium" | "large";
+            hostingPolicyVersion?: string;
+            resources?: {
+                cpuRequest: string;
+                memoryRequest: string;
+                cpuLimit: string;
+                memoryLimit: string;
+                replicas: number;
+            };
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -1169,6 +1181,17 @@ export interface components {
             stripPrefix?: boolean;
             /** @enum {string} */
             hostingScheme?: "path" | "subdomain";
+            /** @enum {string} */
+            serviceSize?: "small" | "medium" | "large";
+            /** @enum {string} */
+            requestedTier?: "sandbox" | "standard" | "production";
+            resources?: {
+                cpuRequest?: string;
+                memoryRequest?: string;
+                cpuLimit?: string;
+                memoryLimit?: string;
+                replicas?: number;
+            };
             /** @default {} */
             metadata: {
                 [key: string]: string;

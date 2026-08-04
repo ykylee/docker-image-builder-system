@@ -53,6 +53,7 @@ import {
   buildStatusResponseFromState,
   enrichBuildSummary
 } from "./build-status-response.js";
+import { resolveHostingPolicy } from "../services/hosting-policy.js";
 
 type StoredBuild = {
   summary: BuildSummary;
@@ -84,6 +85,16 @@ type StoredBuild = {
   stripPrefix: boolean;
   // TASK-172 (v0.5.0): 호스팅 URL 스킴(기본 path).
   hostingScheme: string;
+  serviceSize: string;
+  effectiveTier: string;
+  hostingPolicyVersion: string;
+  resources: {
+    cpuRequest: string;
+    memoryRequest: string;
+    cpuLimit: string;
+    memoryLimit: string;
+    replicas: number;
+  };
 };
 
 // TASK-166 (P3-M1): 호스팅 registry(앱당 1개). deployment 성공 시 upsert.
@@ -95,6 +106,10 @@ type StoredHostedService = {
   containerPort: number;
   stripPrefix: boolean;
   hostingScheme: string;
+  serviceSize: string;
+  effectiveTier: string;
+  hostingPolicyVersion: string;
+  resources: StoredBuild["resources"];
   status: string;
   url: string | null;
   currentBuildId: string | null;
@@ -131,6 +146,9 @@ export function createMemoryBuildRepository(): BuildRepository {
 
   return {
     async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
+      const resolved = resolveHostingPolicy(input);
+      if (!resolved.ok) throw new Error(resolved.error.message);
+      const policy = resolved.policy;
       // Active-build deduplication is keyed on appName only. The previous
       // (projectId, repositoryId) pair was collapsed to appName in the
       // BuildRequest schema — see shared-contract/src/build/request.ts.
@@ -169,6 +187,10 @@ export function createMemoryBuildRepository(): BuildRepository {
         runtimePort: input.runtimePort ?? 8080,
         stripPrefix: input.stripPrefix ?? true,
         hostingScheme: input.hostingScheme ?? "path",
+        effectiveTier: policy.effectiveTier,
+        serviceSize: policy.serviceSize,
+        hostingPolicyVersion: policy.hostingPolicyVersion,
+        resources: policy.resources,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -199,7 +221,11 @@ export function createMemoryBuildRepository(): BuildRepository {
         contextPath: input.contextPath ?? null,
         runtimePort: input.runtimePort ?? 8080,
         stripPrefix: input.stripPrefix ?? true,
-        hostingScheme: input.hostingScheme ?? "path"
+        hostingScheme: input.hostingScheme ?? "path",
+        serviceSize: policy.serviceSize,
+        effectiveTier: policy.effectiveTier,
+        hostingPolicyVersion: policy.hostingPolicyVersion,
+        resources: policy.resources
       });
 
       return {
@@ -1279,6 +1305,16 @@ export function createMemoryBuildRepository(): BuildRepository {
       const existing = hostedServices.get(input.appName);
       const stored: StoredHostedService = {
         ...input,
+        serviceSize: input.serviceSize ?? "small",
+        effectiveTier: input.effectiveTier ?? "sandbox",
+        hostingPolicyVersion: input.hostingPolicyVersion ?? "v1",
+        resources: input.resources ?? {
+          cpuRequest: "100m",
+          memoryRequest: "128Mi",
+          cpuLimit: "500m",
+          memoryLimit: "512Mi",
+          replicas: 1
+        },
         createdAt: existing?.createdAt ?? now,
         updatedAt: now,
         lastDeployedAt: now,
@@ -1333,6 +1369,10 @@ function toHostedService(s: StoredHostedService): HostedService {
     containerPort: s.containerPort,
     stripPrefix: s.stripPrefix,
     hostingScheme: s.hostingScheme as HostedService["hostingScheme"],
+    effectiveTier: s.effectiveTier as HostedService["effectiveTier"],
+    serviceSize: s.serviceSize as HostedService["serviceSize"],
+    hostingPolicyVersion: s.hostingPolicyVersion,
+    resources: s.resources,
     status: s.status as HostedService["status"],
     url: s.url,
     currentBuildId: s.currentBuildId,

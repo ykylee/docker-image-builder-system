@@ -169,6 +169,17 @@ export type HostedServiceView = {
   deploymentName: string;
   containerPort: number;
   stripPrefix: boolean;
+  hostingScheme?: "path" | "subdomain";
+  effectiveTier?: "sandbox" | "standard" | "production";
+  serviceSize?: "small" | "medium" | "large";
+  hostingPolicyVersion?: string;
+  resources?: {
+    cpuRequest: string;
+    memoryRequest: string;
+    cpuLimit: string;
+    memoryLimit: string;
+    replicas: number;
+  };
   status: string;
   url: string | null;
   currentBuildId: string | null;

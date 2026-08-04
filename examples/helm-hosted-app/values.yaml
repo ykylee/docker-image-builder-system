@@ -1,9 +1,12 @@
 image:
   repository: busybox
   tag: latest
+replicaCount: 1
+resources: {}
 service:
   port: 8080
 hosting:
+  tier: ""
   contextPath: app
   basePath: /app/
   stripPrefix: true
@@ -14,3 +17,9 @@ ingress:
   className: nginx
 build:
   id: local
+quota:
+  requestsCpu: ""
+  requestsMemory: ""
+  limitsCpu: ""
+  limitsMemory: ""
+  pods: ""

@@ -31,6 +31,18 @@ export const buildRequestTable = pgTable("build_request", {
   stripPrefix: boolean("strip_prefix").notNull().default(true),
   // TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path). migration 0011.
   hostingScheme: text("hosting_scheme").notNull().default("path"),
+  // Hosting sizing policy snapshot (v1).
+  serviceSize: text("service_size").notNull().default("small"),
+  requestedTier: text("requested_tier"),
+  effectiveTier: text("effective_tier").notNull().default("sandbox"),
+  hostingPolicyVersion: text("hosting_policy_version").notNull().default("v1"),
+  resourceProfile: jsonb("resource_profile").$type<{
+    cpuRequest: string;
+    memoryRequest: string;
+    cpuLimit: string;
+    memoryLimit: string;
+    replicas: number;
+  }>().notNull().default(sql`'{}'::jsonb`),
   // TASK-161 (P2-M2): canonical 이름으로 정렬 — build_test.runtime_url 과
   // 같은 개념이다. 구 preview_url 은 migration 0008 에서 rename 됐다.
   runtimeUrl: text("runtime_url"),

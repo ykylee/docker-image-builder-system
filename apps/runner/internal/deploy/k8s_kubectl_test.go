@@ -259,6 +259,17 @@ func TestDeploymentName_SanitizesToDNS1123(t *testing.T) {
 	}
 }
 
+func TestRenderK8sManifest_EmitsTierResourceQuota(t *testing.T) {
+	manifest := renderK8sManifest("dib-app", "dib-app", "image:test", 8080, "app", true, "path", "apps.example.test", &ResourceProfile{
+		Tier: "standard", CPURequest: "250m", MemoryRequest: "512Mi", CPULimit: "1", MemoryLimit: "1Gi", Replicas: 2,
+	})
+	for _, want := range []string{"kind: ResourceQuota", "requests.cpu: \"2\"", "requests.memory: \"2Gi\"", "pods: \"2\"", "replicas: 2", "cpu: \"250m\""} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("manifest missing %q:\n%s", want, manifest)
+		}
+	}
+}
+
 func containsArg(args []string, want string) bool {
 	for _, a := range args {
 		if a == want {

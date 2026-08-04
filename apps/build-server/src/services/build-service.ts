@@ -28,6 +28,7 @@ import type {
 } from "../repositories/build-repository.js";
 import { validateContextPath } from "./context-path.js";
 import { createKubectlK8sAdmin, type K8sAdmin } from "./k8s-admin.js";
+import { resolveHostingPolicy } from "./hosting-policy.js";
 
 export type ReportPhaseOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
@@ -39,7 +40,8 @@ export type CreateBuildOutcome =
   | { kind: "accepted"; response: BuildAcceptedResponse }
   | { kind: "duplicate"; response: BuildDuplicateResponse }
   | { kind: "context_path_invalid"; reason: string }
-  | { kind: "context_path_taken"; contextPath: string; appName: string };
+  | { kind: "context_path_taken"; contextPath: string; appName: string }
+  | { kind: "hosting_policy_invalid"; code: "HOSTING_TIER_UPGRADE_REQUIRED" | "HOSTING_RESOURCE_LIMIT_EXCEEDED"; reason: string };
 
 // TASK-168 (P3-M3): 호스팅 관리(stop/start/remove) 결과.
 export type HostingActionOutcome =
@@ -122,6 +124,16 @@ export class BuildService {
   // 정규화(appName 파생 포함) → 예약어/빈값 거부 → registry 유일성(다른 앱이
   // 이미 점유했으면 CONTEXT_PATH_TAKEN) → 해소된 contextPath 를 build 에 저장.
   async createBuild(input: BuildRequest): Promise<CreateBuildOutcome> {
+    const policyResult = resolveHostingPolicy(input);
+    if (!policyResult.ok) {
+      return {
+        kind: "hosting_policy_invalid",
+        code: policyResult.error.kind === "tier_upgrade_required"
+          ? "HOSTING_TIER_UPGRADE_REQUIRED"
+          : "HOSTING_RESOURCE_LIMIT_EXCEEDED",
+        reason: policyResult.error.message
+      };
+    }
     const raw = input.contextPath ?? input.appName;
     const validation = validateContextPath(raw);
     if (!validation.ok) {
@@ -553,6 +565,16 @@ export class BuildService {
         containerPort: build.runtimePort ?? 8080,
         stripPrefix: build.stripPrefix ?? true,
         hostingScheme: scheme,
+        serviceSize: build.serviceSize ?? "small",
+        effectiveTier: build.effectiveTier ?? "sandbox",
+        hostingPolicyVersion: build.hostingPolicyVersion ?? "v1",
+        resources: build.resources ?? {
+          cpuRequest: "100m",
+          memoryRequest: "128Mi",
+          cpuLimit: "500m",
+          memoryLimit: "512Mi",
+          replicas: 1
+        },
         status: "RUNNING",
         url,
         currentBuildId: buildId,

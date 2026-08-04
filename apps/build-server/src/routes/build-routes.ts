@@ -74,6 +74,11 @@ export async function registerBuildRoutes(
         )
       );
     }
+    if (outcome.kind === "hosting_policy_invalid") {
+      return reply.status(400).send(
+        errorBody(outcome.reason, { errorCode: outcome.code })
+      );
+    }
 
     if (outcome.kind === "duplicate") {
       const body = buildDuplicateResponseSchema.parse(outcome.response);

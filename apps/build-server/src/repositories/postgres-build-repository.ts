@@ -69,6 +69,7 @@ import type {
   RecordResultDeliveryResult,
   UpsertHostedServiceInput
 } from "./build-repository.js";
+import { resolveHostingPolicy } from "../services/hosting-policy.js";
 import {
   advancePhaseHistory,
   toPhaseTimeline
@@ -99,6 +100,12 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     runtimePort: row.runtimePort,
     stripPrefix: row.stripPrefix,
     hostingScheme: row.hostingScheme as "path" | "subdomain",
+    effectiveTier: row.effectiveTier as BuildSummary["effectiveTier"],
+    serviceSize: row.serviceSize as BuildSummary["serviceSize"],
+    hostingPolicyVersion: row.hostingPolicyVersion,
+    resources: isCompleteResourceProfile(row.resourceProfile)
+      ? row.resourceProfile
+      : undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });
@@ -180,6 +187,9 @@ export class PostgresBuildRepository implements BuildRepository {
   constructor(private readonly db: DatabaseClient) {}
 
   async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
+    const resolved = resolveHostingPolicy(input);
+    if (!resolved.ok) throw new Error(resolved.error.message);
+    const policy = resolved.policy;
     const buildId = randomUUID();
     const timestamp = new Date();
     // Lock keyed on appName only (1 active build per app). See
@@ -240,6 +250,11 @@ export class PostgresBuildRepository implements BuildRepository {
           runtimePort: input.runtimePort ?? 8080,
           stripPrefix: input.stripPrefix ?? true,
           hostingScheme: input.hostingScheme ?? "path",
+          serviceSize: policy.serviceSize,
+          requestedTier: input.requestedTier ?? null,
+          effectiveTier: policy.effectiveTier,
+          hostingPolicyVersion: policy.hostingPolicyVersion,
+          resourceProfile: policy.resources,
           runtimeUrl: null,
           lastErrorCode: null,
           lastErrorMessage: null,
@@ -1682,6 +1697,12 @@ export class PostgresBuildRepository implements BuildRepository {
         containerPort: input.containerPort,
         stripPrefix: input.stripPrefix,
         hostingScheme: input.hostingScheme,
+        serviceSize: input.serviceSize ?? "small",
+        effectiveTier: input.effectiveTier ?? "sandbox",
+        hostingPolicyVersion: input.hostingPolicyVersion ?? "v1",
+        resourceProfile: input.resources ?? {
+          cpuRequest: "100m", memoryRequest: "128Mi", cpuLimit: "500m", memoryLimit: "512Mi", replicas: 1
+        },
         status: input.status,
         url: input.url,
         currentBuildId: input.currentBuildId,
@@ -1701,6 +1722,12 @@ export class PostgresBuildRepository implements BuildRepository {
           containerPort: input.containerPort,
           stripPrefix: input.stripPrefix,
           hostingScheme: input.hostingScheme,
+          serviceSize: input.serviceSize ?? "small",
+          effectiveTier: input.effectiveTier ?? "sandbox",
+          hostingPolicyVersion: input.hostingPolicyVersion ?? "v1",
+          resourceProfile: input.resources ?? {
+            cpuRequest: "100m", memoryRequest: "128Mi", cpuLimit: "500m", memoryLimit: "512Mi", replicas: 1
+          },
           status: input.status,
           url: input.url,
           currentBuildId: input.currentBuildId,
@@ -1759,6 +1786,12 @@ function toHostedService(row: typeof hostedServiceTable.$inferSelect): HostedSer
     containerPort: row.containerPort,
     stripPrefix: row.stripPrefix,
     hostingScheme: row.hostingScheme as HostedService["hostingScheme"],
+    effectiveTier: row.effectiveTier as HostedService["effectiveTier"],
+    serviceSize: row.serviceSize as HostedService["serviceSize"],
+    hostingPolicyVersion: row.hostingPolicyVersion,
+    resources: isCompleteResourceProfile(row.resourceProfile)
+      ? row.resourceProfile
+      : undefined,
     status: row.status as HostedService["status"],
     url: row.url,
     currentBuildId: row.currentBuildId,
@@ -1769,6 +1802,18 @@ function toHostedService(row: typeof hostedServiceTable.$inferSelect): HostedSer
     availableReplicas: row.availableReplicas ?? null,
     lastSyncedAt: row.lastSyncedAt ? row.lastSyncedAt.toISOString() : null
   };
+}
+
+function isCompleteResourceProfile(value: unknown): value is NonNullable<HostedService["resources"]> {
+  if (!value || typeof value !== "object") return false;
+  const profile = value as Record<string, unknown>;
+  return (
+    typeof profile.cpuRequest === "string" &&
+    typeof profile.memoryRequest === "string" &&
+    typeof profile.cpuLimit === "string" &&
+    typeof profile.memoryLimit === "string" &&
+    typeof profile.replicas === "number"
+  );
 }
 
 // TASK-069: postgres → AdminRunner 변환. row 의 status 는 text 로 저장되지만

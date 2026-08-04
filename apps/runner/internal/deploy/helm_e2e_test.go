@@ -26,6 +26,7 @@ func TestHelmE2E_RealDeploy(t *testing.T) {
 	result, err := deployer.Deploy(context.Background(), K8sDeployOptions{
 		SourceImage: image, BuildID: release, Namespace: ns, HelmChart: chart,
 		HelmRelease: release, Cluster: cluster, ContextPath: "helm-e2e", ContainerPort: 8080,
+		Resources: &ResourceProfile{Tier: "standard", CPURequest: "250m", MemoryRequest: "512Mi", CPULimit: "1", MemoryLimit: "1Gi", Replicas: 2},
 	})
 	if err != nil {
 		t.Fatalf("Helm Deploy: %v", err)
@@ -46,6 +47,9 @@ func TestHelmE2E_RealDeploy(t *testing.T) {
 	}
 	if err := runHelmE2ECommand(ctx, "kubectl", "--context", cluster, "get", "ingress", resourceName, "-n", ns); err != nil {
 		t.Fatalf("kubectl ingress verification: %v", err)
+	}
+	if err := runHelmE2ECommand(ctx, "kubectl", "--context", cluster, "get", "resourcequota", resourceName+"-quota", "-n", ns); err != nil {
+		t.Fatalf("kubectl resourcequota verification: %v", err)
 	}
 	if err := runHelmE2ECommand(ctx, "helm", "status", release, "--namespace", ns, "--kube-context", cluster); err != nil {
 		t.Fatalf("helm status verification: %v", err)

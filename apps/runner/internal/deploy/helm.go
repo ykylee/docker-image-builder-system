@@ -122,6 +122,22 @@ func (d *helmDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K8sR
 		"--set-string", "hosting.baseHost="+opts.BaseHost,
 		"--set-string", "build.id="+opts.BuildID,
 	)
+	if opts.Resources != nil {
+		quota := quotaForTier(opts.Resources.Tier)
+		args = append(args,
+			"--set", "replicaCount="+strconv.Itoa(maxInt(opts.Resources.Replicas, 1)),
+			"--set-string", "hosting.tier="+opts.Resources.Tier,
+			"--set-string", "resources.requests.cpu="+opts.Resources.CPURequest,
+			"--set-string", "resources.requests.memory="+opts.Resources.MemoryRequest,
+			"--set-string", "resources.limits.cpu="+opts.Resources.CPULimit,
+			"--set-string", "resources.limits.memory="+opts.Resources.MemoryLimit,
+			"--set-string", "quota.requestsCpu="+quota.cpu,
+			"--set-string", "quota.requestsMemory="+quota.memory,
+			"--set-string", "quota.limitsCpu="+quota.cpuLimit,
+			"--set-string", "quota.limitsMemory="+quota.memoryLimit,
+			"--set-string", "quota.pods="+quota.pods,
+		)
+	}
 	args = append(args, d.setValues...)
 	timeoutCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
@@ -133,6 +149,13 @@ func (d *helmDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K8sR
 		Manifest: chart, ResultRef: fmt.Sprintf("helm/%s", release),
 		AppliedAt: d.now().UTC(), DeploymentID: release, ContextPath: contextPath,
 	}, nil
+}
+
+func maxInt(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
 }
 
 func (d *helmDeployer) Apply(ctx context.Context, opts K8sApplyOptions) (*K8sResult, error) {

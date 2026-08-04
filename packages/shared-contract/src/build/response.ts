@@ -15,6 +15,31 @@ export const hostingSchemes = ["path", "subdomain"] as const;
 
 export type HostingScheme = (typeof hostingSchemes)[number];
 
+// Hosting sizing policy: tier is derived from service size and resources;
+// routing scheme remains an independent choice.
+export const hostingTiers = ["sandbox", "standard", "production"] as const;
+export type HostingTier = (typeof hostingTiers)[number];
+export const serviceSizes = ["small", "medium", "large"] as const;
+export type ServiceSize = (typeof serviceSizes)[number];
+
+export const hostingResourcesSchema = z.object({
+  cpuRequest: z.string().min(1),
+  memoryRequest: z.string().min(1),
+  cpuLimit: z.string().min(1),
+  memoryLimit: z.string().min(1),
+  replicas: z.int().positive()
+});
+export type HostingResources = z.infer<typeof hostingResourcesSchema>;
+
+export const hostingResourceInputSchema = z.object({
+  cpuRequest: z.string().min(1).optional(),
+  memoryRequest: z.string().min(1).optional(),
+  cpuLimit: z.string().min(1).optional(),
+  memoryLimit: z.string().min(1).optional(),
+  replicas: z.int().positive().optional()
+});
+export type HostingResourceInput = z.infer<typeof hostingResourceInputSchema>;
+
 // All exported schemas carry a `.meta({ id, description })` so that
 // @asteasolutions/zod-to-openapi's OpenApiGeneratorV3 can lift them into
 // `components.schemas` with stable refs. The `id` doubles as the component
@@ -92,6 +117,10 @@ export const buildSummarySchema = z
     hostingScheme: z.enum(hostingSchemes).optional().meta({
       description: "Hosting URL scheme: path (host/<cp>/) or subdomain (<cp>.host/). Default path."
     }),
+    effectiveTier: z.enum(hostingTiers).optional(),
+    serviceSize: z.enum(serviceSizes).optional(),
+    hostingPolicyVersion: z.string().min(1).optional(),
+    resources: hostingResourcesSchema.optional(),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
         "Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window."
@@ -322,6 +351,10 @@ export const hostedServiceSchema = z
     stripPrefix: z.boolean(),
     // TASK-172: URL 스킴(path|subdomain).
     hostingScheme: z.enum(hostingSchemes),
+    effectiveTier: z.enum(hostingTiers).optional(),
+    serviceSize: z.enum(serviceSizes).optional(),
+    hostingPolicyVersion: z.string().min(1).optional(),
+    resources: hostingResourcesSchema.optional(),
     status: z.enum(hostedServiceStatuses),
     // 접속 URL. status 가 PROVISIONING/REMOVED 등에서는 null 일 수 있다.
     url: z.string().url().nullable(),

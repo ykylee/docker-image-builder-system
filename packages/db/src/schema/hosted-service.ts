@@ -1,12 +1,14 @@
 import {
   boolean,
   integer,
+  jsonb,
   pgTable,
   text,
   timestamp,
   uniqueIndex,
   uuid
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 // Phase 3 / TASK-166 (P3-M1): 앱 1개의 지속 호스팅(앱당 1개 활성). 빌드가
 // 성공적으로 배포되면 그 앱의 hosted_service 가 upsert 된다. app_name /
@@ -24,6 +26,16 @@ export const hostedServiceTable = pgTable(
     stripPrefix: boolean("strip_prefix").notNull().default(true),
     // TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path).
     hostingScheme: text("hosting_scheme").notNull().default("path"),
+    serviceSize: text("service_size").notNull().default("small"),
+    effectiveTier: text("effective_tier").notNull().default("sandbox"),
+    hostingPolicyVersion: text("hosting_policy_version").notNull().default("v1"),
+    resourceProfile: jsonb("resource_profile").$type<{
+      cpuRequest: string;
+      memoryRequest: string;
+      cpuLimit: string;
+      memoryLimit: string;
+      replicas: number;
+    }>().notNull().default(sql`'{}'::jsonb`),
     status: text("status").notNull(),
     url: text("url"),
     currentBuildId: uuid("current_build_id"),

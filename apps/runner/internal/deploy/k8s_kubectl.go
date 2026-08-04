@@ -103,7 +103,7 @@ func (d *kubectlDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K
 	if contextPath == "" {
 		contextPath = name
 	}
-	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath, opts.StripPrefix, opts.HostingScheme, opts.BaseHost)
+	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath, opts.StripPrefix, opts.HostingScheme, opts.BaseHost, opts.Resources)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
@@ -238,7 +238,19 @@ func deploymentName(buildID string) string {
 //     `/<cp>/...` 를 직접 서빙(base-path-aware 서버, 예: Next basePath).
 //
 // 어느 경우든 APP_BASE_PATH env 는 주입한다. ingressClassName=nginx 전제.
-func renderK8sManifest(name, namespace, image string, port int, contextPath string, stripPrefix bool, hostingScheme, baseHost string) string {
+func renderK8sManifest(name, namespace, image string, port int, contextPath string, stripPrefix bool, hostingScheme, baseHost string, resources *ResourceProfile) string {
+	replicas := 1
+	resourceYaml := ""
+	quotaYaml := "---\n"
+	if resources != nil {
+		replicas = resources.Replicas
+		if replicas < 1 {
+			replicas = 1
+		}
+		resourceYaml = fmt.Sprintf("          resources:\n            requests:\n              cpu: %q\n              memory: %q\n            limits:\n              cpu: %q\n              memory: %q\n", resources.CPURequest, resources.MemoryRequest, resources.CPULimit, resources.MemoryLimit)
+		quota := quotaForTier(resources.Tier)
+		quotaYaml = fmt.Sprintf("---\napiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: dib-%s-quota\n  namespace: %s\nspec:\n  hard:\n    requests.cpu: %q\n    requests.memory: %q\n    limits.cpu: %q\n    limits.memory: %q\n    pods: %q\n---\n", resources.Tier, namespace, quota.cpu, quota.memory, quota.cpuLimit, quota.memoryLimit, quota.pods)
+	}
 	// TASK-172 (v0.5.0): subdomain 스킴이면 Ingress host rule 로 라우팅하고
 	// 앱은 자기 subdomain 루트에서 서빙된다(prefix strip / rewrite 불필요,
 	// APP_BASE_PATH=/). path 스킴이면 기존 path-prefix(+stripPrefix rewrite).
@@ -262,8 +274,7 @@ func renderK8sManifest(name, namespace, image string, port int, contextPath stri
 kind: Namespace
 metadata:
   name: %[2]s
----
-apiVersion: apps/v1
+%[11]sapiVersion: apps/v1
 kind: Deployment
 metadata:
   name: %[1]s
@@ -272,7 +283,7 @@ metadata:
     app.kubernetes.io/name: %[1]s
     app.kubernetes.io/managed-by: docker-image-builder-system
 spec:
-  replicas: 1
+  replicas: %[6]d
   selector:
     matchLabels:
       app.kubernetes.io/name: %[1]s
@@ -290,6 +301,7 @@ spec:
               value: "%[5]s"
           ports:
             - containerPort: %[4]d
+%[12]s
 ---
 apiVersion: v1
 kind: Service
@@ -312,17 +324,30 @@ metadata:
   namespace: %[2]s
   labels:
     app.kubernetes.io/name: %[1]s
-%[6]sspec:
+%[7]sspec:
   ingressClassName: nginx
   rules:
-    - %[9]shttp:
+    - %[10]shttp:
         paths:
-          - path: %[7]s
-            pathType: %[8]s
+          - path: %[8]s
+            pathType: %[9]s
             backend:
               service:
                 name: %[1]s
                 port:
                   number: %[4]d
-`, name, namespace, image, port, appBasePath, ingressAnnotations, ingressPath, pathType, ruleHost)
+`, name, namespace, image, port, appBasePath, replicas, ingressAnnotations, ingressPath, pathType, ruleHost, quotaYaml, resourceYaml)
+}
+
+type quotaValues struct{ cpu, memory, cpuLimit, memoryLimit, pods string }
+
+func quotaForTier(tier string) quotaValues {
+	switch tier {
+	case "production":
+		return quotaValues{"8", "8Gi", "8", "8Gi", "4"}
+	case "standard":
+		return quotaValues{"2", "2Gi", "2", "2Gi", "2"}
+	default:
+		return quotaValues{"250m", "256Mi", "500m", "512Mi", "1"}
+	}
 }

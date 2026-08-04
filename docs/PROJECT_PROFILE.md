@@ -19,6 +19,8 @@
 - 운영 문서 홈: ai-workflow/memory/active/
 - 운영 가이드 인덱스: docs/operations/ (v0.9.0 기준 누적 45종)
   - 호스팅 능력: [`hosting-2026-07-24.md`](operations/hosting-2026-07-24.md) (Phase 3 / P3-M1~M5 종합), [`hosting-sub-path-2026-07-24.md`](operations/hosting-sub-path-2026-07-24.md) (sub-path 규약 + stripPrefix)
+  - 호스팅 3티어 정책 컨셉: [`hosting-tiers.md`](design/hosting-tiers.md) (서비스 규모·자원 할당 기반 `sandbox` / `standard` / `production` 분류 원칙)
+  - 호스팅 3티어 정책 설계안: [`hosting-tiers-design.md`](design/hosting-tiers-design.md) (판정 resolver, policy snapshot, adapter 전달, migration/API 영향)
   - k8s adapter: [`k8s-deploy-webhook-2026-07-24.md`](operations/k8s-deploy-webhook-2026-07-24.md) (P2-M5 + TASK-175 k8s adapter 확장 §6.6 실측 절차)
   - Helm/ArgoCD adapter (v0.9.0): 위 k8s adapter 운영 가이드 §7/§8 및 [`e2e-helm-deploy.sh`](../apps/runner/scripts/e2e-helm-deploy.sh), [`e2e-argocd-deploy.sh`](../apps/runner/scripts/e2e-argocd-deploy.sh) (kind 실 e2e)
   - 운영 절차: [`release-checklist-2026-07-20.md`](operations/release-checklist-2026-07-20.md) (v0.8.3 k8s 보강 §1/§3/§4/§5/§7/§8 정합)
