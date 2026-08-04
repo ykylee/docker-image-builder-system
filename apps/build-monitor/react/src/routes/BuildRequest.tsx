@@ -50,7 +50,6 @@ interface FormState {
   entrypointPath: string;
   dockerfilePath: string;
   dockerfileMode: "required" | "auto";
-  contextPath: string;
   runtimePort: number;
   stripPrefix: boolean;
   hostingScheme: "path" | "subdomain";
@@ -72,7 +71,6 @@ const DEFAULT_FORM: FormState = {
   entrypointPath: "src/index.ts",
   dockerfilePath: "Dockerfile",
   dockerfileMode: "required",
-  contextPath: "",
   runtimePort: 8080,
   stripPrefix: true,
   hostingScheme: "path",
@@ -168,16 +166,6 @@ const FIELDS: readonly {
     testId: "req-dockerfile"
   },
   {
-    key: "contextPath",
-    label: "contextPath (Hosting)",
-    errorPath: "contextPath",
-    kind: "text",
-    required: false,
-    placeholder: "hello-world",
-    hint: "Optional hosting URL sub-path (e.g. hello-world). Defaults to normalized appName.",
-    testId: "req-contextPath"
-  },
-  {
     key: "runtimePort",
     label: "runtimePort (Container Port)",
     errorPath: "runtimePort",
@@ -204,7 +192,6 @@ function makePreset(
       entrypointPath: "src/index.ts",
       dockerfilePath: "Dockerfile",
       dockerfileMode: "required",
-      contextPath: `hello-${ts}`,
       runtimePort: 8080,
       stripPrefix: true,
       hostingScheme: "path",
@@ -227,7 +214,6 @@ function makePreset(
       entrypointPath: "main.py",
       dockerfilePath: "Dockerfile",
       dockerfileMode: "required",
-      contextPath: `minimal-${ts}`,
       runtimePort: 5000,
       stripPrefix: true,
       hostingScheme: "path",
@@ -249,7 +235,6 @@ function makePreset(
     entrypointPath: "src/server.ts",
     dockerfilePath: "Dockerfile",
     dockerfileMode: "required",
-    contextPath: `ts-app-${ts}`,
     runtimePort: 3000,
     stripPrefix: true,
     hostingScheme: "path",
@@ -314,7 +299,6 @@ export function BuildRequest(): ReactElement {
         entrypointPath: form.entrypointPath,
         dockerfilePath: form.dockerfilePath,
         dockerfileMode: form.dockerfileMode,
-        ...(form.contextPath ? { contextPath: form.contextPath } : {}),
         ...(form.runtimePort ? { runtimePort: Number(form.runtimePort) } : {}),
         stripPrefix: form.stripPrefix,
         hostingScheme: form.hostingScheme,
@@ -419,7 +403,6 @@ export function BuildRequest(): ReactElement {
         entrypointPath: entrypointValue,
         dockerfilePath: dockerfileValue,
         dockerfileMode: form.dockerfileMode,
-        ...(form.contextPath ? { contextPath: form.contextPath } : {}),
         ...(form.runtimePort ? { runtimePort: Math.trunc(form.runtimePort) } : {}),
         stripPrefix: form.stripPrefix,
         hostingScheme: form.hostingScheme,

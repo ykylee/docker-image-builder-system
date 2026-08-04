@@ -142,7 +142,10 @@ export class BuildService {
         reason: policyResult.error.message
       };
     }
-    const raw = input.contextPath ?? input.appName;
+    // The public route is derived solely from the canonical service name. A
+    // caller-supplied contextPath is intentionally ignored so a service has
+    // one stable URL identity across registrations and redeployments.
+    const raw = input.appName;
     const validation = validateContextPath(raw);
     if (!validation.ok) {
       return { kind: "context_path_invalid", reason: validation.reason };

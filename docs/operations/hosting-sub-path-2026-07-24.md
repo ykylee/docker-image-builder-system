@@ -48,7 +48,7 @@
 
 | 필드 | 기본 | 의미 |
 |---|---|---|
-| `contextPath` | appName 정규화 | URL prefix. 전역 유일(예약어 회피). |
+| `contextPath` | appName slug | URL prefix. 전역 유일(예약어 회피). 요청 입력은 deprecated이며 서버가 무시한다. |
 | `runtimePort` | 8080 | 앱 컨테이너 listen 포트. |
 | `stripPrefix` | true | §2 참조. base-path-aware 서버는 false. |
 

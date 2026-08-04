@@ -71,8 +71,7 @@ describe("호스팅 registry (memory)", () => {
 
 async function createBuild(
   svc: BuildService,
-  appName: string,
-  contextPath?: string
+  appName: string
 ) {
   const bytes = new Uint8Array(randomBytes(32));
   const checksum = createHash("sha256").update(Buffer.from(bytes)).digest("hex");
@@ -88,20 +87,22 @@ async function createBuild(
     dockerfilePath: "Dockerfile",
     runtimePort: 8080,
     metadata: {},
-    ...(contextPath ? { contextPath } : {})
   });
 }
 
 describe("createBuild — context-path 할당", () => {
-  it("미지정 시 appName 파생, 명시 시 정규화", async () => {
+  it("서비스명을 slug로 변환해 context path를 만든다", async () => {
     const svc = new BuildService(createMemoryBuildRepository());
     const a = await createBuild(svc, "Todo App");
     assert.equal(a.kind, "accepted");
+    if (a.kind === "accepted") {
+      assert.equal(a.response.build.contextPath, "todo-app");
+    }
   });
 
-  it("예약어 context-path 는 거부", async () => {
+  it("예약어 서비스명은 context-path 할당을 거부", async () => {
     const svc = new BuildService(createMemoryBuildRepository());
-    const r = await createBuild(svc, "some-app", "admin");
+    const r = await createBuild(svc, "admin");
     assert.equal(r.kind, "context_path_invalid");
   });
 
@@ -110,7 +111,7 @@ describe("createBuild — context-path 할당", () => {
     // app-a 가 이미 'shared' 를 호스팅 중
     await repo.upsertHostedService({
       appName: "app-a",
-      contextPath: "shared",
+      contextPath: "app-b",
       namespace: "dib-hosted",
       deploymentName: "dib-shared",
       containerPort: 8080,
@@ -123,25 +124,25 @@ describe("createBuild — context-path 할당", () => {
     const svc = new BuildService(repo);
 
     // app-b 가 같은 context-path 요청 → 거부
-    const taken = await createBuild(svc, "app-b", "shared");
+    const taken = await createBuild(svc, "app-b");
     assert.equal(taken.kind, "context_path_taken");
 
-    // app-a 는 같은 context-path 재사용 가능(교체)
-    const same = await createBuild(svc, "app-a", "shared");
+    // app-a 는 자기 서비스명 slug를 재사용 가능(교체)
+    const same = await createBuild(svc, "app-a");
     assert.equal(same.kind, "accepted");
   });
 
   it("다른 앱의 진행 중 build가 점유한 context-path도 차단한다", async () => {
     const repo = createMemoryBuildRepository();
     const svc = new BuildService(repo);
-    const first = await createBuild(svc, "app-a", "shared-active");
+    const first = await createBuild(svc, "App B");
     assert.equal(first.kind, "accepted");
 
-    const second = await createBuild(svc, "app-b", "shared-active");
+    const second = await createBuild(svc, "app-b");
     assert.deepEqual(second, {
       kind: "context_path_taken",
-      contextPath: "shared-active",
-      appName: "app-a"
+      contextPath: "app-b",
+      appName: "App B"
     });
   });
 });
@@ -338,7 +339,7 @@ describe("호스팅 관리 라이프사이클 (TASK-168 / P3-M3)", () => {
     assert.equal(admin.calls.at(-1)!.op, "remove");
     assert.equal(await svc.getHostedService("app-x"), null);
     // context path 반환 확인 — 다른 앱이 app-x 를 다시 쓸 수 있다
-    const other = await createBuild(svc, "other-app", "app-x");
+    const other = await createBuild(svc, "app-x");
     assert.equal(other.kind, "accepted");
   });
 

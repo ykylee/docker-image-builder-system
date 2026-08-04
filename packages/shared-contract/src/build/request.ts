@@ -59,12 +59,11 @@ export const buildRequestSchema = z
     dockerfilePath: z.string().min(1).default("Dockerfile"),
     dockerfileMode: z.enum(dockerfileModes).default("required"),
     // TASK-166 (P3-M1): 호스팅 context path. `https://<host>/<contextPath>/`
-    // 로 서비스가 라우팅된다. 미지정 시 서버가 appName 을 정규화해 자동 부여.
-    // 서버가 정규화(소문자/URL-safe)·유일성·예약어를 최종 검증하므로 계약은
-    // 관대하게 문자열만 받는다.
+    // 로 서비스가 라우팅된다. 서버가 항상 appName 을 slug로 변환해 자동 부여한다.
+    // 기존 소비자 호환을 위해 입력 필드는 잠시 허용하지만 서버는 무시한다.
     contextPath: z.string().min(1).optional().meta({
       description:
-        "Optional hosting URL context path. Defaults to a normalized appName. Server normalizes and enforces global uniqueness."
+        "Deprecated hosting URL context path. The server derives the path from appName and ignores this field."
     }),
     // TASK-166 (P3-M1): 앱이 컨테이너 안에서 listen 하는 포트. Ingress/Service
     // 가 이 포트로 트래픽을 보낸다. optional — 서버가 미지정 시 8080 을 쓴다
