@@ -16,8 +16,9 @@
 #  기존 워크플로와의 역할 분담:
 #    docker-build.yml   PR + main push — 정적 가드 + 이미지 build/smoke (빠름)
 #    nightly-b-layer    nightly 03:00 UTC — 실브라우저 가드(대비/CSS 유출)
-#    nightly-e2e (본)   nightly 04:00 UTC — e2e 13종 + 시각 QA + 호스팅 e2e
-#                      (TASK-171) + k8s-deploy-e2e (TASK-175 / v0.8.1)
+#    nightly-e2e (본)   nightly 04:00 UTC — e2e 13종 + 시각 QA + 통합 배포 e2e
+#                      (Helm/hosted HTTP/ArgoCD, v0.9.0) + k8s-deploy-e2e
+#                      (TASK-175 / v0.8.1)
 #                      (느림, 도커 실사용)
 #
 #  visual 잡의 baseline 정책:
@@ -216,15 +217,16 @@ jobs:
           if-no-files-found: warn
 
   # ---------------------------------------------------------------------------
-  # 호스팅 e2e (Phase 3 / TASK-171) — kind + ingress-nginx 실 path 라우팅 +
-  # 관리 라이프사이클. kind 셋업이 무거워 schedule / 수동 dispatch 에서만 돈다
-  # (매 push 는 제외).
+  # 통합 배포 e2e (v0.9.0) — 같은 job에서 Helm lifecycle, hosted HTTP
+  # path/subdomain + management, ArgoCD Application sync/health/cleanup을
+  # 순차 실행한다. 각 스크립트는 서로 다른 kind cluster를 사용한다.
+  # kind 셋업이 무거워 schedule / 수동 dispatch 에서만 돈다 (매 push 제외).
   # ---------------------------------------------------------------------------
-  hosting-e2e:
-    name: hosting-e2e (kind+ingress-nginx)
+  deployment-e2e:
+    name: deployment-e2e (helm+hosted+argocd)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 
@@ -240,6 +242,10 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
 
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
       - name: Install kind + kubectl
         run: |
           set -euo pipefail
@@ -251,10 +257,32 @@ jobs:
       - name: Install deps (tsx)
         run: pnpm install --frozen-lockfile
 
-      - name: Run hosting e2e
+      - name: Run Helm e2e
+        env:
+          NO_COLOR: "1"
+          DIB_HELM_E2E_CLUSTER: dib-helm-e2e
+          DIB_HELM_E2E_NS: dib-helm-e2e
+        run: bash apps/runner/scripts/e2e-helm-deploy.sh
+
+      - name: Run hosted HTTP e2e
         env:
           NO_COLOR: "1"
         run: bash apps/runner/scripts/e2e-hosting.sh
+
+      - name: Run ArgoCD e2e
+        env:
+          NO_COLOR: "1"
+          DIB_ARGOCD_E2E_CLUSTER: dib-argocd-e2e
+          DIB_ARGOCD_E2E_TARGET_NAMESPACE: dib-argocd-e2e
+          DIB_ARGOCD_E2E_ARGO_NAMESPACE: argocd
+        run: bash apps/runner/scripts/e2e-argocd-deploy.sh
+
+      - name: Teardown kind leftovers
+        if: always()
+        run: |
+          kind delete cluster --name dib-helm-e2e >/dev/null 2>&1 || true
+          kind delete cluster --name dib-hosting-e2e >/dev/null 2>&1 || true
+          kind delete cluster --name dib-argocd-e2e >/dev/null 2>&1 || true
 
   # ---------------------------------------------------------------------------
   # k8s e2e (Phase 2 / TASK-165 — v0.8.1 nightly 편입) — busybox httpd 빌드

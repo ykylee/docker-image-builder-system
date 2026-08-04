@@ -50,7 +50,7 @@ v0.9.0은 v0.8.16 이후 첫 minor 릴리스다. 기존 `k8s` adapter를 유지�
 
 ## 6. 후속 작업
 
-- ArgoCD e2e nightly CI 편입.
-- Helm/ArgoCD hosted HTTP 통합 e2e 확장.
+- Helm/hosted HTTP/ArgoCD 통합 deployment-e2e nightly CI 편입 완료.
+- Linux runner의 ArgoCD local Git source 접근은 kind Docker network gateway를 사용한다.
 - webhook 재시도/서명 및 외부 알림 채널 검토.
 - v0.9.0 tag 기준 운영 배포 및 rollback 검증.

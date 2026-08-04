@@ -21,6 +21,18 @@ if [ -z "${APP_NAME}" ]; then
   APP_NAME="dib-build"
 fi
 
+# Docker Desktop에서는 host.docker.internal을 사용하고, Linux runner에서는
+# kind Docker network의 gateway가 host의 git daemon에 도달하는 주소다.
+if [ -n "${DIB_ARGOCD_E2E_GIT_HOST:-}" ]; then
+  GIT_HOST="${DIB_ARGOCD_E2E_GIT_HOST}"
+else
+  GIT_HOST="host.docker.internal"
+  if [ "$(uname -s)" = "Linux" ]; then
+    GIT_HOST="$(docker network inspect kind -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || true)"
+    GIT_HOST="${GIT_HOST:-host.docker.internal}"
+  fi
+fi
+
 cleanup() {
   set +e
   if [ "${DIB_ARGOCD_E2E_KEEP_DEPLOY:-0}" != "1" ]; then
@@ -77,7 +89,7 @@ docker build -q -t "${IMAGE}" "${WORK}" >/dev/null
 kind load docker-image "${IMAGE}" --name "${CLUSTER}"
 
 # 외부 GitHub credential에 의존하지 않도록 chart만 담은 local Git source를
-# ArgoCD repo-server가 접근 가능한 Docker Desktop host 주소로 제공한다.
+# ArgoCD repo-server가 접근 가능한 host gateway 주소로 제공한다.
 mkdir -p "${WORK}/source"
 cp -R "${ROOT}/examples/helm-hosted-app" "${WORK}/source/helm-hosted-app"
 # kind에는 외부 LoadBalancer 주소가 없어 ArgoCD의 Ingress health가 영구적으로
@@ -109,7 +121,7 @@ kubectl --context "${CONTEXT}" -n "${ARGO_NS}" rollout status statefulset/argocd
   DIB_ARGOCD_E2E_TARGET_NAMESPACE="${TARGET_NS}" \
   DIB_ARGOCD_E2E_ARGO_NAMESPACE="${ARGO_NS}" \
   DIB_ARGOCD_E2E_BUILD_ID="${BUILD_ID}" \
-  DIB_ARGOCD_E2E_REPO_URL="git://host.docker.internal:${GIT_PORT}/dib-e2e.git" \
+  DIB_ARGOCD_E2E_REPO_URL="git://${GIT_HOST}:${GIT_PORT}/dib-e2e.git" \
   DIB_ARGOCD_E2E_PATH="helm-hosted-app" \
   go test -tags argocde2e -count=1 -run TestArgoCDE2E_RealDeploy ./internal/deploy/ -v )
 
