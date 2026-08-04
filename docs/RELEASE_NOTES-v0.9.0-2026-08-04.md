@@ -2,7 +2,7 @@
 
 - 문서 목적: Helm/ArgoCD adapter와 배포 e2e를 포함한 v0.9.0 minor 릴리스 기록.
 - 범위: Phase 3 v0.9.0 첫 마일스톤 — chart 기반 배포와 GitOps Application 배포.
-- 상태: release candidate 준비
+- 상태: released
 - 관련 문서: [CHANGELOG](../CHANGELOG.md), [k8s 배포 운영](./operations/k8s-deploy-webhook-2026-07-24.md), [release checklist](./operations/release-checklist-2026-07-20.md)
 
 ## 1. 요약
@@ -53,4 +53,4 @@ v0.9.0은 v0.8.16 이후 첫 minor 릴리스다. 기존 `k8s` adapter를 유지�
 - ArgoCD e2e nightly CI 편입.
 - Helm/ArgoCD hosted HTTP 통합 e2e 확장.
 - webhook 재시도/서명 및 외부 알림 채널 검토.
-- 실제 release tag 생성 후 workflow baseline을 `v0.9.0`으로 승격.
+- v0.9.0 tag 기준 운영 배포 및 rollback 검증.

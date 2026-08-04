@@ -6,7 +6,7 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일 갱신: **2026-08-04 (rev 132→133: v0.9.0 release candidate e2e 및 PROJECT_PROFILE 복구 정리)**. Helm/hosted HTTP/ArgoCD 실 e2e와 PROJECT_PROFILE 복구, package version/release notes 준비를 완료했다. 다음: workflow meta 최종 정합 검토 후 release 후보 승인.
+- 최종 수정일 갱신: **2026-08-04 (rev 133→134: v0.9.0 release 봉인 및 tag 발급)**. Helm/hosted HTTP/ArgoCD 실 e2e, PROJECT_PROFILE 복구, package version/release notes, workflow meta 정합을 완료했다. 다음: ArgoCD e2e nightly CI 및 Helm/ArgoCD hosted HTTP 통합 e2e 검토.
 - 최신 작업: 2026-08-04 v0.9.0 release candidate 정리 — 상세: `backlog/2026-08-04.md`
 - 최신 작업: 2026-08-03 세션 종료 — Helm/ArgoCD adapter, PR #60 리뷰 수정 및 squash merge(`39b7025`) 완료. 회귀 검증 PASS. 최신 상세: `backlog/2026-08-03.md`, `backlog/2026-08-03-argocd.md`
 - 최신 작업: 2026-08-03 Helm adapter vertical slice 완료 — release cleanup 식별자 정합, hosted chart Ingress, Helm kind e2e(install/status/cleanup) ALL PASS. 상세: `backlog/2026-08-03.md`
