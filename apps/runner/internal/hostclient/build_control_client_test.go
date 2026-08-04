@@ -29,6 +29,7 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 					"appName":         "todo-app",
 					"status":          contract.StatusPreparingSource,
 					"phase":           contract.PhaseQueueClaimed,
+					"dockerfileMode":  "auto",
 					"lifecycleStatus": contract.StatusPreparingSource,
 					"updatedAt":       "2026-07-03T00:00:00Z",
 				},
@@ -58,6 +59,9 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 	}
 	if resp.LifecycleStatus != contract.StatusPreparingSource {
 		t.Errorf("expected lifecycleStatus PREPARING_SOURCE, got %s", resp.LifecycleStatus)
+	}
+	if resp.DockerfileMode != "auto" {
+		t.Errorf("expected dockerfileMode auto, got %s", resp.DockerfileMode)
 	}
 }
 

@@ -97,6 +97,33 @@ describe("admin guard (ADMIN-004)", () => {
   });
 });
 
+describe("GET /admin/hosting-capacity", () => {
+  it("returns capacity usage for an admin caller", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const res = await app.inject({
+      method: "GET",
+      url: "/admin/hosting-capacity",
+      headers: { "x-admin-id": "admin" }
+    });
+    assert.equal(res.statusCode, 200);
+    const body = res.json();
+    assert.equal(body.capacity.cpuMillicores, 2000);
+    assert.equal(body.used.cpuMillicores, 0);
+    assert.equal(body.remaining.memoryMi, 5632);
+    assert.equal(body.tiers.standard.maxServices, 8);
+    await app.close();
+  });
+
+  it("keeps capacity usage admin-only", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const res = await app.inject({ method: "GET", url: "/admin/hosting-capacity" });
+    assert.equal(res.statusCode, 401);
+    await app.close();
+  });
+});
+
 describe("GET /admin/users", () => {
   it("returns per-owner buildCount and lastBuildAt for an admin caller", async () => {
     const service = new BuildService(createMemoryBuildRepository());

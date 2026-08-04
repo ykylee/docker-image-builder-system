@@ -24,6 +24,10 @@ export type CreateBuildResult =
   | {
       kind: "duplicate";
       response: BuildDuplicateResponse;
+    }
+  | {
+      kind: "hosting_capacity_exceeded";
+      tier: "sandbox" | "standard" | "production";
     };
 
 export type ClaimNextBuildResult =
@@ -474,6 +478,11 @@ export interface BuildRepository {
     availableReplicas: number
   ): Promise<HostedService | null>;
   deleteHostedService(appName: string): Promise<boolean>;
+  getHostingCapacityUsage(): Promise<import("../services/hosting-capacity.js").HostingCapacity>;
+  reserveHostingCapacity(
+    reservation: import("../services/hosting-capacity.js").HostingCapacityReservation
+  ): Promise<boolean>;
+  releaseHostingCapacity(buildId: string): Promise<boolean>;
 }
 
 // TASK-166 (P3-M1): 호스팅 upsert 입력. appName 기준으로 기존 row 를 교체한다.

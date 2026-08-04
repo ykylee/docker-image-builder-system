@@ -29,6 +29,11 @@ import type {
 import { validateContextPath } from "./context-path.js";
 import { createKubectlK8sAdmin, type K8sAdmin } from "./k8s-admin.js";
 import { resolveHostingPolicy } from "./hosting-policy.js";
+import {
+  DEFAULT_HOSTING_CAPACITY,
+  calculateAllTierCapacity,
+  reservationForResources
+} from "./hosting-capacity.js";
 
 export type ReportPhaseOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
@@ -41,6 +46,7 @@ export type CreateBuildOutcome =
   | { kind: "duplicate"; response: BuildDuplicateResponse }
   | { kind: "context_path_invalid"; reason: string }
   | { kind: "context_path_taken"; contextPath: string; appName: string }
+  | { kind: "hosting_capacity_exceeded"; tier: "sandbox" | "standard" | "production" }
   | { kind: "hosting_policy_invalid"; code: "HOSTING_TIER_UPGRADE_REQUIRED" | "HOSTING_RESOURCE_LIMIT_EXCEEDED"; reason: string };
 
 // TASK-168 (P3-M3): 호스팅 관리(stop/start/remove) 결과.
@@ -102,6 +108,7 @@ export class BuildService {
     private readonly repository: BuildRepository,
     private readonly runtime: {
       strictContentRange: boolean;
+      hostingCapacity?: { cpuMillicores: number; memoryMi: number };
       // TASK-165 (P2-M5): 설정되면 build 가 terminal(COMPLETED/FAILED) 에
       // 도달할 때 canonical BuildStatusResponse 를 이 URL 로 POST 한다
       // (webhook = NOTIFICATION 모드 결과 전달). 미설정이면 기존 POLLING
@@ -113,7 +120,8 @@ export class BuildService {
       // upsert 안 함 — opt-in, 설계 §9-3).
       hostingBaseHost?: string;
     } = {
-      strictContentRange: false
+      strictContentRange: false,
+      hostingCapacity: DEFAULT_HOSTING_CAPACITY
     },
     // TASK-168 (P3-M3): 호스팅 관리(scale/delete)용 k8s 헬퍼. build-server 가
     // kubectl 을 직접 shell-out 한다(§9-1). 테스트가 fake 를 주입한다.
@@ -155,6 +163,9 @@ export class BuildService {
 
     if (result.kind === "duplicate") {
       return { kind: "duplicate", response: result.response };
+    }
+    if (result.kind === "hosting_capacity_exceeded") {
+      return result;
     }
 
     return {
@@ -308,6 +319,19 @@ export class BuildService {
     return this.repository.getHostedServiceByAppName(appName);
   }
 
+  async getHostingCapacity() {
+    const used = await this.repository.getHostingCapacityUsage();
+    return {
+      capacity: this.runtime.hostingCapacity ?? DEFAULT_HOSTING_CAPACITY,
+      used,
+      remaining: {
+        cpuMillicores: Math.max(0, (this.runtime.hostingCapacity ?? DEFAULT_HOSTING_CAPACITY).cpuMillicores - used.cpuMillicores),
+        memoryMi: Math.max(0, (this.runtime.hostingCapacity ?? DEFAULT_HOSTING_CAPACITY).memoryMi - used.memoryMi)
+      },
+      tiers: calculateAllTierCapacity(this.runtime.hostingCapacity ?? DEFAULT_HOSTING_CAPACITY)
+    };
+  }
+
   // TASK-168 (P3-M3): 호스팅 수명 관리. stop=scale 0 / start=scale 1 /
   // remove=k8s 자원 삭제 + registry 제거(contextPath 반환). k8s 실패는
   // registry 를 바꾸지 않고 k8s_error 로 표면화한다.
@@ -328,9 +352,25 @@ export class BuildService {
     if (!svc) {
       return { kind: "not_found" };
     }
+    if (nextStatus === "RUNNING" && svc.currentBuildId && svc.effectiveTier && svc.resources) {
+      const reserved = await this.repository.reserveHostingCapacity(
+        reservationForResources(
+          svc.currentBuildId,
+          svc.appName,
+          svc.effectiveTier,
+          svc.resources
+        )
+      );
+      if (!reserved) {
+        return { kind: "k8s_error", message: "Hosting capacity is exhausted." };
+      }
+    }
     try {
       await this.k8sAdmin.scale(svc.namespace, svc.deploymentName, replicas);
     } catch (err) {
+      if (nextStatus === "RUNNING" && svc.currentBuildId) {
+        await this.repository.releaseHostingCapacity(svc.currentBuildId);
+      }
       return {
         kind: "k8s_error",
         message: err instanceof Error ? err.message : String(err)
@@ -340,6 +380,9 @@ export class BuildService {
       appName,
       nextStatus
     );
+    if (nextStatus === "STOPPED") {
+      await this.repository.releaseHostingCapacity(svc.currentBuildId ?? "");
+    }
     return { kind: "ok", service: updated ?? svc };
   }
 
@@ -358,6 +401,7 @@ export class BuildService {
     }
     // registry 에서 제거 → context path 반환.
     await this.repository.deleteHostedService(appName);
+    await this.repository.releaseHostingCapacity(svc.currentBuildId ?? "");
     return { kind: "ok", service: { ...svc, status: "REMOVED" } };
   }
 
@@ -422,6 +466,9 @@ export class BuildService {
     failure?: PhaseFailureDetails
   ): Promise<ReportPhaseOutcome> {
     const result = await this.repository.updatePhase(buildId, phase, failure);
+    if (phase === "FAILED" && result.kind === "ok") {
+      await this.repository.releaseHostingCapacity(buildId);
+    }
     // TASK-069: terminal phase 진입 시 runner registry 의 counter + currentBuildId
     // 를 갱신한다. INVALID_TRANSITION result 라도 registry 는 best-effort 로
     // 갱신 (runner 가 잘못된 phase 를 한 번 더 보내더라도 counter 가 정직하게

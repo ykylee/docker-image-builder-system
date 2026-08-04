@@ -54,6 +54,13 @@ import {
   enrichBuildSummary
 } from "./build-status-response.js";
 import { resolveHostingPolicy } from "../services/hosting-policy.js";
+import {
+  DEFAULT_HOSTING_CAPACITY,
+  canReserveHostingCapacity,
+  reservationForResources,
+  type HostingCapacity,
+  type HostingCapacityReservation
+} from "../services/hosting-capacity.js";
 
 type StoredBuild = {
   summary: BuildSummary;
@@ -95,6 +102,7 @@ type StoredBuild = {
     memoryLimit: string;
     replicas: number;
   };
+  dockerfileMode: "required" | "auto";
 };
 
 // TASK-166 (P3-M1): 호스팅 registry(앱당 1개). deployment 성공 시 upsert.
@@ -139,8 +147,11 @@ type StoredRunner = {
 const runners = new Map<string, StoredRunner>();
 
 
-export function createMemoryBuildRepository(): BuildRepository {
+export function createMemoryBuildRepository(
+  capacity: HostingCapacity = DEFAULT_HOSTING_CAPACITY
+): BuildRepository {
   const builds = new Map<string, StoredBuild>();
+  const hostingReservations = new Map<string, HostingCapacityReservation>();
   // TASK-166 (P3-M1): 호스팅 registry — appName 기준(앱당 1개).
   const hostedServices = new Map<string, StoredHostedService>();
 
@@ -175,6 +186,26 @@ export function createMemoryBuildRepository(): BuildRepository {
 
       const timestamp = nowIsoString();
       const buildId = randomUUID();
+      const reservation = reservationForResources(
+        buildId,
+        input.appName,
+        policy.effectiveTier,
+        policy.resources
+      );
+      const used = [...hostingReservations.values()].reduce(
+        (total, current) => {
+          if (current.buildId === reservation.buildId) return total;
+          return {
+            cpuMillicores: total.cpuMillicores + current.cpuMillicores,
+            memoryMi: total.memoryMi + current.memoryMi
+          };
+        },
+        { cpuMillicores: 0, memoryMi: 0 }
+      );
+      if (!canReserveHostingCapacity(used, reservation, capacity)) {
+        return { kind: "hosting_capacity_exceeded", tier: policy.effectiveTier };
+      }
+      hostingReservations.set(buildId, reservation);
       const summary: BuildSummary = {
         buildId,
         appName: input.appName,
@@ -191,6 +222,7 @@ export function createMemoryBuildRepository(): BuildRepository {
         serviceSize: policy.serviceSize,
         hostingPolicyVersion: policy.hostingPolicyVersion,
         resources: policy.resources,
+        dockerfileMode: input.dockerfileMode ?? "required",
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -225,7 +257,8 @@ export function createMemoryBuildRepository(): BuildRepository {
         serviceSize: policy.serviceSize,
         effectiveTier: policy.effectiveTier,
         hostingPolicyVersion: policy.hostingPolicyVersion,
-        resources: policy.resources
+        resources: policy.resources,
+        dockerfileMode: input.dockerfileMode ?? "required"
       });
 
       return {
@@ -1354,6 +1387,34 @@ export function createMemoryBuildRepository(): BuildRepository {
     },
     async deleteHostedService(appName: string): Promise<boolean> {
       return hostedServices.delete(appName);
+    },
+    async getHostingCapacityUsage() {
+      return [...hostingReservations.values()].reduce(
+        (total, current) => ({
+          cpuMillicores: total.cpuMillicores + current.cpuMillicores,
+          memoryMi: total.memoryMi + current.memoryMi
+        }),
+        { cpuMillicores: 0, memoryMi: 0 }
+      );
+    },
+    async releaseHostingCapacity(buildId: string): Promise<boolean> {
+      return hostingReservations.delete(buildId);
+    },
+    async reserveHostingCapacity(reservation: HostingCapacityReservation): Promise<boolean> {
+      const used = [...hostingReservations.values()].reduce(
+        (total, current) => current.buildId === reservation.buildId
+          ? total
+          : {
+              cpuMillicores: total.cpuMillicores + current.cpuMillicores,
+              memoryMi: total.memoryMi + current.memoryMi
+            },
+        { cpuMillicores: 0, memoryMi: 0 }
+      );
+      if (!canReserveHostingCapacity(used, reservation, capacity)) {
+        return false;
+      }
+      hostingReservations.set(reservation.buildId, reservation);
+      return true;
     }
   };
 }

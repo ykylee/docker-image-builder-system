@@ -29,6 +29,30 @@
   color: var(--dib-color-text-primary);
 }
 
+.capacity-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--dib-space-lg, 16px);
+  padding: var(--dib-space-lg, 16px);
+  border: 1px solid var(--dib-color-border-subtle, #242936);
+  border-radius: var(--dib-radius-md, 8px);
+  background: var(--dib-color-bg-surface, #13151c);
+}
+
+.capacity-summary,
+.capacity-tiers {
+  display: flex;
+  align-items: center;
+  gap: var(--dib-space-sm, 8px);
+}
+
+.capacity-tiers > div {
+  display: flex;
+  gap: var(--dib-space-xs, 6px);
+  padding-left: var(--dib-space-md, 12px);
+  border-left: 1px solid var(--dib-color-border-subtle, #242936);
+}
+
 .hosting-table {
   width: 100%;
   border-collapse: collapse;

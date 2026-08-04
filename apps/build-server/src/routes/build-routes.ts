@@ -79,6 +79,14 @@ export async function registerBuildRoutes(
         errorBody(outcome.reason, { errorCode: outcome.code })
       );
     }
+    if (outcome.kind === "hosting_capacity_exceeded") {
+      return reply.status(409).send(
+        errorBody(
+          `Hosting capacity for the ${outcome.tier} tier is currently exhausted.`,
+          { errorCode: "HOSTING_CAPACITY_EXCEEDED", tier: outcome.tier }
+        )
+      );
+    }
 
     if (outcome.kind === "duplicate") {
       const body = buildDuplicateResponseSchema.parse(outcome.response);

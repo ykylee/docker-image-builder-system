@@ -13,6 +13,9 @@ import {
 // BuildRequest 가 공유하므로 파일 상단에 선언(BuildSummary 보다 먼저).
 export const hostingSchemes = ["path", "subdomain"] as const;
 
+export const dockerfileModes = ["required", "auto"] as const;
+export type DockerfileMode = (typeof dockerfileModes)[number];
+
 export type HostingScheme = (typeof hostingSchemes)[number];
 
 // Hosting sizing policy: tier is derived from service size and resources;
@@ -39,6 +42,36 @@ export const hostingResourceInputSchema = z.object({
   replicas: z.int().positive().optional()
 });
 export type HostingResourceInput = z.infer<typeof hostingResourceInputSchema>;
+
+export const hostingCapacityAxisSchema = z.object({
+  cpuMillicores: z.int().nonnegative(),
+  memoryMi: z.int().nonnegative()
+});
+export type HostingCapacityAxis = z.infer<typeof hostingCapacityAxisSchema>;
+
+export const hostingTierCapacitySchema = z.object({
+  tier: z.enum(hostingTiers),
+  cpuServices: z.int().nonnegative(),
+  memoryServices: z.int().nonnegative(),
+  maxServices: z.int().nonnegative(),
+  perService: hostingCapacityAxisSchema.extend({ replicas: z.int().positive() })
+});
+export type HostingTierCapacity = z.infer<typeof hostingTierCapacitySchema>;
+
+export const hostingCapacityResponseSchema = z.object({
+  capacity: hostingCapacityAxisSchema,
+  used: hostingCapacityAxisSchema,
+  remaining: hostingCapacityAxisSchema,
+  tiers: z.object({
+    sandbox: hostingTierCapacitySchema,
+    standard: hostingTierCapacitySchema,
+    production: hostingTierCapacitySchema
+  })
+}).meta({
+  id: "HostingCapacityResponse",
+  description: "Admin view of aggregate hosting capacity, current reservations, and tier density estimates."
+});
+export type HostingCapacityResponse = z.infer<typeof hostingCapacityResponseSchema>;
 
 // All exported schemas carry a `.meta({ id, description })` so that
 // @asteasolutions/zod-to-openapi's OpenApiGeneratorV3 can lift them into
@@ -121,6 +154,7 @@ export const buildSummarySchema = z
     serviceSize: z.enum(serviceSizes).optional(),
     hostingPolicyVersion: z.string().min(1).optional(),
     resources: hostingResourcesSchema.optional(),
+    dockerfileMode: z.enum(dockerfileModes).optional(),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
         "Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window."

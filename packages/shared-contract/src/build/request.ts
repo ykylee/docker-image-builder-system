@@ -5,7 +5,8 @@ import {
   hostingResourceInputSchema,
   hostingSchemes,
   hostingTiers,
-  serviceSizes
+  serviceSizes,
+  dockerfileModes
 } from "./response.js";
 
 export const sourceArchiveSchema = z
@@ -56,6 +57,7 @@ export const buildRequestSchema = z
     sourceArchive: sourceArchiveSchema,
     entrypointPath: z.string().min(1),
     dockerfilePath: z.string().min(1).default("Dockerfile"),
+    dockerfileMode: z.enum(dockerfileModes).default("required"),
     // TASK-166 (P3-M1): 호스팅 context path. `https://<host>/<contextPath>/`
     // 로 서비스가 라우팅된다. 미지정 시 서버가 appName 을 정규화해 자동 부여.
     // 서버가 정규화(소문자/URL-safe)·유일성·예약어를 최종 검증하므로 계약은

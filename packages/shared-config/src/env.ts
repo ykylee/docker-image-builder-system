@@ -19,6 +19,16 @@ export const runtimeEnvSchema = z.object({
   DB_AUTO_BOOTSTRAP: z.coerce.boolean().default(true),
   RUNNER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(DEFAULT_RUNNER_POLL_INTERVAL_MS),
   BUILD_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(DEFAULT_BUILD_TIMEOUT_SECONDS),
+  // Capacity values should be populated from cluster allocatable observation
+  // after reserving system overhead. Defaults match the validated local kind
+  // baseline used by the hosting tier policy.
+  HOSTING_CAPACITY_CPU_MILLICORES: z.coerce.number().int().positive().default(2000),
+  HOSTING_CAPACITY_MEMORY_MI: z.coerce.number().int().positive().default(5632),
+  HOSTING_CAPACITY_RESERVE_RATIO: z.coerce.number().min(0).lt(1).default(0.25),
+  HOSTING_CAPACITY_DRIFT_CHECK_INTERVAL_MS: z.coerce.number().int().nonnegative().default(0),
+  HOSTING_CAPACITY_DRIFT_THRESHOLD: z.coerce.number().min(0).lt(1).default(0.2),
+  HOSTING_CAPACITY_DRIFT_ALERT_WEBHOOK_URL: z.string().url().optional(),
+  HOSTING_CAPACITY_DRIFT_ALERT_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(900_000),
   CORS_ORIGIN: z
     .union([z.literal("true"), z.literal("false"), z.string().min(1)])
     .default("true")

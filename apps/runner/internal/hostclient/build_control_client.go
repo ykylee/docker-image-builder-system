@@ -56,6 +56,7 @@ type ClaimedBuildResponse struct {
 	ServiceSize          string           `json:"serviceSize"`
 	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
 	Resources            *ResourceProfile `json:"resources"`
+	DockerfileMode       string           `json:"dockerfileMode"`
 }
 
 type ResourceProfile struct {
@@ -97,6 +98,7 @@ type buildSummaryBody struct {
 	ServiceSize          string           `json:"serviceSize"`
 	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
 	Resources            *ResourceProfile `json:"resources"`
+	DockerfileMode       string           `json:"dockerfileMode"`
 }
 
 // PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
@@ -175,6 +177,7 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		ServiceSize:          inner.ServiceSize,
 		HostingPolicyVersion: inner.HostingPolicyVersion,
 		Resources:            inner.Resources,
+		DockerfileMode:       inner.DockerfileMode,
 	}, nil
 }
 

@@ -80,6 +80,10 @@ const profiles: Record<HostingTier, TierProfile> = {
   }
 };
 
+export function defaultHostingResources(tier: HostingTier): HostingResources {
+  return { ...profiles[tier].defaultResources };
+}
+
 const tierByRank: Record<TierRank, HostingTier> = {
   1: "sandbox",
   2: "standard",

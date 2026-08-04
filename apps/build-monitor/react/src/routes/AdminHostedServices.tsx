@@ -12,10 +12,12 @@ import { AdminTabs } from "@/components/AdminTabs";
 import { StatusPill } from "@/components/StatusPill";
 import {
   listHostedServices,
+  getHostingCapacity,
   startHostedService,
   stopHostedService,
   removeHostedService,
   type HostedServiceView
+  , type HostingCapacityView
 } from "@/lib/api";
 import { ensureAdminAccess } from "@/lib/admin-guard";
 import { useUserId } from "@/lib/useUserId";
@@ -26,6 +28,7 @@ export function AdminHostedServices(): ReactElement {
   const [userId] = useUserId();
   const navigate = useNavigate();
   const [services, setServices] = useState<HostedServiceView[]>([]);
+  const [capacity, setCapacity] = useState<HostingCapacityView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busyApp, setBusyApp] = useState<string | null>(null);
@@ -38,8 +41,12 @@ export function AdminHostedServices(): ReactElement {
     setLoading(true);
     setError(null);
     try {
-      const result = await listHostedServices(userId);
-      setServices(result.services);
+      const [servicesResult, capacityResult] = await Promise.all([
+        listHostedServices(userId),
+        getHostingCapacity(userId)
+      ]);
+      setServices(servicesResult.services);
+      setCapacity(capacityResult);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -95,6 +102,28 @@ export function AdminHostedServices(): ReactElement {
     <section className="hosting-page" data-testid="admin-hosted-services">
       <AdminTabs />
       <h1 className="hosting-title">Hosted Services</h1>
+
+      {capacity && (
+        <section className="capacity-panel" data-testid="hosting-capacity-panel">
+          <div className="capacity-summary">
+            <span className="muted">Reserved / available</span>
+            <strong data-testid="hosting-capacity-used">
+              {formatCpu(capacity.used.cpuMillicores)} / {capacity.used.memoryMi}Mi
+            </strong>
+            <span className="muted">
+              remaining {formatCpu(capacity.remaining.cpuMillicores)} / {capacity.remaining.memoryMi}Mi
+            </span>
+          </div>
+          <div className="capacity-tiers">
+            {(["sandbox", "standard", "production"] as const).map((tier) => (
+              <div key={tier} data-testid={`hosting-capacity-${tier}`}>
+                <strong>{tier}</strong>
+                <span>{capacity.tiers[tier].maxServices} services</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {loading && <p className="muted" data-testid="hosting-loading">Loading…</p>}
       {error && (
@@ -213,4 +242,10 @@ export function AdminHostedServices(): ReactElement {
       )}
     </section>
   );
+}
+
+function formatCpu(millicores: number): string {
+  return millicores >= 1000 && millicores % 1000 === 0
+    ? `${millicores / 1000} CPU`
+    : `${millicores}m`;
 }

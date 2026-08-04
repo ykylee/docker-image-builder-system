@@ -17,6 +17,7 @@ async function createBuildWithSource(
     requestedBy: string;
     sourceArchive?: { objectKey: string; checksumSha256: string; sizeBytes: number };
     entrypointPath?: string;
+    dockerfileMode?: "required" | "auto";
   }
 ): Promise<{ buildId: string }> {
   const bytes = new Uint8Array(randomBytes(64));
@@ -30,7 +31,8 @@ async function createBuildWithSource(
       checksumSha256,
       sizeBytes
     },
-    entrypointPath: partial.entrypointPath ?? "src/index.ts"
+    entrypointPath: partial.entrypointPath ?? "src/index.ts",
+    dockerfileMode: partial.dockerfileMode
   });
   if (create.kind !== "accepted") {
     throw new Error(
@@ -76,6 +78,21 @@ describe("BuildService: claimNextBuild", () => {
     assert.equal(result.reason, null);
     assert.equal(result.build?.build.status, "PREPARING_SOURCE");
     assert.equal(result.build?.build.phase, "QUEUE_CLAIMED");
+  });
+
+  it("preserves auto Dockerfile mode through the claim response", async () => {
+    const repo = createMemoryBuildRepository();
+    const service = new BuildService(repo);
+    await createBuildWithSource(service, {
+      ...baseRequest,
+      appName: "auto-dockerfile-app",
+      dockerfileMode: "auto",
+    });
+
+    const result = await service.claimNextBuild();
+
+    assert.equal(result.claimed, true);
+    assert.equal(result.build?.build.dockerfileMode, "auto");
   });
 
   it("returns ACTIVE_BUILD_EXISTS when a build is already in flight", async () => {

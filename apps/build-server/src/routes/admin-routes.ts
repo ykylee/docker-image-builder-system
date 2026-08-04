@@ -17,6 +17,7 @@ import {
   errorBody,
   hostedServiceListResponseSchema,
   hostedServiceSchema,
+  hostingCapacityResponseSchema,
   notFoundBody,
   validationErrorBody,
   type AdminRunner
@@ -202,6 +203,18 @@ export async function registerAdminRoutes(
     return reply
       .status(200)
       .send(hostedServiceListResponseSchema.parse({ services }));
+  });
+
+  app.get("/admin/hosting-capacity", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success) {
+      return reply.status(401).send({ message: "Admin id header missing.", header: ADMIN_ID_HEADER });
+    }
+    if (!isAdmin(callerId.data)) {
+      return reply.status(403).send({ message: "Caller is not in the admin allow-list.", callerId: callerId.data });
+    }
+    const body = await buildService.getHostingCapacity();
+    return reply.status(200).send(hostingCapacityResponseSchema.parse(body));
   });
 
   app.get("/admin/hosted-services/:appName", async (request, reply) => {

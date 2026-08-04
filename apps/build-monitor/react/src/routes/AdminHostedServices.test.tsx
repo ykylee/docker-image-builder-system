@@ -23,6 +23,7 @@ vi.mock("@/lib/admin-guard", () => ({
 }));
 
 const listMock = vi.fn();
+const capacityMock = vi.fn();
 const stopMock = vi.fn();
 const startMock = vi.fn();
 const removeMock = vi.fn();
@@ -31,6 +32,7 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     listHostedServices: (...a: unknown[]) => listMock(...a),
+    getHostingCapacity: (...a: unknown[]) => capacityMock(...a),
     stopHostedService: (...a: unknown[]) => stopMock(...a),
     startHostedService: (...a: unknown[]) => startMock(...a),
     removeHostedService: (...a: unknown[]) => removeMock(...a)
@@ -80,6 +82,16 @@ beforeEach(() => {
     reason: "NOT_IN_ALLOW_LIST"
   });
   listMock.mockResolvedValue({ services: [svc()] });
+  capacityMock.mockResolvedValue({
+    capacity: { cpuMillicores: 2000, memoryMi: 5632 },
+    used: { cpuMillicores: 250, memoryMi: 512 },
+    remaining: { cpuMillicores: 1750, memoryMi: 5120 },
+    tiers: {
+      sandbox: { tier: "sandbox", cpuServices: 20, memoryServices: 44, maxServices: 20, perService: { cpuMillicores: 100, memoryMi: 128, replicas: 1 } },
+      standard: { tier: "standard", cpuServices: 8, memoryServices: 11, maxServices: 8, perService: { cpuMillicores: 250, memoryMi: 512, replicas: 1 } },
+      production: { tier: "production", cpuServices: 2, memoryServices: 2, maxServices: 2, perService: { cpuMillicores: 1000, memoryMi: 2048, replicas: 2 } }
+    }
+  });
   stopMock.mockResolvedValue(svc({ status: "STOPPED" }));
   removeMock.mockResolvedValue(svc({ status: "REMOVED" }));
 });
@@ -93,6 +105,13 @@ function renderPage(): void {
 }
 
 describe("AdminHostedServices", () => {
+  it("capacity panel에 사용량과 tier별 수용량을 표시한다", async () => {
+    renderPage();
+    expect(await screen.findByTestId("hosting-capacity-panel")).toBeInTheDocument();
+    expect(screen.getByTestId("hosting-capacity-used")).toHaveTextContent("250m / 512Mi");
+    expect(screen.getByTestId("hosting-capacity-standard")).toHaveTextContent("8 services");
+  });
+
   it("호스팅 서비스의 effective tier와 자원 프로파일을 표시", async () => {
     listMock.mockResolvedValueOnce({ services: [svc()] });
     renderPage();

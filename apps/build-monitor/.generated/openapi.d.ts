@@ -909,6 +909,8 @@ export interface components {
                 memoryLimit: string;
                 replicas: number;
             };
+            /** @enum {string} */
+            dockerfileMode?: "required" | "auto";
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -1175,6 +1177,8 @@ export interface components {
             entrypointPath: string;
             /** @default Dockerfile */
             dockerfilePath: string;
+            /** @default required */
+            dockerfileMode: "required" | "auto";
             /** @description Optional hosting URL context path. Defaults to a normalized appName. Server normalizes and enforces global uniqueness. */
             contextPath?: string;
             runtimePort?: number;

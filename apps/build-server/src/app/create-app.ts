@@ -17,6 +17,11 @@ import { registerAdminRoutes, createAdminAllowList } from "../routes/admin-route
 import { registerBuildRoutes } from "../routes/build-routes.js";
 import { registerHealthRoute } from "../routes/health-route.js";
 import { BuildService } from "../services/build-service.js";
+import {
+  postHostingCapacityDriftAlert,
+  shouldSendDriftAlert,
+  startHostingCapacityMonitor
+} from "../services/hosting-capacity-monitor.js";
 
 // TASK-064 운영 baseline — postgres backend 부팅 시
 // `apps/build-server/migrations/` 의 미적용 SQL 을 자동 적용한다.
@@ -126,7 +131,7 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   const buildRepository =
     runtime.buildRepositoryBackend === "postgres"
       ? await createPostgresBuildRepository(app, runtime)
-      : createMemoryBuildRepository();
+      : createMemoryBuildRepository(runtime.hostingCapacity);
   // TASK-110: STRICT_CONTENT_RANGE env flag mirror. When set to
   // "true"/"1"/"yes" the BuildService enforces numeric Content-Range
   // totals on chunk uploads — callers that supply `*` (RFC 7233
@@ -150,9 +155,59 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
       : undefined;
   const buildService = new BuildService(buildRepository, {
     strictContentRange,
+    hostingCapacity: runtime.hostingCapacity,
     resultWebhookUrl,
     hostingBaseHost
   });
+
+  // Capacity drift monitoring is opt-in. When enabled, compare the configured
+  // admission budget with current Kubernetes node allocatable and warn on a
+  // material drop; admission remains conservative until operators update env.
+  if (runtime.hostingCapacityDriftCheckIntervalMs > 0) {
+    let lastDriftAlertAt = 0;
+    let lastDriftReason: string | undefined;
+    const capacityMonitor = startHostingCapacityMonitor({
+      configured: runtime.hostingCapacity,
+      reserveRatio: runtime.hostingCapacityReserveRatio,
+      threshold: runtime.hostingCapacityDriftThreshold,
+      intervalMs: runtime.hostingCapacityDriftCheckIntervalMs,
+      onDrift: (drift, observed) => {
+        app.log.warn(
+          { drift, configured: runtime.hostingCapacity, observed },
+          "hosting capacity drift detected"
+        );
+        const now = Date.now();
+        const shouldAlert = shouldSendDriftAlert(
+          now,
+          lastDriftAlertAt,
+          runtime.hostingCapacityDriftAlertCooldownMs,
+          lastDriftReason,
+          drift.reason
+        );
+        if (runtime.hostingCapacityDriftAlertWebhookUrl && shouldAlert) {
+          lastDriftAlertAt = now;
+          lastDriftReason = drift.reason;
+          void postHostingCapacityDriftAlert(
+            runtime.hostingCapacityDriftAlertWebhookUrl,
+            drift,
+            runtime.hostingCapacity,
+            observed
+          ).catch((error) => {
+            app.log.warn({ err: error }, "hosting capacity drift alert delivery failed");
+          });
+        } else if (runtime.hostingCapacityDriftAlertWebhookUrl) {
+          app.log.info(
+            { cooldownMs: runtime.hostingCapacityDriftAlertCooldownMs, reason: drift.reason },
+            "hosting capacity drift alert suppressed by cooldown"
+          );
+        }
+      },
+      onError: (error) => {
+        app.log.warn({ err: error }, "hosting capacity drift check failed");
+      }
+    });
+    app.addHook("onClose", async () => capacityMonitor.stop());
+  }
 
   // TASK-174 (v0.7.0): 호스팅 status 캐시 주기 sync. hosting opt-in
   // (HOSTING_BASE_HOST 설정)이고 interval>0 일 때만 기동 — 미설정 배포에서는
@@ -391,5 +446,5 @@ async function createPostgresBuildRepository(
     await pool.end();
   });
 
-  return new PostgresBuildRepository(createDbClientFromPool(pool));
+  return new PostgresBuildRepository(createDbClientFromPool(pool), runtime.hostingCapacity);
 }

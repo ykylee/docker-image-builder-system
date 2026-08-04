@@ -200,6 +200,27 @@ export async function listHostedServices(
   })) as { services: HostedServiceView[] };
 }
 
+export type HostingCapacityView = {
+  capacity: { cpuMillicores: number; memoryMi: number };
+  used: { cpuMillicores: number; memoryMi: number };
+  remaining: { cpuMillicores: number; memoryMi: number };
+  tiers: Record<string, {
+    tier: "sandbox" | "standard" | "production";
+    cpuServices: number;
+    memoryServices: number;
+    maxServices: number;
+    perService: { cpuMillicores: number; memoryMi: number; replicas: number };
+  }>;
+};
+
+export async function getHostingCapacity(
+  callerId: string
+): Promise<HostingCapacityView> {
+  return (await apiGet("/admin/hosting-capacity", "/admin/hosting-capacity", {
+    headers: { "X-Admin-Id": callerId }
+  })) as HostingCapacityView;
+}
+
 export async function stopHostedService(
   callerId: string,
   appName: string

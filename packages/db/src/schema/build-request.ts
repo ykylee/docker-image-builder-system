@@ -21,6 +21,7 @@ export const buildRequestTable = pgTable("build_request", {
   sourceArchiveSizeBytes: integer("source_archive_size_bytes").notNull(),
   entrypointPath: text("entrypoint_path").notNull(),
   dockerfilePath: text("dockerfile_path").notNull(),
+  dockerfileMode: text("dockerfile_mode").notNull().default("required"),
   metadata: jsonb("metadata").$type<Record<string, string>>().notNull(),
   // TASK-166 (P3-M1): 호스팅 입력. context_path 는 build 생성 시 할당(미지정
   // 시 app_name 정규화)·유일성 검증되고, runtime_port 는 앱 컨테이너 내부

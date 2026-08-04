@@ -219,3 +219,28 @@ aggregate를 사용한다. 따라서 standard quota는 `requests 2 CPU/2Gi`,
 서비스이며, 혼합 배치에서는 tier별 가중치 합이 budget을 넘지 않도록 한다.
 Production autoscaling은 이 baseline을 초과할 수 있으므로 HPA 도입 전에는
 replica 상한 4를 admission에서 유지한다.
+
+### Capacity 설정과 cluster 관측
+
+Admission capacity는 다음 환경변수로 외부화한다.
+
+- `HOSTING_CAPACITY_CPU_MILLICORES` — 서비스에 배정할 CPU millicores
+- `HOSTING_CAPACITY_MEMORY_MI` — 서비스에 배정할 memory Mi
+- `HOSTING_CAPACITY_RESERVE_RATIO` — 관측 allocatable에서 제외할 비율(스크립트 전용, 기본 `0.25`)
+- `HOSTING_CAPACITY_DRIFT_CHECK_INTERVAL_MS` — runtime drift check 주기(기본 `0`, 비활성)
+- `HOSTING_CAPACITY_DRIFT_THRESHOLD` — configured 대비 허용 하락률(기본 `0.2`)
+- `HOSTING_CAPACITY_DRIFT_ALERT_WEBHOOK_URL` — drift warning 수신 webhook(선택)
+- `HOSTING_CAPACITY_DRIFT_ALERT_COOLDOWN_MS` — 같은 drift reason 재알림 간격(기본 `900000`)
+
+운영자는 [`observe-hosting-capacity.sh`](../../apps/build-server/scripts/observe-hosting-capacity.sh)를
+현재 Kubernetes context에서 실행해 node allocatable 합계에서 reserve를 제외한 값을
+확인하고, 출력된 두 `export`를 build-server deployment 환경에 반영한다. 서버 기본값은
+`2000m / 5632Mi`이며, 설정값은 memory/Postgres admission과 Admin capacity API가
+공통으로 사용한다.
+
+drift check를 활성화하면 CPU 또는 memory 관측 capacity가 threshold 아래로 떨어질 때
+build-server structured warning log가 기록된다. webhook URL이 설정되면 같은 이벤트를
+5초 timeout의 HTTP POST로 전달하며, 전송 실패는 warning log로만 처리한다. 반복 이벤트
+같은 drift reason은 cooldown 동안 webhook을 억제하고 reason이 변경되면 즉시 재전송한다.
+Slack 전용 연동은 범위에서 제외한다. capacity recovery 이벤트의 별도 전송 여부는
+후속 운영 정책이다.

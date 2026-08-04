@@ -13,6 +13,7 @@ import (
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/dockerfile"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/hostclient"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/queue"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/source"
@@ -117,7 +118,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 	buildID := claim.BuildID
 	log.Printf("runner %s processing build %s", s.runnerID, buildID)
 
-	sourceDir, failure := s.prepareSource(ctx, buildID)
+	sourceDir, failure := s.prepareSource(ctx, buildID, claim.DockerfileMode)
 	if failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
@@ -194,7 +195,7 @@ func (s *BuildService) fail(ctx context.Context, buildID string, f *stageFailure
 // prepareSource — claim 직후 단계. 호스트에서 source archive 를 받아
 // (`GET /builds/:buildId/source`, TASK-066) SHA-256 을 검증하고 per-build
 // workspace 에 풀어 놓는다. 반환값은 `docker build` 의 context 디렉터리.
-func (s *BuildService) prepareSource(ctx context.Context, buildID string) (string, *stageFailure) {
+func (s *BuildService) prepareSource(ctx context.Context, buildID, dockerfileMode string) (string, *stageFailure) {
 	if err := s.reportPhase(ctx, buildID, contract.PhaseSourcePrepared); err != nil {
 		// phase 보고 실패는 호스트와의 통신 문제다 — 실패 보고를 또 시도해봐야
 		// 같은 이유로 실패한다. 그대로 올려보낸다.
@@ -214,6 +215,17 @@ func (s *BuildService) prepareSource(ctx context.Context, buildID string) (strin
 	}
 	log.Printf("runner %s fetched source: buildID=%s archiveBytes=%d sourceDir=%s checksum=%s",
 		s.runnerID, buildID, extracted.SizeBytes, extracted.SourceDir, extracted.Checksum)
+	mode := dockerfile.Mode(dockerfileMode)
+	if mode == "" {
+		mode = dockerfile.ModeRequired
+	}
+	result, err := dockerfile.Ensure(extracted.SourceDir, s.dockerfilePath, mode)
+	if err != nil {
+		return "", &stageFailure{errorCode: contract.ErrorCodeDockerBuildFailed, err: err}
+	}
+	if result.Generated {
+		log.Printf("runner %s generated Dockerfile: buildID=%s template=%s", s.runnerID, buildID, result.Template)
+	}
 	return extracted.SourceDir, nil
 }
 

@@ -71,6 +71,13 @@ import type {
 } from "./build-repository.js";
 import { resolveHostingPolicy } from "../services/hosting-policy.js";
 import {
+  DEFAULT_HOSTING_CAPACITY,
+  canReserveHostingCapacity,
+  reservationForResources,
+  type HostingCapacity,
+  type HostingCapacityReservation
+} from "../services/hosting-capacity.js";
+import {
   advancePhaseHistory,
   toPhaseTimeline
 } from "./phase-history.js";
@@ -106,6 +113,7 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
     resources: isCompleteResourceProfile(row.resourceProfile)
       ? row.resourceProfile
       : undefined,
+    dockerfileMode: row.dockerfileMode as BuildSummary["dockerfileMode"],
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });
@@ -184,7 +192,10 @@ function mapBuildLogRow(row: BuildLogRow): BuildLogEntry {
 }
 
 export class PostgresBuildRepository implements BuildRepository {
-  constructor(private readonly db: DatabaseClient) {}
+  constructor(
+    private readonly db: DatabaseClient,
+    private readonly capacity: HostingCapacity = DEFAULT_HOSTING_CAPACITY
+  ) {}
 
   async createBuild(input: BuildRequest): Promise<CreateBuildResult> {
     const resolved = resolveHostingPolicy(input);
@@ -228,6 +239,37 @@ export class PostgresBuildRepository implements BuildRepository {
         };
       }
 
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('hosting-capacity-v1'))`);
+      const reservation = reservationForResources(
+        buildId,
+        input.appName,
+        policy.effectiveTier,
+        policy.resources
+      );
+      const usageResult = await tx.execute(sql`
+        SELECT COALESCE(SUM(cpu_millicores), 0) AS cpu_millicores,
+               COALESCE(SUM(memory_mi), 0) AS memory_mi
+        FROM hosting_capacity_reservation
+      `);
+      const usage = usageResult.rows[0] as { cpu_millicores: number | string; memory_mi: number | string };
+      if (!canReserveHostingCapacity(
+        {
+          cpuMillicores: Number(usage?.cpu_millicores ?? 0),
+          memoryMi: Number(usage?.memory_mi ?? 0)
+        },
+        reservation,
+        this.capacity
+      )) {
+        return { kind: "hosting_capacity_exceeded", tier: policy.effectiveTier };
+      }
+      await tx.execute(sql`
+        INSERT INTO hosting_capacity_reservation
+          (build_id, app_name, tier, cpu_millicores, memory_mi, replicas)
+        VALUES
+          (${reservation.buildId}, ${reservation.appName}, ${reservation.tier},
+           ${reservation.cpuMillicores}, ${reservation.memoryMi}, ${reservation.replicas})
+      `);
+
       const [createdBuild] = await tx
         .insert(buildRequestTable)
         .values({
@@ -244,6 +286,7 @@ export class PostgresBuildRepository implements BuildRepository {
           sourceArchiveSizeBytes: input.sourceArchive.sizeBytes,
           entrypointPath: input.entrypointPath,
           dockerfilePath: input.dockerfilePath,
+          dockerfileMode: input.dockerfileMode ?? "required",
           metadata: input.metadata,
           // TASK-166 (P3-M1): 할당된 호스팅 context path + 앱 컨테이너 포트.
           contextPath: input.contextPath ?? null,
@@ -1773,6 +1816,61 @@ export class PostgresBuildRepository implements BuildRepository {
       .where(eq(hostedServiceTable.appName, appName))
       .returning({ id: hostedServiceTable.id });
     return rows.length > 0;
+  }
+
+  async getHostingCapacityUsage() {
+    const result = await this.db.execute(sql`
+      SELECT COALESCE(SUM(cpu_millicores), 0) AS cpu_millicores,
+             COALESCE(SUM(memory_mi), 0) AS memory_mi
+      FROM hosting_capacity_reservation
+    `);
+    const row = result.rows[0] as { cpu_millicores: number | string; memory_mi: number | string };
+    return {
+      cpuMillicores: Number(row?.cpu_millicores ?? 0),
+      memoryMi: Number(row?.memory_mi ?? 0)
+    };
+  }
+
+  async reserveHostingCapacity(reservation: HostingCapacityReservation): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext('hosting-capacity-v1'))`);
+      const usageResult = await tx.execute(sql`
+        SELECT COALESCE(SUM(cpu_millicores), 0) AS cpu_millicores,
+               COALESCE(SUM(memory_mi), 0) AS memory_mi
+        FROM hosting_capacity_reservation
+        WHERE build_id <> ${reservation.buildId}
+      `);
+      const usage = usageResult.rows[0] as { cpu_millicores: number | string; memory_mi: number | string };
+      if (!canReserveHostingCapacity(
+        {
+          cpuMillicores: Number(usage?.cpu_millicores ?? 0),
+          memoryMi: Number(usage?.memory_mi ?? 0)
+        },
+        reservation,
+        this.capacity
+      )) return false;
+      await tx.execute(sql`
+        INSERT INTO hosting_capacity_reservation
+          (build_id, app_name, tier, cpu_millicores, memory_mi, replicas)
+        VALUES
+          (${reservation.buildId}, ${reservation.appName}, ${reservation.tier},
+           ${reservation.cpuMillicores}, ${reservation.memoryMi}, ${reservation.replicas})
+        ON CONFLICT (build_id) DO UPDATE SET
+          app_name = EXCLUDED.app_name,
+          tier = EXCLUDED.tier,
+          cpu_millicores = EXCLUDED.cpu_millicores,
+          memory_mi = EXCLUDED.memory_mi,
+          replicas = EXCLUDED.replicas
+      `);
+      return true;
+    });
+  }
+
+  async releaseHostingCapacity(buildId: string): Promise<boolean> {
+    const result = await this.db.execute(sql`
+      DELETE FROM hosting_capacity_reservation WHERE build_id = ${buildId}
+    `);
+    return (result.rowCount ?? 0) > 0;
   }
 }
 

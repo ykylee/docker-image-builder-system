@@ -19,6 +19,7 @@ import {
   adminRunnerSchema,
   adminUserBuildSummarySchema,
   adminUserListResponseSchema,
+  hostingCapacityResponseSchema,
   apiErrorIssueSchema,
   apiErrorResponseSchema,
   buildErrorSchema,
@@ -101,7 +102,8 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   // pre-registers a runner record so the admin can see which runner is
   // expected to start, even before the runner process boots.
   { id: "AdminRunnerRegisterRequest", schema: adminRunnerRegisterRequestSchema },
-  { id: "AdminRunnerRegisterResponse", schema: adminRunnerRegisterResponseSchema }
+  { id: "AdminRunnerRegisterResponse", schema: adminRunnerRegisterResponseSchema },
+  { id: "HostingCapacityResponse", schema: hostingCapacityResponseSchema }
 ];
 
 // Component registry. We keep a Map from canonical component id to a
@@ -335,6 +337,22 @@ registry.registerPath({
     200: {
       description: "Owner rollup.",
       content: { "application/json": { schema: component("AdminUserListResponse") as never } }
+    },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." }
+  }
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/admin/hosting-capacity",
+  description:
+    "Admin-only. Return aggregate CPU/memory capacity, active reservations, remaining capacity, and theoretical density for each hosting tier.",
+  tags: ["Admin"],
+  responses: {
+    200: {
+      description: "Current hosting capacity snapshot.",
+      content: { "application/json": { schema: component("HostingCapacityResponse") as never } }
     },
     401: { description: "X-Admin-Id header missing." },
     403: { description: "Caller is not in the admin allow-list." }

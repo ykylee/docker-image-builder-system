@@ -99,8 +99,10 @@ type buildManifest struct {
 	// alongside the absolute `Dockerfile` so a dry-run manifest
 	// can show what the user asked for vs. what the Runner
 	// resolved.
-	DockerfileEntry string `json:"dockerfileEntry"`
-	ImageTag        string `json:"imageTag"`
+	DockerfileEntry     string `json:"dockerfileEntry"`
+	DockerfileGenerated bool   `json:"dockerfileGenerated"`
+	DockerfileTemplate  string `json:"dockerfileTemplate,omitempty"`
+	ImageTag            string `json:"imageTag"`
 }
 
 func NewClient() *Client {
@@ -230,16 +232,26 @@ func (c *Client) BuildImage(ctx context.Context, buildID, sourceDir, dockerfileR
 		}
 		return fmt.Errorf("build image: stat Dockerfile: %w", err)
 	}
+	generated := struct {
+		Template string `json:"template"`
+	}{}
+	if marker, err := os.ReadFile(filepath.Join(sourceDir, ".dib-dockerfile-generated.json")); err == nil {
+		if err := json.Unmarshal(marker, &generated); err != nil {
+			return fmt.Errorf("build image: parse Dockerfile generation marker: %w", err)
+		}
+	}
 
 	manifest := buildManifest{
-		BuildID:         buildID,
-		GeneratedAt:     time.Now().UTC().Format(time.RFC3339),
-		BuildMode:       c.buildMode,
-		WorkspaceDir:    workspaceDir,
-		SourceDir:       sourceDir,
-		Dockerfile:      dockerfilePath,
-		DockerfileEntry: dockerfileRelPath,
-		ImageTag:        imageTag,
+		BuildID:             buildID,
+		GeneratedAt:         time.Now().UTC().Format(time.RFC3339),
+		BuildMode:           c.buildMode,
+		WorkspaceDir:        workspaceDir,
+		SourceDir:           sourceDir,
+		Dockerfile:          dockerfilePath,
+		DockerfileEntry:     dockerfileRelPath,
+		DockerfileGenerated: generated.Template != "",
+		DockerfileTemplate:  generated.Template,
+		ImageTag:            imageTag,
 	}
 	payload, err := json.MarshalIndent(manifest, "", "  ")
 	if err != nil {

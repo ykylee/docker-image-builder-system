@@ -24,6 +24,7 @@ export const errorCodes = [
   "CONTEXT_PATH_TAKEN",
   "HOSTING_TIER_UPGRADE_REQUIRED",
   "HOSTING_RESOURCE_LIMIT_EXCEEDED",
+  "HOSTING_CAPACITY_EXCEEDED",
   "UNKNOWN_ERROR"
 ] as const;
 // TASK-166 (P3-M1): `CONTEXT_PATH_TAKEN` — 호스팅 context path 가 다른 앱에

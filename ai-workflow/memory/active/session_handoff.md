@@ -1277,6 +1277,84 @@
   - admin 화면은 global header 와 page-level admin tabs 가 함께 보여 hierarchy 가 다소 중첩되어 보인다.
   - Build Request / Build Detail 대비 admin 화면의 시각 톤과 밀도 차이가 있어 일관성 점검 후보로 남긴다.
 
+## 2026-08-04 호스팅 capacity admission 후속
+
+- 현재 미커밋 변경: `hosting-capacity.ts`, memory/Postgres reservation, migration
+  `0014_hosting_capacity_reservation.sql`, `HOSTING_CAPACITY_EXCEEDED` 계약/route,
+  테스트와 backlog.
+- 기본 capacity는 `2000m CPU / 5632Mi memory`; standard 8개 기준으로 초과 요청은
+  `409` 거절된다.
+- Postgres reservation은 `hosting-capacity-v1` advisory lock 안에서 합산·insert하고,
+  memory는 동일한 aggregate 계산을 사용한다.
+- 다음 세션: capacity usage 조회 API와 Admin UI panel. 이후 전체 회귀 및 commit.
+
+## 2026-08-04 capacity usage API/Admin UI 완료
+
+- `GET /admin/hosting-capacity`를 추가했다. `X-Admin-Id` guard를 통과한 관리자만
+  capacity/used/remaining/tier density를 조회한다.
+- Admin Hosted Services 화면에 예약 CPU/memory와 tier별 max services panel을 추가했다.
+- OpenAPI component `HostingCapacityResponse`와 React API helper를 추가했다.
+- 검증: build-server 217 tests, frontend Vitest 284 tests, TypeScript clean.
+- 현재 미커밋 변경은 capacity reservation + usage API/UI 전체다. `.omx/`는 제외한다.
+- 다음: capacity 기본값을 env/config로 외부화하고 실제 cluster allocatable 관측과 연결.
+
+## 2026-08-04 capacity 설정 외부화 완료
+
+- shared-config에 `HOSTING_CAPACITY_CPU_MILLICORES`(기본 2000),
+  `HOSTING_CAPACITY_MEMORY_MI`(기본 5632)를 추가했다.
+- createApp이 runtime settings를 memory/Postgres repository와 BuildService에 전달해
+  admission/API가 같은 capacity를 사용한다.
+- `apps/build-server/scripts/observe-hosting-capacity.sh`가 kubectl node allocatable을
+  합산하고 reserve ratio(기본 25%)를 적용한 export를 출력한다.
+- 검증: build-server 220 tests, frontend 284 tests, TypeScript clean, shell syntax clean.
+- 다음: reservation과 실제 cluster capacity의 drift monitoring/alerting.
+
+## 2026-08-04 capacity drift monitoring 완료
+
+- `HOSTING_CAPACITY_DRIFT_CHECK_INTERVAL_MS`가 0보다 크면 `kubectl get nodes -o json`
+  기반 관측을 주기 실행한다. `HOSTING_CAPACITY_RESERVE_RATIO` 적용 후 configured
+  capacity 대비 CPU/memory 하락을 `HOSTING_CAPACITY_DRIFT_THRESHOLD`(기본 20%)로 판정한다.
+- drift 또는 kubectl 오류는 build-server structured warning log로 기록하고, monitor는
+  onClose에서 정리한다. 기본 interval 0이라 opt-in이다.
+- 테스트/검증: build-server 224 tests, TypeScript clean, shell syntax clean.
+- 다음: warning을 외부 Slack/webhook alert channel로 전달.
+
+## 2026-08-04 capacity drift webhook 완료
+
+- `HOSTING_CAPACITY_DRIFT_ALERT_WEBHOOK_URL`이 설정되면 drift 발생 시 5초 timeout의
+  HTTP POST를 보낸다. payload에는 configured/observed, ratio, reason, observedAt가 있다.
+- webhook 실패/non-2xx는 warning log로 흡수하며 capacity admission은 계속 동작한다.
+- 검증: capacity monitor/config 9건, build-server 전체 226 tests, TypeScript clean.
+- 다음: 반복 drift webhook alert dedup/cooldown 결정. Slack 연동은 범위에서 제외.
+
+## 2026-08-04 drift webhook cooldown 완료
+
+- `HOSTING_CAPACITY_DRIFT_ALERT_COOLDOWN_MS` 기본 900000ms를 추가했다.
+- 같은 reason의 drift webhook은 cooldown 동안 억제하고, reason이 바뀌면 즉시 전송한다.
+- 억제는 info log, 전송 오류는 warning log로 남기며 admission에는 영향을 주지 않는다.
+- 검증: capacity monitor/config 11건, build-server 전체 228 tests, TypeScript clean.
+- 다음: capacity recovery 이벤트 webhook 여부 결정.
+
+## 2026-08-04 Dockerfile 자동 생성 foundation 완료
+
+- BuildRequest에 `dockerfileMode`(`required` default / `auto`)를 추가하고 DB migration
+  `0015_dockerfile_mode.sql`, memory/Postgres snapshot, claim wire, Runner queue까지 연결.
+- Runner generator는 `index.html`→static nginx, `package.json.scripts.start`→Node만
+  결정적으로 생성한다. 그 외 source는 실패한다.
+- marker `.dib-dockerfile-generated.json`, build manifest fields, Runner log로 provenance를
+  남긴다. UI에서도 mode 선택 가능.
+- 검증: Go 전체 PASS, TypeScript clean, Build Request 18건, generator 4건 PASS.
+- 다음: 실제 Docker CLI auto-generation e2e와 generated image 재현성 검증.
+
+## 2026-08-04 Dockerfile auto CLI e2e 완료
+
+- `apps/runner/scripts/e2e-dockerfile-auto.sh`를 추가했다. 기본 Go test와 분리된 opt-in
+  Docker daemon 테스트다.
+- 실제 검증: `index.html` source에서 static-nginx Dockerfile 생성 → nginx pinned image
+  pull/build → build manifest의 `dockerfileGenerated/template` 확인 → image cleanup.
+- Go 전체 PASS, TS shared/db/build-server/build-monitor clean, git diff check PASS.
+- 다음: Node auto template CLI e2e와 generated image 재현성 검증.
+
 ## Next Actions
 
 - [ ] memory fallback 을 계속 기본값으로 둘지, postgres 를 기본 개발 경로로 승격할지 결정
@@ -1300,6 +1378,16 @@
 - [x] TASK-042: 진입 페이지(Login.svelte) 추가. 사용자 ID 입력 및 `localStorage` 기반 간이 세션 구성, 헤더 내 사용자 ID 및 로그아웃 버튼 반영, 빌드 목록 필터링 연동.
 
 - [x] TASK-040: Build Server GET /builds list endpoint + openapi-typescript 자동 client (PR #7). Memory + postgres 양쪽 listBuilds (filter status, cursor pagination, limit max 200). zod BuildListQuery/BuildListResponse schema + .meta. build-monitor 측 openapi-typescript 7 + openapi-fetch 0.13 + tsx script (predev/prebuild hook) 로 ./.generated/openapi.d.ts 자동 생성. lib/api.ts 재작성 (SAMPLE_BUILDS 제거, openapi-fetch helper apiGet, BuildLogsResponse inline). 회귀 268/268 OK (TS 42+8 + Go 13 + Python 215). live e2e: vite proxy /api/builds → 3 builds, ?limit=2 → 2 + nextCursor.
+
+## 2026-08-04 Dockerfile auto CLI e2e 완료
+
+- `apps/runner/scripts/e2e-dockerfile-auto.sh`가 static nginx와 Node template을 실제
+  Docker CLI로 빌드한다.
+- Node source를 동일 context로 두 번 빌드해 image ID 동일성을 확인했다.
+- 검증: Go 전체 PASS, TS shared-contract/db/build-server/build-monitor clean,
+  Build Request 18건 PASS, `git diff --check` PASS.
+- 다음: `dockerfileMode=auto`의 API→claim→Runner lifecycle e2e와 unsupported source
+  실패 경로를 추가 검증한다. legacy builder 경고는 BuildKit 전환 후속이다.
 
 ## Next Actions
 

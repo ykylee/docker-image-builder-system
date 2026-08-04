@@ -49,6 +49,7 @@ interface FormState {
   sizeBytes: number;
   entrypointPath: string;
   dockerfilePath: string;
+  dockerfileMode: "required" | "auto";
   contextPath: string;
   runtimePort: number;
   stripPrefix: boolean;
@@ -70,6 +71,7 @@ const DEFAULT_FORM: FormState = {
   sizeBytes: 0,
   entrypointPath: "src/index.ts",
   dockerfilePath: "Dockerfile",
+  dockerfileMode: "required",
   contextPath: "",
   runtimePort: 8080,
   stripPrefix: true,
@@ -201,6 +203,7 @@ function makePreset(
       sizeBytes: 12345,
       entrypointPath: "src/index.ts",
       dockerfilePath: "Dockerfile",
+      dockerfileMode: "required",
       contextPath: `hello-${ts}`,
       runtimePort: 8080,
       stripPrefix: true,
@@ -223,6 +226,7 @@ function makePreset(
       sizeBytes: 4096,
       entrypointPath: "main.py",
       dockerfilePath: "Dockerfile",
+      dockerfileMode: "required",
       contextPath: `minimal-${ts}`,
       runtimePort: 5000,
       stripPrefix: true,
@@ -244,6 +248,7 @@ function makePreset(
     sizeBytes: 102400,
     entrypointPath: "src/server.ts",
     dockerfilePath: "Dockerfile",
+    dockerfileMode: "required",
     contextPath: `ts-app-${ts}`,
     runtimePort: 3000,
     stripPrefix: true,
@@ -308,6 +313,7 @@ export function BuildRequest(): ReactElement {
         },
         entrypointPath: form.entrypointPath,
         dockerfilePath: form.dockerfilePath,
+        dockerfileMode: form.dockerfileMode,
         ...(form.contextPath ? { contextPath: form.contextPath } : {}),
         ...(form.runtimePort ? { runtimePort: Number(form.runtimePort) } : {}),
         stripPrefix: form.stripPrefix,
@@ -412,6 +418,7 @@ export function BuildRequest(): ReactElement {
         },
         entrypointPath: entrypointValue,
         dockerfilePath: dockerfileValue,
+        dockerfileMode: form.dockerfileMode,
         ...(form.contextPath ? { contextPath: form.contextPath } : {}),
         ...(form.runtimePort ? { runtimePort: Math.trunc(form.runtimePort) } : {}),
         stripPrefix: form.stripPrefix,
@@ -557,6 +564,25 @@ export function BuildRequest(): ReactElement {
         </div>
 
         <div className="hosting-options" data-testid="req-hosting-options">
+          <div className="hosting-option">
+            <span>
+              <strong>dockerfile mode</strong>
+              <small>Auto generates only for static index.html or Node scripts.start sources.</small>
+            </span>
+            <select
+              value={form.dockerfileMode}
+              data-testid="req-dockerfileMode"
+              onChange={(event) =>
+                setForm((prev) => ({
+                  ...prev,
+                  dockerfileMode: event.target.value as FormState["dockerfileMode"]
+                }))
+              }
+            >
+              <option value="required">required</option>
+              <option value="auto">auto</option>
+            </select>
+          </div>
           <div className="hosting-option">
             <span>
               <strong>hosting tier</strong>
