@@ -50,8 +50,9 @@ RUN CGO_ENABLED=0 go build \
 # ---------- stage 2: runtime ----------
 FROM alpine:3.20 AS runtime
 
-# docker CLI + tini + ca-certs. alpine 의 musl 환경에서 docker CLI 정적
-# binary 는 `static` 으로 packaging 되어 있어 추가 의존성 없음.
+# docker CLI + Buildx(BuildKit frontend) + tini + ca-certs. Alpine 3.20
+# repository의 docker-cli-buildx 패키지를 함께 설치해 `docker build`가
+# legacy builder로 fallback하지 않도록 한다.
 #
 # 비-root 사용자:
 # - `runner` (uid 1500) — primary group 으로 사용.
@@ -62,7 +63,7 @@ FROM alpine:3.20 AS runtime
 # - alpine busybox adduser 의 `-G` flag 는 첫 번째 등장만 primary group 으로
 #   적용되고 이후는 무시되므로, `addgroup runner docker` 로 docker group 을
 #   runner 의 supplementary group 으로 추가.
-RUN apk add --no-cache docker-cli tini ca-certificates \
+RUN apk add --no-cache docker-cli docker-cli-buildx tini ca-certificates \
  && addgroup -S docker \
  && addgroup -S -g 1500 runner \
  && adduser -S -u 1500 -G runner runner \

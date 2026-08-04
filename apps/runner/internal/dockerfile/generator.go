@@ -75,7 +75,9 @@ CMD ["npm", "start"]
 	}
 	if hasIndex {
 		return "static-nginx", `FROM nginx:1.27.4-alpine3.21
+RUN sed -i 's/listen       80;/listen       8080;/' /etc/nginx/conf.d/default.conf
 COPY . /usr/share/nginx/html/
+EXPOSE 8080
 `, nil
 	}
 	return "", "", fmt.Errorf("auto Dockerfile: unsupported source; expected index.html or package.json with scripts.start")

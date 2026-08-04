@@ -61,7 +61,8 @@ services:
       BUILD_MONITOR_DIST_PATH: /app/apps/build-monitor/dist
       NODE_ENV: production
     ports:
-      - "3000:3000"
+      # Override for isolated e2e runs; default remains the local dev port.
+      - "${BUILD_SERVER_HOST_PORT:-3000}:3000"
     healthcheck:
       # 15초 start_period — postgres backend 의 cold start (applyMigrations)
       # 가 5초보다 길 수 있어 여유. memory backend 에서는 1~2초 안에 health.

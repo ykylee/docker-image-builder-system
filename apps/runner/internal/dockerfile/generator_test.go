@@ -3,6 +3,7 @@ package dockerfile
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -32,6 +33,9 @@ func TestEnsureAutoGeneratesStaticSiteDockerfile(t *testing.T) {
 	}
 	if string(contents) == "" {
 		t.Fatal("generated Dockerfile is empty")
+	}
+	if !strings.Contains(string(contents), "listen       8080") || !strings.Contains(string(contents), "EXPOSE 8080") {
+		t.Fatalf("static template must serve the runner default port 8080:\n%s", contents)
 	}
 }
 

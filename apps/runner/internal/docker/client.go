@@ -275,6 +275,10 @@ func (c *Client) BuildImage(ctx context.Context, buildID, sourceDir, dockerfileR
 		imageTag,
 		sourceDir,
 	)
+	// The runner image ships docker-cli-buildx. Set this explicitly so a host
+	// daemon/client combination cannot silently fall back to the removed legacy
+	// builder when `docker build` is invoked through the mounted socket.
+	cmd.Env = append(os.Environ(), "DOCKER_BUILDKIT=1")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
