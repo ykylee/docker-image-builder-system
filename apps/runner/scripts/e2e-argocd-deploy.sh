@@ -7,19 +7,28 @@ CONTEXT="kind-${CLUSTER}"
 TARGET_NS="${DIB_ARGOCD_E2E_TARGET_NAMESPACE:-dib-argocd-e2e}"
 ARGO_NS="${DIB_ARGOCD_E2E_ARGO_NAMESPACE:-argocd}"
 IMAGE="${DIB_ARGOCD_E2E_IMAGE:-dib-argocd-e2e/app:test}"
+BUILD_ID="${DIB_ARGOCD_E2E_BUILD_ID:-argocd-e2e}"
 ARGOCD_MANIFEST="${DIB_ARGOCD_MANIFEST_URL:-https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml}"
 GIT_PORT="${DIB_ARGOCD_E2E_GIT_PORT:-9418}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 WORK="$(mktemp -d)"
 CREATED=0
+NAMESPACE_OWNED=0
 GIT_PID=0
+
+APP_NAME="$(printf 'dib-%s' "${BUILD_ID}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g; s/^-*//; s/-*$//' | cut -c1-63)"
+if [ -z "${APP_NAME}" ]; then
+  APP_NAME="dib-build"
+fi
 
 cleanup() {
   set +e
   if [ "${DIB_ARGOCD_E2E_KEEP_DEPLOY:-0}" != "1" ]; then
-    kubectl --context "${CONTEXT}" delete application --all -n "${ARGO_NS}" --ignore-not-found >/dev/null 2>&1
-    kubectl --context "${CONTEXT}" wait --for=delete "application/dib-argocd-e2e" -n "${ARGO_NS}" --timeout=120s >/dev/null 2>&1 || true
-    kubectl --context "${CONTEXT}" delete namespace "${TARGET_NS}" --ignore-not-found >/dev/null 2>&1
+    kubectl --context "${CONTEXT}" delete application "${APP_NAME}" -n "${ARGO_NS}" --ignore-not-found >/dev/null 2>&1
+    kubectl --context "${CONTEXT}" wait --for=delete "application/${APP_NAME}" -n "${ARGO_NS}" --timeout=120s >/dev/null 2>&1 || true
+    if [ "${NAMESPACE_OWNED}" = "1" ]; then
+      kubectl --context "${CONTEXT}" delete namespace "${TARGET_NS}" --ignore-not-found >/dev/null 2>&1
+    fi
   fi
   if [ "${GIT_PID}" != "0" ]; then
     kill "${GIT_PID}" >/dev/null 2>&1
@@ -41,11 +50,22 @@ if ! kind get clusters | grep -qx "${CLUSTER}"; then
 fi
 kubectl config use-context "${CONTEXT}" >/dev/null
 
-# 이전 실패/중단 실행의 Application finalizer와 namespace가 남아 있을 수
-# 있으므로, 새 시나리오를 시작하기 전에 테스트 대상만 순서대로 비운다.
-kubectl --context "${CONTEXT}" delete application --all -n "${ARGO_NS}" --ignore-not-found >/dev/null 2>&1 || true
-kubectl --context "${CONTEXT}" delete namespace "${TARGET_NS}" --ignore-not-found >/dev/null 2>&1 || true
-kubectl --context "${CONTEXT}" wait --for=delete "namespace/${TARGET_NS}" --timeout=120s >/dev/null 2>&1 || true
+# 테스트 namespace가 이미 존재하면 공유 workload를 삭제하지 않고 중단한다.
+# 이전 테스트가 소유한 namespace만 명시적 owner label을 확인한 뒤 재생성한다.
+if kubectl --context "${CONTEXT}" get namespace "${TARGET_NS}" >/dev/null 2>&1; then
+  OWNER="$(kubectl --context "${CONTEXT}" get namespace "${TARGET_NS}" -o 'jsonpath={.metadata.labels.dib\.e2e/owner}' 2>/dev/null || true)"
+  if [ "${OWNER}" != "argocd-deploy-e2e" ]; then
+    echo "refusing to delete existing non-test namespace: ${TARGET_NS}" >&2
+    exit 1
+  fi
+  kubectl --context "${CONTEXT}" delete application "${APP_NAME}" -n "${ARGO_NS}" --ignore-not-found >/dev/null 2>&1 || true
+  kubectl --context "${CONTEXT}" wait --for=delete "application/${APP_NAME}" -n "${ARGO_NS}" --timeout=120s >/dev/null 2>&1 || true
+  kubectl --context "${CONTEXT}" delete namespace "${TARGET_NS}" >/dev/null 2>&1
+  kubectl --context "${CONTEXT}" wait --for=delete "namespace/${TARGET_NS}" --timeout=120s >/dev/null 2>&1
+fi
+kubectl --context "${CONTEXT}" create namespace "${TARGET_NS}" >/dev/null
+kubectl --context "${CONTEXT}" label namespace "${TARGET_NS}" dib.e2e/owner=argocd-deploy-e2e --overwrite >/dev/null
+NAMESPACE_OWNED=1
 
 cat > "${WORK}/Dockerfile" <<'EOF'
 FROM busybox
@@ -88,8 +108,9 @@ kubectl --context "${CONTEXT}" -n "${ARGO_NS}" rollout status statefulset/argocd
   DIB_ARGOCD_E2E_CONTEXT="${CONTEXT}" \
   DIB_ARGOCD_E2E_TARGET_NAMESPACE="${TARGET_NS}" \
   DIB_ARGOCD_E2E_ARGO_NAMESPACE="${ARGO_NS}" \
+  DIB_ARGOCD_E2E_BUILD_ID="${BUILD_ID}" \
   DIB_ARGOCD_E2E_REPO_URL="git://host.docker.internal:${GIT_PORT}/dib-e2e.git" \
   DIB_ARGOCD_E2E_PATH="helm-hosted-app" \
   go test -tags argocde2e -count=1 -run TestArgoCDE2E_RealDeploy ./internal/deploy/ -v )
 
-echo "ALL PASS — ArgoCD Application sync/health + managed resource cleanup e2e"
+echo "ALL PASS — ArgoCD Application ${APP_NAME} sync/health + managed resource cleanup e2e"

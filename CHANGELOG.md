@@ -14,7 +14,7 @@
 - **MAJOR.MINOR.PATCH** — `v0.9.0` 형식
 - **현재 release candidate**: `v0.9.0` (2026-08-04, Helm/ArgoCD adapter + 실 e2e)
 - **release history**:
-  - `v0.9.0` (2026-08-04) — minor. Helm/ArgoCD adapter, hosted deployment UI follow-up, Helm/hosted HTTP/ArgoCD 실 e2e, and 5 package version bump. 상세: [Release Notes v0.9.0](./docs/RELEASE_NOTES-v0.9.0-2026-08-04.md).
+  - candidate `v0.9.0` — 2026-08-04 minor release candidate. Helm/ArgoCD adapter, hosted deployment UI follow-up, Helm/hosted HTTP/ArgoCD 실 e2e, and 5 package version bump. 상세: [Release Notes v0.9.0](./docs/RELEASE_NOTES-v0.9.0-2026-08-04.md).
   - `v0.8.13` (2026-07-27) — patch. 호스팅 e2e CI 운영 가이드 보강 + `session-end` skill 신설. salp 라인의 `docs/operations/hosting-e2e-ci-2026-07-27.md` 흡수(잡 신호 강도·환경·트러블슈팅 9 섹션 260줄) + `ai-workflow/skills/session-end/` 신설(skill 카드 + `run_session_end.py` 가드 5종) + `ai-workflow/core/session_end_skill_spec.md` 13 섹션 + `/workflow-session-end` 슬래시 명령 + standard-ai-workflow §3.4 / global_workflow_standard §8.1 cross-ref. workflow / 스크립트 / SQL / schema / migration 변경 0. `origin/ykylee/salp`(v0.7.1) 의 운영 가이드 1종을 본 단일 라인에 흡수해 단일 release stream 정합.
   - `v0.8.7` (2026-07-25) — patch. `docs/RELEASE_NOTES-v0.8.0-2026-07-25.md` §3 의 "후속 patch 4종 (v0.8.1~0.8.4)" 표를 "후속 patch 6종 (v0.8.1~0.8.6)" 으로 정합. v0.8.5 (v0.8.0 종합 RELEASE_NOTES) + v0.8.6 (v0.6.0 / v0.7.0 종합 RELEASE_NOTES) 2 종 row 추가. v0.8.5 작성 시점엔 v0.8.5/v0.8.6 가 미존재라 표가 4 종에 머물렀던 사각지대 해소. 코드 변경 0.
   - `v0.8.12` (2026-07-25) — patch. `docs/PHASE-3-DESIGN.md` §10 신규(v0.9.0 진입 결정). 4 잔여 후보(Helm/ArgoCD adapter / webhook 확장 / 실 k8s e2e sync 캐시 실측 / kind e2e nightly CI 자동화) 의 우선순위 정렬 + v0.9.0 의 첫 마일스톤 추천 = **Helm/ArgoCD adapter**. 12연속 운영 보강 patch(v0.8.1~v0.8.11) 의 운영 정합 완료 + v0.9.0 minor 의 신규 기능 표면 진입. 코드 변경 0.
@@ -43,7 +43,7 @@
 - **release staging anchor**: 각 version 의 tagged commit 이 운영 환경의 release staging 의 단일 anchor.
 - **standard_ai_workflow kit 의 version (`ai-workflow/workflow_kit/pyproject.toml`) 은 별도 stream** — 본 저장소가 의존하는 표준 워크플로우 키트의 자체 versioning 이며 본 프로젝트 release 와 무관 (TASK-121 정책).
 
-## 2. v0.9.0 (2026-08-04) — Helm/ArgoCD adapter + 실 e2e (minor)
+## 2. v0.9.0 candidate — Helm/ArgoCD adapter + 실 e2e (minor)
 
 Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter 위에 추가한 Phase 3 minor 릴리스다. 상세 내용은 [Release Notes v0.9.0](./docs/RELEASE_NOTES-v0.9.0-2026-08-04.md)를 참조한다.
 

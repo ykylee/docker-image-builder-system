@@ -53,4 +53,4 @@ v0.9.0은 v0.8.16 이후 첫 minor 릴리스다. 기존 `k8s` adapter를 유지�
 - ArgoCD e2e nightly CI 편입.
 - Helm/ArgoCD hosted HTTP 통합 e2e 확장.
 - webhook 재시도/서명 및 외부 알림 채널 검토.
-- `docs/PROJECT_PROFILE.md` 무결성 복구 및 workflow 문서 정합.
+- 실제 release tag 생성 후 workflow baseline을 `v0.9.0`으로 승격.

@@ -113,7 +113,11 @@ func assertExists(t *testing.T, ctx context.Context, kctx, ns, kind, name string
 
 func assertAbsent(t *testing.T, ctx context.Context, kctx, ns, kind, name string) {
 	t.Helper()
-	if out, err := kubectl(ctx, kctx, "get", kind, name, "-n", ns, "-o", "name"); err == nil {
+	out, err := kubectl(ctx, kctx, "get", kind, name, "-n", ns, "--ignore-not-found", "-o", "name")
+	if err != nil {
+		t.Fatalf("verify absent %s/%s: %v (%s)", kind, name, err, out)
+	}
+	if out != "" {
 		t.Errorf("%s/%s still exists after cleanup: %s", kind, name, out)
 	}
 }
