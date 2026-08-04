@@ -2,6 +2,7 @@
 
 # Session Handoff
 
+- Updated: 2026-08-05 (원격 main 최신 동기화 및 신규 UI 기능 디자인 개선). 원격 `origin/main` (v0.9.0 포함 18개 커밋) 동기화 및 Astryx 토큰 기반 UI 디자인 개선 (Capacity Dashboard 게이지, 3-Tier 선택 카드, Manifest JSON 에디터, Dockerfile Mode 라디오 카드) 완료. 검증: Vitest 284개/node:test 232개/TypeScript clean 100% PASS.
 - Updated: 2026-08-04 (TASK-177: Hosting context path 충돌 예약 보강 완료). PostgreSQL
   createBuild 트랜잭션에 context별 advisory lock과 hosted service/다른 앱의 active build
   점유 검사를 추가하고 Memory backend도 정렬했다. build-server 전체 테스트 230건 PASS.

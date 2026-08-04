@@ -6,7 +6,8 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일 갱신: **2026-08-04 (rev 134→135: 통합 deployment e2e nightly CI 편입)**. Helm/hosted HTTP/ArgoCD 실 e2e를 `deployment-e2e` job으로 순차 통합하고 Linux kind Git source 접근 경로를 보강했다. 다음: 실제 scheduled/manual workflow run 결과 관찰.
+- 최종 수정일 갱신: **2026-08-05 (rev 135→136: 원격 main 동기화 및 신규 기능 UI 디자인 개선)**. 원격 `origin/main` 최신 커밋 동기화 (v0.9.0 포함 18개 커밋 반영) 및 Astryx 토큰 기반 UI 디자인 개선 (Capacity Dashboard, 3-Tier 선택 카드, Manifest JSON 에디터, Dockerfile Mode 라디오 카드) 완료.
+- 최신 작업: 2026-08-05 원격 main 동기화 & 신규 기능 UI 디자인 개선 — 상세: `backlog/2026-08-05.md`
 - 최신 작업: 2026-08-04 v0.9.0 release candidate 정리 — 상세: `backlog/2026-08-04.md`
 - 최신 작업: 2026-08-03 세션 종료 — Helm/ArgoCD adapter, PR #60 리뷰 수정 및 squash merge(`39b7025`) 완료. 회귀 검증 PASS. 최신 상세: `backlog/2026-08-03.md`, `backlog/2026-08-03-argocd.md`
 - 최신 작업: 2026-08-03 Helm adapter vertical slice 완료 — release cleanup 식별자 정합, hosted chart Ingress, Helm kind e2e(install/status/cleanup) ALL PASS. 상세: `backlog/2026-08-03.md`

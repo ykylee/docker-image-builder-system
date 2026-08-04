@@ -1,17 +1,13 @@
 /* TASK-099 (M4.5 Group E): BuildRequest (React) CSS.
- *
  * Svelte src/routes/BuildRequest.svelte 의 inline `<style>` block 을 1:1
  * 정합으로 변환. 우리 Svelte tokens.css (react/src/tokens.css) 의 디자인 토큰을
  * 직접 사용 — fallback 없음 (TASK-096.5 디자인 토큰 단일화).
  */
 
-/* max-width 는 .app-main 이 결정한다. 이전에는 여기 max-width: 960px 만 있고
- * margin: 0 auto 가 빠져 있어 폼이 좌측에 붙고 우측 900px 가 빈 채로 남았다
- * (2026-07-21 UI 검수). */
 .page {
   display: flex;
   flex-direction: column;
-  gap: var(--dib-space-lg);
+  gap: var(--dib-space-xl, 20px);
   animation: fadeIn var(--dib-motion-duration-slow) var(--dib-motion-easing-standard);
 }
 
@@ -44,10 +40,11 @@
   align-items: center;
   gap: var(--dib-space-sm);
   flex-wrap: wrap;
-  padding: var(--dib-space-md);
+  padding: var(--dib-space-md) var(--dib-space-lg);
   background: var(--dib-color-bg-surface);
   border-radius: var(--dib-radius-md);
   border: 1px solid var(--dib-color-border-subtle);
+  box-shadow: var(--dib-shadow-card);
 }
 
 .presets .label {
@@ -82,27 +79,112 @@
 }
 
 .form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dib-space-xl, 20px);
   background: var(--dib-color-bg-surface);
-  padding: var(--dib-space-lg);
+  padding: var(--dib-space-xl, 24px);
   border-radius: var(--dib-radius-lg);
   border: 1px solid var(--dib-color-border-subtle);
   box-shadow: var(--dib-shadow-card);
+}
+
+.form-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dib-space-md, 14px);
+  padding-bottom: var(--dib-space-lg, 16px);
+  border-bottom: 1px solid var(--dib-color-border-subtle);
+}
+
+.form-section:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.section-title {
+  margin: 0;
+  font-size: var(--dib-size-md, 15px);
+  font-weight: var(--dib-weight-semibold);
+  color: var(--dib-color-text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--dib-space-xs);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--dib-space-lg);
-  margin-bottom: var(--dib-space-lg);
+}
+
+/* === Visual Radio Cards for Dockerfile Mode & Hosting Tier === */
+.card-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--dib-space-md, 12px);
+}
+
+.select-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dib-space-xs, 6px);
+  padding: var(--dib-space-md, 14px);
+  border: 1px solid var(--dib-color-border-subtle);
+  border-radius: var(--dib-radius-md);
+  background: var(--dib-color-bg-surface-elevated);
+  cursor: pointer;
+  transition: all var(--dib-motion-duration-fast) var(--dib-motion-easing-standard);
+  user-select: none;
+}
+
+.select-card:hover {
+  border-color: var(--dib-color-border-strong);
+  transform: translateY(-1px);
+}
+
+.select-card.selected {
+  border-color: var(--dib-color-accent-primary);
+  box-shadow: 0 0 0 1px var(--dib-color-accent-primary);
+  background: color-mix(in srgb, var(--dib-color-accent-primary) 8%, var(--dib-color-bg-surface-elevated));
+}
+
+.select-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.select-card-title {
+  font-size: var(--dib-size-sm, 14px);
+  font-weight: var(--dib-weight-semibold);
+  color: var(--dib-color-text-primary);
+}
+
+.select-card-badge {
+  padding: 2px 8px;
+  font-size: var(--dib-size-xs, 11px);
+  font-weight: var(--dib-weight-semibold);
+  border-radius: var(--dib-radius-pill);
+  background: var(--dib-color-bg-canvas);
+  color: var(--dib-color-text-muted);
+}
+
+.select-card.selected .select-card-badge {
+  background: var(--dib-color-accent-primary);
+  color: var(--dib-color-on-accent);
+}
+
+.select-card-desc {
+  font-size: var(--dib-size-xs, 12px);
+  color: var(--dib-color-text-muted);
+  line-height: var(--dib-line-normal);
 }
 
 .hosting-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--dib-space-lg);
-  margin-bottom: var(--dib-space-lg);
-  padding-top: var(--dib-space-md);
-  border-top: 1px solid var(--dib-color-border-subtle);
 }
 
 .hosting-option {
@@ -140,21 +222,16 @@
 
 @media (max-width: 640px) {
   .grid,
-  .hosting-options { grid-template-columns: 1fr; }
+  .hosting-options,
+  .card-selector-grid { grid-template-columns: 1fr; }
 }
-
-/* TASK-138: 폼 필드 스타일 제거 — Astryx TextInput / NumberInput 이 담당한다.
- *
- * 특히 여기 있던 `label { }` 과 `input[type="text"] { }` 는 **bare element
- * 셀렉터**였다. 이 파일은 unlayered 라 Astryx 의 @layer 보다 우선하므로,
- * 그 규칙들이 Astryx 컴포넌트 **내부의** label/input 까지 덮어쓰고 있었다.
- * 페이지 CSS 에 요소 셀렉터를 두면 이렇게 컴포넌트 경계를 넘는다. */
 
 .actions {
   display: flex;
   gap: var(--dib-space-sm);
   flex-wrap: wrap;
   align-items: center;
+  margin-top: var(--dib-space-sm);
 }
 
 .btn-secondary {
@@ -324,3 +401,4 @@
   color: var(--dib-color-text-primary);
   overflow-x: auto;
 }
+

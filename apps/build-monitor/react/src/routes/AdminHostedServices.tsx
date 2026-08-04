@@ -133,27 +133,72 @@ export function AdminHostedServices(): ReactElement {
     return <AdminAccessDenied userId={userId} reason={accessDenied.reason} />;
   }
 
+  const totalCpu = capacity?.capacity?.cpuMillicores ?? 2000;
+  const totalMem = capacity?.capacity?.memoryMi ?? 5632;
+  const cpuPercent = capacity && totalCpu > 0 ? Math.min(100, Math.max(0, (capacity.used.cpuMillicores / totalCpu) * 100)) : 0;
+  const memPercent = capacity && totalMem > 0 ? Math.min(100, Math.max(0, (capacity.used.memoryMi / totalMem) * 100)) : 0;
+
   return (
     <section className="hosting-page" data-testid="admin-hosted-services">
       <AdminTabs />
-      <h1 className="hosting-title">Hosted Services</h1>
+      <div className="hosting-header-row">
+        <h1 className="hosting-title">Hosted Services</h1>
+      </div>
 
       {capacity && (
         <section className="capacity-panel" data-testid="hosting-capacity-panel">
-          <div className="capacity-summary">
-            <span className="muted">Reserved / available</span>
-            <strong data-testid="hosting-capacity-used">
-              {formatCpu(capacity.used.cpuMillicores)} / {capacity.used.memoryMi}Mi
-            </strong>
+          <div className="capacity-header">
+            <span className="capacity-header-title">Cluster Capacity Overview</span>
             <span className="muted">
-              remaining {formatCpu(capacity.remaining.cpuMillicores)} / {capacity.remaining.memoryMi}Mi
+              Remaining: {formatCpu(capacity.remaining.cpuMillicores)} / {capacity.remaining.memoryMi}Mi
             </span>
           </div>
-          <div className="capacity-tiers">
+
+          <div className="capacity-metrics-grid">
+            {/* CPU Metric Card */}
+            <div className="capacity-metric-card">
+              <div className="metric-label">Reserved CPU Millicores</div>
+              <div className="metric-value" data-testid="hosting-capacity-used">
+                {formatCpu(capacity.used.cpuMillicores)} / {capacity.used.memoryMi}Mi
+              </div>
+              <div className="gauge-track">
+                <div
+                  className={`gauge-fill ${cpuPercent > 80 ? "warning" : ""}`}
+                  style={{ width: `${cpuPercent}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Memory Metric Card */}
+            <div className="capacity-metric-card">
+              <div className="metric-label">Reserved Memory Ratio</div>
+              <div className="metric-value">
+                {Math.round(memPercent)}% used
+              </div>
+              <div className="gauge-track">
+                <div
+                  className={`gauge-fill ${memPercent > 80 ? "warning" : ""}`}
+                  style={{ width: `${memPercent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Tier Capacity Grid */}
+          <div className="capacity-tiers-grid">
             {(["sandbox", "standard", "production"] as const).map((tier) => (
-              <div key={tier} data-testid={`hosting-capacity-${tier}`}>
-                <strong>{tier}</strong>
-                <span>{capacity.tiers[tier].maxServices} services</span>
+              <div
+                key={tier}
+                className={`tier-card ${tier}`}
+                data-testid={`hosting-capacity-${tier}`}
+              >
+                <span className="tier-badge">{tier}</span>
+                <span className="tier-services-count">
+                  {capacity.tiers[tier].maxServices} services
+                </span>
+                <span className="muted">
+                  Max capacity estimation
+                </span>
               </div>
             ))}
           </div>
@@ -194,7 +239,9 @@ export function AdminHostedServices(): ReactElement {
                 </td>
                 <td data-testid={`hosting-tier-${svc.appName}`}>
                   <strong>{svc.effectiveTier ?? "sandbox"}</strong>
-                  <small className="muted">{svc.serviceSize ?? "small"}</small>
+                  <small className="muted" style={{ display: "block" }}>
+                    {svc.serviceSize ?? "small"}
+                  </small>
                 </td>
                 <td className="mono" data-testid={`hosting-resources-${svc.appName}`}>
                   {svc.resources
@@ -286,21 +333,29 @@ export function AdminHostedServices(): ReactElement {
       )}
 
       {manifestApp && (
-        <section className="capacity-panel" data-testid="hosting-manifest-editor">
-          <div className="capacity-summary">
-            <strong>{manifestApp} manifest</strong>
-            <span className="muted">revision {manifestRevision ?? "—"}</span>
+        <section className="manifest-panel" data-testid="hosting-manifest-editor">
+          <div className="manifest-toolbar">
+            <div className="manifest-title">
+              <strong>{manifestApp} service manifest</strong>
+              <span className="manifest-revision-tag">rev {manifestRevision ?? "—"}</span>
+            </div>
+            <span className="muted">JSON Configuration</span>
           </div>
           <textarea
             value={manifestText}
             onChange={(event) => setManifestText(event.target.value)}
-            rows={20}
+            rows={18}
             spellCheck={false}
             className="manifest-editor"
             data-testid="hosting-manifest-text"
           />
           <div className="hosting-actions">
-            <button type="button" className="btn-action" onClick={() => void saveManifest()} disabled={busyApp === manifestApp}>
+            <button
+              type="button"
+              className="btn-action"
+              onClick={() => void saveManifest()}
+              disabled={busyApp === manifestApp}
+            >
               Save revision
             </button>
             <button type="button" className="btn-action" onClick={() => setManifestApp(null)}>
