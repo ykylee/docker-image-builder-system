@@ -39,6 +39,17 @@ export interface IdentityProvider {
   issue(subject: string, role: PrincipalRole): Promise<IssuedToken>;
 
   /**
+   * Phase 2 (Runner 인증) — 명시 ttlSeconds 로 토큰 발급. lease token 처럼
+   * 짧은 만료가 필요한 경우 사용. verify 결과는 동일 wire format + signature
+   * scheme — caller 가 발급 시점의 ttl 만 다름.
+   */
+  issueWithExpiresAt(
+    subject: string,
+    role: PrincipalRole,
+    ttlSeconds: number
+  ): Promise<IssuedToken>;
+
+  /**
    * wire 토큰을 검증해 principal 을 반환한다. 유효하지 않으면 null.
    * - 변조 (signature mismatch): null
    * - 만료 (now > expiresAt): null

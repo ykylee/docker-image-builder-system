@@ -17,7 +17,7 @@ import { z } from "zod";
  * Principal role. 서버가 부여하며 client 는 표식만 사용한다.
  * "admin" 은 서버에서 별도 admin allow-list 검증 통과 후에만 발급된다.
  */
-export const principalRoleSchema = z.enum(["user", "admin"]);
+export const principalRoleSchema = z.enum(["user", "admin", "runner"]);
 export type PrincipalRole = z.infer<typeof principalRoleSchema>;
 
 /**
@@ -68,3 +68,70 @@ export type AuthLoginResponse = z.infer<typeof authLoginResponseSchema>;
  */
 export const whoAmIResponseSchema = principalSchema;
 export type WhoAmIResponse = z.infer<typeof whoAmIResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// Phase 2 (Runner 인증) — lease token.
+//
+// Runner 가 claim / phase / container-test / deployment API 를 호출할 때마다
+// Authorization: Bearer <leaseToken> 헤더를 첨부한다. lease token 은 짧은
+// TTL (기본 5분, RUNNER_LEASE_TTL_SECONDS env) 로 발급되며 만료 60초 전에
+// 갱신한다. 만료된 lease 는 401 reject — 운영자가 stale runner 의 build
+// 활동을 강제로 정지시킬 수 있다.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /auth/runner-login request body.
+ *
+ * Runner 가 자기 신원 (RUNNER_ID env 와 일치) 을 선언하며 lease token 발급
+ * 요청. Build Server 가 runnerId 의 allow-list 검증 통과 + status=ACTIVE
+ * 확인 후 lease token 발급.
+ */
+export const runnerLoginRequestSchema = z
+  .object({
+    runnerId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(128)
+      .meta({
+        description:
+          "Canonical runner id. Matches RUNNER_ID env on the runner process. Self-registers on first claim (TASK-069) — runner 가 unknown 이면 401."
+      })
+  })
+  .strict()
+  .meta({
+    id: "RunnerLoginRequest",
+    description:
+      "Request body for POST /auth/runner-login. RUNNER_HMAC_SECRET 가 build-server 측에 셋업되어 있어야 하며, 동일 secret 이 runner 측 환경에도 있어야 한다."
+  });
+
+export type RunnerLoginRequest = z.infer<typeof runnerLoginRequestSchema>;
+
+/**
+ * POST /auth/runner-login response + POST /auth/runner-lease-renew response.
+ *
+ * `leaseToken` 을 claim 응답 + 매 build-scoped API 호출에 첨부. lease 만료
+ * 전 runner 가 갱신 endpoint 호출 → 새 leaseToken 발급 (subject + role 유지,
+ * jti + expiresAt 갱신).
+ */
+export const runnerLeaseResponseSchema = z
+  .object({
+    leaseToken: z.string().min(1).meta({
+      description:
+        "HMAC v2 형식 lease token (v2.<base64url>.<base64url>). claim 응답 + 매 build-scoped API 호출의 Authorization: Bearer 헤더 값."
+    }),
+    expiresAt: z.number().int().positive().meta({
+      description:
+        "Unix epoch seconds. lease 만료 시각. 만료 60초 전에 runner 가 /auth/runner-lease-renew 호출 권장."
+    }),
+    runnerId: z.string().min(1).meta({
+      description: "Echo of the request runnerId."
+    })
+  })
+  .meta({
+    id: "RunnerLeaseResponse",
+    description:
+      "Response body for POST /auth/runner-login and POST /auth/runner-lease-renew."
+  });
+
+export type RunnerLeaseResponse = z.infer<typeof runnerLeaseResponseSchema>;

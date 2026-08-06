@@ -1,18 +1,24 @@
-// Phase 1 (Identity + 테넌트 권한) 인증 라우트.
+// Phase 1 (Identity + 테넌트 권한) + Phase 2 (Runner 인증) 인증 라우트.
 //
-// 세 가지 endpoint 를 노출한다:
-//   - POST /auth/login  — subject + role 로 토큰 발급 (HMAC 서명).
-//   - POST /auth/logout — 현재 principal 의 jti 를 revoke.
-//   - GET  /auth/whoami — 현재 principal 을 그대로 echo.
+// endpoint 5종:
+//   - POST /auth/login            — subject + role 로 토큰 발급 (HMAC 서명).
+//   - POST /auth/logout           — 현재 principal 의 jti 를 revoke.
+//   - GET  /auth/whoami           — 현재 principal 을 그대로 echo.
+//   - POST /auth/runner-login     — Runner lease 토큰 발급 (subject=runner:<id>,
+//                                    role=runner, TTL 짧음).
+//   - POST /auth/runner-lease-renew — Runner 가 만료 전 lease 갱신.
 //
 // admin role 발급은 별도 admin allow-list 검증 통과가 필요하다. 토큰 payload
 // 의 role 은 client 가 신뢰할 값이 아니라 server 가 결정한다 — 클라이언트가
 // role=admin 으로 요청해도 admin allow-list 에 없으면 403.
 
 import type { FastifyInstance } from "fastify";
+import { z } from "zod";
 import {
   authLoginRequestSchema,
   authLoginResponseSchema,
+  runnerLeaseResponseSchema,
+  runnerLoginRequestSchema,
   whoAmIResponseSchema,
   type PrincipalRole
 } from "@docker-image-builder-system/shared-contract";
@@ -30,6 +36,7 @@ export async function registerAuthRoutes(
   app: FastifyInstance,
   identityProvider: IdentityProvider,
   adminAllowList: AdminAllowList,
+  buildService: import("../services/build-service.js").BuildService,
   options: RegisterAuthRoutesOptions = {}
 ): Promise<void> {
   void options;
@@ -115,4 +122,108 @@ export async function registerAuthRoutes(
 
   // 운영자가 명시적으로 켜지 않는 한 legacy header 무시는 silent — 본 TASK 의
   // 정책은 default OFF 이므로 별도 경고 emit 없음.
+
+  // ---------------------------------------------------------------------
+  // Phase 2 (Runner 인증) — lease token 발급 / 갱신
+  // ---------------------------------------------------------------------
+
+  const leaseTtlSeconds = (() => {
+    const raw = process.env.RUNNER_LEASE_TTL_SECONDS?.trim();
+    if (!raw) return 300; // default 5 min
+    const n = Number.parseInt(raw, 10);
+    return Number.isFinite(n) && n > 0 ? n : 300;
+  })();
+
+  // BuildService 의 runnerAllowList 검증은 BuildService 가 아니라 repository 의
+  // getRunnerStatus 로 위임 — runner 가 unknown 이면 undefined (401 reject).
+  // 별도 BuildService 의 getRunnerStatus 메서드 사용.
+
+  app.post("/auth/runner-login", async (request, reply) => {
+    const parsed = runnerLoginRequestSchema.safeParse(request.body ?? {});
+    if (!parsed.success) {
+      return reply.status(400).send({
+        message: "Invalid runner login payload.",
+        issues: parsed.error.issues
+      });
+    }
+    const { runnerId } = parsed.data;
+    const status = await buildService.getRunnerStatus(runnerId);
+    if (status === undefined || status === null) {
+      // unknown runner — self-register 가 발생할 첫 claim 시점에 동일 runnerId
+      // 로 claim 하면 Build Server 가 runner record 를 생성하므로 login 만으로는
+      // 등록을 강제하지 않는다. 운영자가 명시적으로 등록하려면 POST /admin/runners.
+      return reply.status(401).send({
+        message: "Runner is not registered.",
+        runnerId
+      });
+    }
+    if (status === "DISABLED") {
+      return reply.status(403).send({
+        message: "Runner is disabled by admin.",
+        runnerId
+      });
+    }
+    // subject 형식: `<runnerId>` — build-scoped API 의 lease 검증이
+    // principal.role === "runner" 으로 식별한다. subject 에 `runner:` prefix
+    // 를 붙이면 HmacIdentityProvider 의 forbidden char (`:`) 와 충돌하므로
+    // prefix 없이 raw runnerId 만 사용.
+    const issued = await identityProvider.issueWithExpiresAt(
+      runnerId,
+      "runner",
+      leaseTtlSeconds
+    );
+    const body = runnerLeaseResponseSchema.parse({
+      leaseToken: issued.token,
+      expiresAt: issued.principal.expiresAt,
+      runnerId
+    });
+    return reply.status(200).send(body);
+  });
+
+  app.post("/auth/runner-lease-renew", async (request, reply) => {
+    await ensurePrincipalInline(request);
+    if (!request.principal) {
+      return reply.status(401).send({
+        message: "Authentication required.",
+        hint: "POST /auth/runner-login to obtain a lease token."
+      });
+    }
+    if (request.principal.role !== "runner") {
+      return reply.status(403).send({
+        message: "Caller is not a runner.",
+        callerId: request.principal.subject
+      });
+    }
+    // subject === runnerId (raw). prefix 슬라이스 불요.
+    const runnerId = request.principal.subject;
+    // DISABLED 된 runner 의 lease 갱신은 거절 — admin 이 disable 한 runner 가
+    // stale lease 로 build 활동하는 결함 방지.
+    const status = await buildService.getRunnerStatus(runnerId);
+    if (status === undefined || status === null) {
+      return reply.status(401).send({
+        message: "Runner is not registered.",
+        runnerId
+      });
+    }
+    if (status === "DISABLED") {
+      return reply.status(403).send({
+        message: "Runner is disabled by admin.",
+        runnerId
+      });
+    }
+    // 동일 subject + role + 새 ttl 로 재발급. jti 갱신 (이전 lease 는 자연 만료).
+    const renewed = await identityProvider.issueWithExpiresAt(
+      request.principal.subject,
+      "runner",
+      leaseTtlSeconds
+    );
+    // 기존 jti revoke — stale client 가 같은 lease 를 재사용하지 못하도록.
+    await identityProvider.revoke(request.principal.jti);
+    const body = runnerLeaseResponseSchema.parse({
+      leaseToken: renewed.token,
+      expiresAt: renewed.principal.expiresAt,
+      runnerId
+    });
+    return reply.status(200).send(body);
+  });
 }

@@ -532,7 +532,19 @@ export const claimResponseSchema = z
         // 본 enum 멤버 제거 검토.
         "RUNNER_ID_REQUIRED"
       ])
-      .nullable()
+      .nullable(),
+    // Phase 2 (Runner 인증) — claim 응답에 lease token 동봉. runner 가 후속
+    // phase / container-test / deployment 호출 시 Authorization: Bearer 헤더로
+    // 첨부. 만료 시 /auth/runner-lease-renew 로 갱신. claim 안 된 빌드
+    // (claimed=false) 면 leaseToken / expiresAt 은 null — 갱신 불요.
+    leaseToken: z.string().min(1).nullable().meta({
+      description:
+        "HMAC v2 형식 lease token (v2.<base64url>.<base64url>). 빌드 처리 동안 모든 build-scoped API 호출에 첨부."
+    }),
+    expiresAt: z.number().int().positive().nullable().meta({
+      description:
+        "Unix epoch seconds. lease 만료 시각. 만료 60초 전에 /auth/runner-lease-renew 호출 권장."
+    })
   })
   .meta({
     id: "ClaimResponse",

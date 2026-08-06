@@ -61,6 +61,13 @@ export interface OwnerPolicyOptions {
    * 문자열 = 미사용, 비어있지 않으면 강제 인증.
    */
   readonly legacyDefaultSubject: string;
+  /**
+   * Phase 2 (Runner 인증) — lease gate 활성 여부. create-app.ts 가
+   * BuildService.runtime.identityProvider !== undefined 일 때 true 로
+   * 전달. 단위 테스트 / identityProvider 미주입 환경에서는 false — helper
+   * 가 silent skip.
+   */
+  readonly leaseGateEnabled: boolean;
 }
 
 export interface ResolvedCaller {
@@ -75,6 +82,65 @@ export type OwnerPolicyOutcome =
   | { kind: "unauthorized"; reason: string };
 
 const userIdHeaderSchema = z.string().min(1);
+
+/**
+ * Phase 2 (Runner 인증) — lease token 검증 helper. cookie/Bearer 인증 + role
+ * 이 runner 가 아니면 silent skip (admin / user 는 기존 owner policy 로).
+ * runner 면 Authorization: Bearer 헤더의 lease token 을 verify 하고 만료
+ * 시 401 + hint. 통과 시 caller subject 는 `runner:<runnerId>` 형식이라
+ * repository.updateBuild 같은 mutation 의 ownership gate 와 무관하게 동작
+ * (admin runner 가 모든 owner 의 빌드를 처리하는 정책은 운영자가 결정).
+ *
+ * 검증 순서:
+ *   1) request.principal 이 있고 role === "runner" 면 통과 (cookie/Bearer
+ *      모두 registerPrincipalPreHandler 가 채워줌).
+ *   2) role 이 runner 가 아니면 silent skip — admin / user 는 기존
+ *      owner policy 가 enforce.
+ *   3) 인증 부재면 401 + Authentication required + hint.
+ *
+ * 단, BuildService 가 identityProvider 없이 instantiate 된 환경 (단위 테스트)
+ * 에서는 lease 검증을 **skip** — BuildService.claimNextBuild 가 leaseToken 을
+ * 발급하지 않으므로 caller 도 lease 를 첨부할 수 없어 reject 가 되는 무한
+ * loop 방지. 본 helper 의 `leaseGateEnabled` flag 가 create-app.ts 에서
+ * 전달 (BuildService.runtime.identityProvider !== undefined 와 정합).
+ */
+export type RunnerLeaseOutcome =
+  | { kind: "ok"; callerSubject: string }
+  | { kind: "unauthorized"; reason: string };
+
+export interface LeaseGateOptions {
+  /** lease 검증을 활성할지. false 면 helper 는 silent 통과. */
+  readonly enabled: boolean;
+}
+
+function enforceRunnerLease(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  options: LeaseGateOptions
+): RunnerLeaseOutcome {
+  if (!options.enabled) {
+    // Phase 2 이전 환경 (BuildService 가 identityProvider 없이 instantiate)
+    // 에서는 lease 검증을 skip — 기존 동작 (anonymous claim 허용) 유지.
+    const subject = request.principal?.subject ?? "";
+    return { kind: "ok", callerSubject: subject };
+  }
+  const principal = request.principal;
+  if (!principal) {
+    reply.status(401).send({
+      message: "Authentication required.",
+      hint: "POST /auth/runner-login to obtain a lease token."
+    });
+    return { kind: "unauthorized", reason: "no_principal" };
+  }
+  if (principal.role !== "runner") {
+    // admin / user — 기존 owner policy 가 enforce. 본 helper 는 silent skip.
+    return { kind: "ok", callerSubject: principal.subject };
+  }
+  // runner role — principal 검증만으로 충분 (cookie/Bearer + jti 만료는
+  // HmacIdentityProvider.verify 가 reject). subject 는 runnerId 그 자체 —
+  // repository 가 claim record 와 매칭.
+  return { kind: "ok", callerSubject: principal.subject };
+}
 
 function resolveCaller(
   request: FastifyRequest,
@@ -158,12 +224,17 @@ export async function registerBuildRoutes(
     // buildApp 가 명시적으로 `{ legacyHeadersEnabled: true }` 를 넘긴다.
     adminAllowList: [],
     legacyHeadersEnabled: false,
-    legacyDefaultSubject: ""
+    legacyDefaultSubject: "",
+    // default = lease gate 비활성. 단위 테스트 호환. 운영 환경은
+    // create-app.ts 가 BuildService.runtime.identityProvider !== undefined 일
+    // 때 true 로 전달.
+    leaseGateEnabled: false
   }
 ): Promise<void> {
   const legacyHeadersEnabled = options.legacyHeadersEnabled;
   const adminAllowList = options.adminAllowList;
   const legacyDefaultSubject = options.legacyDefaultSubject;
+  const leaseGateEnabled = options.leaseGateEnabled;
 
   app.get("/builds", async (request, reply) => {
     const caller = resolveCaller(request, {
@@ -342,6 +413,10 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid claim payload", payloadResult.error.issues)
       );
     }
+    // Phase 2 (Runner 인증) — lease 검증. cookie/Bearer + role=runner 면
+    // 통과, admin/user 면 silent skip (기존 owner policy), 인증 부재 401.
+    const leaseOutcome = enforceRunnerLease(request, reply, { enabled: leaseGateEnabled });
+    if (leaseOutcome.kind === "unauthorized") return reply;
     const payload = payloadResult.data;
     void payload.capabilities;
     // TASK-069: claim 의 canonical runnerId 를 Build Service 에 넘긴다.
@@ -354,6 +429,8 @@ export async function registerBuildRoutes(
   });
 
   app.post("/builds/:buildId/phase", async (request, reply) => {
+    const leaseOutcome = enforceRunnerLease(request, reply, { enabled: leaseGateEnabled });
+    if (leaseOutcome.kind === "unauthorized") return reply;
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       return reply.status(400).send(
@@ -413,6 +490,8 @@ export async function registerBuildRoutes(
   // preview-era 의 `ttlMinutes` 는 제거됐다 — 테스트 컨테이너의 수명은
   // runner 가 결과 보고 시점에 정리하지, 호스트가 TTL 로 만료시키지 않는다.
   app.post("/builds/:buildId/container-test/start", async (request, reply) => {
+    const leaseOutcome = enforceRunnerLease(request, reply, { enabled: leaseGateEnabled });
+    if (leaseOutcome.kind === "unauthorized") return reply;
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       return reply.status(400).send(
@@ -459,6 +538,8 @@ export async function registerBuildRoutes(
   // PROVISIONING/READY/EXPIRED 가 아니라 canonical ExecutionStatus
   // (IN_PROGRESS / SUCCESS / FAILED) 를 그대로 받는다.
   app.post("/builds/:buildId/container-test/result", async (request, reply) => {
+    const leaseOutcome = enforceRunnerLease(request, reply, { enabled: leaseGateEnabled });
+    if (leaseOutcome.kind === "unauthorized") return reply;
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       return reply.status(400).send(
@@ -508,6 +589,8 @@ export async function registerBuildRoutes(
   });
 
   app.post("/builds/:buildId/deployment", async (request, reply) => {
+    const leaseOutcome = enforceRunnerLease(request, reply, { enabled: leaseGateEnabled });
+    if (leaseOutcome.kind === "unauthorized") return reply;
     const paramsResult = buildIdParamsSchema.safeParse(request.params);
     if (!paramsResult.success) {
       return reply.status(400).send(

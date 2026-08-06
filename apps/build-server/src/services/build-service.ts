@@ -122,6 +122,10 @@ export class BuildService {
       // 를 조립한다. 미설정이면 호스팅 비활성(k8s 배포는 되지만 registry
       // upsert 안 함 — opt-in, 설계 §9-3).
       hostingBaseHost?: string;
+      // Phase 2 (Runner 인증) — lease token 발급용 identity provider. null
+      // 인 환경 (단위 테스트, 구버전 호환) 에서는 claim 응답에 leaseToken=null.
+      identityProvider?: import("../auth/identity-provider.js").IdentityProvider;
+      leaseTtlSeconds?: number;
     } = {
       strictContentRange: false,
       hostingCapacity: DEFAULT_HOSTING_CAPACITY
@@ -241,7 +245,9 @@ export class BuildService {
       return {
         claimed: false,
         build: null,
-        reason: "RUNNER_DISABLED"
+        reason: "RUNNER_DISABLED",
+        leaseToken: null,
+        expiresAt: null
       };
     }
 
@@ -254,7 +260,9 @@ export class BuildService {
       return {
         claimed: false,
         build: null,
-        reason: "NO_BUILD_AVAILABLE"
+        reason: "NO_BUILD_AVAILABLE",
+        leaseToken: null,
+        expiresAt: null
       };
     }
 
@@ -262,7 +270,9 @@ export class BuildService {
       return {
         claimed: false,
         build: result.build,
-        reason: "ACTIVE_BUILD_EXISTS"
+        reason: "ACTIVE_BUILD_EXISTS",
+        leaseToken: null,
+        expiresAt: null
       };
     }
 
@@ -270,7 +280,9 @@ export class BuildService {
       return {
         claimed: false,
         build: null,
-        reason: "RUNNER_DISABLED"
+        reason: "RUNNER_DISABLED",
+        leaseToken: null,
+        expiresAt: null
       };
     }
 
@@ -278,7 +290,9 @@ export class BuildService {
       return {
         claimed: false,
         build: null,
-        reason: "RUNNER_ID_REQUIRED"
+        reason: "RUNNER_ID_REQUIRED",
+        leaseToken: null,
+        expiresAt: null
       };
     }
 
@@ -298,10 +312,29 @@ export class BuildService {
           : {})
       };
     }
+    // Phase 2 (Runner 인증) — claim 성공 시 lease token 발급. identityProvider 가
+    // 주입되지 않은 환경 (legacy / 단위 테스트) 에서는 null — claim 자체는
+    // 여전히 동작하지만 caller 가 lease 를 첨부하지 않으므로 후속 build-scoped
+    // API 의 lease 검증에서 reject (build routes 의 enforceRunnerLease 가 detect).
+    let leaseToken: string | null = null;
+    let expiresAt: number | null = null;
+    const ip = this.runtime.identityProvider;
+    const ttl = this.runtime.leaseTtlSeconds;
+    if (ip) {
+      const issued = await ip.issueWithExpiresAt(
+        trimmedRunnerId,
+        "runner",
+        ttl ?? 300
+      );
+      leaseToken = issued.token;
+      expiresAt = issued.principal.expiresAt;
+    }
     return {
       claimed: true,
       build: result.response,
-      reason: null
+      reason: null,
+      leaseToken,
+      expiresAt
     };
   }
 
@@ -337,6 +370,15 @@ export class BuildService {
    */
    listAdminRunners() {
     return this.repository.listRunners();
+  }
+
+  /**
+   * Phase 2 (Runner 인증) — runner 단일 status 조회. runner 가 /auth/runner-login
+   * 시 status 가 DISABLED 면 401 reject. unknown runner 면 undefined.
+   * claim 응답의 RUNNER_DISABLED gate 와 동일 정책.
+   */
+  async getRunnerStatus(runnerId: string): Promise<"ACTIVE" | "DISABLED" | null> {
+    return this.repository.getRunnerStatus(runnerId);
   }
 
   // ---- Hosting management (TASK-166 / P3-M1) --------------------------------

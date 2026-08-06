@@ -83,18 +83,37 @@ export class HmacIdentityProvider implements IdentityProvider {
   }
 
   async issue(subject: string, role: PrincipalRole): Promise<IssuedToken> {
+    return this.issueWithExpiresAt(subject, role, this.#ttlSeconds);
+  }
+
+  /**
+   * Phase 2 (Runner 인증) — lease token 발급. ttlSeconds 가 짧아도
+   * 동일 wire format + 동일 signature scheme — verify 는 변동 없음.
+   * 단, expiresAt 을 짧게 (5min 등) 발급해 lease 만료 시 401 로 강제
+   * 갱신 흐름을 강제한다.
+   */
+  async issueWithExpiresAt(
+    subject: string,
+    role: PrincipalRole,
+    ttlSeconds: number
+  ): Promise<IssuedToken> {
     if (!subject || FORBIDDEN_IN_SUBJECT.test(subject)) {
       throw new Error(
         `HmacIdentityProvider.issue: subject must be non-empty and must not contain ":" (got ${JSON.stringify(subject)})`
       );
     }
-    if (role !== "user" && role !== "admin") {
+    if (role !== "user" && role !== "admin" && role !== "runner") {
       throw new Error(
-        `HmacIdentityProvider.issue: role must be "user" or "admin" (got ${JSON.stringify(role)})`
+        `HmacIdentityProvider.issue: role must be "user", "admin", or "runner" (got ${JSON.stringify(role)})`
+      );
+    }
+    if (!Number.isFinite(ttlSeconds) || ttlSeconds <= 0) {
+      throw new Error(
+        `HmacIdentityProvider.issueWithExpiresAt: ttlSeconds must be positive (got ${ttlSeconds})`
       );
     }
     const now = Math.floor(Date.now() / 1000);
-    const expiresAt = now + this.#ttlSeconds;
+    const expiresAt = now + ttlSeconds;
     const jti = randomUUID();
     const payload = `${subject}:${role}:${expiresAt}:${jti}`;
     const signature = createHmac("sha256", this.#secret)
@@ -109,7 +128,7 @@ export class HmacIdentityProvider implements IdentityProvider {
     return {
       token,
       principal: { subject, role, expiresAt, jti },
-      maxAgeSeconds: this.#ttlSeconds
+      maxAgeSeconds: ttlSeconds
     };
   }
 
@@ -152,7 +171,7 @@ export class HmacIdentityProvider implements IdentityProvider {
     if (segments.length !== 4) return null;
     const [subject, roleRaw, expiryRaw, jti] = segments as [string, string, string, string];
     if (!subject || !jti) return null;
-    if (roleRaw !== "user" && roleRaw !== "admin") return null;
+    if (roleRaw !== "user" && roleRaw !== "admin" && roleRaw !== "runner") return null;
     const expiresAt = Number.parseInt(expiryRaw, 10);
     if (!Number.isFinite(expiresAt) || expiresAt <= 0) return null;
 

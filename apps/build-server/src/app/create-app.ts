@@ -179,7 +179,15 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     strictContentRange,
     hostingCapacity: runtime.hostingCapacity,
     resultWebhookUrl,
-    hostingBaseHost
+    hostingBaseHost,
+    // Phase 2 (Runner 인증) — claim 응답에 leaseToken 동봉용.
+    identityProvider,
+    leaseTtlSeconds: (() => {
+      const raw = process.env.RUNNER_LEASE_TTL_SECONDS?.trim();
+      if (!raw) return 300; // default 5 min
+      const n = Number.parseInt(raw, 10);
+      return Number.isFinite(n) && n > 0 ? n : 300;
+    })()
   });
 
   // Capacity drift monitoring is opt-in. When enabled, compare the configured
@@ -272,7 +280,7 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   // Phase 1: /auth/login + /auth/logout + /auth/whoami 라우트. principal preHandler
   // 가 위에서 등록되어 있으므로 /auth/login 은 preHandler 없이 진입해 토큰을
   // 발급하고, /auth/logout + /auth/whoami 은 preHandler 가 principal 을 채운다.
-  await registerAuthRoutes(app, identityProvider, adminAllowList);
+  await registerAuthRoutes(app, identityProvider, adminAllowList, buildService);
   await registerAdminRoutes(app, buildService, adminAllowList, identityProvider, serviceDatabasePool ? {
     provisioner: new ServiceDatabaseProvisioner(serviceDatabasePool),
     secretWriter: new KubectlSecretWriter(),
@@ -296,7 +304,11 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     // `BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT=""` 으로 명시해 401 강제.
     legacyDefaultSubject: legacyHeadersEnabled
       ? process.env.BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT ?? "<anonymous>"
-      : ""
+      : "",
+    // Phase 2 (Runner 인증) — lease gate 활성. BuildService.runtime.identityProvider
+    // 가 셋업되어 있으므로 claim 응답에 leaseToken 동봉 + build-scoped API 의
+    // enforceRunnerLease 가 활성.
+    leaseGateEnabled: identityProvider !== undefined
   };
   await registerBuildRoutes(app, buildService, buildOwnerPolicyOptions);
   // tsconfig 측에서 `void` dispatch 가 노이즈라 unused-vars 무시 패턴으로
