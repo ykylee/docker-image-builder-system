@@ -1,7 +1,8 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # Session Handoff
 
+- Updated: 2026-08-06 (표준 워크플로우 키트 v1.0.0-beta 이식 + 메타 헤더 정합). `~/repos/standard_ai_workflow` 의 workflow-source v1.0.0 (2026-07-22 released) 와 본 프로젝트 ai-workflow 의 차이를 식별하고 부재 자산 7종 skills + 5종 MCP + core 3종 + workflow_kit/common/maturity.py 를 일괄 이식. 진입점 4종 (CLAUDE/GROK/MiniMax/AGENTS.md) + 운영 표면 5종 (PROJECT_PROFILE / ai-workflow README / session-end SKILL.md / memory_index README / work_backlog 인덱스) 의 메타 헤더를 v0.15.19-beta → v1.0.0-beta 로 정합. session-end 가드 9종 9/9 PASS (G3 latest_rev drift 해소). 회귀 baseline 불변 — build-server / build-monitor / runner / SQL / schema / migration / 5 package.json 모두 변경 0. 다음 세션은 Phase 1 인증·테넌트 권한 또는 표준 키트 v1.0.0 부재 13종 harness 정합 후보.
 - Updated: 2026-08-06 (wiki anchor 구축). 누락되어 있던 `ai-workflow/wiki/index.md`를 canonical 문서 탐색 허브로 신설하고 README 및 최신 backlog에 연결했다. 다음 세션은 wiki 링크 검증 또는 Phase 1 인증·테넌트 권한 구현으로 진입한다.
 
 - Updated: 2026-08-05 (구현 현황 문서화 및 실서비스 진입 로드맵). `docs/operations/current-state-and-readiness-2026-08-05.md`에 현재 기능·검증 기준선·운영 제한·self-dogfood/MVP 판정과 실서비스 차단 이슈를 정리했다. `.omx/plans/production-readiness-roadmap-2026-08-05.md`에는 Phase 0 운영 경계 봉인 → Phase 1 인증/테넌트 권한 → Phase 2 Runner 인증/격리 → Phase 3 control-plane 영속성/queue recovery → Phase 4 서비스 DB lifecycle → Phase 5 운영성 → Phase 6 private beta 로드맵과 테스트/진입 게이트를 작성했다. 다음 구현은 Phase 1 인증·소유권 경계부터 시작한다.

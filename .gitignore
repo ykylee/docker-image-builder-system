@@ -49,3 +49,9 @@ apps/build-monitor/vite.config.js.map
 # 9MB 바이너리가 커밋될 뻔했다 (TASK-153 의 vite.config.js 와 정반대
 # 방향의 같은 종류의 사각지대 — 두 ignore 파일은 서로를 대신하지 않는다).
 apps/runner/bin/
+
+# TASK-2026-08-06: session-end 가드 --apply 모드가 state.json.bak.<ts> 백업을
+# working tree 에 남긴다. 추적 대상이 아니므로 무시 — 푸시 직전 자동 정리.
+# 표준 키트 v1.0.0-beta maturity 모듈 부재 회피를 위해 --apply 모드를 쓰는
+# 동안 항상 생성되며, 본 세션에서 2건 발생.
+ai-workflow/memory/active/state.json.bak.*

@@ -1,4 +1,4 @@
-<!-- standard-ai-workflow-kit: v0.15.19-beta -->
+<!-- standard-ai-workflow-kit: v1.0.0-beta -->
 
 # 작업 백로그 인덱스
 
@@ -6,7 +6,8 @@
 - 범위: 전체 태스크 목록, 우선순위, 진행 상태, 날짜별 기록 연결
 - 대상 독자: 개발자, AI 에이전트, 프로젝트 매니저
 - 상태: stable
-- 최종 수정일 갱신: **2026-08-05 (rev 135→136: 원격 main 동기화 및 신규 기능 UI 디자인 개선)**. 원격 `origin/main` 최신 커밋 동기화 (v0.9.0 포함 18개 커밋 반영) 및 Astryx 토큰 기반 UI 디자인 개선 (Capacity Dashboard, 3-Tier 선택 카드, Manifest JSON 에디터, Dockerfile Mode 라디오 카드) 완료.
+- 최종 수정일 갱신: **2026-08-06 (rev 136→137: 표준 워크플로우 키트 v1.0.0-beta 이식 + 메타 헤더 정합 + session-end 가드 9/9 PASS)**. `~/repos/standard_ai_workflow` 의 workflow-source (v1.0.0, 2026-07-22 released) 와 본 프로젝트 `ai-workflow/` 의 차이를 식별하고 부재 자산 7종 skills + 5종 MCP + core 3종 + workflow_kit/common/maturity.py 를 일괄 이식. 진입점 4종 + 운영 표면 5종의 메타 헤더를 v0.15.19-beta → v1.0.0-beta 로 정합. session-end 가드 9종 read-only 재실행. 회귀 baseline 불변.
+- 최신 작업: 2026-08-06 표준 워크플로우 키트 v1.0.0-beta 이식 — 상세: `backlog/2026-08-06.md`
 - 최신 작업: 2026-08-05 원격 main 동기화 & 신규 기능 UI 디자인 개선 — 상세: `backlog/2026-08-05.md`
 - 최신 작업: 2026-08-04 v0.9.0 release candidate 정리 — 상세: `backlog/2026-08-04.md`
 - 최신 작업: 2026-08-03 세션 종료 — Helm/ArgoCD adapter, PR #60 리뷰 수정 및 squash merge(`39b7025`) 완료. 회귀 검증 PASS. 최신 상세: `backlog/2026-08-03.md`, `backlog/2026-08-03-argocd.md`
