@@ -32,6 +32,7 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import type { Principal, PrincipalRole } from "@docker-image-builder-system/shared-contract";
 
 import type { IdentityProvider, IssuedToken } from "./identity-provider.js";
+import type { PersistentRevokeStore } from "./persistent-revoke-store.js";
 
 /** Wire 형식 버전. 형식 변경 시 bump 하고 구 reader 가 거부하도록 한다. */
 const SCHEME_VERSION = "v1";
@@ -57,6 +58,13 @@ export interface HmacIdentityProviderOptions {
   readonly ttlSeconds?: number;
   /** 운영자가 secret 누락으로 boot fail 시키지 않고 dev default 를 허용할지. */
   readonly allowDevDefault?: boolean;
+  /**
+   * v0.12.0 follow-up: 영속 revoke store (Postgres). 주입되면 in-memory
+   * Set 과 영속 store 양쪽에 동시 기록 + verify 시 양쪽 check. 멀티
+   * build-server replica 운영 시 revoke 가 모든 replica 에 즉시 전파.
+   * 미주입 시 기존 in-memory only 동작 (legacy / 단위 테스트).
+   */
+  readonly persistentRevokeStore?: PersistentRevokeStore;
 }
 
 export class HmacIdentityProvider implements IdentityProvider {
@@ -65,6 +73,14 @@ export class HmacIdentityProvider implements IdentityProvider {
   readonly #revokedJtis = new Set<string>();
   /** 발급 시점 추적 (메트릭). revoke 되어도 size 만 감소. */
   #issuedCount = 0;
+  /**
+   * v0.12.0 follow-up: 본 process 가 issue 한 jti + 만료 시각 매핑.
+   * persistentRevokeStore 가 셋업된 환경에서 revoke(jti) 가 호출되면
+   * in-memory + persistent 양쪽에 동시 기록. verify 시 in-memory hit
+   * 으로 fast-path, miss 면 persistent 조회.
+   */
+  readonly #issuedJtis = new Map<string, number>();
+  readonly #persistentRevokeStore?: PersistentRevokeStore;
 
   constructor(options: HmacIdentityProviderOptions) {
     const secret = options.secret;
@@ -80,6 +96,7 @@ export class HmacIdentityProvider implements IdentityProvider {
       this.#secret = Buffer.from(secret, "utf-8");
     }
     this.#ttlSeconds = options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
+    this.#persistentRevokeStore = options.persistentRevokeStore;
   }
 
   async issue(subject: string, role: PrincipalRole): Promise<IssuedToken> {
@@ -125,6 +142,7 @@ export class HmacIdentityProvider implements IdentityProvider {
     const encodedSignature = base64UrlEncode(Buffer.from(signature, "utf-8"));
     const token = `${SCHEME_VERSION_V2}.${encodedPayload}.${encodedSignature}`;
     this.#issuedCount += 1;
+    this.#issuedJtis.set(jti, expiresAt);
     return {
       token,
       principal: { subject, role, expiresAt, jti },
@@ -180,6 +198,25 @@ export class HmacIdentityProvider implements IdentityProvider {
 
     if (this.#revokedJtis.has(jti)) return null;
 
+    // v0.12.0 follow-up: persistent revoke store check. in-memory miss 면
+    // persistent 조회. persistent hit 면 in-memory cache 에도 기록 (다음
+    // verify 의 fast-path). TTL 만료된 row 은 expires_at > now() 조건으로
+    // 자동 skip — cleanup sweeper 가 background 에서 정리.
+    if (this.#persistentRevokeStore) {
+      try {
+        const persistentHit = await this.#persistentRevokeStore.isRevoked(jti);
+        if (persistentHit) {
+          this.#revokedJtis.add(jti);
+          return null;
+        }
+      } catch {
+        // persistent 조회 실패 시 fail-open (기존 동작 유지 — secret manager
+        // / network blip 으로 revoke 가 일시적으로 못 잡혀도 1분 후 lease 갱신
+        // / TTL 만료로 자연 안전망). 운영자에게 alert 가 가도록 별도 metric.
+        // follow-up: 운영 metric + alert rule 추가.
+      }
+    }
+
     return {
       subject,
       role: roleRaw,
@@ -189,13 +226,31 @@ export class HmacIdentityProvider implements IdentityProvider {
   }
 
   async revoke(jti: string): Promise<void> {
-    if (typeof jti === "string" && jti.length > 0) {
-      this.#revokedJtis.add(jti);
+    if (typeof jti !== "string" || jti.length === 0) return;
+    this.#revokedJtis.add(jti);
+    if (this.#persistentRevokeStore) {
+      const expiresAtEpoch = this.#issuedJtis.get(jti);
+      const expiresAt = new Date(
+        typeof expiresAtEpoch === "number" && expiresAtEpoch > 0
+          ? expiresAtEpoch * 1000
+          : Date.now() + this.#ttlSeconds * 1000
+      );
+      try {
+        await this.#persistentRevokeStore.revoke(jti, expiresAt);
+      } catch {
+        // persistent 기록 실패 시 in-memory 는 이미 반영됨. 다음 verify 가
+        // 본 process 에서는 in-memory hit 으로 reject, 다른 replica 는
+        // persistent hit 으로 reject — 단, 본 record 가 persistent 에 없으면
+        // 다른 replica 가 fail-open 으로 통과 가능. 운영 metric + alert.
+      }
     }
   }
 
   async revokeAll(): Promise<void> {
     this.#revokedJtis.clear();
+    // persistent 의 revokeAll 은 identity-provider interface 정합을 위해
+    // no-op 으로 노출 (admin 강제 전체 로그아웃 후속 TASK). 운영자가
+    // 직접 TRUNCATE 할 수 있으나 의도치 않은 사용자 영향 분리.
   }
 
   activeCount(): number {
