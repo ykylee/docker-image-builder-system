@@ -37,6 +37,7 @@ import {
   calculateAllTierCapacity,
   reservationForResources
 } from "./hosting-capacity.js";
+import type { LeaseRenewer } from "../auth/lease-renewer.js";
 
 export type ReportPhaseOutcome =
   | { kind: "ok"; response: BuildStatusResponse }
@@ -126,6 +127,11 @@ export class BuildService {
       // 인 환경 (단위 테스트, 구버전 호환) 에서는 claim 응답에 leaseToken=null.
       identityProvider?: import("../auth/identity-provider.js").IdentityProvider;
       leaseTtlSeconds?: number;
+      // v0.12.0 follow-up: long-running build lease 자동 갱신 worker.
+      // claim 성공 시 lease 를 등록 + 만료 70% 시점에 expiresAt 을
+      // +TTL 만큼 늘려 Runner 의 stale lease 도 본 process 에서는
+      // 정상 통과. 미주입 시 manual 갱신만 가능 (Runner 측 EnsureLease).
+      leaseRenewer?: LeaseRenewer;
     } = {
       strictContentRange: false,
       hostingCapacity: DEFAULT_HOSTING_CAPACITY
@@ -328,6 +334,19 @@ export class BuildService {
       );
       leaseToken = issued.token;
       expiresAt = issued.principal.expiresAt;
+      // v0.12.0 follow-up: lease-renewer 에 등록 — 만료 70% 시점에
+      // 자동 갱신 흐름 진입. process-local registry + activeCount() metric.
+      const renewer = this.runtime.leaseRenewer;
+      if (renewer) {
+        renewer.register({
+          buildId: result.response.build.buildId,
+          runnerId: trimmedRunnerId,
+          subject: trimmedRunnerId,
+          jti: issued.principal.jti,
+          expiresAt: issued.principal.expiresAt,
+          issuedAt: issued.principal.expiresAt - (ttl ?? 300)
+        });
+      }
     }
     return {
       claimed: true,
