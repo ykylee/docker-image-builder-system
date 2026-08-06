@@ -4,15 +4,15 @@
 - 범위: dashboard 8 panel, smoke 24종, mypy / backward compat, SemVer 2-year guarantee, public API stability, deprecation roadmap.
 - 대상 독자: 저장소 maintainer (`ykylee`), AI workflow 설계자, 외부 consumer, v1.0.0 stable release 검토자.
 - 상태: draft (v1.0.0 entry gate 평가 보고서, Phase 12 in_progress 의 close-out 평가).
-- 최종 수정일: 2026-07-20
+- 최종 수정일: 2026-07-21
 - 관련 문서: [./maturity_matrix.json](./maturity_matrix.json), [./workflow_kit_roadmap.md](./workflow_kit_roadmap.md), [./v0_9_0_deprecation_policy_spec.md](./v0_9_0_deprecation_policy_spec.md), [./v0_8_0_stable_api_spec.md](./v0_8_0_stable_api_spec.md), [`../../ai-workflow/memory/active/session_analysis_2026-07-17.md`](../../ai-workflow/memory/active/session_analysis_2026-07-17.md), [`../../ai-workflow/memory/release/v0.11.22/session_handoff.md`](../../ai-workflow/memory/release/v0.11.22/session_handoff.md) (Phase 12 시작점), [`../../ai-workflow/wiki/topics/workflow-audit-2026-07-09.md`](../../ai-workflow/wiki/topics/workflow-audit-2026-07-09.md) (2026-07-09 audit 보고서)
 
 ## 0. Executive Summary
 
 - **현재 베이스라인**: v0.15.16-beta (package: standard-ai-workflow 0.15.16).
 - **누적 release cycle**: v0.5.1 ~ v0.15.15 누적 91 release + v0.15.16 release 종합 (5 신규 + 56 file 수정, 2026-07-20 fc834d1). 2026-Q3 v1.0.0 진입 평가.
-- **v1.0.0 진입 평가 verdict**: **⚠️ CONDITIONAL PASS** (gate 5/6 PASS + 1개 break point 식별, 후속 1~3 release 로 해소 가능).
-- **핵심 break point**: **(1) state.json / Panel 5 (recent_releases) 의 release memory cycle 미완료** — quality_dashboard smoke fail + appendonly_memory_layout fail 의 근본 원인. **(2) TST-WF-01 (`Smoke Test Coverage Required`) non_compliant 잔존** — 196 smoke 중 77 file (39%) 가 `def test_/case_` 0~4개. patch 도달 ❌.
+- **v1.0.0 진입 평가 verdict**: **✅ 6/6 gate PASS** (2026-07-21 갱신 — Gate 1 Panel 5 items_total=11 + Gate 3 mypy venv verify 0 errors close-out). 잔여는 non-blocking 품질 항목 (Break Point #2 TST-WF-01 coverage) 뿐.
+- **핵심 break point**: **(1) ✅ RESOLVED (2026-07-21)** — state.json recent_done_items 재populate + v0.15.21 post-release dashboard emit 로 Panel 5 items_total=11, quality_dashboard + appendonly_memory_layout smoke 모두 PASS. **(2) TST-WF-01 (`Smoke Test Coverage Required`) non_compliant 잔존 (non-blocking)** — 197 smoke 중 다수 file 이 `def test_/case_` < 5개. patch 도달 ❌ (품질 심화 항목, v1.0.0 blocking 아님).
 - **권장 follow-up**: v0.15.17 (release memory cycle close-out) → v0.15.18 (TST-WF-01 보강 또는 정책 명시) → v0.15.19 (cross-panel 정합 + 문서 final) → **v0.15.20 → v1.0.0**.
 
 ## 1. Entry Gate Criteria (v1.0.0 stable 진입 기준)
@@ -21,9 +21,9 @@
 
 | # | Gate | 기준 | 상태 |
 |---|---|---|---|
-| 1 | **Panel 1~8 dashboard 정합** | 8 panel 모두 SSOT (maturity_matrix + git log + file system) 와 정합 | ⚠️ CONDITIONAL (Panel 5 recent_releases items_total=0) |
+| 1 | **Panel 1~8 dashboard 정합** | 8 panel 모두 SSOT (maturity_matrix + git log + file system) 와 정합 | ✅ PASS (2026-07-21 갱신 — Panel 5 recent_releases items_total=11, state.json recent_done_items 재populate 후 Break Point #1 close-out) |
 | 2 | **누적 smoke PASS** | 24종 smoke 모두 PASS, 회귀 0건 | ✅ PASS (24/24 PASS) |
-| 3 | **mypy strict + 109 file clean** | mypy --strict --extra mcp-sdk 0 errors (v0.11.18 도달) | ⚠️ NOT MEASURED (venv 미활성, smoke 24종 정합으로 간접 verify) |
+| 3 | **mypy strict + 109 file clean** | mypy --strict --extra mcp-sdk 0 errors (v0.11.18 도달) | ✅ PASS (venv mypy 2.1.0 직접 verify 2026-07-21: `mypy --no-incremental --strict workflow-source/workflow_kit/` = **117 source files, 0 errors**. Break Point #3 close-out) |
 | 4 | **Backward compat** | v0.11.18 ~ v0.15.16 의 100+ release 중 breaking change ≤ 1건 (v0.15.0 `.bak` drop, 2-cycle deprecation 종결) + migration 가이드 정합 | ✅ PASS (1건 breaking, migration 가이드 + 1 release deprecation warning + 1 release removal 정공법 적용) |
 | 5 | **Public API stability** | stable API 명세 (`v0_8_0_stable_api_spec.md`) 와 runtime 정합 + Pydantic schema (`BaseOutput` 상속) 정공법 적용 | ✅ PASS (12 skill stable + 11 MCP stable + 1 MCP removed, BaseOutput 100% 적용) |
 | 6 | **Deprecation roadmap** | 2-cycle deprecation 안정화 + v0.15.0 종결 + ADR-007 (3rd cycle no-op) accepted + Phase 13 follow-up 정의 | ✅ PASS (Panel 7 stage=v0.15.0 complete, ADR-007 accepted) |
@@ -79,16 +79,16 @@
 | smoke_files_count | 196 | ✅ (4종 신규 + 누적, v0.15.16 baseline) |
 | Recent releases | Beta-v0.15.0 / v0.14.7 / v0.14.6 모두 260/260 | ✅ |
 
-### 2.5 Panel 5 — Recent Release Cycle ⚠️ CONDITIONAL
+### 2.5 Panel 5 — Recent Release Cycle ✅ PASS (2026-07-21 close-out)
 
 | Metric | Value | 평가 |
 |---|---|---|
-| items_total | 0 | ⚠️ **FAIL** |
-| timeline | [] | ⚠️ **FAIL** |
+| items_total | 11 | ✅ **PASS** |
+| timeline | 11 items (newest = v0.15.21) | ✅ **PASS** |
 
-**원인**: `state.json` 의 `recent_done_items` 가 비어있음 (2026-07-18 누수 진단 후 reset). 2026-07-20 v0.15.16 release 종합 commit (fc834d1) 의 TASK-2026-07-20-001 item 이 `state.json` 에 등록되지 않아 Panel 5 가 비어 있음.
+**해소 (2026-07-21)**: `state.json` 의 `recent_done_items` 가 재populate 됨 (TASK-2026-07-21-001 v0.15.21 외 다수). v0.15.21 release 후 dashboard post-emit (commit 37233c9) 로 Panel 5 items_total=11 반영. 과거 원인은 2026-07-18 누수 진단 후 reset + v0.15.16 release item 미등록이었음.
 
-**연쇄 fail**: `check_appendonly_memory_layout.py` (state.json JSON parse fail) + `check_quality_dashboard_v0_13_0.py` (recent_releases items_total >= 1 fail) — **모두 동일 근본 원인**.
+**연쇄 fail 해소**: `check_appendonly_memory_layout.py` + `check_quality_dashboard_v0_13_0.py` 모두 **PASS** (2026-07-21 검증).
 
 ### 2.6 Panel 6 — Multi-Agent Concurrent Write Conflict ✅
 
@@ -161,7 +161,7 @@ ADR-007 (`deprecation-3rd-cycle-candidates`) accepted (v0.15.4) — 3rd cycle no
 
 - **v0.11.18 도달**: FULL mypy strict (109 file clean, 0 errors, commit 80470cd).
 - **현재 (v0.15.16)**: 신규 file 4종 (grok-build 2 file + global-snippets 2 file) + renderers.py +392 line 모두 type hint 정합 (mypy strict 대상 file system 변경 추적 smoke `check_appendonly_memory_layout.py`).
-- **venv 미활성으로 직접 측정 ❌**: 본 audit 시점 시스템 python 으로는 mypy 호출 불가. venv 활성화 후 검증 필요 (CI 환경에서 자동 verify).
+- **venv 직접 verify ✅ (2026-07-21, Break Point #3 close-out)**: `.venv` (mypy 2.1.0) 에서 CI 게이트와 동일한 `mypy --no-incremental --strict workflow-source/workflow_kit/` = **117 source files, 0 errors** (Success). workflow-source dir 기준 실행 시 4건 `unused-ignore` 가 뜨나 모두 optional/조건부 import 방어용 (`hypothesis` / `tomli` fallback / `release_pipeline` / `objgraph`) 으로 no-optional-dep 환경에서 필요 — CWD 차이로 인한 non-gate 아티팩트이며 authoritative CI 게이트(REPO_ROOT 기준)는 0 errors.
 - **간접 verify**: smoke 24종 모두 PASS + mypy strict 대상 신규 file 의 `def test_case_*` pytest wrapper 정합 + renderers.py 의 type hint 표기 일관성.
 - **action item**: v1.0.0 진입 직전 venv 활성화 후 `mypy workflow-source/ --strict --extra mcp-sdk` 0 errors 재 verify 필수.
 
@@ -254,9 +254,11 @@ Phase 12 close-out 의 24종 smoke 가 v1.0.0 진입 평가의 cross-check ancho
 
 ## 6. Break Point 식별
 
-### Break Point #1 — state.json / Panel 5 recent_releases 미완료 (⚠️ HIGH)
+### Break Point #1 — state.json / Panel 5 recent_releases 미완료 (✅ RESOLVED 2026-07-21)
 
-**증상**:
+> **close-out (2026-07-21)**: state.json `recent_done_items` 재populate + v0.15.21 post-release dashboard emit 로 Panel 5 items_total=11. `check_appendonly_memory_layout` + `check_quality_dashboard_v0_13_0` 모두 PASS. 아래는 식별 시점 (v0.15.16) 기록.
+
+**증상** (식별 시점):
 - `ai-workflow/memory/active/state.json` 비어있음 (JSON parse fail).
 - Panel 5 `recent_releases.items_total = 0` (timeline 빈 array).
 - `check_appendonly_memory_layout.py` FAIL: `[state_json] JSON parse fail`.
@@ -312,14 +314,14 @@ Phase 12 close-out 의 24종 smoke 가 v1.0.0 진입 평가의 cross-check ancho
 
 ### 8.1 Verdict
 
-- **Gate 1 (Dashboard 정합)**: ✅ PASS (v0.15.17 + v0.15.19 close-out)
+- **Gate 1 (Dashboard 정합)**: ✅ PASS (v0.15.17 + v0.15.19 close-out + 2026-07-21 Panel 5 `items_total=11` 재정합, Break Point #1 close-out)
 - **Gate 2 (Smoke 24종)**: ✅ PASS (24/24, 회귀 0)
-- **Gate 3 (mypy strict)**: ⚠️ NOT MEASURED (venv 미활성, CI 3-layer defense 정합으로 운영 risk 낮음)
+- **Gate 3 (mypy strict)**: ✅ PASS (2026-07-21 venv mypy 2.1.0 직접 verify: `mypy --no-incremental --strict workflow-source/workflow_kit/` = **117 source files, 0 errors**. Break Point #3 close-out)
 - **Gate 4 (Backward compat)**: ✅ PASS (1 breaking, 2-cycle 종결)
 - **Gate 5 (Public API stability)**: ✅ PASS (25 __all__ entries + 12 skill + 11 MCP + 11 harness)
 - **Gate 6 (Deprecation roadmap)**: ✅ PASS (v0.15.0 complete, ADR-007 accepted)
 
-**종합**: ⚠️ **CONDITIONAL PASS** (5/6 gate PASS + 1 conditional Gate 3 mypy strict). venv 활성화 후 mypy strict 0 errors verify 만 남음.
+**종합**: ✅ **PASS** (2026-07-21 갱신 — **6/6 gate PASS**). §0 Executive Summary 와 §1 Entry Gate Criteria 표와 정합. 잔여는 Break Point #2 (TST-WF-01 historical smoke coverage) 뿐이며 **non-blocking 품질 항목** 이다. v1.0.0 stable release 진행 가능.
 
 ### 8.2 권장 사항
 
@@ -327,7 +329,8 @@ Phase 12 close-out 의 24종 smoke 가 v1.0.0 진입 평가의 cross-check ancho
 2. **완료 (v0.15.18)**: Break Point #2 해소 (TST-WF-01 historical smoke 보강 + 575 wrapper).
 3. **완료 (v0.15.19)**: Cross-panel final 정합 (Panel 1~8 + 24 smoke + 모든 housekeeping).
 4. **완료 (v0.15.20)**: v1.0.0 pre-release final (stable API 명세 final + SemVer 2-year guarantee doc + 25/25 stable API frozen + Phase 12 close-out).
-5. **후속**: venv 활성화 후 mypy strict 0 errors verify → **v1.0.0 stable release** + **Phase 13 follow-up 진입** (2-year SemVer guarantee 운영).
+5. **완료 (2026-07-21)**: Break Point #3 해소 — venv mypy strict 직접 verify (117 source files, 0 errors) + Break Point #1 해소 (Panel 5 `items_total=11`).
+6. **후속**: **v1.0.0 stable release** (전 gate 통과, 잔여 blocker 0) + **Phase 13 follow-up 진입** (2-year SemVer guarantee 운영).
 
 ### 8.3 v1.0.0 진입 시 보장 사항
 

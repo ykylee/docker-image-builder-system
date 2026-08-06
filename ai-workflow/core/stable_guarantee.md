@@ -4,7 +4,7 @@
 - 범위: public API surface, deprecation policy, breaking change 절차, migration guide, cross-check discipline anchor, 외부 의존성 한계.
 - 대상 독자: workflow_kit consumer, 저장소 maintainer, AI workflow 설계자, v1.0.0 stable release 검토자.
 - 상태: stable (v1.0.0 entry anchor, Phase 12 close-out 의 final deliverable).
-- 최종 수정일: 2026-07-20
+- 최종 수정일: 2026-07-21
 - 관련 문서: [./v0_8_0_stable_api_spec.md](./v0_8_0_stable_api_spec.md), [./v0_9_0_deprecation_policy_spec.md](./v0_9_0_deprecation_policy_spec.md), [./workflow_release_spec.md](./workflow_release_spec.md), [./output_schema_guide.md](./output_schema_guide.md), [./v1_0_0_entry_evaluation.md](./v1_0_0_entry_evaluation.md)
 
 ## 0. Executive Summary

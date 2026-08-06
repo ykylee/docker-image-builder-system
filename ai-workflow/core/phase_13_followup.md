@@ -3,10 +3,10 @@
 - 문서 목적: Phase 12 close-out 후, v1.0.0 stable 진입 시점부터의 2-year SemVer guarantee 기간 동안의 follow-up 운영 작업을 정의한다.
 - 범위: Quality Dashboard north-star, Telemetry, Self-Recover, Bidirectional Link (Phase 13 AC1~AC4) + stable API 운영 + 2-year backward compat follow-up + ADR-007 회귀 검증.
 - 대상 독자: 저장소 maintainer (`ykylee`), AI workflow 설계자, 외부 consumer, v1.0.0 stable consumer.
-- 상태: planned (Phase 13 진입 대기, v1.0.0 stable release 후 정식 start).
-- 시작 예정: v1.0.0 stable release 직후 (target_milestone).
+- 상태: **in_progress** (2026-07-21 start — v1.0.0 진입과 함께 정식 시작. matrix `milestones['Phase 13'].status` 가 SSOT).
+- 시작: 2026-07-21 (v1.0.0, `started_in_release`). 종료 목표는 아래 참조.
 - 종료 예정: v3.0.0 stable 진입 시점 (2-year guarantee 종결).
-- 최종 수정일: 2026-07-20
+- 최종 수정일: 2026-07-31
 - 관련 문서: [`./maturity_matrix.json`](./maturity_matrix.json), [`./quality_dashboard_spec.md`](./quality_dashboard_spec.md), [`./stable_guarantee.md`](./stable_guarantee.md), [`./v1_0_0_entry_evaluation.md`](./v1_0_0_entry_evaluation.md), [`./workflow_kit_roadmap.md`](./workflow_kit_roadmap.md), [`../../ai-workflow/wiki/decisions/adr-007-deprecation-3rd-cycle-candidates.md`](../../ai-workflow/wiki/decisions/adr-007-deprecation-3rd-cycle-candidates.md)
 
 ## 0. Executive Summary
@@ -23,7 +23,7 @@
 ### 1.1 Phase 12 → Phase 13 의 transition
 
 - **Phase 12** (2026-06-18 ~ 2026-07-20, v0.11.18 ~ v0.15.20, closed): *Operational Intelligence* + *Deprecation Stabilization* 중심. Quality Dashboard + Telemetry + Self-Recover + Bidirectional Link 의 prototype → stable 화 + 2-cycle deprecation 운영 검증 + 3rd cycle no-op (ADR-007) close-out.
-- **Phase 13** (v1.0.0 stable 진입 후, planned): *2-year SemVer guarantee* + *north-star metric 수렴* + *backward compat 운영*. Phase 12 의 운영 지능화를 *안정* 상태로 유지하면서 외부 consumer 2-year 보장. 신규 feature 추가는 *범위 밖* (Phase 14+ 의 별도 milestone).
+- **Phase 13** (v1.0.0 진입 후, `in_progress` — 2026-07-21 start): *2-year SemVer guarantee* + *north-star metric 수렴* + *backward compat 운영*. Phase 12 의 운영 지능화를 *안정* 상태로 유지하면서 외부 consumer 2-year 보장. 신규 feature 추가는 *범위 밖* (Phase 14+ 의 별도 milestone).
 
 ### 1.2 Phase 13 의 5영역 정체성
 

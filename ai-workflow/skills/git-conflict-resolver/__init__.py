@@ -1,0 +1,1 @@
+"""Git conflict resolution skill package."""
