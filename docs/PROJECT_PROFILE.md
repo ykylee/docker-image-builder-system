@@ -474,6 +474,36 @@
   - Phase 2 3·4·5차 봉인: Runner별 K8s RBAC / build sandbox 격리 / resource limits + node/namespace 분리.
   - DISABLED 토글 시 즉시 lease 회수 (WebSocket / SSE 기반 실시간 lease revoke).
 
+## 3.15 v0.12.0 follow-up — Revoke / Lease 영속화 + 자동 갱신
+- 의도: v0.10.0 / v0.11.0 의 in-memory revoke Set 한계 해소 + long-running build 의 lease 자동 갱신. 멀티 build-server replica 운영 시 한 replica 의 logout / lease 갱신 이 모든 replica 에 즉시 전파. multi-hour build 가 lease TTL (5분) 을 초과해도 자동 갱신 흐름 유지.
+- 결정:
+  - **`revoke_jti` table 신규** — jti PK + expires_at timestamptz + created_at timestamptz. migration 0019. expires_at index 로 cleanup sweeper 최적화.
+  - **`PersistentRevokeStore`** — `apps/build-server/src/auth/persistent-revoke-store.ts`. SELECT (`expires_at > now()` 조건) / INSERT (`ON CONFLICT (jti) DO NOTHING`) / `revokeAll` (no-op, admin 강제 전체 로그아웃 후속). `HmacIdentityProvider` 가 옵션으로 받음. 미주입 시 in-memory only 동작.
+  - **fail-open 정책** — persistent store 조회 실패 시 in-memory 만으로 reject. 다음 sweep / TTL 만료로 자연 안전망. 운영 metric + alert 후속.
+  - **`LeaseRenewer` background worker** — `apps/build-server/src/auth/lease-renewer.ts`. active lease registry (Map<buildId, ActiveLease>) + 30s sweep + 만료 30% 시점 expiresAt += TTL + 이전 jti revoke. `setInterval().unref()` + `stop()` + create-app.ts 의 onClose hook.
+  - **`BuildService.claimNextBuild`** 가 claim 성공 시 lease-renewer 에 lease 등록. postgres backend + persistentRevokeStore 셋업 시에만 활성.
+- 신규 회귀 가드:
+  - **`apps/build-server/tests/lease-renewer.test.ts`** 4 case (register/getExpiresAt/unregister / activeCount / sweep policy expiresAt += TTL / manual renew + 이전 jti revoke).
+  - **`apps/build-server/tests/persistent-revoke-store.test.ts`** 6 case (in-memory mock PG pool 로 isRevoked 등록/만료/중복/revokedCount/revokeAll).
+- 핵심 변경:
+  - `packages/db/src/schema/revoke-jti.ts` 신규 — `revokeJtiTable` schema.
+  - `packages/db/src/index.ts` schema re-export.
+  - `apps/build-server/migrations/0019_revoke_jti.sql` 신규 — CREATE TABLE.
+  - `apps/build-server/src/auth/persistent-revoke-store.ts` 신규.
+  - `apps/build-server/src/auth/lease-renewer.ts` 신규.
+  - `apps/build-server/src/auth/hmac-identity-provider.ts` `persistentRevokeStore` 옵션 + `#issuedJtis` map + revoke 양쪽 기록 + verify persistent check.
+  - `apps/build-server/src/services/build-service.ts` `leaseRenewer` 옵션 + `claimNextBuild` 가 lease 등록.
+  - `apps/build-server/src/app/create-app.ts` `persistentRevokeStore` + `leaseRenewer` 셋업 (postgres backend 일 때만).
+- 운영 영향: build-monitor / runner / SQL / schema (revoke_jti 신규 외) / migration (0019 신규 외) 변경 0. code 변경 0 (단, 신규 5 file + 4 file amend).
+- 회귀 baseline: TS 5 packages `--noEmit` clean, build-server node:test **295/295 PASS** (이전 285 + v0.12.0 10 신규). session-end 가드 9/9 PASS (release commit 후).
+- 운영 가이드: [`revoke-lease-persistence-2026-08-06.md`](operations/revoke-lease-persistence-2026-08-06.md) (8 섹션 — 의도 / 결정 / 회귀 baseline / 운영 명령 / 사용 절차 / 운영 환경 배포 절차 / 사전 결함 + 보강 4건 / 운영 환경 baseline / 한계와 follow-up 5종).
+- follow-up:
+  - revoke_jti cleanup sweeper (Phase 3 follow-up).
+  - LeaseRenewer 의 multi-replica 정합 (persistent active_lease table).
+  - fail-open 정책의 운영 metric / alert rule.
+  - admin 강제 전체 로그아웃 endpoint (revokeAll 의 TRUNCATE 호출).
+  - DISABLED 토글 시 즉시 lease 회수 (WebSocket / SSE 기반).
+
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
 - [작업 백로그](../ai-workflow/memory/active/work_backlog.md)
@@ -498,6 +528,7 @@
 - TASK-113 Multi-runner Chunked Postgres 운영 가이드: [multi-runner-chunked-postgres-2026-07-20.md](operations/multi-runner-chunked-postgres-2026-07-20.md)
 - TASK-131 follow-up Phase 1 Identity + 테넌트 권한 (1·2·3·4단계) 운영 가이드: [identity-cookie-hmac-2026-08-06.md](operations/identity-cookie-hmac-2026-08-06.md)
 - Phase 2 Runner 인증 (HMAC lease token) 운영 가이드: [runner-lease-hmac-2026-08-06.md](operations/runner-lease-hmac-2026-08-06.md)
+- v0.12.0 follow-up Revoke / Lease 영속화 + 자동 갱신 운영 가이드: [revoke-lease-persistence-2026-08-06.md](operations/revoke-lease-persistence-2026-08-06.md)
 - [CHANGELOG.md](../CHANGELOG.md) (TASK-123 v0.1.0 release staging anchor)
 - [v0.9.0 release notes](RELEASE_NOTES-v0.9.0-2026-08-04.md) (Helm/ArgoCD adapter + 실 e2e)
 - [Helm/ArgoCD e2e scripts](../apps/runner/scripts/e2e-helm-deploy.sh) / [`e2e-argocd-deploy.sh`](../apps/runner/scripts/e2e-argocd-deploy.sh)
