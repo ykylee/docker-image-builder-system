@@ -1,4 +1,4 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
 
 import {
@@ -38,36 +38,206 @@ const buildIdParamsSchema = z.object({
 
 const userIdHeader = "x-user-id";
 
+// Phase 1 (Identity + 테넌트 권한) — build owner policy.
+//
+// 3단계 봉인: cookie/Bearer principal 우선, AUTH_LEGACY_HEADERS=true 일 때만
+// X-User-Id 헤더 보조 인정. admin role + admin allow-list 통과 시 본인이
+// 아닌 빌드에도 접근 가능. 본인이 owner 인 빌드는 admin role 유무와 무관하게
+// 접근 가능. 미인증 상태 + legacy off 라면 401. 인증되었는데 owner 도 admin
+// 도 아니면 403.
+//
+// 본 helper 는 build-routes 의 모든 build-scoped 엔드포인트 진입 직전에
+// 호출된다. 미인증과 404 의 의미 차이를 의도적으로 흐리지 않기 위해
+// `owner` lookup 결과가 null 이면 404 로 응답 (build 부재와 동일 보장).
+export interface OwnerPolicyOptions {
+  /** Admin allow-list. admin role 의 subject 가 여기 있어야 admin 통과. */
+  readonly adminAllowList: ReadonlyArray<string>;
+  /** Legacy X-User-Id 헤더 fallback 허용 여부. default false. */
+  readonly legacyHeadersEnabled: boolean;
+  /**
+   * legacy ON 인 환경에서 X-User-Id 가 부재할 때 강제 subject.
+   * 운영은 미사용 (default `""` — 미사용 시에도 명시). 단위 테스트
+   * fixture 가 X-User-Id 미발송 호출을 시뮬레이션할 때 사용. 빈
+   * 문자열 = 미사용, 비어있지 않으면 강제 인증.
+   */
+  readonly legacyDefaultSubject: string;
+}
+
+export interface ResolvedCaller {
+  /** `"alice"` 같은 canonical owner key. */
+  readonly subject: string;
+  /** "user" | "admin". admin allow-list 검증 결과를 반영. */
+  readonly role: "user" | "admin";
+}
+
+export type OwnerPolicyOutcome =
+  | { kind: "ok"; caller: ResolvedCaller }
+  | { kind: "unauthorized"; reason: string };
+
+const userIdHeaderSchema = z.string().min(1);
+
+function resolveCaller(
+  request: FastifyRequest,
+  options: Pick<OwnerPolicyOptions, "adminAllowList" | "legacyHeadersEnabled">,
+  legacyDefaultSubject: string
+): OwnerPolicyOutcome {
+  // 1) cookie/Bearer principal (registerPrincipalPreHandler 가 동일 process
+  //    에 등록되어 있어야 채워짐). 1·2단계에서 cookie 가 base, Bearer 가 보조.
+  const principal = request.principal;
+  if (principal) {
+    const subject = principal.subject;
+    const role: "user" | "admin" =
+      principal.role === "admin" && options.adminAllowList.includes(subject)
+        ? "admin"
+        : "user";
+    return { kind: "ok", caller: { subject, role } };
+  }
+  // 2) legacy X-User-Id 헤더 fallback (운영자 opt-in).
+  //    legacy ON 인 환경에서 X-User-Id 가 있으면 user role 로 인정.
+  //    X-User-Id 가 부재하면 401 — 운영 baseline 의 self-dogfood 가
+  //    X-User-Id 를 항상 전달하는 흐름을 유지하기 위함. anonymous
+  //    통과는 build 소유권 추적의 핵심 가드를 우회하므로 의도적 차단.
+  //    단, 단위 테스트 fixture 가 X-User-Id 부재 호출을 시뮬레이션할
+  //    때 legacyDefaultSubject 가 지정되면 그 subject 로 anonymous 통과.
+  if (options.legacyHeadersEnabled) {
+    const parsed = userIdHeaderSchema.safeParse(request.headers[userIdHeader]);
+    if (parsed.success) {
+      // legacy 헤더는 항상 user role. admin 이라도 cookie 를 권장 — legacy
+      // 헤더는 admin allow-list 를 우회하지 못한다.
+      return { kind: "ok", caller: { subject: parsed.data, role: "user" } };
+    }
+    if (typeof legacyDefaultSubject === "string" && legacyDefaultSubject.length > 0) {
+      return { kind: "ok", caller: { subject: legacyDefaultSubject, role: "user" } };
+    }
+  }
+  return {
+    kind: "unauthorized",
+    reason: "Authentication required. POST /auth/login to obtain a cookie."
+  };
+}
+
+async function enforceOwnerPolicy(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  options: Pick<OwnerPolicyOptions, "adminAllowList" | "legacyHeadersEnabled">,
+  buildService: BuildService,
+  buildId: string,
+  legacyDefaultSubject: string
+): Promise<ResolvedCaller | null> {
+  const outcome = resolveCaller(request, options, legacyDefaultSubject);
+  if (outcome.kind === "unauthorized") {
+    reply.status(401).send({ message: outcome.reason });
+    return null;
+  }
+  const caller = outcome.caller;
+  if (caller.role === "admin") {
+    return caller;
+  }
+  const ownerResult = await buildService.getBuildOwner(buildId);
+  if (!ownerResult) {
+    // build 부재와 동일한 표면 — 인증 실패 정보 누설 방지.
+    reply.status(404).send(notFoundBody("Build not found."));
+    return null;
+  }
+  if (ownerResult.requestedBy !== caller.subject) {
+    reply.status(403).send({
+      message: "Caller is not the build owner.",
+      callerId: caller.subject
+    });
+    return null;
+  }
+  return caller;
+}
+
 export async function registerBuildRoutes(
   app: FastifyInstance,
-  buildService: BuildService
+  buildService: BuildService,
+  options: OwnerPolicyOptions = {
+    // default = legacy OFF + empty admin allow-list. 운영 baseline 정합.
+    // cookie/Bearer 인증만 허용. 단위 테스트가 X-User-Id 호환이 필요하면
+    // buildApp 가 명시적으로 `{ legacyHeadersEnabled: true }` 를 넘긴다.
+    adminAllowList: [],
+    legacyHeadersEnabled: false,
+    legacyDefaultSubject: ""
+  }
 ): Promise<void> {
+  const legacyHeadersEnabled = options.legacyHeadersEnabled;
+  const adminAllowList = options.adminAllowList;
+  const legacyDefaultSubject = options.legacyDefaultSubject;
+
   app.get("/builds", async (request, reply) => {
+    const caller = resolveCaller(request, {
+      adminAllowList,
+      legacyHeadersEnabled
+    }, legacyDefaultSubject);
+    if (caller.kind === "unauthorized") {
+      return reply
+        .status(401)
+        .send({ message: caller.reason });
+    }
     const queryResult = buildListQuerySchema.safeParse(request.query ?? {});
     if (!queryResult.success) {
       return reply.status(400).send(
         validationErrorBody("Invalid list query", queryResult.error.issues)
       );
     }
-    const body = await buildService.listBuilds(queryResult.data);
+    // user role 은 자기 빌드만. admin role 은 query 의 requestedBy 그대로
+    // (buildService.listBuilds 가 그 값을 받음). user role 은 명시
+    // requestedBy 가 와도 본인 subject 로 덮어쓴다 — 위조 방지.
+    const requestedBy = caller.caller.role === "admin"
+      ? queryResult.data.requestedBy
+      : caller.caller.subject;
+    const body = await buildService.listBuilds({
+      ...queryResult.data,
+      requestedBy
+    });
     return reply.status(200).send(body);
   });
 
   app.get("/services", async (request, reply) => {
-    const requestedBy = z.string().min(1).safeParse(request.headers[userIdHeader]);
-    if (!requestedBy.success) {
-      return reply.status(401).send({ message: "X-User-Id header missing.", header: "X-User-Id" });
+    const caller = resolveCaller(request, {
+      adminAllowList,
+      legacyHeadersEnabled
+    }, legacyDefaultSubject);
+    if (caller.kind === "unauthorized") {
+      return reply
+        .status(401)
+        .send({ message: caller.reason });
     }
-    const services = await buildService.listHostedServicesByOwner(requestedBy.data);
+    // user role 은 본인 빌드만. admin role 도 동일하게 본인 subject 의
+    // 서비스를 본다. 다른 owner 의 서비스 목록은 별도 admin API 가 담당.
+    const requestedBy = caller.caller.subject;
+    const services = await buildService.listHostedServicesByOwner(requestedBy);
     return reply.status(200).send({ services });
   });
 
   app.post("/builds", async (request, reply) => {
+    const caller = resolveCaller(request, {
+      adminAllowList,
+      legacyHeadersEnabled
+    }, legacyDefaultSubject);
+    if (caller.kind === "unauthorized") {
+      return reply
+        .status(401)
+        .send({ message: caller.reason });
+    }
     const payloadResult = buildRequestSchema.safeParse(request.body ?? {});
     if (!payloadResult.success) {
       return reply.status(400).send(
         validationErrorBody("Invalid build request payload", payloadResult.error.issues)
       );
+    }
+    // body.requestedBy 위조 차단 — authenticated principal.subject 와
+    // 일치해야 한다. admin role 도 동일 제약 (UI 가 admin 으로 빌드 적재
+    // 시 본인 subject 를 보내는 정직 흐름을 가정). legacy X-User-Id 헤더
+    // 사용자도 동일 — payload 와 헤더가 어긋나면 403.
+    if (payloadResult.data.requestedBy !== caller.caller.subject) {
+      return reply.status(403).send({
+        message:
+          "BuildRequest.requestedBy must match the authenticated subject.",
+        callerId: caller.caller.subject,
+        requestedBy: payloadResult.data.requestedBy
+      });
     }
     const outcome = await buildService.createBuild(payloadResult.data);
 
@@ -115,6 +285,17 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
     }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
+    }
     const result = await buildService.getBuild(paramsResult.data.buildId);
 
     if (!result) {
@@ -131,6 +312,17 @@ export async function registerBuildRoutes(
       return reply.status(400).send(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
+    }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
     }
     const result = await buildService.getBuildLogs(paramsResult.data.buildId);
 
@@ -167,6 +359,17 @@ export async function registerBuildRoutes(
       return reply.status(400).send(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
+    }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
     }
     const body = request.body ?? {};
     const payloadResult = phaseUpdateRequestSchema.safeParse(body);
@@ -216,6 +419,17 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
     }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
+    }
     const body = request.body ?? {};
     const payloadResult = containerTestStartRequestSchema.safeParse(body);
     if (!payloadResult.success) {
@@ -250,6 +464,17 @@ export async function registerBuildRoutes(
       return reply.status(400).send(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
+    }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
     }
     const body = request.body ?? {};
     const payloadResult = containerTestResultRequestSchema.safeParse(body);
@@ -289,6 +514,17 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
     }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
+    }
     const body = request.body ?? {};
     const payloadResult = deploymentReportRequestSchema.safeParse(body);
     if (!payloadResult.success) {
@@ -321,6 +557,17 @@ export async function registerBuildRoutes(
       return reply.status(400).send(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
+    }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
     }
 
     // The metadata we need to verify the upload against is read via
@@ -398,6 +645,17 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
     }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
+    }
 
     const result = await buildService.getSourceArchive(paramsResult.data.buildId);
     if (result.kind === "not_found") {
@@ -435,6 +693,17 @@ export async function registerBuildRoutes(
       return reply.status(400).send(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
+    }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
     }
     if (!Buffer.isBuffer(request.body)) {
       return reply.status(415).send(notFoundBody("Source chunk body must be application/octet-stream."));
@@ -541,6 +810,17 @@ export async function registerBuildRoutes(
       return reply.status(400).send(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
+    }
+    const caller = await enforceOwnerPolicy(
+      request,
+      reply,
+      { adminAllowList, legacyHeadersEnabled },
+      buildService,
+      paramsResult.data.buildId,
+      legacyDefaultSubject
+    );
+    if (!caller) {
+      return reply;
     }
     const result = await buildService.deleteSourceArchive(
       paramsResult.data.buildId

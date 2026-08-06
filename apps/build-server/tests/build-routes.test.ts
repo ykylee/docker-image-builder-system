@@ -18,9 +18,23 @@ function buildApp() {
     { parseAs: "buffer" },
     (_request, payload, done) => done(null, payload)
   );
+  // Phase 1 3단계 봉인 (build owner policy) — 본 test 의 fixture 는
+  // X-User-Id 헤더로 인증하는 self-dogfood 흐름을 시뮬레이션한다.
+  // 운영 baseline (createApp) 은 legacy OFF 이지만, build-routes 의
+  // owner policy 만 검증하는 본 test 는 legacy ON 으로 둔다.
+  // 본 fixture 의 모든 inject 가 "yklee" subject 로 인증되도록
+  // onRequest hook 에서 X-User-Id 가 부재하면 default 로 주입한다.
+  app.addHook("onRequest", async (request) => {
+    if (typeof request.headers["x-user-id"] !== "string") {
+      request.headers["x-user-id"] = "yklee";
+    }
+  });
   const repo = createMemoryBuildRepository();
   const service = new BuildService(repo);
-  return registerBuildRoutes(app, service).then(() => app);
+  return registerBuildRoutes(app, service, {
+    adminAllowList: [],
+    legacyHeadersEnabled: true
+  }).then(() => app);
 }
 
 const baseBody = {
@@ -240,7 +254,7 @@ describe("POST /builds/:buildId/container-test/start", () => {
   it("returns 202 with the canonical build status response", async () => {
     const { repo, service } = { ...(await setupCompletedBuild()) };
     const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
+    await registerBuildRoutes(app, service, { adminAllowList: [], legacyHeadersEnabled: true, legacyDefaultSubject: "yklee" });
     // x-not-existing is non-UUID so it fails zod and returns 400; not_found (404) is tested via unknown UUID below.
     const res = await app.inject({
       method: "POST",
@@ -253,7 +267,7 @@ describe("POST /builds/:buildId/container-test/start", () => {
     // proper call: a separate setup for a fresh completed build
     const fresh = await setupCompletedBuild();
     const app2 = Fastify({ logger: false });
-    await registerBuildRoutes(app2, fresh.service);
+    await registerBuildRoutes(app2, fresh.service, { adminAllowList: [], legacyHeadersEnabled: true, legacyDefaultSubject: "yklee" });
     const res2 = await app2.inject({
       method: "POST",
       url: `/builds/${fresh.buildId}/container-test/start`,
@@ -269,12 +283,12 @@ describe("POST /builds/:buildId/container-test/start", () => {
   });
 
   it("returns 400 on missing internalPort", async () => {
-    const { service } = await setupCompletedBuild();
+    const { service, buildId } = await setupCompletedBuild();
     const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
+    await registerBuildRoutes(app, service, { adminAllowList: [], legacyHeadersEnabled: true, legacyDefaultSubject: "yklee" });
     const res = await app.inject({
       method: "POST",
-      url: "/builds/00000000-0000-0000-0000-000000000000/container-test/start",
+      url: `/builds/${buildId}/container-test/start`,
       payload: { runnerId: "r-1" }
     });
     assert.equal(res.statusCode, 400);
@@ -299,7 +313,7 @@ describe("POST /builds/:buildId/container-test/result", () => {
       return { service: svc, buildId: id };
     })();
     const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
+    await registerBuildRoutes(app, service, { adminAllowList: [], legacyHeadersEnabled: true, legacyDefaultSubject: "yklee" });
     const res = await app.inject({
       method: "POST",
       url: `/builds/${buildId}/container-test/result`,
@@ -359,7 +373,7 @@ describe("POST /builds/:buildId/deployment", () => {
     })();
 
     const app = Fastify({ logger: false });
-    await registerBuildRoutes(app, service);
+    await registerBuildRoutes(app, service, { adminAllowList: [], legacyHeadersEnabled: true, legacyDefaultSubject: "yklee" });
     const res = await app.inject({
       method: "POST",
       url: `/builds/${buildId}/deployment`,

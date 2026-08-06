@@ -392,6 +392,20 @@ export class PostgresBuildRepository implements BuildRepository {
     return toBuildStatusResponse(row.build, row.buildTest, row.deploymentAttempt);
   }
 
+  async tryGetBuildOwner(
+    buildId: string
+  ): Promise<import("./build-repository.js").GetBuildOwnerResult> {
+    const [row] = await this.db
+      .select({ requestedBy: buildRequestTable.requestedBy })
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+    if (!row) {
+      return null;
+    }
+    return { requestedBy: row.requestedBy };
+  }
+
   async getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null> {
     const [buildExists] = await this.db
       .select({ id: buildRequestTable.id })

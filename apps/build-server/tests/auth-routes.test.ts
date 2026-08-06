@@ -71,7 +71,7 @@ describe("POST /auth/login", () => {
       assert.ok(result.cookie?.includes("HttpOnly"));
       assert.ok(result.cookie?.includes("SameSite=Lax"));
       const token = extractTokenFromCookie(result.cookie);
-      assert.ok(token && token.startsWith("v1."));
+      assert.ok(token && token.startsWith("v2."));
 
       // verify 가드로 토큰 재검증
       const principal = await provider.verify(token!);
@@ -257,13 +257,37 @@ describe("HmacIdentityProvider — guard edge cases", () => {
     const provider = new HmacIdentityProvider({ secret: "x".repeat(32) });
     await assert.rejects(provider.issue("ali:ce", "user"), /":"/);
   });
+
+  it("subject containing '.' is accepted (v2 wire format)", async () => {
+    // TASK-1 3단계 봉인 — v1 wire format 의 잠복 결함 (subject 'yky.lee' 의
+    // '.' 가 split(".") 와 충돌) 을 base64url encoding 으로 봉인.
+    const provider = new HmacIdentityProvider({ secret: "x".repeat(32) });
+    const issued = await provider.issue("yky.lee", "user");
+    assert.ok(issued.token.startsWith("v2."));
+    const verified = await provider.verify(issued.token);
+    assert.ok(verified);
+    assert.equal(verified.subject, "yky.lee");
+  });
+
+  it("issue + verify round-trip 정상 — subject 에 '.' 포함 가능 (v2 wire format)", async () => {
+    // 3단계 봉인: base64url-encoded payload/signature 로 wire format의
+    // '.' 가 inner payload 의 '.' 와 충돌하지 않도록 봉인.
+    const provider = new HmacIdentityProvider({ secret: "x".repeat(32) });
+    const issued = await provider.issue("yky.lee", "admin");
+    assert.ok(issued.token.startsWith("v2."));
+    const verified = await provider.verify(issued.token);
+    assert.ok(verified);
+    assert.equal(verified.subject, "yky.lee");
+    assert.equal(verified.role, "admin");
+  });
 });
 
-describe("requireAuth-legacy-headers default OFF", () => {
-  // 본 test 는 X-Admin-Id 호환의 default 가 OFF 임을 간접 검증한다.
-  // create-app.ts 의 registerAdminRoutes 가 identityProvider 없이 호출될
-  // 때 X-Admin-Id 헤더만으로 admin API 가 200 인지를 확인한다.
-  it("falls back to inline X-Admin-Id when identityProvider is omitted (legacy default)", async () => {
+describe("requireAuth-legacy-headers policy", () => {
+  // Phase 1 4단계: admin-routes 의 enforceAdminGuard 가 legacy OFF (default) 일
+  // 때는 X-Admin-Id 헤더를 silent 무시하고 401 reject — 운영 baseline 정책.
+  // legacy ON (AUTH_LEGACY_HEADERS=true) 일 때만 X-Admin-Id 헤더가 allow-list
+  // 와 일치하면 admin API 가 200 으로 통과 — self-dogfood 마이그레이션 경로.
+  it("legacy OFF: rejects X-Admin-Id header with 401 envelope (hint: cookie auth required)", async () => {
     const { createMemoryBuildRepository } = await import(
       "../src/repositories/memory-build-repository.js"
     );
@@ -271,16 +295,51 @@ describe("requireAuth-legacy-headers default OFF", () => {
       "../src/routes/admin-routes.js"
     );
     const { BuildService } = await import("../src/services/build-service.js");
-    const app = Fastify({ logger: false });
-    const service = new BuildService(createMemoryBuildRepository());
-    // identityProvider 인자 생략 → preHandler 미등록 → legacy X-Admin-Id 가 동작.
-    await registerAdminRoutes(app, service, createAdminAllowList(["admin"]));
-    const res = await app.inject({
-      method: "GET",
-      url: "/admin/builds",
-      headers: { "x-admin-id": "admin" }
-    });
-    assert.equal(res.statusCode, 200);
-    await app.close();
+    const previous = process.env.AUTH_LEGACY_HEADERS;
+    delete process.env.AUTH_LEGACY_HEADERS;
+    try {
+      const app = Fastify({ logger: false });
+      const service = new BuildService(createMemoryBuildRepository());
+      await registerAdminRoutes(app, service, createAdminAllowList(["admin"]));
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/builds",
+        headers: { "x-admin-id": "admin" }
+      });
+      assert.equal(res.statusCode, 401);
+      const body = res.json();
+      assert.equal(body.message, "Authentication required.");
+      assert.match(body.hint ?? "", /\/auth\/login/);
+      await app.close();
+    } finally {
+      if (previous !== undefined) process.env.AUTH_LEGACY_HEADERS = previous;
+    }
+  });
+
+  it("legacy ON: accepts X-Admin-Id header when allow-list matches (200)", async () => {
+    const { createMemoryBuildRepository } = await import(
+      "../src/repositories/memory-build-repository.js"
+    );
+    const { registerAdminRoutes } = await import(
+      "../src/routes/admin-routes.js"
+    );
+    const { BuildService } = await import("../src/services/build-service.js");
+    const previous = process.env.AUTH_LEGACY_HEADERS;
+    process.env.AUTH_LEGACY_HEADERS = "true";
+    try {
+      const app = Fastify({ logger: false });
+      const service = new BuildService(createMemoryBuildRepository());
+      await registerAdminRoutes(app, service, createAdminAllowList(["admin"]));
+      const res = await app.inject({
+        method: "GET",
+        url: "/admin/builds",
+        headers: { "x-admin-id": "admin" }
+      });
+      assert.equal(res.statusCode, 200);
+      await app.close();
+    } finally {
+      if (previous === undefined) delete process.env.AUTH_LEGACY_HEADERS;
+      else process.env.AUTH_LEGACY_HEADERS = previous;
+    }
   });
 });

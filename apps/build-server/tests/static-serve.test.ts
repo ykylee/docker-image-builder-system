@@ -41,6 +41,13 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
 
   before(async () => {
     prevReactEnv = process.env.BUILD_MONITOR_REACT_DIST_PATH;
+    // Phase 1 3단계 봉인 (build owner policy) 의 createApp default 가
+    // AUTH_LEGACY_HEADERS=false (운영 baseline). 본 test 의 SPA fallback
+    // 검증은 X-User-Id 없이도 200 JSON/HTML 이 떨어지는지 확인하는 것이
+    // 목적이므로 legacy ON 으로 만들어 anonymous + X-User-Id 부재 호출
+    // 도 통과하게 한다 (legacy ON 환경의 createApp 가 default subject
+    // "<anonymous>" 를 자동 적용).
+    process.env.AUTH_LEGACY_HEADERS = "true";
 
     reactDistDir = mkdtempSync(join(tmpdir(), "build-monitor-react-"));
     writeFileSync(
@@ -64,6 +71,9 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
       delete process.env.BUILD_MONITOR_REACT_DIST_PATH;
     } else {
       process.env.BUILD_MONITOR_REACT_DIST_PATH = prevReactEnv;
+    }
+    if (process.env.AUTH_LEGACY_HEADERS !== undefined) {
+      delete process.env.AUTH_LEGACY_HEADERS;
     }
     if (reactDistDir) {
       rmSync(reactDistDir, { recursive: true, force: true });

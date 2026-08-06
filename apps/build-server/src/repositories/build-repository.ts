@@ -341,10 +341,30 @@ export type GetSourceArchiveMetadataResult =
       kind: "not_found";
     };
 
+/**
+ * Phase 1 (Identity + 테넌트 권한) — build owner 1회 조회.
+ *
+ * `BuildStatusResponse` / `BuildSummary` 가 user-facing 으로 `requestedBy` 를
+ * 노출하지 않으므로 (TASK-160 후속 + admin summary 확장), build-routes 의
+ * owner policy 게이트는 별도 helper 로 owner 한 번만 읽어 principal.subject
+ * 와 비교한다. 비용은 단일 row 조회 (memory: Map.get, postgres: `SELECT
+ * requested_by FROM build_request WHERE id = $1`).
+ *
+ * 존재하지 않는 buildId 는 `null`. route layer 는 이걸 받아 404 와 동일하게
+ * 표면 — 인증 실패 정보 누설을 피하기 위함.
+ */
+export type GetBuildOwnerResult = { requestedBy: string } | null;
+
 export interface BuildRepository {
   createBuild(input: BuildRequest): Promise<CreateBuildResult>;
   getBuild(buildId: string): Promise<BuildStatusResponse | null>;
   getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null>;
+  /**
+   * Phase 1 owner policy support. Build owner (`requestedBy`) 한 행을
+   * BuildStatusResponse 전체 로드보다 가볍게 가져온다. build-routes 의
+   * preHandler 단계에서 principal.subject 와 비교하는 용도.
+   */
+  tryGetBuildOwner(buildId: string): Promise<GetBuildOwnerResult>;
   claimNextBuild(): Promise<ClaimNextBuildResult>;
   // TASK-162 (P2-M3): FAILED phase 는 실패 이유를 함께 받는다. 이전에는
   // 채널이 없어 `build_request.last_error_code/message` 가 한 번도 기록되지

@@ -7,15 +7,23 @@
 // 보안 결정:
 //   - AUTH_HMAC_SECRET 은 필수 env. 부재 시 boot fail. dev/local default 는
 //     `dev-only-secret-change-me-in-production` — production 은 secret manager.
-//   - subject/role/jti 콜론 충돌 회피: 검증 시 payload 를 5-segment 로 split
-//     하고, subject/role 이 ":" 를 포함하면 reject.
+//   - subject/role 의 `:` 매직 캐릭터 회피: payload 의 inner separator 와
+//     외부 wire format 의 `.` 모두 escape 한다. 3단계 봉인에서 base64url
+//     encoding 으로 wire format을 재설계 — subject/role/jti 가 `.` 또는 `:`
+//     를 포함해도 payload/signature 의 byte 표현이 base64url-safe chars 만
+//     사용하도록 정규화.
 //   - jti 는 crypto.randomUUID (RFC 4122). 충돌 확률은 사실상 0.
 //   - revocation 은 메모리 Set. server 재시작 시 소실. 영속 revoke 가
 //     필요해지면 postgres revoke table + follow-up TASK.
 //
 // 설계 노트:
-//   - 토큰은 base64 가 아닌 plain utf-8 사용. opaque string 이라 가독성/
-//     디버깅성을 우선시. payload 가 작아 size 차이는 무시 가능.
+//   - wire 형식: `v1.<base64url(payload)>.<base64url(sig)>`.
+//     payload = `subject:role:expiresAt:jti` 의 utf-8 bytes.
+//     payload + signature 가 base64url-safe chars 만 사용하므로 subject 의
+//     `:` `.` 가 wire format 의 segment separator 와 충돌하지 않는다.
+//   - 1·2단계의 plain utf-8 wire format 은 subject 가 `.` 를 포함할 때
+//     (예: `yky.lee`) split(".") 가 payload 를 더 잘라 sig mismatch 가
+//     발생하는 잠복 결함이 있었다. 3단계에서 base64url 로 봉인.
 //   - issue/verify 는 deterministic — IdP 가 분산된 경우 (multi-replica)
 //     동일 secret + 동일 payload 가 같은 signature 를 내야 한다. 단일
 //     process 가정으로 운영한다 (Phase 3 의 multi-replica 도입 시 검토).
@@ -28,10 +36,18 @@ import type { IdentityProvider, IssuedToken } from "./identity-provider.js";
 /** Wire 형식 버전. 형식 변경 시 bump 하고 구 reader 가 거부하도록 한다. */
 const SCHEME_VERSION = "v1";
 
+/** v2 wire format 사용 — base64url-encoded payload + signature. 1·2단계
+ *  의 v1 (plain utf-8) 는 subject 의 `.` 와 충돌하므로 v1 토큰은 reject. */
+const SCHEME_VERSION_V2 = "v2";
+
 /** 기본 TTL 8시간. 운영 가이드 + tests 에서 env 로 조정 가능. */
 const DEFAULT_TTL_SECONDS = 8 * 60 * 60;
 
-/** subject/role 의 콜론 충돌 회피 — 형식상 ":" 불가. */
+/** subject 안전성: payload 의 inner separator `:` 는 wire format 의
+ *  segment separator `.` 와 무관 (base64url 변환 후) 하지만 inner
+ *  segment 자체는 `:` 로 split 하므로 subject 가 `:` 를 포함하면 inner
+ *  segment 가 늘어 sig mismatch. 따라서 subject 의 `:` 만 차단. `.` 은
+ *  base64url encoding 으로 wire format 안전. */
 const FORBIDDEN_IN_SUBJECT = /:/;
 
 export interface HmacIdentityProviderOptions {
@@ -84,7 +100,11 @@ export class HmacIdentityProvider implements IdentityProvider {
     const signature = createHmac("sha256", this.#secret)
       .update(payload, "utf-8")
       .digest("hex");
-    const token = `${SCHEME_VERSION}.${payload}.${signature}`;
+    // v2 wire format: payload/signature 를 base64url 로 wrapping 하여
+    // subject 의 `.` 가 wire format `.` separator 와 충돌하지 않도록.
+    const encodedPayload = base64UrlEncode(Buffer.from(payload, "utf-8"));
+    const encodedSignature = base64UrlEncode(Buffer.from(signature, "utf-8"));
+    const token = `${SCHEME_VERSION_V2}.${encodedPayload}.${encodedSignature}`;
     this.#issuedCount += 1;
     return {
       token,
@@ -97,13 +117,21 @@ export class HmacIdentityProvider implements IdentityProvider {
     if (typeof token !== "string" || token.length === 0) return null;
     const parts = token.split(".");
     if (parts.length !== 3) return null;
-    const [version, payload, providedSignature] = parts as [string, string, string];
-    if (version !== SCHEME_VERSION) return null;
-    if (!payload || !providedSignature) return null;
+    const [version, encodedPayload, encodedSignature] = parts as [string, string, string];
+    // v1 wire format (plain utf-8) 은 subject 가 `.` 와 충돌하여
+    // 잠복 결함이 있어 (TASK-1 3단계) v2 만 받는다.
+    if (version !== SCHEME_VERSION_V2) return null;
+    if (!encodedPayload || !encodedSignature) return null;
+
+    const payloadBytes = base64UrlDecode(encodedPayload);
+    const signatureBytes = base64UrlDecode(encodedSignature);
+    if (!payloadBytes || !signatureBytes) return null;
+    const payload = payloadBytes.toString("utf-8");
 
     const expectedSignature = createHmac("sha256", this.#secret)
       .update(payload, "utf-8")
       .digest("hex");
+    const providedSignature = signatureBytes.toString("utf-8");
 
     // 길이 다르면 timingSafeEqual 가 throw 하므로 먼저 가드.
     if (providedSignature.length !== expectedSignature.length) return null;
@@ -157,5 +185,29 @@ export class HmacIdentityProvider implements IdentityProvider {
 
   revokedCount(): number {
     return this.#revokedJtis.size;
+  }
+}
+
+/** base64url encode (RFC 4648 §5) — `+` → `-`, `/` → `_`, padding 제외. */
+function base64UrlEncode(bytes: Buffer): string {
+  return bytes
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+/** base64url decode. invalid input 은 null. */
+function base64UrlDecode(input: string): Buffer | null {
+  if (typeof input !== "string" || input.length === 0) return null;
+  // RFC 4648 §5 — base64url chars 만 허용.
+  if (!/^[A-Za-z0-9_-]+$/.test(input)) return null;
+  const padded = input.replace(/-/g, "+").replace(/_/g, "/");
+  const remainder = padded.length % 4;
+  const full = remainder === 0 ? padded : padded + "=".repeat(4 - remainder);
+  try {
+    return Buffer.from(full, "base64");
+  } catch {
+    return null;
   }
 }

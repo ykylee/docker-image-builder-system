@@ -279,7 +279,28 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     gatewayHost: process.env.SERVICE_DB_GATEWAY_HOST?.trim() ?? "",
     databaseName: process.env.SERVICE_DB_DATABASE_NAME?.trim() || "dibs"
   } : undefined);
-  void registerBuildRoutes(app, buildService);
+  // Phase 1 (Identity + 테넌트 권한) 3단계: build owner policy 게이트.
+  // cookie/Bearer principal 우선, AUTH_LEGACY_HEADERS=true 일 때 X-User-Id
+  // 헤더 fallback. admin allow-list 의 subject 는 admin role 로 빌드
+  // 전체 접근 — 본인 외 빌드도 조회 가능. 인증 부재 시 401, owner 도
+  // admin 도 아니면 403. 미들웨어 단의 enforceOwnerPolicy 가 모든
+  // build-scoped 라우트에 적용된다.
+  const legacyHeadersEnabled = process.env.AUTH_LEGACY_HEADERS === "true";
+  const buildOwnerPolicyOptions = {
+    adminAllowList: adminAllowList.list(),
+    legacyHeadersEnabled,
+    // legacy ON 인 환경의 self-dogfood 가 X-User-Id 미발송 시 anonymous
+    // subject 로 동작하도록 default subject 를 환경변수에서 결정. 운영
+    // baseline (legacy OFF) 에서는 빈 문자열 (X-User-Id 부재 시 401).
+    // legacy ON 환경에서 self-dogfood 가 X-User-Id 를 항상 보낸다면
+    // `BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT=""` 으로 명시해 401 강제.
+    legacyDefaultSubject: legacyHeadersEnabled
+      ? process.env.BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT ?? "<anonymous>"
+      : ""
+  };
+  await registerBuildRoutes(app, buildService, buildOwnerPolicyOptions);
+  // tsconfig 측에서 `void` dispatch 가 노이즈라 unused-vars 무시 패턴으로
+  // 회귀하지 않도록 await 로 호출.
 
   // TASK-075: build-monitor 의 vite build 산출물을 정적 서빙 + SPA
   // fallback 으로 mount. Build Server 의 자체 route (/api/*, /openapi,

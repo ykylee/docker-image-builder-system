@@ -338,6 +338,16 @@ export function createMemoryBuildRepository(
       });
     },
 
+    async tryGetBuildOwner(
+      buildId: string
+    ): Promise<import("./build-repository.js").GetBuildOwnerResult> {
+      const build = builds.get(buildId);
+      if (!build) {
+        return null;
+      }
+      return { requestedBy: build.requestedBy };
+    },
+
     async getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null> {
       const build = builds.get(buildId);
       if (!build) {

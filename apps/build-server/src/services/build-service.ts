@@ -191,6 +191,17 @@ export class BuildService {
     return this.repository.getBuild(buildId);
   }
 
+  /**
+   * Phase 1 (Identity + 테넌트 권한) — owner 1회 조회 보조.
+   * build-routes 의 preHandler 가 principal.subject 와 비교하기 위해 사용.
+   * build 가 없거나 store 가 손상된 경우 null.
+   */
+  async getBuildOwner(
+    buildId: string
+  ): Promise<{ requestedBy: string } | null> {
+    return this.repository.tryGetBuildOwner(buildId);
+  }
+
   async getBuildLogs(buildId: string): Promise<BuildLogsResponse | null> {
     const logs = await this.repository.getBuildLogs(buildId);
     if (!logs) {
