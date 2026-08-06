@@ -1,6 +1,6 @@
 {
   "name": "@docker-image-builder-system/build-server",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "private": true,
   "type": "module",
   "main": "dist/apps/build-server/src/index.js",

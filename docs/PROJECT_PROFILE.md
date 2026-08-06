@@ -327,6 +327,80 @@
 - 회귀 baseline: TS 5 packages `tsc --noEmit` clean, build-server node:test **131 → 143 PASS** (TASK-075 baseline 131 + TASK-093 신규 12 + TASK-101 Svelte scaffold 정리 영향 0), build-monitor vitest **130/130 PASS** (TASK-101 Svelte 135 case 일괄 삭제), Go 7 packages 모두 PASS. svelte-check script 제거 (TASK-101 Svelte scaffold 정리).
 - **Postgres backend 회귀 (TASK-102 baseline 양축 동기화)**: Build Server 의 `mountBuildMonitorDist` + SPA fallback + `/api/*` 307 redirect + JSON 404 + POST/PATCH/DELETE bypass 는 memory / postgres 두 backend 와 직교 — backend 선정과 무관하게 동일하게 통과. React 단일 SPA 운영 baseline 은 Postgres 환경 (Prod / Staging) 의 default 운영 패턴에서도 유지. 단일 port reverse proxy 의 `/health` + `/openapi.json` 응답은 backend 가 memory / postgres 어느 쪽이든 동일 — backend 차이로 frontend mount 동작에 영향 없음. 운영 검증은 §3.5 의 e2e-source-archive-postgres.sh + TASK-082 의 e2e-multi-runner-postgres.sh 모두 ALL PASS 로 확인.
 
+## 3.13 Identity + 테넌트 권한 (Phase 1, 1·2·3·4단계)
+- 의도: production-readiness-roadmap Phase 1 의 1차 봉인. 기존 `X-User-Id` / `X-Admin-Id` 평문 헤더 + `localStorage userId` 의 위조 가능 + build-scoped / admin-scoped 라우트 무인증의 보안 결함을 HMAC 서명 Bearer cookie + principal preHandler + owner/admin policy 로 봉인. 1·2단계: HMAC IdentityProvider + `/auth/login·logout·whoami` + cookie/Bearer 추출. 3단계: build-routes owner policy + `BuildRepository.tryGetBuildOwner` helper + `BuildService.getBuildOwner` thin wrapper + v2 base64url wire format (v1 reject). 4단계: admin-routes 14 라우트 inline 가드를 `enforceAdminGuard` + `resolveAdminCallerId` helper 로 일원화.
+- 결정:
+  - **`AUTH_HMAC_SECRET`** 운영 baseline (production deployment) 필수. dev/test 환경에서 secret 미설정 시 NODE_ENV !== "production" 일 때만 dev default secret 허용 (allowDevDefault: true).
+  - **`AUTH_LEGACY_HEADERS`** default **false**. 운영자가 self-dogfood / staging / 외부 admin UI 마이그레이션 경로에서만 `true` 로 설정.
+  - **`AUTH_TOKEN_TTL_SECONDS`** default 28800 (8h). 운영자가 secret rotation 주기에 맞춰 조정.
+  - **`BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT`** legacy ON 환경의 X-User-Id 부재 시 default subject (default `<anonymous>`). self-dogfood 의 X-User-Id 미발송 호환. legacy OFF 환경에서는 무효 (`""`).
+  - HMAC 알고리즘: HMAC-SHA256. payload + signature 모두 base64url (URL-safe, no padding) 인코딩.
+  - `POST /auth/logout` 이 jti revoke (in-memory Set) + Set-Cookie Max-Age=0 으로 강제 만료.
+- 신규 회귀 가드:
+  - **`apps/build-server/tests/auth-routes.test.ts`** 14 + 2 = 16 case (1·2단계 login 4 / whoami 3 / logout 2 / HMAC edge case 4 / legacy-headers default OFF 1 + 3단계 v2 round-trip / subject `.` 허용 2).
+  - **`apps/build-server/tests/build-owner-policy.test.ts`** 12 case (3단계 cookie 인증 owner 가드 / admin role / legacy ON/OFF / body requestedBy 위조 / 부재 404 / user role query 위조 / logs·DELETE source 가드).
+  - **`apps/build-server/tests/admin-routes-prehandler.test.ts`** 6 case (4단계 cookie admin 200 / cookie user role 403 / legacy ON X-Admin-Id 200 / legacy OFF X-Admin-Id 401 hint / legacy ON X-Admin-Id 비-allow-list 403 callerId echo / 인증 부재 401 hint).
+- 핵심 변경:
+  - `apps/build-server/src/auth/` (identity-provider.ts + hmac-identity-provider.ts + request-principal.ts) + `apps/build-server/src/routes/auth-routes.ts` (`/auth/login·logout·whoami`).
+  - `apps/build-server/src/routes/build-routes.ts` `enforceOwnerPolicy` 가 12 build-scoped 라우트에 통합 + `resolveCaller` helper.
+  - `apps/build-server/src/routes/admin-routes.ts` `enforceAdminGuard` + `resolveAdminCallerId` helper 가 14 admin-scoped 라우트 inline 가드를 일원화. 동일 envelope (`{ message, header, callerId, hint }`) 보존.
+  - `packages/shared-contract/src/auth/index.ts` (Principal/AuthLoginRequest/AuthLoginResponse/WhoAmIResponse zod schema).
+  - `apps/build-server/src/app/create-app.ts` 가 `HmacIdentityProvider` boot 시 instantiate + `registerPrincipalPreHandler` 호출 + `AUTH_LEGACY_HEADERS` 분기로 build owner policy 의 legacy fallback 결정.
+  - `apps/build-server/src/app/openapi.ts` `getOpenApiDocument()` 에 cookieAuth + bearerAuth securityScheme 추가. CORS allowHeaders 에 Cookie 추가.
+  - `apps/build-server/src/auth/hmac-identity-provider.ts` wire format `v1.<plain-utf8>.<hex-sig>` → `v2.<base64url(payload)>.<base64url(sig)>` (subject `.` 충돌 회피).
+- 운영 명령 (Production, cookie 인증 ON + legacy OFF):
+  ```bash
+  DATABASE_URL=postgres://postgres:***@***/docker_image_builder \
+    AUTH_HMAC_SECRET=$(cat /run/secrets/auth_hmac_secret) \
+    BUILD_REPOSITORY_BACKEND=postgres \
+    DB_AUTO_BOOTSTRAP=true \
+    node apps/build-server/dist/apps/build-server/src/index.js
+  ```
+- 운영 명령 (Self-dogfood / Staging, cookie 인증 ON + legacy ON):
+  ```bash
+  DATABASE_URL=postgres://postgres:postgres@127.0.0.1:15432/docker_image_builder \
+    AUTH_HMAC_SECRET=staging-secret-32-bytes-or-more-xxxxx \
+    AUTH_LEGACY_HEADERS=true \
+    BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT="<anonymous>" \
+    BUILD_REPOSITORY_BACKEND=postgres \
+    DB_AUTO_BOOTSTRAP=true \
+    node apps/build-server/dist/apps/build-server/src/index.js
+  ```
+- 운영 검증 절차:
+  ```bash
+  # 1) health
+  curl -i http://<host>:3000/health                              # → 200 {"status":"ok"}
+  # 2) whoami — cookie 인증 활성 확인
+  curl -i http://<host>:3000/auth/whoami                         # → 401 + hint
+  # 3) login + cookie round-trip
+  curl -i -c /tmp/cookies.txt -X POST http://<host>:3000/auth/login \
+    -H "content-type: application/json" -d '{"subject":"admin","role":"admin"}'
+  curl -i -b /tmp/cookies.txt http://<host>:3000/auth/whoami     # → 200 + admin principal
+  curl -i -b /tmp/cookies.txt http://<host>:3000/admin/builds   # → 200 BuildSummary[]
+  # 4) admin allow-list 비통과 → 403 + callerId echo
+  curl -i -X POST http://<host>:3000/auth/login \
+    -H "content-type: application/json" -d '{"subject":"alice","role":"user"}'
+  curl -i -b /tmp/cookies.txt http://<host>:3000/admin/builds   # → 403 + callerId:"alice"
+  # 5) owner mismatch → 403
+  curl -i -b /tmp/cookies.txt http://<host>:3000/builds/<bob-build-id>   # → 403
+  # 6) logout — jti revoke + cookie 만료
+  curl -i -b /tmp/cookies.txt -X POST http://<host>:3000/auth/logout    # → 204
+  ```
+- 사전 결함 + 보강 4건:
+  1. **`X-User-Id` / `X-Admin-Id` 평문 헤더 위조 가능** — HMAC 서명 Bearer cookie + principal preHandler 가 Build Server 진입 시 cookie/Bearer 인증을 강제. legacy ON 환경에서만 X-User-Id / X-Admin-Id 헤더 fallback 노출.
+  2. **build-scoped 라우트 무인증** — `enforceOwnerPolicy` 가 12 build-scoped 라우트에 통합. body `requestedBy` 위조 403 + owner mismatch 403 + 부재 404 (인증 정보 누설 방지) + admin role + admin allow-list 통과 시 본인 외 빌드도 200.
+  3. **HMAC v1 wire format 잠복 결함** — v1 plain-utf8 payload 의 `split(".")` 가 subject `yky.lee` 의 `.` 와 충돌 → sig mismatch. v2 base64url encoding 으로 봉인, v1 reject.
+  4. **admin-scoped 라우트 inline 가드 반복** — 14 라우트의 inline `callerId` 검증 블록을 `enforceAdminGuard` + `resolveAdminCallerId` helper 로 일원화. 동일 envelope (`{ message, header, callerId, hint }`) 보존.
+- 운영 영향: build-monitor / runner / SQL / schema / migration / 5 package.json (`0.10.0`) 변경 0. code 변경 0 (1·2·3·4단계의 봉인 산출물만).
+- 회귀 baseline: TS 5 packages `--noEmit` clean, build-server node:test **278/278 PASS** (1·2단계 14 + 3단계 14 + 4단계 6 = 32 신규 회귀 가드), session-end 가드 9/9 PASS, `git diff --check` clean.
+- 운영 가이드: [`identity-cookie-hmac-2026-08-06.md`](operations/identity-cookie-hmac-2026-08-06.md) (v0.10.0 운영 메타 정합, §1~§8 운영 명령 + 사전 결함 + 마이그레이션 안내).
+- follow-up:
+  - 메모리 revoke Set 의 영속화 (Redis / Postgres) — 멀티 build-server replica 운영 시 jti revoke 공유.
+  - SSO / OIDC / JWT provider 연동 — `AUTH_HMAC_SECRET` 외부 IdP 매핑.
+  - route-level preHandler 일원화 — admin-routes 14 라우트 등록을 `withGuard({ preHandler })` helper 로 묶는 fastify route config 일원화 TASK. 본 4단계 봉인은 handler 내부 inline helper 호출로 봉인.
+  - legacy X-User-Id / X-Admin-Id sunset 정책 — cookie 인증 완전 전환 후 일정 기간 (운영 권장 1 release cycle) 후 legacy 코드 경로 (resolveCaller / enforceAdminGuard 의 legacy fallback) 자체를 제거하는 sunset 결정. 본 TASK 범위 밖.
+  - 멀티 탭 logout 의 broadcast channel — `storage` event 기반 cross-tab cookie invalidation. 본 TASK 범위 밖.
+
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
 - [작업 백로그](../ai-workflow/memory/active/work_backlog.md)
@@ -349,6 +423,7 @@
 - TASK-111 Production-semantic Postgres 운영 가이드: [production-semantic-postgres-2026-07-20.md](operations/production-semantic-postgres-2026-07-20.md)
 - TASK-085 Production-semantic (memory variant) 운영 가이드 — TASK-112 (양 variant 운영 가이드 cross-reference): [production-semantic-2026-07-07.md](operations/production-semantic-2026-07-07.md)
 - TASK-113 Multi-runner Chunked Postgres 운영 가이드: [multi-runner-chunked-postgres-2026-07-20.md](operations/multi-runner-chunked-postgres-2026-07-20.md)
+- TASK-131 follow-up Phase 1 Identity + 테넌트 권한 (1·2·3·4단계) 운영 가이드: [identity-cookie-hmac-2026-08-06.md](operations/identity-cookie-hmac-2026-08-06.md)
 - [CHANGELOG.md](../CHANGELOG.md) (TASK-123 v0.1.0 release staging anchor)
 - [v0.9.0 release notes](RELEASE_NOTES-v0.9.0-2026-08-04.md) (Helm/ArgoCD adapter + 실 e2e)
 - [Helm/ArgoCD e2e scripts](../apps/runner/scripts/e2e-helm-deploy.sh) / [`e2e-argocd-deploy.sh`](../apps/runner/scripts/e2e-argocd-deploy.sh)

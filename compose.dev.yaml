@@ -59,7 +59,7 @@ services:
       postgres:
         condition: service_healthy
     # 운영자가 명시적으로 주입해야 하는 env (Dockerfile 에는 default 없음).
-    # - ADMIN_IDS 는 secret 처럼 취급 (PROJECT_PROFILE §3).
+    # - ADMIN_IDS / AUTH_HMAC_SECRET 은 secret 처럼 취급 (PROJECT_PROFILE §3).
     environment:
       BUILD_REPOSITORY_BACKEND: ${BUILD_REPOSITORY_BACKEND:-postgres}
       DATABASE_URL: ${DATABASE_URL:-postgres://dibs:dibs@postgres:5432/dibs}
@@ -77,6 +77,19 @@ services:
       SERVICE_DB_GATEWAY_HOST: ${SERVICE_DB_GATEWAY_HOST:-dib-db-gateway.dib-hosted.svc.cluster.local:5432}
       SERVICE_DB_DATABASE_NAME: ${SERVICE_DB_DATABASE_NAME:-dibs}
       KUBECONFIG: /run/kube/config
+      # Phase 1 (v0.10.0) Identity + 테넌트 권한 — HMAC cookie 인증 env.
+      # - AUTH_HMAC_SECRET: secret 처럼 취급. 운영 baseline 필수. self-dogfood
+      #   / staging 만 미설정 + AUTH_LEGACY_HEADERS=true 로 X-User-Id 호환.
+      # - AUTH_TOKEN_TTL_SECONDS: default 28800 (8h). 운영자가 secret rotation
+      #   주기에 맞춰 조정.
+      # - AUTH_LEGACY_HEADERS: default false (운영). self-dogfood / staging 만
+      #   true 로 legacy X-User-Id / X-Admin-Id 헤더 fallback 허용.
+      # - BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT: legacy ON 환경의 X-User-Id
+      #   부재 시 default subject (default "<anonymous>"). self-dogfood 호환.
+      AUTH_HMAC_SECRET: ${AUTH_HMAC_SECRET:-}
+      AUTH_TOKEN_TTL_SECONDS: ${AUTH_TOKEN_TTL_SECONDS:-28800}
+      AUTH_LEGACY_HEADERS: ${AUTH_LEGACY_HEADERS:-false}
+      BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT: ${BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT:-<anonymous>}
       NODE_ENV: production
     ports:
       # Override for isolated e2e runs; default remains the local dev port.

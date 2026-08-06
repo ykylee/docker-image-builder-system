@@ -158,6 +158,41 @@ bash apps/runner/scripts/e2e-k8s-deploy.sh
 - [ ] `e2e-single-port.sh` ALL PASS
 - [ ] `scripts/db-migrate.sh --status` no pending
 - [ ] **`e2e-k8s-deploy.sh` ALL PASS** (v0.4.0+ 영향 시, k8s staging 환경 있는 경우). 미설치 시 skip + follow-up deferred.
+- [ ] **Phase 1 Identity + 테넌트 권한 회귀 가드 (v0.10.0+)**: `/auth/whoami` 401 + hint (cookie 인증 OFF 환경), `POST /auth/login` 200 + `Set-Cookie: auth_token=v2.<base64url>.<base64url>` (HttpOnly + SameSite=Lax), `GET /auth/whoami` 200 + admin principal echo, `GET /admin/builds` 200 (cookie 인증) / 401 hint (cookie OFF + legacy OFF) / 200 (legacy ON + X-Admin-Id 헤더). `BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT` 가 legacy ON 환경의 self-dogfood 호환. 자세한 절차는 [`docs/operations/identity-cookie-hmac-2026-08-06.md`](identity-cookie-hmac-2026-08-06.md) §3 참조.
+
+```bash
+# Phase 1 (v0.10.0) Identity + 테넌트 권한 round-trip 검증
+# 1) whoami — cookie 인증 활성 확인 (cookie OFF 환경이면 401 + hint)
+curl -i http://127.0.0.1:3000/auth/whoami
+# → 401 + {"message":"Authentication required.","hint":"POST /auth/login to obtain a cookie."}
+
+# 2) login — admin role 토큰 발급. allow-list 검증 필수.
+curl -i -c /tmp/cookies.txt -X POST http://127.0.0.1:3000/auth/login \
+  -H "content-type: application/json" \
+  -d '{"subject":"admin","role":"admin"}'
+# → 200 + Set-Cookie: auth_token=v2.<base64url>.<base64url>; HttpOnly; SameSite=Lax; Max-Age=28800
+
+# 3) whoami — cookie 인증 round-trip
+curl -i -b /tmp/cookies.txt http://127.0.0.1:3000/auth/whoami
+# → 200 + {"subject":"admin","role":"admin","jti":"...","expiresAt":"..."}
+
+# 4) admin builds — cookie 인증 admin 통과
+curl -i -b /tmp/cookies.txt http://127.0.0.1:3000/admin/builds
+# → 200 + BuildSummary[]
+
+# 5) admin allow-list 비통과 — 403 + callerId echo
+curl -i -X POST http://127.0.0.1:3000/auth/login \
+  -H "content-type: application/json" \
+  -d '{"subject":"alice","role":"user"}'
+curl -i -b /tmp/cookies.txt http://127.0.0.1:3000/admin/builds
+# → 403 + {"message":"Admin role or allow-list membership required.","callerId":"alice"}
+
+# 6) logout — jti revoke + cookie 만료
+curl -i -b /tmp/cookies.txt -X POST http://127.0.0.1:3000/auth/logout
+# → 204 + Set-Cookie: auth_token=; Max-Age=0
+```
+
+운영자가 staging 에서 위 6 단계를 모두 통과한 뒤 production 에 적용한다. v1 wire format 토큰(`v1.<plain-utf8>.<hex-sig>`) 보유 세션은 reject — 자가 복구 절차는 [`docs/operations/identity-cookie-hmac-2026-08-06.md` §4.4](./operations/identity-cookie-hmac-2026-08-06.md) 참조.
 
 ### 4) Post-deploy Monitoring (배포 후 모니터링)
 
