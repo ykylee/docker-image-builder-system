@@ -86,6 +86,14 @@ func (f *fakeClient) DownloadSource(ctx context.Context, buildID string) ([]byte
 	return nil, "", 0, nil
 }
 
+// Phase 2 (Runner 인증) — lease helpers. test fixture 는 lease 게이트
+// 비활성 환경이라 no-op 으로 충분.
+func (f *fakeClient) EnsureLease(ctx context.Context) error { return nil }
+func (f *fakeClient) RenewLease(ctx context.Context) (int64, error) {
+	return 0, nil
+}
+func (f *fakeClient) LoginLease(ctx context.Context) error { return nil }
+
 func TestProcessClaim_NilClaim_NoPhaseReports(t *testing.T) {
 	fc := &fakeClient{}
 	// TASK-066: `fetcher=nil` exercises the `PrepareSource`

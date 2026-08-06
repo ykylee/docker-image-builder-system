@@ -4,12 +4,18 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 )
+
+// ErrNoLease 는 EnsureLease 가 lease 미보관 상태에서 호출될 때 반환. 호출자가
+// /auth/runner-login 부터 재시도해야 함을 알리는 sentinel.
+var ErrNoLease = errors.New("runner lease not acquired; call /auth/runner-login first")
 
 // BuildControlClient 는 Host Server 의 build control endpoint 들을 호출한다.
 // - ClaimNextBuild: POST /builds/claim
@@ -18,6 +24,7 @@ import (
 // - ReportContainerTestResult: POST /builds/:buildId/container-test/result
 // - ReportDeployment: POST /builds/:buildId/deployment
 // - DownloadSource: GET /builds/:buildId/source (TASK-066)
+// - RenewLease: POST /auth/runner-lease-renew (Phase 2)
 type BuildControlClient interface {
 	ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error)
 	ReportPhase(ctx context.Context, buildID string, report PhaseReport) error
@@ -32,6 +39,15 @@ type BuildControlClient interface {
 	// the build's `sourceArchive.checksumSha256` metadata) before
 	// trusting the payload.
 	DownloadSource(ctx context.Context, buildID string) ([]byte, string, int, error)
+	// RenewLease 는 Phase 2 (Runner 인증) — lease token 을 만료 전에 갱신.
+	// Worker 가 주기적으로 호출 (e.g. expiresAt 60초 전). 응답의 leaseToken 을
+	// 내부 state 에 저장 + expiresAt 갱신. 401 이면 lease 해제 + 호출자가
+	// /auth/runner-login 부터 재시도.
+	RenewLease(ctx context.Context) (expiresAt int64, err error)
+	// EnsureLease 는 현재 lease 의 expiresAt 이 임계값 (default 60s) 이내로
+	// 다가왔는지 확인 + 필요 시 RenewLease 호출. 호출자가 모든 build-scoped
+	// API 직전에 1 회 호출.
+	EnsureLease(ctx context.Context) error
 }
 
 // ClaimedBuildResponse 는 Host Server POST /builds/claim 응답에서
@@ -80,6 +96,10 @@ type claimResponseBody struct {
 	// `z.enum([...]).nullable()` does not reject a successful no-op
 	// (claimed=false) response with an empty reason string.
 	Reason string `json:"reason,omitempty"`
+	// Phase 2 (Runner 인증) — claim 응답에 동봉된 lease token + 만료 시각.
+	// claimed=true 일 때만 채워짐. claimed=false 면 둘 다 0 (zero value) — null.
+	LeaseToken string `json:"leaseToken,omitempty"`
+	ExpiresAt  int64  `json:"expiresAt,omitempty"`
 }
 
 // buildStatusResponseBody 는 Host Server BuildStatusResponse 의 한 단계 풀린 wrapper.
@@ -125,14 +145,74 @@ type HTTPBuildControlClient struct {
 	baseURL  string
 	runnerID string
 	http     *http.Client
+	// Phase 2 (Runner 인증) — lease token 보관. atomic.Value 로 동시성 안전.
+	// 초기엔 nil — build-server 가 identityProvider 없이 운영되면 lease 미발급
+	// (legacy 모드) — 모든 build-scoped API 가 anonymous 호출 가능. 본 1차 봉인
+	// 의 운영 baseline (RUNNER_HMAC_SECRET 셋업) 에서는 /auth/runner-login 으로
+	// 초기 lease 발급 후 사용.
+	lease atomic.Value // holds *leaseState or nil
+}
+
+// leaseState 는 runner 가 보관하는 lease 토큰의 단일 표현.
+type leaseState struct {
+	Token     string
+	ExpiresAt int64 // Unix epoch seconds
 }
 
 func NewHTTPBuildControlClient(baseURL, runnerID string) *HTTPBuildControlClient {
-	return &HTTPBuildControlClient{
+	c := &HTTPBuildControlClient{
 		baseURL:  baseURL,
 		runnerID: runnerID,
 		http:     &http.Client{Timeout: 10 * time.Second},
 	}
+	c.lease.Store((*leaseState)(nil))
+	return c
+}
+
+// getLease 는 현재 보관중인 lease state 를 읽는다.
+func (c *HTTPBuildControlClient) getLease() *leaseState {
+	if v := c.lease.Load(); v != nil {
+		if s, ok := v.(*leaseState); ok {
+			return s
+		}
+	}
+	return nil
+}
+
+// storeLease 는 lease state 를 atomic 하게 갱신한다.
+func (c *HTTPBuildControlClient) storeLease(s *leaseState) {
+	if s == nil {
+		c.lease.Store((*leaseState)(nil))
+		return
+	}
+	c.lease.Store(s)
+}
+
+// setAuthHeader 는 request 에 lease Bearer 헤더를 첨부한다. lease 가 없으면
+// silent skip (legacy 모드 호환).
+func (c *HTTPBuildControlClient) setAuthHeader(req *http.Request) {
+	if lease := c.getLease(); lease != nil {
+		req.Header.Set("Authorization", "Bearer "+lease.Token)
+	}
+}
+
+// EnsureLease implements BuildControlClient.
+func (c *HTTPBuildControlClient) EnsureLease(ctx context.Context) error {
+	lease := c.getLease()
+	if lease == nil {
+		// lease 미보관 — 호출자가 /auth/runner-login 으로 발급해야 함.
+		return ErrNoLease
+	}
+	const renewBeforeSeconds = 60
+	now := time.Now().Unix()
+	if lease.ExpiresAt-now > renewBeforeSeconds {
+		return nil
+	}
+	// 만료 60초 이내 — 갱신.
+	if _, err := c.RenewLease(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBuildResponse, error) {
@@ -142,6 +222,7 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setAuthHeader(req)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -157,6 +238,13 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 	var resp claimResponseBody
 	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
 		return nil, fmt.Errorf("claim: failed to decode response: %w", err)
+	}
+
+	// Phase 2 (Runner 인증) — lease token 보관. 운영 baseline 에서는 claim 응답에
+	// leaseToken + expiresAt 가 동봉됨. legacy 모드 (identityProvider 미주입) 에서는
+	// 둘 다 0 — storeLease(nil) 가 silent skip.
+	if resp.LeaseToken != "" && resp.ExpiresAt > 0 {
+		c.storeLease(&leaseState{Token: resp.LeaseToken, ExpiresAt: resp.ExpiresAt})
 	}
 
 	if !resp.Claimed {
@@ -197,6 +285,7 @@ func (c *HTTPBuildControlClient) ReportPhase(ctx context.Context, buildID string
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setAuthHeader(req)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -267,6 +356,7 @@ func (c *HTTPBuildControlClient) DownloadSource(ctx context.Context, buildID str
 		return nil, "", 0, err
 	}
 	req.Header.Set("Accept", "application/octet-stream")
+	c.setAuthHeader(req)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -310,6 +400,7 @@ func (c *HTTPBuildControlClient) StartContainerTest(ctx context.Context, buildID
 		return err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	c.setAuthHeader(r)
 
 	res, err := c.http.Do(r)
 	if err != nil {
@@ -372,6 +463,7 @@ func (c *HTTPBuildControlClient) ReportContainerTestResult(ctx context.Context, 
 		return err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	c.setAuthHeader(r)
 
 	res, err := c.http.Do(r)
 	if err != nil {
@@ -394,6 +486,7 @@ func (c *HTTPBuildControlClient) ReportDeployment(ctx context.Context, buildID s
 		return err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	c.setAuthHeader(r)
 
 	res, err := c.http.Do(r)
 	if err != nil {
@@ -406,4 +499,83 @@ func (c *HTTPBuildControlClient) ReportDeployment(ctx context.Context, buildID s
 	}
 	raw, _ := io.ReadAll(res.Body)
 	return fmt.Errorf("report deployment failed: buildID=%s status=%d body=%s", buildID, res.StatusCode, string(raw))
+}
+
+// LoginLease 는 /auth/runner-login 으로 초기 lease 발급. worker boot 시점에
+// 호출되며 leaseToken + expiresAt 를 내부 state 에 저장. 운영 baseline
+// (RUNNER_HMAC_SECRET 셋업) 에서 호출. legacy 모드에서는 호출 불요 —
+// identityProvider 가 build-server 측에 미주입되어 lease 미발급.
+func (c *HTTPBuildControlClient) LoginLease(ctx context.Context) error {
+	body, _ := json.Marshal(map[string]any{"runnerId": c.runnerID})
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/auth/runner-login", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(res.Body)
+		return fmt.Errorf("runner-login failed: status=%d body=%s", res.StatusCode, string(raw))
+	}
+	var resp struct {
+		LeaseToken string `json:"leaseToken"`
+		ExpiresAt  int64  `json:"expiresAt"`
+		RunnerID   string `json:"runnerId"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return fmt.Errorf("runner-login: decode failed: %w", err)
+	}
+	if resp.LeaseToken == "" || resp.ExpiresAt <= 0 {
+		return fmt.Errorf("runner-login: empty lease response")
+	}
+	c.storeLease(&leaseState{Token: resp.LeaseToken, ExpiresAt: resp.ExpiresAt})
+	return nil
+}
+
+// RenewLease 는 현재 보관중인 lease 를 /auth/runner-lease-renew 로 갱신.
+// 갱신 후 새 leaseToken + expiresAt 를 내부 state 에 저장. 이전 lease 의 jti
+// 는 server 측 revoke Set 에 등록되어 stale client 의 lease 재사용 차단.
+// 401 / 403 이면 lease nil 로 reset — caller 가 /auth/runner-login 부터 재시도.
+func (c *HTTPBuildControlClient) RenewLease(ctx context.Context) (int64, error) {
+	req, err := http.NewRequestWithContext(ctx, "POST", c.baseURL+"/auth/runner-lease-renew", nil)
+	if err != nil {
+		return 0, err
+	}
+	c.setAuthHeader(req)
+	res, err := c.http.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer res.Body.Close()
+	if res.StatusCode != http.StatusOK {
+		raw, _ := io.ReadAll(res.Body)
+		c.storeLease(nil)
+		return 0, fmt.Errorf("lease-renew failed: status=%d body=%s", res.StatusCode, string(raw))
+	}
+	var resp struct {
+		LeaseToken string `json:"leaseToken"`
+		ExpiresAt  int64  `json:"expiresAt"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&resp); err != nil {
+		return 0, fmt.Errorf("lease-renew: decode failed: %w", err)
+	}
+	if resp.LeaseToken == "" || resp.ExpiresAt <= 0 {
+		c.storeLease(nil)
+		return 0, fmt.Errorf("lease-renew: empty response")
+	}
+	c.storeLease(&leaseState{Token: resp.LeaseToken, ExpiresAt: resp.ExpiresAt})
+	return resp.ExpiresAt, nil
+}
+
+// GetLeaseExpiresAt 는 현재 lease 의 만료 시각을 반환. lease 가 없으면 0.
+// worker 가 주기적으로 본 값을 확인해 만료 전에 RenewLease 호출 가능.
+func (c *HTTPBuildControlClient) GetLeaseExpiresAt() int64 {
+	if lease := c.getLease(); lease != nil {
+		return lease.ExpiresAt
+	}
+	return 0
 }

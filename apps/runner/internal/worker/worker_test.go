@@ -62,6 +62,14 @@ func (c *tickerClient) DownloadSource(ctx context.Context, buildID string) ([]by
 	return nil, "", 0, nil
 }
 
+// Phase 2 (Runner 인증) — lease helpers. test fixture 는 lease 게이트
+// 비활성 환경이라 no-op 으로 충분.
+func (c *tickerClient) EnsureLease(ctx context.Context) error { return nil }
+func (c *tickerClient) RenewLease(ctx context.Context) (int64, error) {
+	return 0, nil
+}
+func (c *tickerClient) LoginLease(ctx context.Context) error { return nil }
+
 func TestWorker_StopsOnContextCancel(t *testing.T) {
 	fc := &tickerClient{buildID: "b-1"}
 	cfg := config.Config{

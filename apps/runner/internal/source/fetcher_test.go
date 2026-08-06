@@ -43,6 +43,13 @@ func (s *stubClient) ReportContainerTestResult(context.Context, string, hostclie
 func (s *stubClient) ReportDeployment(context.Context, string, hostclient.DeploymentReportRequest) error {
 	return nil
 }
+// Phase 2 (Runner 인증) — lease helpers. test fixture 는 lease 게이트
+// 비활성 환경이라 no-op 으로 충분.
+func (s *stubClient) EnsureLease(context.Context) error { return nil }
+func (s *stubClient) RenewLease(context.Context) (int64, error) {
+	return 0, nil
+}
+func (s *stubClient) LoginLease(context.Context) error { return nil }
 
 // makeTarGz builds a tar.gz archive in memory with a single file
 // `entry` whose contents are `content`. Returns the archive bytes
