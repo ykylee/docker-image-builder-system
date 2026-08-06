@@ -77,6 +77,7 @@ export function AppHeader(): ReactElement {
           {userId ? (
             <>
               <TopNavItem href="/builds" label="Builds" />
+              <TopNavItem href="/services" label="Services" />
               <TopNavItem href="/build-request" label="New Build" />
               {effectiveAdminId ? (
                 <TopNavItem href="/admin/builds" label="Admin" />

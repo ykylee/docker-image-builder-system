@@ -77,6 +77,51 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/services": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List hosted services owned by the requesting user. */
+        get: {
+            parameters: {
+                query?: never;
+                header: {
+                    "x-user-id": string;
+                };
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Hosted services owned by the requesting user. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HostedServiceListResponse"];
+                    };
+                };
+                /** @description X-User-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/builds/{buildId}": {
         parameters: {
             query?: never;
@@ -616,6 +661,413 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/hosting-capacity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Admin-only. Return aggregate CPU/memory capacity, active reservations, remaining capacity, and theoretical density for each hosting tier. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current hosting capacity snapshot. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HostingCapacityResponse"];
+                    };
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/hosted-services/{appName}/manifest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Admin-only. Return the current canonical service manifest. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    appName: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Current manifest. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ServiceManifestResponse"];
+                    };
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Manifest not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        /** @description Admin-only. Validate and save a new immutable service manifest revision. */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    appName: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ServiceManifest"];
+                };
+            };
+            responses: {
+                /** @description Manifest revision saved. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ServiceManifestResponse"];
+                    };
+                };
+                /** @description Invalid manifest. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/hosted-services/{appName}/database": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Admin-only. Return service database provisioning and migration status without credentials. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    appName: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Service database status. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ServiceDatabaseStatus"];
+                    };
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Service database not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/hosted-services/{appName}/database/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin-only. Permanently delete the service Secret, schema, role, and metadata after exact appName confirmation. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    appName: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ServiceDatabasePurgeRequest"];
+                };
+            };
+            responses: {
+                /** @description Service database purged. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ServiceDatabasePurgeResponse"];
+                    };
+                };
+                /** @description Confirmation does not match appName. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Service database not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/hosted-services/{appName}/database/rotate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin-only. Rotate the service role password and Kubernetes Secret after exact appName confirmation. */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    appName: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ServiceDatabaseRotationRequest"];
+                };
+            };
+            responses: {
+                /** @description Service database rotated. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ServiceDatabaseStatus"];
+                    };
+                };
+                /** @description Confirmation does not match appName. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Service database not found. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/hosted-services/{appName}/manifest/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Admin-only. List immutable manifest revisions, newest first. */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    appName: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Manifest revision history. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ServiceManifestRevisionListResponse"];
+                    };
+                };
+                /** @description X-Admin-Id header missing. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Caller is not in the admin allow-list. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/runners": {
         parameters: {
             query?: never;
@@ -831,13 +1283,13 @@ export interface components {
         /** @description Standard error shape returned with 4xx/5xx responses. */
         BuildError: {
             /** @enum {string} */
-            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
+            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "HOSTING_TIER_UPGRADE_REQUIRED" | "HOSTING_RESOURCE_LIMIT_EXCEEDED" | "HOSTING_CAPACITY_EXCEEDED" | "UNKNOWN_ERROR";
             message: string;
         };
         /** @description BuildError or null. null = 이 빌드에 기록된 실패 이유가 없음 (TASK-162 이전에는 항상 null 이었다). */
         NullableBuildError: {
             /** @enum {string} */
-            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
+            code: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "HOSTING_TIER_UPGRADE_REQUIRED" | "HOSTING_RESOURCE_LIMIT_EXCEEDED" | "HOSTING_CAPACITY_EXCEEDED" | "UNKNOWN_ERROR";
             message: string;
         } | null;
         /** @description One field-level validation failure. Mirrors a zod issue narrowed to the fields the API contract guarantees. */
@@ -883,7 +1335,7 @@ export interface components {
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             /**
              * Format: uri
-             * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.
+             * @description Public hosted runtime URL, populated only after a successful hosted deployment. Internal container-test addresses are not exposed here.
              */
             runtimeUrl: string | null;
             /** @description Allocated hosting context path (URL prefix). Null on pre-hosting builds. */
@@ -911,6 +1363,10 @@ export interface components {
             };
             /** @enum {string} */
             dockerfileMode?: "required" | "auto";
+            database?: {
+                enabled: boolean;
+                migrationCommand?: string;
+            };
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -978,6 +1434,8 @@ export interface components {
             contextPath?: string | null;
             namespace?: string | null;
             deploymentName?: string | null;
+            /** Format: uri */
+            runtimeUrl?: string | null;
             runnerId: string;
             responsePayloadJson?: {
                 [key: string]: unknown;
@@ -1130,7 +1588,7 @@ export interface components {
             /** Format: date-time */
             occurredAt?: string;
             /** @enum {string} */
-            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
+            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "HOSTING_TIER_UPGRADE_REQUIRED" | "HOSTING_RESOURCE_LIMIT_EXCEEDED" | "HOSTING_CAPACITY_EXCEEDED" | "UNKNOWN_ERROR";
             errorMessage?: string;
         };
         /** @description POST /builds/:buildId/container-test/start payload (Runner → Host). 컨테이너 테스트 시작을 알린다. preview-era 의 ttlMinutes 는 canonical 모델에 대응 개념이 없어 제거됐다. */
@@ -1151,7 +1609,7 @@ export interface components {
             portOpen?: boolean;
             stabilityWindowPassed?: boolean;
             /** @enum {string} */
-            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "UNKNOWN_ERROR";
+            errorCode?: "ACTIVE_BUILD_EXISTS" | "INVALID_REQUEST" | "BUILD_NOT_FOUND" | "LOGS_NOT_FOUND" | "QUEUE_CLAIM_FAILED" | "DOCKER_BUILD_FAILED" | "CONTAINER_TEST_FAILED" | "DEPLOYMENT_FAILED" | "CONTEXT_PATH_TAKEN" | "HOSTING_TIER_UPGRADE_REQUIRED" | "HOSTING_RESOURCE_LIMIT_EXCEEDED" | "HOSTING_CAPACITY_EXCEEDED" | "UNKNOWN_ERROR";
             errorMessage?: string;
             runnerId: string;
         };
@@ -1177,9 +1635,12 @@ export interface components {
             entrypointPath: string;
             /** @default Dockerfile */
             dockerfilePath: string;
-            /** @default required */
+            /**
+             * @default required
+             * @enum {string}
+             */
             dockerfileMode: "required" | "auto";
-            /** @description Optional hosting URL context path. Defaults to a normalized appName. Server normalizes and enforces global uniqueness. */
+            /** @description Deprecated hosting URL context path. The server derives the path from appName and ignores this field. */
             contextPath?: string;
             runtimePort?: number;
             stripPrefix?: boolean;
@@ -1245,7 +1706,7 @@ export interface components {
             phase: "REQUEST_ACCEPTED" | "QUEUE_CLAIMED" | "SOURCE_PREPARED" | "DOCKER_BUILD_STARTED" | "DOCKER_BUILD_COMPLETED" | "CONTAINER_TEST_STARTED" | "CONTAINER_TEST_PASSED" | "DEPLOYMENT_STARTED" | "DEPLOYMENT_COMPLETED" | "COMPLETED" | "RESULT_DELIVERY_STARTED" | "RESULT_DELIVERED" | "FAILED";
             /**
              * Format: uri
-             * @description Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다.
+             * @description Public hosted runtime URL, populated only after a successful hosted deployment. Internal container-test addresses are not exposed here.
              */
             runtimeUrl: string | null;
             /** @description Allocated hosting context path (URL prefix). Null on pre-hosting builds. */
@@ -1259,6 +1720,24 @@ export interface components {
              * @enum {string}
              */
             hostingScheme?: "path" | "subdomain";
+            /** @enum {string} */
+            effectiveTier?: "sandbox" | "standard" | "production";
+            /** @enum {string} */
+            serviceSize?: "small" | "medium" | "large";
+            hostingPolicyVersion?: string;
+            resources?: {
+                cpuRequest: string;
+                memoryRequest: string;
+                cpuLimit: string;
+                memoryLimit: string;
+                replicas: number;
+            };
+            /** @enum {string} */
+            dockerfileMode?: "required" | "auto";
+            database?: {
+                enabled: boolean;
+                migrationCommand?: string;
+            };
             /**
              * @description Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window.
              * @enum {string}
@@ -1374,6 +1853,330 @@ export interface components {
                 /** @description Last error message reported by this runner for the current claim (PHASE=FAILED reason). null when no error is recorded. */
                 lastError: string | null;
             };
+        };
+        /** @description Admin view of aggregate hosting capacity, current reservations, and tier density estimates. */
+        HostingCapacityResponse: {
+            capacity: {
+                cpuMillicores: number;
+                memoryMi: number;
+            };
+            used: {
+                cpuMillicores: number;
+                memoryMi: number;
+            };
+            remaining: {
+                cpuMillicores: number;
+                memoryMi: number;
+            };
+            tiers: {
+                sandbox: {
+                    /** @enum {string} */
+                    tier: "sandbox" | "standard" | "production";
+                    cpuServices: number;
+                    memoryServices: number;
+                    maxServices: number;
+                    perService: {
+                        cpuMillicores: number;
+                        memoryMi: number;
+                        replicas: number;
+                    };
+                };
+                standard: {
+                    /** @enum {string} */
+                    tier: "sandbox" | "standard" | "production";
+                    cpuServices: number;
+                    memoryServices: number;
+                    maxServices: number;
+                    perService: {
+                        cpuMillicores: number;
+                        memoryMi: number;
+                        replicas: number;
+                    };
+                };
+                production: {
+                    /** @enum {string} */
+                    tier: "sandbox" | "standard" | "production";
+                    cpuServices: number;
+                    memoryServices: number;
+                    maxServices: number;
+                    perService: {
+                        cpuMillicores: number;
+                        memoryMi: number;
+                        replicas: number;
+                    };
+                };
+            };
+        };
+        ServiceManifest: {
+            /** @enum {number} */
+            version: 1;
+            service: {
+                appName: string;
+                image: {
+                    repository: string;
+                    tag: string;
+                };
+            };
+            runtime: {
+                /** @default 8080 */
+                port: number;
+                command?: string;
+                /** @default /health */
+                healthPath: string;
+                /** @default APP_BASE_PATH */
+                basePathEnv: string;
+            };
+            /**
+             * @default {
+             *       "enabled": false,
+             *       "engine": "postgres"
+             *     }
+             */
+            database: {
+                /** @default false */
+                enabled: boolean;
+                /**
+                 * @default postgres
+                 * @enum {string}
+                 */
+                engine: "postgres";
+                migrationCommand?: string;
+            };
+            hosting: {
+                /**
+                 * @default path
+                 * @enum {string}
+                 */
+                scheme: "path" | "subdomain";
+                contextPath: string;
+                /** @default true */
+                stripPrefix: boolean;
+                /**
+                 * @default sandbox
+                 * @enum {string}
+                 */
+                tier: "sandbox" | "standard" | "production";
+                /** @default 1 */
+                replicas: number;
+            };
+            deployment: {
+                /**
+                 * @default kubectl
+                 * @enum {string}
+                 */
+                adapter: "kubectl" | "helm" | "argocd";
+                /** @default dib-hosted */
+                namespace: string;
+            };
+        };
+        ServiceManifestResponse: {
+            appName: string;
+            currentRevision: number;
+            manifest: {
+                /** @enum {number} */
+                version: 1;
+                service: {
+                    appName: string;
+                    image: {
+                        repository: string;
+                        tag: string;
+                    };
+                };
+                runtime: {
+                    /** @default 8080 */
+                    port: number;
+                    command?: string;
+                    /** @default /health */
+                    healthPath: string;
+                    /** @default APP_BASE_PATH */
+                    basePathEnv: string;
+                };
+                /**
+                 * @default {
+                 *       "enabled": false,
+                 *       "engine": "postgres"
+                 *     }
+                 */
+                database: {
+                    /** @default false */
+                    enabled: boolean;
+                    /**
+                     * @default postgres
+                     * @enum {string}
+                     */
+                    engine: "postgres";
+                    migrationCommand?: string;
+                };
+                hosting: {
+                    /**
+                     * @default path
+                     * @enum {string}
+                     */
+                    scheme: "path" | "subdomain";
+                    contextPath: string;
+                    /** @default true */
+                    stripPrefix: boolean;
+                    /**
+                     * @default sandbox
+                     * @enum {string}
+                     */
+                    tier: "sandbox" | "standard" | "production";
+                    /** @default 1 */
+                    replicas: number;
+                };
+                deployment: {
+                    /**
+                     * @default kubectl
+                     * @enum {string}
+                     */
+                    adapter: "kubectl" | "helm" | "argocd";
+                    /** @default dib-hosted */
+                    namespace: string;
+                };
+            };
+            updatedBy: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ServiceManifestRevisionListResponse: {
+            revisions: {
+                revision: number;
+                manifest: {
+                    /** @enum {number} */
+                    version: 1;
+                    service: {
+                        appName: string;
+                        image: {
+                            repository: string;
+                            tag: string;
+                        };
+                    };
+                    runtime: {
+                        /** @default 8080 */
+                        port: number;
+                        command?: string;
+                        /** @default /health */
+                        healthPath: string;
+                        /** @default APP_BASE_PATH */
+                        basePathEnv: string;
+                    };
+                    /**
+                     * @default {
+                     *       "enabled": false,
+                     *       "engine": "postgres"
+                     *     }
+                     */
+                    database: {
+                        /** @default false */
+                        enabled: boolean;
+                        /**
+                         * @default postgres
+                         * @enum {string}
+                         */
+                        engine: "postgres";
+                        migrationCommand?: string;
+                    };
+                    hosting: {
+                        /**
+                         * @default path
+                         * @enum {string}
+                         */
+                        scheme: "path" | "subdomain";
+                        contextPath: string;
+                        /** @default true */
+                        stripPrefix: boolean;
+                        /**
+                         * @default sandbox
+                         * @enum {string}
+                         */
+                        tier: "sandbox" | "standard" | "production";
+                        /** @default 1 */
+                        replicas: number;
+                    };
+                    deployment: {
+                        /**
+                         * @default kubectl
+                         * @enum {string}
+                         */
+                        adapter: "kubectl" | "helm" | "argocd";
+                        /** @default dib-hosted */
+                        namespace: string;
+                    };
+                };
+                updatedBy: string;
+                /** Format: date-time */
+                createdAt: string;
+            }[];
+        };
+        ServiceDatabaseStatus: {
+            appName: string;
+            /** @enum {string} */
+            engine: "postgres";
+            schemaName: string;
+            roleName: string;
+            secretName: string;
+            /** @enum {string} */
+            status: "PROVISIONING" | "READY" | "FAILED";
+            migrationCommand: string | null;
+            migrationRevision: number | null;
+            created: boolean;
+        };
+        /** @description GET /admin/hosted-services response. */
+        HostedServiceListResponse: {
+            services: components["schemas"]["HostedService"][];
+        };
+        /** @description A durable hosted service for one app (one active per app). Returned by the admin hosting management API. */
+        HostedService: {
+            appName: string;
+            contextPath: string;
+            namespace: string;
+            deploymentName: string;
+            containerPort: number;
+            stripPrefix: boolean;
+            /** @enum {string} */
+            hostingScheme: "path" | "subdomain";
+            /** @enum {string} */
+            effectiveTier?: "sandbox" | "standard" | "production";
+            /** @enum {string} */
+            serviceSize?: "small" | "medium" | "large";
+            hostingPolicyVersion?: string;
+            resources?: {
+                cpuRequest: string;
+                memoryRequest: string;
+                cpuLimit: string;
+                memoryLimit: string;
+                replicas: number;
+            };
+            /** @enum {string} */
+            status: "PROVISIONING" | "RUNNING" | "STOPPED" | "FAILED" | "REMOVED";
+            /** Format: uri */
+            url: string | null;
+            /** Format: uuid */
+            currentBuildId: string | null;
+            imageRef: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+            /** Format: date-time */
+            lastDeployedAt: string | null;
+            availableReplicas: number | null;
+            /** Format: date-time */
+            lastSyncedAt: string | null;
+        };
+        ServiceDatabasePurgeRequest: {
+            confirmation: string;
+        };
+        ServiceDatabasePurgeResponse: {
+            appName: string;
+            schemaName: string;
+            roleName: string;
+            secretName: string;
+            /** @enum {boolean} */
+            purged: true;
+        };
+        ServiceDatabaseRotationRequest: {
+            confirmation: string;
         };
     };
     responses: never;

@@ -6,6 +6,8 @@
 
 ## Product Direction
 
+- Wiki Index: `ai-workflow/wiki/index.md` (R4 anchor)
+
 - SDLC Step 01: `docs/sdlc/01-mvp-onboarding.md`
 - SDLC Step 02: `docs/sdlc/02-concept-refinement.md`
 - SDLC Step 03: `docs/sdlc/03-requirements-baseline.md`

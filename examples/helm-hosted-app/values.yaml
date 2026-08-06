@@ -12,6 +12,9 @@ hosting:
   stripPrefix: true
   scheme: path
   baseHost: ""
+database:
+  secretName: ""
+  migrationCommand: ""
 ingress:
   enabled: true
   className: nginx

@@ -24,6 +24,7 @@ vi.mock("@/lib/admin-guard", () => ({
 
 const listMock = vi.fn();
 const capacityMock = vi.fn();
+const databaseStatusMock = vi.fn();
 const stopMock = vi.fn();
 const startMock = vi.fn();
 const removeMock = vi.fn();
@@ -33,6 +34,7 @@ vi.mock("@/lib/api", async () => {
     ...actual,
     listHostedServices: (...a: unknown[]) => listMock(...a),
     getHostingCapacity: (...a: unknown[]) => capacityMock(...a),
+    getHostedServiceDatabaseStatus: (...a: unknown[]) => databaseStatusMock(...a),
     stopHostedService: (...a: unknown[]) => stopMock(...a),
     startHostedService: (...a: unknown[]) => startMock(...a),
     removeHostedService: (...a: unknown[]) => removeMock(...a)
@@ -92,6 +94,17 @@ beforeEach(() => {
       production: { tier: "production", cpuServices: 2, memoryServices: 2, maxServices: 2, perService: { cpuMillicores: 1000, memoryMi: 2048, replicas: 2 } }
     }
   });
+  databaseStatusMock.mockResolvedValue({
+    appName: "todo-app",
+    engine: "postgres",
+    schemaName: "svc_todo_app_abc123",
+    roleName: "svc_abc123",
+    secretName: "dib-service-todo-app-abc123-db",
+    status: "READY",
+    migrationCommand: "npm run db:migrate",
+    migrationRevision: 3,
+    created: false
+  });
   stopMock.mockResolvedValue(svc({ status: "STOPPED" }));
   removeMock.mockResolvedValue(svc({ status: "REMOVED" }));
 });
@@ -128,6 +141,12 @@ describe("AdminHostedServices", () => {
     expect(
       screen.getByText("https://apps.example.com/todo-app/")
     ).toBeInTheDocument();
+  });
+
+  it("서비스별 DB 상태와 migration revision을 표시한다", async () => {
+    renderPage();
+    expect(await screen.findByTestId("hosting-database-todo-app")).toHaveTextContent("READY");
+    expect(screen.getByTestId("hosting-database-todo-app")).toHaveTextContent("migration #3");
   });
 
   it("Stop 클릭 시 stopHostedService 호출 + 목록 갱신", async () => {

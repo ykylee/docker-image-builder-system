@@ -288,6 +288,38 @@ func (c *Client) BuildImage(ctx context.Context, buildID, sourceDir, dockerfileR
 	return nil
 }
 
+// LoadImageToKind imports a locally built image into a kind node's containerd
+// namespace. This keeps the self-dogfood path registry-free while still
+// exercising a real Kubernetes deployment.
+func (c *Client) LoadImageToKind(ctx context.Context, imageTag, nodeName string) error {
+	save := exec.CommandContext(ctx, c.dockerBin, "save", imageTag)
+	importCmd := exec.CommandContext(ctx, c.dockerBin, "exec", "-i", nodeName,
+		"ctr", "--namespace=k8s.io", "images", "import", "-")
+	pipe, err := save.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("kind image load: create docker save pipe: %w", err)
+	}
+	importCmd.Stdin = pipe
+	importCmd.Stderr = os.Stderr
+	if err := save.Start(); err != nil {
+		return fmt.Errorf("kind image load: docker save: %w", err)
+	}
+	if err := importCmd.Start(); err != nil {
+		_ = save.Process.Kill()
+		_ = save.Wait()
+		return fmt.Errorf("kind image load: docker exec: %w", err)
+	}
+	importErr := importCmd.Wait()
+	saveErr := save.Wait()
+	if saveErr != nil {
+		return fmt.Errorf("kind image load: docker save failed: %w", saveErr)
+	}
+	if importErr != nil {
+		return fmt.Errorf("kind image load: docker exec import failed: %w", importErr)
+	}
+	return nil
+}
+
 // ErrContainerHealthcheckTimeout 은 WaitForHealth 가 timeout 내에
 // healthcheck / port open 을 통과하지 못할 때 반환된다. caller (BuildService)
 // 는 이 에러를 받아서 container 를 stop 한 뒤 FAILED phase 를 보고한다.
@@ -416,13 +448,20 @@ func (c *Client) RunContainer(ctx context.Context, opts ContainerRunOptions) (*C
 	return &ContainerStatus{
 		ContainerRef: opts.ContainerName,
 		ImageTag:     opts.ImageTag,
-		Host:         "127.0.0.1",
+		Host:         runtimeHost(),
 		HostPort:     hostPort,
 		InternalPort: opts.InternalPort,
-		RuntimeURL:   fmt.Sprintf("%s://127.0.0.1:%d%s", opts.HealthcheckScheme, hostPort, opts.HealthcheckPath),
+		RuntimeURL:   fmt.Sprintf("%s://%s:%d%s", opts.HealthcheckScheme, runtimeHost(), hostPort, opts.HealthcheckPath),
 		Running:      true,
 		StartedAt:    c.now().UTC(),
 	}, nil
+}
+
+func runtimeHost() string {
+	if host := strings.TrimSpace(os.Getenv("RUNNER_DOCKER_HOST")); host != "" {
+		return host
+	}
+	return "127.0.0.1"
 }
 
 // WaitForHealth 는 container 가 ready 상태가 될 때까지 (1) healthcheck

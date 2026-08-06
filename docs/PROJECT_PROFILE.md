@@ -18,6 +18,8 @@
 - 문서 위키 홈: README.md
 - 운영 문서 홈: ai-workflow/memory/active/
 - 운영 가이드 인덱스: docs/operations/ (v0.9.0 기준 누적 45종)
+  - 현재 구현 현황/실사용 준비도: [`current-state-and-readiness-2026-08-05.md`](operations/current-state-and-readiness-2026-08-05.md) (기능 기준선, 검증 결과, 실서비스 차단 이슈)
+  - 실서비스 진입 로드맵: [`production-readiness-roadmap-2026-08-05.md`](../.omx/plans/production-readiness-roadmap-2026-08-05.md) (인증·격리·복구·DB lifecycle·private beta 진입 게이트)
   - 호스팅 능력: [`hosting-2026-07-24.md`](operations/hosting-2026-07-24.md) (Phase 3 / P3-M1~M5 종합), [`hosting-sub-path-2026-07-24.md`](operations/hosting-sub-path-2026-07-24.md) (sub-path 규약 + stripPrefix)
   - 호스팅 3티어 정책 컨셉: [`hosting-tiers.md`](design/hosting-tiers.md) (서비스 규모·자원 할당 기반 `sandbox` / `standard` / `production` 분류 원칙)
   - 호스팅 3티어 정책 설계안: [`hosting-tiers-design.md`](design/hosting-tiers-design.md) (판정 resolver, policy snapshot, adapter 전달, migration/API 영향)

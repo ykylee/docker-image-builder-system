@@ -63,7 +63,7 @@ FROM alpine:3.20 AS runtime
 # - alpine busybox adduser 의 `-G` flag 는 첫 번째 등장만 primary group 으로
 #   적용되고 이후는 무시되므로, `addgroup runner docker` 로 docker group 을
 #   runner 의 supplementary group 으로 추가.
-RUN apk add --no-cache docker-cli docker-cli-buildx tini ca-certificates \
+RUN apk add --no-cache docker-cli docker-cli-buildx kubectl tini ca-certificates \
  && addgroup -S docker \
  && addgroup -S -g 1500 runner \
  && adduser -S -u 1500 -G runner runner \

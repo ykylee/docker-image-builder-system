@@ -1,9 +1,10 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-08-05T00:06:20Z",
-  "purpose_digest": "원격 origin/main 최신 동기화(v0.9.0 포함 18개 커밋) 및 Astryx 디자인 토큰 시스템 기반 UI 디자인 개선 완료. Admin Hosted Services 디렉터리의 Cluster Capacity Dashboard(CPU/Memory 게이지 바, 3-Tier 수용량 뱃지 카드) 및 Manifest JSON 에디터, Build Request Form 의 4-Section 구조화 & Visual Card Selector(Dockerfile Mode Required vs Auto, 3-Tier Target Selection Cards) 적용 완료. 검증: Vitest 284개/node:test 232개/TypeScript 5개 패키지 typecheck 100% PASS.",
-  "purpose_digest_rev": 219,
+  "generated_at": "2026-08-06T00:00:00Z",
+  "purpose_digest": "path-hosted self-dogfood을 host API fallback 없이 cluster-local dib-control-plane Service로 격리했고, auto Dockerfile 조건을 보완했다. 서비스별 DB gateway/Secret/provisioning을 kind에서 검증했고, schema role 격리와 host PostgreSQL 왕복을 통과했다. kubectl/Helm/ArgoCD Secret 주입과 migration initContainer rollout gate를 정렬했으며 manifest별 migration command를 claim/deploy까지 전달한다. initContainer ResourceQuota 결함을 보정하고 full kind migration e2e를 통과했다. 관리자용 DB 상태 조회 API와 explicit purge/Secret rotation lifecycle을 추가했고 gateway egress NetworkPolicy를 적용했다. 외부 HTTPS/PostgreSQL TLS는 도입하지 않으며 migration 0017 id default 누락은 0018로 보정했다. Admin self-hosted deep-link 자산과 hosted API base 경로를 수정해 브라우저 메뉴 5종과 API를 실검증했다. API Docs도 context 경로로 고정했고 self-host DB opt-in, Secret, postgres backend, gateway/schema persistence를 실제 배포에서 검증했다. Scalar API Console의 480px 높이 제약을 viewport 기반 문서 영역으로 확장하고 실배포 캡처로 확인했다. 동일한 공통 API Docs 번들을 메인 dibs-build-server에도 재빌드·재기동해 root /docs 경로와 확장 레이아웃을 실브라우저에서 검증했다. 메인 production API rewrite 허용 목록에 /services를 추가해 /api/services 404와 사용자 Services 탭 경로 불일치를 수정하고 OpenAPI 계약 및 타입 산출물을 갱신했다. 전체 구현 셀프 리뷰에서 테스트 green과 별개로 인증·테넌트 권한·Runner 격리·control-plane 영속성·claim recovery·DB provisioning retry·artifact cleanup이 실서비스 진입 차단 이슈임을 확인했다. 현재 구현 현황 운영 문서와 Phase 0~6 실서비스 진입 로드맵을 작성하고 다음 구현 우선순위를 인증·테넌트 권한으로 고정했다.",
+  "purpose_digest_rev": 261,
   "source_of_truth": {
+    "wiki_index_path": "ai-workflow/wiki/index.md",
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": "ai-workflow/memory/active/session_handoff.md",
     "work_backlog_index_path": "ai-workflow/memory/active/work_backlog.md",
@@ -160,7 +161,7 @@
     "in_progress_items": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-08-04.md",
+    "latest_backlog_path": "ai-workflow/memory/active/backlog/2026-08-05.md",
     "task_count": 76,
     "in_progress_items": [],
     "blocked_items": [],

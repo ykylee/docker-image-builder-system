@@ -23,8 +23,12 @@ export interface ChipFilterable {
 export function matchesChip(b: ChipFilterable, f: StatusFilter): boolean {
   if (f === "ALL") return true;
   if (f === "COMPLETED") {
-    return CANONICAL_SUCCESS_STATUSES.includes(
-      b.lifecycleStatus as CanonicalSuccessStatus
+    return (
+      b.lifecycleStatus === "COMPLETED" ||
+      b.status === "COMPLETED" ||
+      CANONICAL_SUCCESS_STATUSES.includes(
+        b.lifecycleStatus as CanonicalSuccessStatus
+      )
     );
   }
   if (b.lifecycleStatus === f) return true;

@@ -27,6 +27,11 @@
 #
 #  health:
 #    curl -fsS http://127.0.0.1:3000/health
+#
+#  service DB policy:
+#    service DB is opt-in through ServiceManifest.database. DATABASE_URL and
+#    host/schema/role/password values are never baked into this image or a
+#    generated Dockerfile; Build Server injects the service Secret at runtime.
 # =============================================================================
 
 # ---------- stage 1: builder (devDeps + tsc/vite) ----------
@@ -99,7 +104,7 @@ WORKDIR /app
 # curl 은 HEALTHCHECK + 운영자 e2e curl 호출용.
 # tini 는 SIGTERM 전파 — child process 가 graceful shutdown.
 # NOTE: corepack 미설치 — runtime 에서 pnpm 사용 안 함.
-RUN apk add --no-cache curl tini
+RUN apk add --no-cache curl kubectl tini
 
 # 비-root 사용자 — Fastify 는 root 권한 없이 정상 동작 (port 3000 + filesystem
 # read). alpine 의 reserved uid range 회피하기 위해 1500 대 explicit uid.
@@ -135,13 +140,15 @@ COPY --from=prod-deps /repo/apps/build-server/node_modules     apps/build-server
 # - ADMIN_IDS: PROJECT_PROFILE §3 — admin secret 정책. default 가 image 에
 #   박히면 image pull 받아서 그대로 실행한 누구나 admin 가능 → 운영자가
 #   반드시 주입. self-dogfood 에서는 docker compose / k8s 가 env 전달.
-# - BUILD_REPOSITORY_BACKEND=memory: backend 의 편의 default. 운영 시에는
-#   postgres 권장.
+# - BUILD_REPOSITORY_BACKEND=memory: the pre-deploy container test must run
+#   without a service Secret. DB-enabled hosted deployments override this to
+#   postgres alongside the platform-injected DATABASE_URL Secret.
 ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0 \
     BUILD_REPOSITORY_BACKEND=memory \
     BUILD_MONITOR_DIST_PATH=/app/apps/build-monitor/dist \
+    BUILD_MONITOR_REACT_DIST_PATH=/app/apps/build-monitor/dist \
     DB_AUTO_BOOTSTRAP=true
 
 EXPOSE 3000

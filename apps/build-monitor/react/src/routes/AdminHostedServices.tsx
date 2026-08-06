@@ -1,4 +1,4 @@
-// TASK-168 (P3-M3): AdminHostedServices — /admin/hosting.
+// TASK-168 (P3-M3): AdminHostedServices — /admin/services.
 //
 // 호스팅 서비스 목록 + 수명 관리(stop/start/delete). build-server 가 kubectl
 // 로 실제 조작하고, 이 페이지는 그 관리 API 를 호출한다. AdminRunners 와 동일
@@ -18,9 +18,11 @@ import {
   removeHostedService,
   getHostedServiceManifest,
   updateHostedServiceManifest,
+  getHostedServiceDatabaseStatus,
   type ServiceManifestView,
-  type HostedServiceView
-  , type HostingCapacityView
+  type HostedServiceView,
+  type HostingCapacityView,
+  type ServiceDatabaseStatusView
 } from "@/lib/api";
 import { ensureAdminAccess } from "@/lib/admin-guard";
 import { useUserId } from "@/lib/useUserId";
@@ -31,6 +33,7 @@ export function AdminHostedServices(): ReactElement {
   const [userId] = useUserId();
   const navigate = useNavigate();
   const [services, setServices] = useState<HostedServiceView[]>([]);
+  const [databaseStatuses, setDatabaseStatuses] = useState<Record<string, ServiceDatabaseStatusView>>({});
   const [capacity, setCapacity] = useState<HostingCapacityView | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +56,18 @@ export function AdminHostedServices(): ReactElement {
       ]);
       setServices(servicesResult.services);
       setCapacity(capacityResult);
+      const databaseEntries = await Promise.all(
+        servicesResult.services.map(async (service) => {
+          try {
+            return [service.appName, await getHostedServiceDatabaseStatus(userId, service.appName)] as const;
+          } catch {
+            // 404 means the service has not opted into/provisioned a database;
+            // it should not hide the rest of the hosting inventory.
+            return null;
+          }
+        })
+      );
+      setDatabaseStatuses(Object.fromEntries(databaseEntries.filter((entry): entry is readonly [string, ServiceDatabaseStatusView] => entry !== null)));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -142,7 +157,7 @@ export function AdminHostedServices(): ReactElement {
     <section className="hosting-page" data-testid="admin-hosted-services">
       <AdminTabs />
       <div className="hosting-header-row">
-        <h1 className="hosting-title">Hosted Services</h1>
+        <h1 className="hosting-title">Registered Services</h1>
       </div>
 
       {capacity && (
@@ -224,6 +239,7 @@ export function AdminHostedServices(): ReactElement {
               <th>Context path</th>
               <th>Tier</th>
               <th>Resources</th>
+              <th>Database</th>
               <th>Status</th>
               <th>Replicas</th>
               <th>URL</th>
@@ -247,6 +263,20 @@ export function AdminHostedServices(): ReactElement {
                   {svc.resources
                     ? `${svc.resources.cpuRequest} / ${svc.resources.memoryRequest} · ${svc.resources.replicas}r`
                     : "default"}
+                </td>
+                <td data-testid={`hosting-database-${svc.appName}`}>
+                  {databaseStatuses[svc.appName] ? (
+                    <div className="database-status">
+                      <StatusPill status={databaseStatuses[svc.appName].status} />
+                      <small className="muted mono">
+                        {databaseStatuses[svc.appName].migrationRevision === null
+                          ? "migration pending"
+                          : `migration #${databaseStatuses[svc.appName].migrationRevision}`}
+                      </small>
+                    </div>
+                  ) : (
+                    <span className="muted">Not provisioned</span>
+                  )}
                 </td>
                 <td>
                   <StatusPill status={svc.status} />

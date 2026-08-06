@@ -21,6 +21,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig({
   plugins: [react()],
   root: path.resolve(__dirname, "react"),
+  // Hosted apps are served behind an Ingress path prefix (for example
+  // /self-dogfood-k8s-admin-retry/). Relative assets keep the SPA inside
+  // that prefix while still resolving correctly when served at `/`.
+  base: "./",
   resolve: {
     conditions: process.env.VITEST ? ["browser"] : undefined,
     alias: {

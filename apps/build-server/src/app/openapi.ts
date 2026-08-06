@@ -23,6 +23,11 @@ import {
   serviceManifestSchema,
   serviceManifestResponseSchema,
   serviceManifestRevisionListResponseSchema,
+  serviceDatabaseStatusSchema,
+  serviceDatabasePurgeRequestSchema,
+  serviceDatabasePurgeResponseSchema,
+  serviceDatabaseRotationRequestSchema,
+  hostedServiceListResponseSchema,
   apiErrorIssueSchema,
   apiErrorResponseSchema,
   buildErrorSchema,
@@ -109,7 +114,12 @@ const componentSchemas: ReadonlyArray<{ id: string; schema: ZodTypeAny }> = [
   { id: "HostingCapacityResponse", schema: hostingCapacityResponseSchema },
   { id: "ServiceManifest", schema: serviceManifestSchema },
   { id: "ServiceManifestResponse", schema: serviceManifestResponseSchema },
-  { id: "ServiceManifestRevisionListResponse", schema: serviceManifestRevisionListResponseSchema }
+  { id: "ServiceManifestRevisionListResponse", schema: serviceManifestRevisionListResponseSchema },
+  { id: "ServiceDatabaseStatus", schema: serviceDatabaseStatusSchema }
+  , { id: "HostedServiceListResponse", schema: hostedServiceListResponseSchema }
+  , { id: "ServiceDatabasePurgeRequest", schema: serviceDatabasePurgeRequestSchema }
+  , { id: "ServiceDatabasePurgeResponse", schema: serviceDatabasePurgeResponseSchema }
+  , { id: "ServiceDatabaseRotationRequest", schema: serviceDatabaseRotationRequestSchema }
 ];
 
 // Component registry. We keep a Map from canonical component id to a
@@ -165,6 +175,20 @@ registry.registerPath({
   responses: {
     202: { description: "Build accepted.", content: { "application/json": { schema: buildAcceptedResponseSchema } } },
     409: { description: "A matching build is already in flight.", content: { "application/json": { schema: buildDuplicateResponseSchema } } }
+  }
+});
+registry.registerPath({
+  method: "get",
+  path: "/services",
+  description: "List hosted services owned by the requesting user.",
+  tags: ["Builds"],
+  request: { headers: z.object({ "x-user-id": z.string().min(1) }) },
+  responses: {
+    200: {
+      description: "Hosted services owned by the requesting user.",
+      content: { "application/json": { schema: hostedServiceListResponseSchema } }
+    },
+    401: { description: "X-User-Id header missing." }
   }
 });
 registry.registerPath({
@@ -379,6 +403,53 @@ registry.registerPath({
   }
 });
 registry.registerPath({
+  method: "get",
+  path: "/admin/hosted-services/{appName}/database",
+  description: "Admin-only. Return service database provisioning and migration status without credentials.",
+  tags: ["Admin"],
+  request: { params: z.object({ appName: z.string().min(1) }) },
+  responses: {
+    200: { description: "Service database status.", content: { "application/json": { schema: component("ServiceDatabaseStatus") as never } } },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." },
+    404: { description: "Service database not found." }
+  }
+});
+registry.registerPath({
+  method: "post",
+  path: "/admin/hosted-services/{appName}/database/purge",
+  description: "Admin-only. Permanently delete the service Secret, schema, role, and metadata after exact appName confirmation.",
+  tags: ["Admin"],
+  request: {
+    params: z.object({ appName: z.string().min(1) }),
+    body: { content: { "application/json": { schema: component("ServiceDatabasePurgeRequest") as never } } }
+  },
+  responses: {
+    200: { description: "Service database purged.", content: { "application/json": { schema: component("ServiceDatabasePurgeResponse") as never } } },
+    400: { description: "Confirmation does not match appName." },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." },
+    404: { description: "Service database not found." }
+  }
+});
+registry.registerPath({
+  method: "post",
+  path: "/admin/hosted-services/{appName}/database/rotate",
+  description: "Admin-only. Rotate the service role password and Kubernetes Secret after exact appName confirmation.",
+  tags: ["Admin"],
+  request: {
+    params: z.object({ appName: z.string().min(1) }),
+    body: { content: { "application/json": { schema: component("ServiceDatabaseRotationRequest") as never } } }
+  },
+  responses: {
+    200: { description: "Service database rotated.", content: { "application/json": { schema: component("ServiceDatabaseStatus") as never } } },
+    400: { description: "Confirmation does not match appName." },
+    401: { description: "X-Admin-Id header missing." },
+    403: { description: "Caller is not in the admin allow-list." },
+    404: { description: "Service database not found." }
+  }
+});
+registry.registerPath({
   method: "put",
   path: "/admin/hosted-services/{appName}/manifest",
   description: "Admin-only. Validate and save a new immutable service manifest revision.",
@@ -531,7 +602,7 @@ export async function registerOpenApiRoutes(
     const allowOrigin =
       options.corsOrigin === true ? "*" : options.corsOrigin;
     const allowMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
-    const allowHeaders = "Content-Type,Authorization,X-Admin-Id";
+    const allowHeaders = "Content-Type,Authorization,X-Admin-Id,X-User-Id";
 
     app.addHook("onRequest", async (request, reply) => {
       // Set the CORS headers on every request as early as possible so they

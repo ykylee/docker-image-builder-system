@@ -143,6 +143,10 @@
 - 역할: source repository 의 stack 신호와 Dockerfile 생성 정책을 받아, 기본 Dockerfile 템플릿 후보를 추천한다.
 - 입력: `sourceRef`, (선택) detected stack 정보.
 - 출력: `{ template_name, rationale, placeholders }`.
+- 서비스 DB 정책: `DATABASE_URL`, `DB_*`, `PG*`, host/schema/role/password를
+  입력·출력·Dockerfile placeholder로 전달하지 않는다. DB 사용은
+  `ServiceManifest.database.enabled`와 migration command로만 opt-in하고,
+  runtime Secret 주입은 Build Server가 담당한다.
 - 우선순위: P2 — Dockerfile 자동 생성 정책 결정 후 우선순위 재평가.
 - Active 시점: Runner 가 Dockerfile 기반 build 를 실제 수행한 뒤.
 

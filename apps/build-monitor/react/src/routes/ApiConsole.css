@@ -9,6 +9,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--dib-space-lg);
+  min-height: calc(100dvh - 150px);
   animation: fadeIn var(--dib-motion-duration-slow) var(--dib-motion-easing-standard);
   /* 높이는 .app-main 이 flex 로 넘겨준다 — viewport 산수 없음. */
 }
@@ -94,7 +95,8 @@
 .frame-wrap {
   position: relative;
   flex: 1 1 auto;
-  min-height: 480px;
+  min-height: 640px;
+  height: 72dvh;
   border-radius: var(--dib-radius-lg);
   overflow: hidden;
   border: 1px solid var(--dib-color-border-subtle);
@@ -159,4 +161,15 @@
   border-radius: var(--dib-radius-sm);
   font-family: var(--dib-font-mono);
   font-size: var(--dib-size-xs);
+}
+
+@media (max-width: 767px) {
+  .page {
+    min-height: 0;
+  }
+
+  .frame-wrap {
+    height: 620px;
+    min-height: 620px;
+  }
 }

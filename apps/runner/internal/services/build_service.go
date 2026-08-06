@@ -2,11 +2,14 @@ package services
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -50,6 +53,47 @@ type BuildService struct {
 	// 런타임 URL 이 컨테이너 테스트 동안 살아있어야 하므로. e2e
 	// script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 검증.
 	stopContainerOnDone bool
+}
+
+func parsePositiveEnv(key string, fallback int) int {
+	value, err := strconv.Atoi(strings.TrimSpace(os.Getenv(key)))
+	if err != nil || value <= 0 {
+		return fallback
+	}
+	return value
+}
+
+// serviceDatabaseSecretName mirrors the Build Server provisioning helper.
+// The Secret reference is optional in every hosted Deployment, so services
+// without database opt-in continue to run while opted-in services receive
+// DATABASE_URL from the platform-created Secret.
+func serviceDatabaseSecretName(appName string) string {
+	normalized := strings.TrimSpace(appName)
+	slug := strings.ToLower(normalized)
+	slug = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(slug, "-")
+	slug = strings.Trim(slug, "-")
+	if slug == "" {
+		slug = "service"
+	}
+	if len(slug) > 30 {
+		slug = slug[:30]
+	}
+	digest := sha256.Sum256([]byte(normalized))
+	return fmt.Sprintf("dib-service-%s-%s-db", slug, hex.EncodeToString(digest[:])[:12])
+}
+
+func databaseSecretName(appName string, policy *hostclient.DatabasePolicy) string {
+	if policy == nil || !policy.Enabled {
+		return ""
+	}
+	return serviceDatabaseSecretName(appName)
+}
+
+func databaseMigrationCommand(policy *hostclient.DatabasePolicy) string {
+	if policy == nil || !policy.Enabled {
+		return ""
+	}
+	return strings.TrimSpace(policy.MigrationCommand)
 }
 
 func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *docker.Client, fetcher *source.Fetcher, runnerID string) *BuildService {
@@ -127,12 +171,16 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return s.fail(ctx, buildID, failure)
 	}
 
-	containerStatus, failure := s.runContainerTest(ctx, buildID)
+	internalPort := s.internalPort
+	if claim.RuntimePort > 0 {
+		internalPort = claim.RuntimePort
+	}
+	containerStatus, failure := s.runContainerTest(ctx, buildID, internalPort)
 	if failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
 
-	if failure := s.deployImage(ctx, buildID, containerStatus, claim.ContextPath, claim.RuntimePort, claim.StripPrefix, claim.HostingScheme, claim.EffectiveTier, claim.Resources); failure != nil {
+	if failure := s.deployImage(ctx, buildID, containerStatus, claim.AppName, claim.ContextPath, claim.RuntimePort, claim.StripPrefix, claim.HostingScheme, claim.EffectiveTier, claim.Resources, claim.Database); failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
 
@@ -280,9 +328,9 @@ func (s *BuildService) buildImage(ctx context.Context, buildID, sourceDir string
 // hostPort=0 으로 두면 RunContainer 가 cli mode 일 때 OS 가 알려주는
 // ephemeral port 를 잡고, skeleton mode 일 때는 38124 fallback 을 쓴다.
 // BuildService 는 그 결정에 개입하지 않아 두 mode 사이의 일관성을 유지한다.
-func (s *BuildService) runContainerTest(ctx context.Context, buildID string) (*docker.ContainerStatus, *stageFailure) {
+func (s *BuildService) runContainerTest(ctx context.Context, buildID string, internalPort int) (*docker.ContainerStatus, *stageFailure) {
 	if err := s.hostClient.StartContainerTest(ctx, buildID, hostclient.StartContainerTestRequest{
-		InternalPort: s.internalPort,
+		InternalPort: internalPort,
 		RunnerID:     s.runnerID,
 	}); err != nil {
 		return nil, &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
@@ -292,7 +340,7 @@ func (s *BuildService) runContainerTest(ctx context.Context, buildID string) (*d
 		ImageTag:           s.docker.ImageTagFor(buildID),
 		ContainerName:      fmt.Sprintf("container-%s", buildID),
 		HostPort:           s.hostPortOverride,
-		InternalPort:       s.internalPort,
+		InternalPort:       internalPort,
 		HealthcheckPath:    s.healthcheckPath,
 		HealthcheckTimeout: s.healthcheckTimeout,
 		StabilityWindow:    5 * time.Second,
@@ -349,12 +397,14 @@ func (s *BuildService) deployImage(
 	ctx context.Context,
 	buildID string,
 	containerStatus *docker.ContainerStatus,
+	appName string,
 	contextPath string,
 	runtimePort int,
 	stripPrefix bool,
 	hostingScheme string,
 	effectiveTier string,
 	resources *hostclient.ResourceProfile,
+	database *hostclient.DatabasePolicy,
 ) *stageFailure {
 	// 컨테이너는 컨테이너 테스트가 끝난 뒤 정리한다. e2e script 가
 	// RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 cleanup 을 검증한다.
@@ -398,6 +448,11 @@ func (s *BuildService) deployImage(
 	reportTargetType := deployResult.TargetType
 	var k8sResult *deploy.K8sResult
 	if s.k8sDeployer != nil {
+		if node := strings.TrimSpace(os.Getenv("RUNNER_K8S_KIND_NODE")); node != "" {
+			if err := s.docker.LoadImageToKind(ctx, containerStatus.ImageTag, node); err != nil {
+				return &stageFailure{errorCode: contract.ErrorCodeDeploymentFailed, err: err}
+			}
+		}
 		// TASK-175 (v0.8.0, E1): per-build namespace 옵트인.
 		// RUNNER_K8S_NAMESPACE_PER_BUILD=true 면 buildID 별 namespace 로
 		// 격리(deployment/ingress DNS 충돌 + audit). 기본값(false) 은
@@ -417,17 +472,21 @@ func (s *BuildService) deployImage(
 			ResponsePayloadJSON: map[string]any{"deliveryMode": "POLLING"},
 		})
 		kRes, kErr := s.k8sDeployer.Deploy(ctx, deploy.K8sDeployOptions{
-			SourceImage:   containerStatus.ImageTag,
-			Cluster:       os.Getenv("RUNNER_K8S_CLUSTER"),
-			Namespace:     ns,
-			Manifest:      os.Getenv("RUNNER_K8S_MANIFEST"),
-			BuildID:       buildID,
-			ContextPath:   contextPath,
-			ContainerPort: runtimePort,
-			StripPrefix:   stripPrefix,
-			HostingScheme: hostingScheme,
-			BaseHost:      os.Getenv("RUNNER_HOSTING_BASE_HOST"),
-			Resources:     resourceProfile(effectiveTier, resources),
+			SourceImage:              containerStatus.ImageTag,
+			Cluster:                  os.Getenv("RUNNER_K8S_CLUSTER"),
+			Namespace:                ns,
+			Manifest:                 os.Getenv("RUNNER_K8S_MANIFEST"),
+			BuildID:                  buildID,
+			ContextPath:              contextPath,
+			ContainerPort:            runtimePort,
+			StripPrefix:              stripPrefix,
+			HostingScheme:            hostingScheme,
+			BaseHost:                 os.Getenv("RUNNER_HOSTING_BASE_HOST"),
+			Resources:                resourceProfile(effectiveTier, resources),
+			APIServiceName:           strings.TrimSpace(os.Getenv("RUNNER_K8S_API_SERVICE")),
+			APIServicePort:           parsePositiveEnv("RUNNER_K8S_API_PORT", 3000),
+			DatabaseSecretName:       databaseSecretName(appName, database),
+			DatabaseMigrationCommand: databaseMigrationCommand(database),
 		})
 		if kErr != nil {
 			// TASK-175 (E3): k8s 실패 시 docker registry 결과(payload, targetRef)
@@ -486,6 +545,13 @@ func (s *BuildService) deployImage(
 		successReport.Namespace = k8sResult.Namespace
 		successReport.DeploymentName = k8sResult.DeploymentID
 		successReport.ResultRef = k8sResult.ResultRef
+		if baseHost := strings.TrimSpace(os.Getenv("RUNNER_HOSTING_BASE_HOST")); baseHost != "" {
+			if hostingScheme == "subdomain" {
+				successReport.RuntimeURL = fmt.Sprintf("http://%s.%s/", k8sResult.ContextPath, baseHost)
+			} else {
+				successReport.RuntimeURL = fmt.Sprintf("http://%s/%s/", baseHost, k8sResult.ContextPath)
+			}
+		}
 	}
 	if err := s.hostClient.ReportDeployment(ctx, buildID, successReport); err != nil {
 		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}

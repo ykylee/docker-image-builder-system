@@ -130,6 +130,7 @@ describe("service manifest management", () => {
     service: { appName: "manifest-app", image: { repository: "registry/manifest-app", tag } },
     runtime: { port: 8080, command: "npm start", healthPath: "/health", basePathEnv: "APP_BASE_PATH" },
     hosting: { scheme: "path" as const, contextPath: "manifest-app", stripPrefix: true, tier: "sandbox" as const, replicas: 1 },
+    database: { enabled: true, engine: "postgres" as const, migrationCommand: "npm run db:migrate" },
     deployment: { adapter: "helm" as const, namespace: "dib-hosted" }
   });
 
@@ -183,6 +184,23 @@ describe("service manifest management", () => {
       payload: manifest("build-1")
     });
     assert.equal(res.statusCode, 403);
+    await app.close();
+  });
+
+  it("rejects caller-owned database connection fields", async () => {
+    const service = new BuildService(createMemoryBuildRepository());
+    const app = await buildAppWithService(["admin"], service);
+    const response = await app.inject({
+      method: "PUT",
+      url: "/admin/hosted-services/manifest-app/manifest",
+      headers: { "x-admin-id": "admin" },
+      payload: {
+        ...manifest("build-1"),
+        database: { enabled: true, host: "host.docker.internal", password: "secret" }
+      }
+    });
+
+    assert.equal(response.statusCode, 400);
     await app.close();
   });
 });

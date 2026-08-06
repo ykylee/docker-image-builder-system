@@ -122,6 +122,12 @@ func (d *helmDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K8sR
 		"--set-string", "hosting.baseHost="+opts.BaseHost,
 		"--set-string", "build.id="+opts.BuildID,
 	)
+	if strings.TrimSpace(opts.DatabaseSecretName) != "" {
+		args = append(args, "--set-string", "database.secretName="+opts.DatabaseSecretName)
+	}
+	if strings.TrimSpace(opts.DatabaseMigrationCommand) != "" {
+		args = append(args, "--set-string", "database.migrationCommand="+opts.DatabaseMigrationCommand)
+	}
 	if opts.Resources != nil {
 		quota := quotaForTier(opts.Resources.Tier)
 		args = append(args,

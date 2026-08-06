@@ -57,6 +57,12 @@ type ClaimedBuildResponse struct {
 	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
 	Resources            *ResourceProfile `json:"resources"`
 	DockerfileMode       string           `json:"dockerfileMode"`
+	Database             *DatabasePolicy  `json:"database,omitempty"`
+}
+
+type DatabasePolicy struct {
+	Enabled          bool   `json:"enabled"`
+	MigrationCommand string `json:"migrationCommand,omitempty"`
 }
 
 type ResourceProfile struct {
@@ -99,6 +105,7 @@ type buildSummaryBody struct {
 	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
 	Resources            *ResourceProfile `json:"resources"`
 	DockerfileMode       string           `json:"dockerfileMode"`
+	Database             *DatabasePolicy  `json:"database,omitempty"`
 }
 
 // PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
@@ -178,6 +185,7 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		HostingPolicyVersion: inner.HostingPolicyVersion,
 		Resources:            inner.Resources,
 		DockerfileMode:       inner.DockerfileMode,
+		Database:             inner.Database,
 	}, nil
 }
 
@@ -351,6 +359,7 @@ type DeploymentReportRequest struct {
 	ContextPath         string         `json:"contextPath,omitempty"`
 	Namespace           string         `json:"namespace,omitempty"`
 	DeploymentName      string         `json:"deploymentName,omitempty"`
+	RuntimeURL          string         `json:"runtimeUrl,omitempty"`
 	RunnerID            string         `json:"runnerId"`
 	ResponsePayloadJSON map[string]any `json:"responsePayloadJson,omitempty"`
 }

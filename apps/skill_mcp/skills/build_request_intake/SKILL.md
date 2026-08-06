@@ -73,7 +73,12 @@
   - `sourceRef` 누락 → `MISSING_FIELD` 경고 + `ok=false`.
   - `env` 가 객체가 아니면 → `INVALID_ENV` 에러.
 - 알 수 없는 추가 필드:
-  - `extra` 키에 모아서 그대로 통과(contract 외 정보 손실 방지). `warnings` 에 `UNKNOWN_FIELD` 1건 추가.
+- `extra` 키에 모아서 그대로 통과(contract 외 정보 손실 방지). `warnings` 에 `UNKNOWN_FIELD` 1건 추가.
+- 서비스 DB 정책: `DATABASE_URL`, `DB_*`, `PG*` 연결 환경변수와 Dockerfile
+  `ENV`/`ARG` 선언은 입력으로 받지 않는다. 위반 시
+  `SERVICE_DATABASE_POLICY_VIOLATION` 오류를 반환한다. DB 사용은
+  `ServiceManifest.database.enabled=true`와 migration command로만 opt-in하며,
+  실제 credential은 Build Server가 Kubernetes Secret으로 런타임 주입한다.
 - 결정적 출력:
   - 키 순서는 `userId` → `appName` → `sourceRef` → `env` → `extra` 로 고정. `JSON dump` 시 `sort_keys=False, indent=2`.
 
@@ -83,3 +88,6 @@
 - shared contract 가 진화하면 canonical 문서 버전(`contract_version`) 을 bump 하고 본 skill 의 `core.py` 가 그 버전을 인지하도록 한다.
 - 후속 MCP `latest-build-status` 와 결합 시 `payload.userId + payload.appName` 으로 `GET /builds` 목록 조회 → 동일 active build 가 있으면 payload 사용자에게 경고.
 - `OI-008` (Dockerfile 생성 우선순위) 결정 시 `extra.dockerfileOverride` 의미를 그쪽 결정에 맞춰 조정.
+- Dockerfile 자동 생성/추천은 `docs/design/dockerfile-generation.md`와
+  `apps/skill_mcp/skills/dockerfile_template_suggest/SKILL.md`의 서비스 DB 정책을
+  함께 따른다.

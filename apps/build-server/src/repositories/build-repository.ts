@@ -468,6 +468,7 @@ export interface BuildRepository {
   // ---- Hosting registry (Phase 3 / TASK-166) --------------------------------
   // 앱당 1개 활성 호스팅. 배포 성공 시 upsert(appName 기준 교체).
   listHostedServices(): Promise<HostedService[]>;
+  listHostedServicesByOwner(requestedBy: string): Promise<HostedService[]>;
   getHostedServiceByAppName(appName: string): Promise<HostedService | null>;
   getHostedServiceByContextPath(
     contextPath: string

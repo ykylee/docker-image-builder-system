@@ -4,7 +4,9 @@
 # =============================================================================
 #  `docker compose -f compose.dev.yaml up --abort-on-container-exit` 으로
 #  build-server + runner + (옵션) postgres 를 같은 network 안에서 띄운다.
-#  메모리 backend 라면 postgres service 는 단순히 profile 으로 분리.
+#  기본 self-dogfood backend 는 Postgres로 사용해 컨테이너 재기동 후에도
+#  build history가 보존되도록 한다. memory backend가 필요하면
+#  `BUILD_REPOSITORY_BACKEND=memory`로 명시한다.
 #
 #  필수 환경 변수 (fallback 없이):
 #    - DOCKER_SOCKET_GID: 호스트의 docker group gid. host 의
@@ -24,12 +26,12 @@
 #      build-server 가 schema_migrations 까지 자동 bootstrap.
 #
 #  사용 예:
-#    # memory backend
+#    # postgres backend (default)
 #    export DOCKER_SOCKET_GID=$(getent group docker | cut -d: -f3)
 #    docker compose -f compose.dev.yaml up -d
 #
-#    # postgres backend
-#    docker compose -f compose.dev.yaml --profile postgres up -d
+#    # memory backend (명시적 fallback)
+#    BUILD_REPOSITORY_BACKEND=memory docker compose -f compose.dev.yaml up -d
 #
 #    # log 추적
 #    docker compose -f compose.dev.yaml logs -f build-server
@@ -53,12 +55,28 @@ services:
     # dev/self-dogfood 용 — 실패 시 자동 재시작. 무한 restart 방지하려면
     # `on-failure: 5` 처럼 한계 명시 가능. 본 PR 은 default.
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     # 운영자가 명시적으로 주입해야 하는 env (Dockerfile 에는 default 없음).
     # - ADMIN_IDS 는 secret 처럼 취급 (PROJECT_PROFILE §3).
     environment:
-      BUILD_REPOSITORY_BACKEND: memory
+      BUILD_REPOSITORY_BACKEND: ${BUILD_REPOSITORY_BACKEND:-postgres}
+      DATABASE_URL: ${DATABASE_URL:-postgres://dibs:dibs@postgres:5432/dibs}
+      DB_AUTO_BOOTSTRAP: "true"
       ADMIN_IDS: ${ADMIN_IDS:?ADMIN_IDS must be set, e.g. "admin,yky.lee"}
       BUILD_MONITOR_DIST_PATH: /app/apps/build-monitor/dist
+      BUILD_MONITOR_REACT_DIST_PATH: /app/apps/build-monitor/dist
+      HOSTING_BASE_HOST: ${HOSTING_BASE_HOST:-100.119.181.116:18080}
+      HOSTING_KUBE_CONTEXT: ${HOSTING_KUBE_CONTEXT:-kind-dib}
+      HOSTING_KUBECTL_BIN: kubectl
+      HOSTING_STATUS_SYNC_INTERVAL_MS: ${HOSTING_STATUS_SYNC_INTERVAL_MS:-10000}
+      # Hosted service databases use the cluster-local gateway. The gateway
+      # forwards to the host PostgreSQL; the host address is never injected
+      # into hosted app containers.
+      SERVICE_DB_GATEWAY_HOST: ${SERVICE_DB_GATEWAY_HOST:-dib-db-gateway.dib-hosted.svc.cluster.local:5432}
+      SERVICE_DB_DATABASE_NAME: ${SERVICE_DB_DATABASE_NAME:-dibs}
+      KUBECONFIG: /run/kube/config
       NODE_ENV: production
     ports:
       # Override for isolated e2e runs; default remains the local dev port.
@@ -74,6 +92,10 @@ services:
     # build-server 메모리 한계 — postgres backend 의 applyMigrations / 일반
     # REST traffic 의 여유. 운영 시에는 pod level 에서 별도 설정.
     mem_limit: 512m
+    volumes:
+      - dibs-kubeconfig:/run/kube:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   runner:
     build:
@@ -89,13 +111,43 @@ services:
       build-server:
         condition: service_healthy
     environment:
-      HOST_SERVER_BASE_URL: http://build-server:3000
+      HOST_SERVER_BASE_URL: ${HOST_SERVER_BASE_URL:-http://build-server:3000}
       RUNNER_ID: runner-compose-1
       RUNNER_POLL_INTERVAL: 5s
+      # self-dogfood must exercise the real Docker daemon through the mounted
+      # socket. Skeleton mode remains available only for isolated contract
+      # tests, never for the long-running dev service.
+      RUNNER_DOCKER_BUILD_MODE: ${RUNNER_DOCKER_BUILD_MODE:-cli}
+      RUNNER_DOCKER_RUN_MODE: ${RUNNER_DOCKER_RUN_MODE:-cli}
+      RUNNER_STOP_CONTAINER_ON_DONE: ${RUNNER_STOP_CONTAINER_ON_DONE:-true}
+      # Apps such as Build Server expose readiness at /health rather than /.
+      # Keep / as the generic default; self-hosting this project uses
+      # RUNNER_HEALTHCHECK_PATH=/health for the build/run cycle.
+      RUNNER_HEALTHCHECK_PATH: ${RUNNER_HEALTHCHECK_PATH:-/}
+      # The runner is itself a container, while test containers publish their
+      # ports through the Docker host. Probe through the host gateway instead
+      # of the runner container's own loopback.
+      RUNNER_DOCKER_HOST: ${RUNNER_DOCKER_HOST:-host.docker.internal}
+      RUNNER_K8S_MODE: ${RUNNER_K8S_MODE:-k8s}
+      RUNNER_K8S_CLUSTER: ${RUNNER_K8S_CLUSTER:-kind-dib}
+      RUNNER_K8S_NAMESPACE: ${RUNNER_K8S_NAMESPACE:-dib-hosted}
+      RUNNER_K8S_KIND_NODE: ${RUNNER_K8S_KIND_NODE:-dib-control-plane}
+      # Cluster-local control-plane Service. Hosted bundles use <context>/api
+      # and Ingress forwards it here; no host IP is embedded in the bundle.
+      RUNNER_K8S_API_SERVICE: ${RUNNER_K8S_API_SERVICE:-dib-control-plane}
+      RUNNER_K8S_API_PORT: ${RUNNER_K8S_API_PORT:-3000}
+      # Optional per-image migration gate. The command runs in an init
+      # container with the service-local DATABASE_URL Secret.
+      RUNNER_HOSTING_BASE_HOST: ${RUNNER_HOSTING_BASE_HOST:-100.119.181.116:18080}
+      RUNNER_KUBECTL_BIN: kubectl
+      KUBECONFIG: /run/kube/config
     # host docker socket 을 공유 mount → container 가 host 데몬을 통해
     # build/test/deploy 단계 실행. self-dogfood 용 단순화 (DinD 미사용).
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      - dibs-kubeconfig:/run/kube:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # host 의 docker group gid 를 supplementary group 으로 추가. socket R/W
     # 권한 (root:docker 0660) 에 필요한 gid. silent fallback 없이 명시 강제.
     # 자기 환경에 맞춰 export 후 사용:
@@ -107,12 +159,11 @@ services:
     # 가 변동. 256 MB 는 단일 build 한계 가정.
     mem_limit: 512m
 
-  # postgres backend. `--profile postgres` 일 때만 활성. memory backend 만
-  # 쓰려면 이 service 를 무시한다.
+  # 기본 persistence backend. memory backend를 명시한 경우에도 컨테이너는
+  # 기동하지만 Build Server가 연결하지 않아 local override가 단순하다.
   postgres:
     image: postgres:16-alpine
     container_name: dibs-postgres
-    profiles: ["postgres"]
     environment:
       POSTGRES_USER: dibs
       POSTGRES_PASSWORD: dibs
@@ -138,4 +189,5 @@ services:
 
 volumes:
   postgres-data:
-    driver: local
+  dibs-kubeconfig:
+    external: true

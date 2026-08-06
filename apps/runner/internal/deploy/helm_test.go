@@ -37,6 +37,7 @@ func TestHelmDeploy_UpgradeInstallAndValues(t *testing.T) {
 		Namespace: "dib-hosted", HelmChart: "./chart", HelmRelease: "app-release",
 		ContextPath: "demo-app", ContainerPort: 3000, StripPrefix: true,
 		HostingScheme: "subdomain", BaseHost: "apps.example.test",
+		DatabaseSecretName: "dib-service-demo-abcdef123456-db",
 	})
 	if err != nil {
 		t.Fatalf("Deploy: %v", err)
@@ -45,7 +46,7 @@ func TestHelmDeploy_UpgradeInstallAndValues(t *testing.T) {
 		t.Fatalf("expected one helm call, got %d", len(*calls))
 	}
 	args := (*calls)[0].args
-	for _, want := range []string{"upgrade", "--install", "app-release", "./chart", "--namespace", "dib-hosted", "--wait", "--kube-context", "kind-dib-helm-e2e", "image.repository=localhost:5000/demo/app", "image.tag=build-1", "service.port=3000", "hosting.contextPath=demo-app", "hosting.basePath=/", "hosting.stripPrefix=true", "hosting.scheme=subdomain", "hosting.baseHost=apps.example.test", "build.id=build-1", "extra.enabled=true"} {
+	for _, want := range []string{"upgrade", "--install", "app-release", "./chart", "--namespace", "dib-hosted", "--wait", "--kube-context", "kind-dib-helm-e2e", "image.repository=localhost:5000/demo/app", "image.tag=build-1", "service.port=3000", "hosting.contextPath=demo-app", "hosting.basePath=/", "hosting.stripPrefix=true", "hosting.scheme=subdomain", "hosting.baseHost=apps.example.test", "build.id=build-1", "database.secretName=dib-service-demo-abcdef123456-db", "extra.enabled=true"} {
 		if !containsArg(args, want) {
 			t.Errorf("helm args = %v, missing %q", args, want)
 		}

@@ -1,0 +1,125 @@
+# Cluster-local TCP gateway for the host PostgreSQL instance.
+#
+# Set DB_UPSTREAM to an address reachable from the kind node, for example the
+# host gateway address in the local Docker runtime. Hosted app pods never see
+# this value; they only receive the dib-db-gateway Service DNS name through a
+# Secret-backed DATABASE_URL.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dib-db-gateway
+  namespace: dib-hosted
+  labels:
+    app.kubernetes.io/name: dib-db-gateway
+    app.kubernetes.io/part-of: docker-image-builder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dib-db-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dib-db-gateway
+        app.kubernetes.io/part-of: docker-image-builder
+    spec:
+      containers:
+        - name: haproxy
+          image: haproxy:3.0-alpine
+          env:
+            - name: DB_UPSTREAM
+              value: "host.docker.internal:5432"
+          command: ["/bin/sh", "-ec"]
+          args:
+            - |
+              cat > /tmp/haproxy.cfg <<EOF
+              global
+                maxconn 256
+              defaults
+                mode tcp
+                timeout connect 5s
+                timeout client 1h
+                timeout server 1h
+              frontend postgres
+                bind :5432
+                default_backend postgres_upstream
+              backend postgres_upstream
+                server postgres ${DB_UPSTREAM} check
+              EOF
+              exec haproxy -f /tmp/haproxy.cfg
+          ports:
+            - name: postgres
+              containerPort: 5432
+          readinessProbe:
+            tcpSocket:
+              port: postgres
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 25m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dib-db-gateway
+  namespace: dib-hosted
+spec:
+  selector:
+    app.kubernetes.io/name: dib-db-gateway
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dib-db-gateway-ingress
+  namespace: dib-hosted
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dib-db-gateway
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/hosted-service: "true"
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dib-hosted-service-egress
+  namespace: dib-hosted
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/hosted-service: "true"
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: dib-db-gateway
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

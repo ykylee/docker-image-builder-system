@@ -74,6 +74,25 @@ if (container === null) {
   throw new Error("Root container #app-react not found");
 }
 
+// Hosted self-dogfood apps are served behind a path prefix, while the same
+// bundle is served from `/` by Build Server. Infer only an unknown first path
+// segment as the hosting prefix; known app routes remain root-relative.
+const APP_ROUTE_ROOTS = new Set([
+  "login",
+  "builds",
+  "services",
+  "build-request",
+  "api-console",
+  "admin"
+]);
+
+function getRouterBasename(pathname: string): string {
+  const firstSegment = pathname.split("/").filter(Boolean)[0] ?? "";
+  return firstSegment === "" || APP_ROUTE_ROOTS.has(firstSegment)
+    ? ""
+    : `/${firstSegment}`;
+}
+
 /**
  * Astryx `<Theme>` 를 우리 테마 상태에 묶는 껍데기.
  *
@@ -94,7 +113,7 @@ function ThemedApp(): React.ReactElement {
 
   return (
     <Theme theme={dibTheme} mode={mode}>
-      <BrowserRouter>
+      <BrowserRouter basename={getRouterBasename(window.location.pathname)}>
         {/* TASK-144: 모든 Astryx 링크(TopNavItem / Link 등)가 react-router
             로 SPA 내비게이션하도록 어댑터를 전역 등록한다. LinkProvider 는
             react-router context 를 쓰므로 반드시 BrowserRouter 안쪽. */}

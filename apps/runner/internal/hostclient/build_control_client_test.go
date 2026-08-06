@@ -25,11 +25,15 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 			"claimed": true,
 			"build": map[string]any{
 				"build": map[string]any{
-					"buildId":         "b-1",
-					"appName":         "todo-app",
-					"status":          contract.StatusPreparingSource,
-					"phase":           contract.PhaseQueueClaimed,
-					"dockerfileMode":  "auto",
+					"buildId":        "b-1",
+					"appName":        "todo-app",
+					"status":         contract.StatusPreparingSource,
+					"phase":          contract.PhaseQueueClaimed,
+					"dockerfileMode": "auto",
+					"database": map[string]any{
+						"enabled":          true,
+						"migrationCommand": "npm run db:migrate",
+					},
 					"lifecycleStatus": contract.StatusPreparingSource,
 					"updatedAt":       "2026-07-03T00:00:00Z",
 				},
@@ -62,6 +66,9 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 	}
 	if resp.DockerfileMode != "auto" {
 		t.Errorf("expected dockerfileMode auto, got %s", resp.DockerfileMode)
+	}
+	if resp.Database == nil || resp.Database.MigrationCommand != "npm run db:migrate" {
+		t.Errorf("expected database migration policy, got %+v", resp.Database)
 	}
 }
 

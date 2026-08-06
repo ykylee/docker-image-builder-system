@@ -95,6 +95,27 @@ describe("BuildService: claimNextBuild", () => {
     assert.equal(result.build?.build.dockerfileMode, "auto");
   });
 
+  it("attaches the service manifest database policy to the runner claim", async () => {
+    const repo = createMemoryBuildRepository();
+    const service = new BuildService(repo);
+    await service.updateServiceManifest("db-policy-app", {
+      version: 1,
+      service: { appName: "db-policy-app", image: { repository: "example/db-policy-app", tag: "latest" } },
+      runtime: { port: 8080, healthPath: "/" },
+      hosting: { contextPath: "db-policy-app", scheme: "path", stripPrefix: true, tier: "sandbox", replicas: 1 },
+      deployment: { adapter: "kubectl", namespace: "dib-hosted" },
+      database: { enabled: true, engine: "postgres", migrationCommand: "npm run db:migrate" }
+    }, "admin");
+    await createBuildWithSource(service, { ...baseRequest, appName: "db-policy-app" });
+
+    const result = await service.claimNextBuild();
+
+    assert.deepEqual(result.build?.build.database, {
+      enabled: true,
+      migrationCommand: "npm run db:migrate"
+    });
+  });
+
   it("returns ACTIVE_BUILD_EXISTS when a build is already in flight", async () => {
     const repo = createMemoryBuildRepository();
     const service = new BuildService(repo);

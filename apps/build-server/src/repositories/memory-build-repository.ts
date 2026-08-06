@@ -64,6 +64,15 @@ import {
   type HostingCapacityReservation
 } from "../services/hosting-capacity.js";
 
+function publicRuntimeUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname === "container-test.local" ? null : value;
+  } catch {
+    return value;
+  }
+}
+
 type StoredBuild = {
   summary: BuildSummary;
   requestedBy: string;
@@ -686,7 +695,10 @@ export function createMemoryBuildRepository(
 
       build.summary = {
         ...enrichBuildSummary(build.summary),
-        runtimeUrl,
+        // Container-test URL is internal-only. Keep non-internal fixture and
+        // legacy values compatible, but never expose the runner's internal
+        // container-test hostname as a public runtime URL.
+        runtimeUrl: publicRuntimeUrl(runtimeUrl),
         phase: nextPhase as BuildPhase,
         status: nextStatus,
         updatedAt: timestamp
@@ -706,7 +718,9 @@ export function createMemoryBuildRepository(
         id: randomUUID(),
         buildId,
         phase: nextPhase as BuildPhase,
-        message: `Container test: ${status}` + (runtimeUrl ? ` url=${runtimeUrl}` : ""),
+        // Container-test runtime addresses are internal runner diagnostics;
+        // never copy them into the public build log.
+        message: `Container test: ${status}`,
         createdAt: timestamp
       };
       build.logs.push(log);
@@ -769,6 +783,7 @@ export function createMemoryBuildRepository(
       };
       build.summary = {
         ...enrichBuildSummary(build.summary),
+        runtimeUrl: publicRuntimeUrl(input.runtimeUrl ?? build.summary.runtimeUrl),
         phase: nextPhase,
         status: nextStatus,
         updatedAt: timestamp
@@ -1351,6 +1366,17 @@ export function createMemoryBuildRepository(
     // ---- Hosting registry (TASK-166 / P3-M1) --------------------------------
     async listHostedServices(): Promise<HostedService[]> {
       return [...hostedServices.values()]
+        .map(toHostedService)
+        .sort((a, b) => a.appName.localeCompare(b.appName));
+    },
+    async listHostedServicesByOwner(requestedBy: string): Promise<HostedService[]> {
+      const ownedBuildIds = new Set(
+        [...builds.values()]
+          .filter((build) => build.requestedBy === requestedBy)
+          .map((build) => build.summary.buildId)
+      );
+      return [...hostedServices.values()]
+        .filter((service) => service.currentBuildId !== null && ownedBuildIds.has(service.currentBuildId))
         .map(toHostedService)
         .sort((a, b) => a.appName.localeCompare(b.appName));
     },

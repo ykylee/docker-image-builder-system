@@ -33,6 +33,9 @@ describe("openapi document", () => {
     const pathKeys = Object.keys(document.paths).sort();
     assert.deepEqual(pathKeys, [
       "/admin/builds",
+      "/admin/hosted-services/{appName}/database",
+      "/admin/hosted-services/{appName}/database/purge",
+      "/admin/hosted-services/{appName}/database/rotate",
       "/admin/hosted-services/{appName}/manifest",
       "/admin/hosted-services/{appName}/manifest/revisions",
       "/admin/hosting-capacity",
@@ -49,6 +52,7 @@ describe("openapi document", () => {
       "/builds/{buildId}/phase",
       "/builds/{buildId}/source",
       "/health"
+      , "/services"
     ]);
 
     // /builds 는 GET (list) + POST (create) 두 method 를 가져야 함

@@ -1,0 +1,31 @@
+# Apply this after k8s-db-gateway.yaml.
+#
+# The CIDR is intentionally kept in this environment-specific file. Replace
+# it with the address of the host PostgreSQL endpoint reachable from the
+# cluster before applying to another cluster. Do not widen it to 0.0.0.0/0.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dib-db-gateway-egress
+  namespace: dib-hosted
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: dib-db-gateway
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.168.5.2/32
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

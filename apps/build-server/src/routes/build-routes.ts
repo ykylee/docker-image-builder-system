@@ -36,6 +36,8 @@ const buildIdParamsSchema = z.object({
   buildId: z.string().uuid()
 });
 
+const userIdHeader = "x-user-id";
+
 export async function registerBuildRoutes(
   app: FastifyInstance,
   buildService: BuildService
@@ -49,6 +51,15 @@ export async function registerBuildRoutes(
     }
     const body = await buildService.listBuilds(queryResult.data);
     return reply.status(200).send(body);
+  });
+
+  app.get("/services", async (request, reply) => {
+    const requestedBy = z.string().min(1).safeParse(request.headers[userIdHeader]);
+    if (!requestedBy.success) {
+      return reply.status(401).send({ message: "X-User-Id header missing.", header: "X-User-Id" });
+    }
+    const services = await buildService.listHostedServicesByOwner(requestedBy.data);
+    return reply.status(200).send({ services });
   });
 
   app.post("/builds", async (request, reply) => {

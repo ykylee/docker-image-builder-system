@@ -14,11 +14,20 @@ import { Link } from "react-router-dom";
 
 import "./ApiConsole.css";
 
-// iframe URL. trailing slash 가 빠지면 fastify redirect 가 발생하므로
-// 명시적으로 포함 (Svelte ApiConsole.svelte 와 동일).
-const API_DOCS_URL = "/docs/";
+// Hosted apps are mounted below a context path. Keep the docs iframe and raw
+// OpenAPI link inside that prefix; a root-absolute `/docs/` escapes to the
+// host Build Server and returns 404 from the ingress.
+export function getApiDocsUrl(pathname = window.location.pathname): string {
+  const firstSegment = pathname.split("/").filter(Boolean)[0] ?? "";
+  const appRouteRoots = new Set(["login", "builds", "services", "build-request", "api-console", "admin"]);
+  const contextPrefix = firstSegment !== "" && !appRouteRoots.has(firstSegment)
+    ? `/${firstSegment}`
+    : "";
+  return `${contextPrefix}/docs/`;
+}
 
 export function ApiConsole(): ReactElement {
+  const apiDocsUrl = getApiDocsUrl();
   const [iframeError, setIframeError] = useState<string | null>(null);
   // iframe 재로드를 위한 key. 사용자가 refresh 누를 때마다 새 src 캐시 회피.
   const [reloadKey, setReloadKey] = useState(0);
@@ -37,7 +46,7 @@ export function ApiConsole(): ReactElement {
   }
 
   function openOpenApiSpec(): void {
-    window.open("/openapi.json", "_blank", "noopener,noreferrer");
+    window.open(getApiDocsUrl(window.location.pathname).replace(/\/docs\/$/, "/openapi.json"), "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -82,7 +91,7 @@ export function ApiConsole(): ReactElement {
       <div className="frame-wrap" data-testid="api-console-frame">
         <iframe
           key={reloadKey}
-          src={API_DOCS_URL}
+          src={apiDocsUrl}
           title="Build Server Scalar API Reference"
           onLoad={handleIframeLoad}
           onError={handleIframeError}
@@ -101,7 +110,7 @@ export function ApiConsole(): ReactElement {
       <details className="hint-block">
         <summary>About this view</summary>
         <p>
-          Scalar API Reference 는 build server 가 직접 서빙합니다 (<code>{API_DOCS_URL}</code>).
+            Scalar API Reference 는 build server 가 직접 서빙합니다 (<code>{apiDocsUrl}</code>).
           본 페이지에서는 같은 SPA 안에서 navigation 흐름을 깨지 않도록 iframe 으로
           임베드합니다. 네트워크 오류 또는 backend down 시 iframe 이 빈 화면으로
           남을 수 있어, 그 경우 "Refresh" 버튼 또는 우측 상단 "Raw OpenAPI JSON"
@@ -109,7 +118,7 @@ export function ApiConsole(): ReactElement {
         </p>
         <p>
           본 화면과 함께 <code>/build-request</code> 페이지에서 BuildRequest payload 를
-          직접 제출하면서 본 API Console 의 응답 형식을 확인할 수 있습니다.
+            직접 제출하면서 본 API Console 의 응답 형식을 확인할 수 있습니다.
         </p>
       </details>
     </section>

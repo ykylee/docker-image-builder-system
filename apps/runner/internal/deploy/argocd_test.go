@@ -37,6 +37,7 @@ func TestArgoCDDeploy_AppliesApplicationAndWaits(t *testing.T) {
 		SourceImage: "localhost:5000/demo/app:build-1", BuildID: "build-1",
 		Cluster: "kind-dib-argocd", Namespace: "dib-hosted", ContextPath: "demo-app",
 		ContainerPort: 3000, StripPrefix: true, HostingScheme: "path", BaseHost: "apps.example.test",
+		DatabaseSecretName: "dib-service-demo-abcdef123456-db",
 	})
 	if err != nil {
 		t.Fatalf("Deploy: %v", err)
@@ -60,7 +61,7 @@ func TestArgoCDDeploy_AppliesApplicationAndWaits(t *testing.T) {
 	if application["kind"] != "Application" {
 		t.Fatalf("kind = %v", application["kind"])
 	}
-	if !strings.Contains((*calls)[0].stdin, "image.repository") || !strings.Contains((*calls)[0].stdin, "hosting.contextPath") {
+	if !strings.Contains((*calls)[0].stdin, "image.repository") || !strings.Contains((*calls)[0].stdin, "hosting.contextPath") || !strings.Contains((*calls)[0].stdin, "database.secretName") {
 		t.Fatalf("application missing Helm parameters: %s", (*calls)[0].stdin)
 	}
 }

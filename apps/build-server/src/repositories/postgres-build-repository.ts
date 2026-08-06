@@ -803,7 +803,9 @@ export class PostgresBuildRepository implements BuildRepository {
         .set({
           phase: nextPhase,
           status: nextStatus,
-          runtimeUrl: nextRuntimeUrl,
+          // Container-test URL is internal-only. The public runtime URL is
+          // written by a successful hosted deployment report.
+          runtimeUrl: row.runtimeUrl,
           phaseHistory: nextPhaseHistory,
           ...testFailureColumns,
           updatedAt: timestamp
@@ -875,7 +877,9 @@ export class PostgresBuildRepository implements BuildRepository {
         id: randomUUID(),
         buildId,
         phase: nextPhase,
-        message: `Container test: ${status}` + (nextRuntimeUrl ? ` url=${nextRuntimeUrl}` : ""),
+        // Container-test runtime addresses are internal runner diagnostics;
+        // never copy them into the public build log.
+        message: `Container test: ${status}`,
         createdAt: timestamp
       });
 
@@ -936,6 +940,7 @@ export class PostgresBuildRepository implements BuildRepository {
         .set({
           phase: nextPhase as BuildPhase,
           status: nextStatus,
+          runtimeUrl: input.runtimeUrl ?? row.runtimeUrl,
           phaseHistory: nextPhaseHistory,
           updatedAt: timestamp
         })
@@ -1748,6 +1753,19 @@ export class PostgresBuildRepository implements BuildRepository {
       .from(hostedServiceTable)
       .orderBy(hostedServiceTable.appName);
     return rows.map(toHostedService);
+  }
+
+  async listHostedServicesByOwner(requestedBy: string): Promise<HostedService[]> {
+    const rows = await this.db
+      .select({ service: hostedServiceTable })
+      .from(hostedServiceTable)
+      .innerJoin(
+        buildRequestTable,
+        eq(hostedServiceTable.currentBuildId, buildRequestTable.id)
+      )
+      .where(eq(buildRequestTable.requestedBy, requestedBy))
+      .orderBy(hostedServiceTable.appName);
+    return rows.map(({ service }) => toHostedService(service));
   }
 
   async getHostedServiceByAppName(

@@ -25,6 +25,25 @@ PAYLOAD_KEY_ORDER = ("userId", "appName", "sourceRef", "env", "extra")
 # BuildRequest 가 직접 다루는 canonical keys (env / extra 제외).
 _CANONICAL_TOP_KEYS = ("userId", "appName", "sourceRef")
 
+# Service DB credentials are created by Build Server and injected from a
+# Kubernetes Secret. Callers must opt in through ServiceManifest.database;
+# they must never smuggle host/schema/role/password values through BuildRequest.
+_FORBIDDEN_SERVICE_DB_ENV_KEYS = {
+    "DATABASE_URL",
+    "DB_HOST",
+    "DB_PORT",
+    "DB_NAME",
+    "DB_SCHEMA",
+    "DB_ROLE",
+    "DB_USER",
+    "DB_PASSWORD",
+    "PGHOST",
+    "PGPORT",
+    "PGDATABASE",
+    "PGUSER",
+    "PGPASSWORD",
+}
+
 
 @dataclass
 class ShapeResult:
@@ -200,6 +219,13 @@ def shape(input_data: Any) -> ShapeResult:
                 env_normalized[raw_key] = str(raw_val)
             else:
                 env_normalized[raw_key] = raw_val
+            if raw_key.upper() in _FORBIDDEN_SERVICE_DB_ENV_KEYS:
+                _issue(
+                    errors,
+                    "SERVICE_DATABASE_POLICY_VIOLATION",
+                    f"env.{raw_key}",
+                    "service DB connection values are platform-injected; enable ServiceManifest.database instead",
+                )
 
     # 3) extra (canonical 외 필드) — 알 수 없는 top-level 필드 모으기
     extra: dict[str, Any] = {}
@@ -216,6 +242,18 @@ def shape(input_data: Any) -> ShapeResult:
             key,
             f"field '{key}' is not part of BuildRequest v1; moved to extra",
         )
+
+        if key == "dockerfileOverride" and isinstance(value, str):
+            upper_override = value.upper()
+            for forbidden in _FORBIDDEN_SERVICE_DB_ENV_KEYS:
+                if f"ENV {forbidden}" in upper_override or f"ARG {forbidden}" in upper_override:
+                    _issue(
+                        errors,
+                        "SERVICE_DATABASE_POLICY_VIOLATION",
+                        key,
+                        "Dockerfile must not declare service DB connection values; use the platform-injected DATABASE_URL Secret",
+                    )
+                    break
 
     # 4) payload 합성 — key 순서 고정
     payload: dict[str, Any] = {}

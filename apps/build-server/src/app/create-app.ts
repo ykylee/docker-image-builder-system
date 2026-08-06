@@ -17,6 +17,8 @@ import { registerAdminRoutes, createAdminAllowList } from "../routes/admin-route
 import { registerBuildRoutes } from "../routes/build-routes.js";
 import { registerHealthRoute } from "../routes/health-route.js";
 import { BuildService } from "../services/build-service.js";
+import { ServiceDatabaseProvisioner } from "../services/service-database-provisioner.js";
+import { KubectlSecretWriter } from "../services/k8s-secret-writer.js";
 import {
   postHostingCapacityDriftAlert,
   shouldSendDriftAlert,
@@ -76,7 +78,7 @@ function parseStrictContentRangeFlag(env: NodeJS.ProcessEnv): boolean {
 // 등록되어 있으므로 동일 prefix 만 redirect 허용 — 미등록 path 는
 // SPA fallback 으로 떨어지지 않고 정직한 404 JSON 으로 응답되어
 // consumer 가 잘못된 path 호출을 신뢰성 있게 인지.
-const API_REWRITE_ALLOWED_PREFIXES = ["/builds", "/admin/"];
+const API_REWRITE_ALLOWED_PREFIXES = ["/builds", "/services", "/admin/"];
 
 // API documentation prefix. SPA fallback 에서 제외 — Build Server 가 자체
 // 응답하지 못한 GET path 만 wildcard 가 잡으므로 사실상 catch-all 404
@@ -247,7 +249,14 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   // isAdmin guard shares the same Set, so mutations are immediately visible
   // to subsequent /admin/* requests within the same process.
   const adminAllowList = createAdminAllowList(runtime.adminIds);
-  await registerAdminRoutes(app, buildService, adminAllowList);
+  const serviceDatabasePool = runtime.buildRepositoryBackend === "postgres" ? createDbPool(runtime.databaseUrl) : undefined;
+  if (serviceDatabasePool) app.addHook("onClose", async () => serviceDatabasePool.end());
+  await registerAdminRoutes(app, buildService, adminAllowList, serviceDatabasePool ? {
+    provisioner: new ServiceDatabaseProvisioner(serviceDatabasePool),
+    secretWriter: new KubectlSecretWriter(),
+    gatewayHost: process.env.SERVICE_DB_GATEWAY_HOST?.trim() ?? "",
+    databaseName: process.env.SERVICE_DB_DATABASE_NAME?.trim() || "dibs"
+  } : undefined);
 
   // TASK-075: build-monitor 의 vite build 산출물을 정적 서빙 + SPA
   // fallback 으로 mount. Build Server 의 자체 route (/api/*, /openapi,
@@ -317,21 +326,23 @@ async function mountBuildMonitorDist(app: FastifyInstance): Promise<void> {
   // path 만 처리하는 setNotFoundHandler 로는 잡을 수 없다 — 이 경로들은
   // "등록된" 경로이기 때문. 그래서 라우팅 이전 단계인 onRequest 에서 가른다.
   //
-  // 판정 기준은 `Sec-Fetch-Dest: document` — 브라우저가 주소창 이동/링크
-  // 클릭 같은 **문서 내비게이션**에만 붙이는 값이다. fetch/XHR 은 `empty`,
-  // iframe 은 `iframe`, 이미지·스크립트는 각각 `image`/`script` 이고, Go
-  // runner 나 curl 같은 비-브라우저 클라이언트는 아예 보내지 않는다.
+  // 판정 기준은 `Accept: text/html`인 문서 요청이다. 브라우저 주소창 이동은
+  // 보통 `Sec-Fetch-Dest: document`도 보내지만, Tailscale/reverse proxy,
+  // Safari, 일부 embedded browser는 이 헤더를 제거할 수 있다. 따라서
+  // `Sec-Fetch-Dest`가 없을 때도 HTML 수락 의사가 명확하면 SPA로 처리한다.
+  // fetch/XHR의 `Sec-Fetch-Dest: empty`, iframe의 `iframe`, 이미지·스크립트의
+  // `image`/`script`는 여전히 API 응답을 유지한다.
   // 따라서 프론트엔드의 `/api/*` 호출과 runner 의 bare `/builds/claim` 호출은
   // 이 분기에 걸리지 않는다 — 기존 API 계약은 무변경.
   //
-  // 한계: 헤더 기반이라 Sec-Fetch-* 미지원 클라이언트(구형 브라우저)는 종전
-  // 대로 JSON 을 받는다. 규칙이 암묵적이므로 회귀 가드로 고정해 둔다
-  // (tests/static-serve.test.ts).
+  // `Accept`가 없는 curl/runner 요청은 종전대로 JSON을 받는다. 규칙이
+  // 암묵적이므로 회귀 가드로 고정해 둔다 (tests/static-serve.test.ts).
   app.addHook("onRequest", async (request, reply) => {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return;
     }
-    if (request.headers["sec-fetch-dest"] !== "document") {
+    const fetchDest = request.headers["sec-fetch-dest"];
+    if (fetchDest && fetchDest !== "document") {
       return;
     }
     if (!(request.headers.accept ?? "").includes("text/html")) {
@@ -395,6 +406,22 @@ async function mountBuildMonitorDist(app: FastifyInstance): Promise<void> {
   // 정합 영향 0.
   app.setNotFoundHandler((request, reply) => {
     const path = request.url.split("?")[0]!;
+    // Vite `base: "./"` is required for path-hosted services, but a deep
+    // SPA URL such as `/admin/builds` makes the browser resolve `./assets/*`
+    // as `/admin/assets/*`.  Normalize that deep-link suffix here, before
+    // the generic SPA fallback can return index.html with a JavaScript MIME
+    // type.  The ingress has already stripped the service context prefix.
+    const assetMarker = "/assets/";
+    const assetIndex = path.indexOf(assetMarker);
+    if (assetIndex >= 0) {
+      const relativeAsset = path.slice(assetIndex + 1);
+      if (!relativeAsset.includes("..")) {
+        return reply.sendFile(relativeAsset);
+      }
+    }
+    if (path.endsWith("/favicon.svg")) {
+      return reply.sendFile("favicon.svg");
+    }
     if (path.startsWith("/api/")) {
       const withoutApi = path.replace(/^\/api/, "");
       const isRegisteredPath = API_REWRITE_ALLOWED_PREFIXES.some((prefix) =>

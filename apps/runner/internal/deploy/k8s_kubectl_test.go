@@ -262,10 +262,64 @@ func TestDeploymentName_SanitizesToDNS1123(t *testing.T) {
 func TestRenderK8sManifest_EmitsTierResourceQuota(t *testing.T) {
 	manifest := renderK8sManifest("dib-app", "dib-app", "image:test", 8080, "app", true, "path", "apps.example.test", &ResourceProfile{
 		Tier: "standard", CPURequest: "250m", MemoryRequest: "512Mi", CPULimit: "1", MemoryLimit: "1Gi", Replicas: 2,
-	})
+	}, "", 0)
 	for _, want := range []string{"kind: ResourceQuota", "requests.cpu: \"2\"", "requests.memory: \"2Gi\"", "pods: \"2\"", "replicas: 2", "cpu: \"250m\""} {
 		if !strings.Contains(manifest, want) {
 			t.Errorf("manifest missing %q:\n%s", want, manifest)
+		}
+	}
+}
+
+func TestRenderK8sManifest_SandboxQuotaIncludesControlPlaneAndGateway(t *testing.T) {
+	manifest := renderK8sManifest("dib-app", "dib-hosted", "image:test", 8080, "app", true, "path", "", &ResourceProfile{Tier: "sandbox", CPURequest: "100m", MemoryRequest: "128Mi", CPULimit: "500m", MemoryLimit: "512Mi", Replicas: 1}, "dib-control-plane", 3000)
+	for _, want := range []string{"requests.cpu: \"2\"", "limits.memory: \"2Gi\"", "pods: \"3\""} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("sandbox quota missing %q:\n%s", want, manifest)
+		}
+	}
+}
+
+func TestRenderK8sManifest_EmitsClusterLocalAPIIngress(t *testing.T) {
+	manifest := renderK8sManifest("dib-app", "dib-app", "image:test", 8080, "app", true, "path", "apps.example.test", nil, "dib-control-plane", 3000)
+	for _, want := range []string{
+		"path: /app/api(/|$)(.*)",
+		"name: dib-control-plane",
+		"number: 3000",
+	} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("manifest missing cluster-local API route %q:\n%s", want, manifest)
+		}
+	}
+}
+
+func TestRenderK8sManifest_InjectsOptionalDatabaseSecret(t *testing.T) {
+	manifest := renderK8sManifest("dib-app", "dib-app", "image:test", 8080, "app", true, "path", "apps.example.test", nil, "", 0, "dib-service-app-abcdef123456-db")
+	for _, want := range []string{
+		"name: DATABASE_URL",
+		"name: dib-service-app-abcdef123456-db",
+		"key: DATABASE_URL",
+		"optional: true",
+		"name: BUILD_REPOSITORY_BACKEND",
+		"value: postgres",
+	} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("manifest missing database Secret reference %q:\n%s", want, manifest)
+		}
+	}
+}
+
+func TestRenderK8sManifest_GatesAppWithDatabaseMigrationInitContainer(t *testing.T) {
+	manifest := renderK8sManifest("dib-app", "dib-app", "image:test", 8080, "app", true, "path", "apps.example.test", &ResourceProfile{CPURequest: "100m", MemoryRequest: "128Mi", CPULimit: "500m", MemoryLimit: "512Mi", Replicas: 1}, "", 0, "dib-service-app-abcdef123456-db", "npm run db:migrate")
+	for _, want := range []string{
+		"initContainers:",
+		"name: service-database-migration",
+		"args: [\"npm run db:migrate\"]",
+		"initContainers:",
+		"requests:\n              cpu: \"100m\"",
+		"optional: false",
+	} {
+		if !strings.Contains(manifest, want) {
+			t.Errorf("manifest missing migration gate %q:\n%s", want, manifest)
 		}
 	}
 }

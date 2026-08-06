@@ -20,6 +20,10 @@ import {
   serviceManifestResponseSchema,
   serviceManifestRevisionListResponseSchema,
   serviceManifestSchema,
+  serviceDatabaseStatusSchema,
+  serviceDatabasePurgeRequestSchema,
+  serviceDatabasePurgeResponseSchema,
+  serviceDatabaseRotationRequestSchema,
   hostingCapacityResponseSchema,
   notFoundBody,
   validationErrorBody,
@@ -30,6 +34,8 @@ import type {
   BuildService,
   HostingActionOutcome
 } from "../services/build-service.js";
+import type { SecretWriter } from "../services/k8s-secret-writer.js";
+import { serviceDatabaseUrl, ServiceDatabaseProvisioner } from "../services/service-database-provisioner.js";
 
 // Admin guard (ADMIN-004, ADMIN-049). The admin allow-list is a mutable
 // Set owned by the process and seeded from `runtime.adminIds` at boot.
@@ -150,7 +156,13 @@ const adminIdHeaderSchema = z.string().min(1);
 export async function registerAdminRoutes(
   app: FastifyInstance,
   buildService: BuildService,
-  allowList: AdminAllowList
+  allowList: AdminAllowList,
+  serviceDatabase?: {
+    provisioner: ServiceDatabaseProvisioner;
+    secretWriter: SecretWriter;
+    gatewayHost: string;
+    databaseName: string;
+  }
 ): Promise<void> {
   const isAdmin = makeAdminAuthenticator(allowList);
 
@@ -289,6 +301,112 @@ export async function registerAdminRoutes(
     }
     const saved = await buildService.updateServiceManifest(normalizedAppName, parsed.data, callerId.data);
     return reply.status(200).send(serviceManifestResponseSchema.parse(saved));
+  });
+
+  app.post("/admin/hosted-services/:appName/database/provision", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success || !isAdmin(callerId.data)) {
+      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    }
+    const appName = ((request.params as { appName?: string }).appName ?? "").trim();
+    const manifest = await buildService.getServiceManifest(appName);
+    if (!manifest) return reply.status(404).send(notFoundBody("Service manifest not found."));
+    if (!manifest.manifest.database.enabled) {
+      return reply.status(409).send(errorBody("Service database is not enabled in the manifest.", { errorCode: "INVALID_REQUEST" }));
+    }
+    if (!serviceDatabase || serviceDatabase.gatewayHost.trim() === "") {
+      return reply.status(503).send(errorBody("Service database gateway is not configured.", { errorCode: "DATABASE_UNAVAILABLE" }));
+    }
+    const provisioned = await serviceDatabase.provisioner.provision({
+      appName,
+      migrationCommand: manifest.manifest.database.migrationCommand
+    });
+    if (!provisioned.created || !provisioned.password) {
+      return reply.status(200).send(serviceDatabaseStatusSchema.parse({ ...provisioned, password: undefined }));
+    }
+    try {
+      const namespace = manifest.manifest.deployment.namespace;
+      const url = serviceDatabaseUrl(serviceDatabase.gatewayHost, serviceDatabase.databaseName, provisioned.roleName, provisioned.password);
+      await serviceDatabase.secretWriter.write(namespace, provisioned.secretName, { DATABASE_URL: url });
+      await serviceDatabase.provisioner.markReady(appName);
+      return reply.status(201).send(serviceDatabaseStatusSchema.parse({ ...provisioned, status: "READY", password: undefined }));
+    } catch (error) {
+      request.log.error({ err: error, appName }, "service database secret provisioning failed");
+      return reply.status(502).send(errorBody("Service database Secret provisioning failed.", { errorCode: "DEPLOYMENT_FAILED" }));
+    }
+  });
+
+  app.get("/admin/hosted-services/:appName/database", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success || !isAdmin(callerId.data)) {
+      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    }
+    if (!serviceDatabase) {
+      return reply.status(503).send(errorBody("Service database is not configured.", { errorCode: "DATABASE_UNAVAILABLE" }));
+    }
+    const appName = ((request.params as { appName?: string }).appName ?? "").trim();
+    const status = await serviceDatabase.provisioner.getStatus(appName);
+    if (!status) return reply.status(404).send(notFoundBody("Service database not found."));
+    return reply.status(200).send(serviceDatabaseStatusSchema.parse(status));
+  });
+
+  app.post("/admin/hosted-services/:appName/database/purge", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success || !isAdmin(callerId.data)) {
+      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    }
+    if (!serviceDatabase) {
+      return reply.status(503).send(errorBody("Service database is not configured.", { errorCode: "DATABASE_UNAVAILABLE" }));
+    }
+    const appName = ((request.params as { appName?: string }).appName ?? "").trim();
+    const parsed = serviceDatabasePurgeRequestSchema.safeParse(request.body);
+    if (!parsed.success || parsed.data.confirmation !== appName) {
+      return reply.status(400).send(errorBody("Purge confirmation must exactly match appName.", { errorCode: "INVALID_REQUEST" }));
+    }
+    const status = await serviceDatabase.provisioner.getStatus(appName);
+    if (!status) return reply.status(404).send(notFoundBody("Service database not found."));
+    try {
+      const manifest = await buildService.getServiceManifest(appName);
+      const namespace = manifest?.manifest.deployment.namespace ?? "dib-hosted";
+      await serviceDatabase.secretWriter.remove(namespace, status.secretName);
+      const purged = await serviceDatabase.provisioner.purge(appName);
+      if (!purged) return reply.status(404).send(notFoundBody("Service database not found."));
+      return reply.status(200).send(serviceDatabasePurgeResponseSchema.parse(purged));
+    } catch (error) {
+      request.log.error({ err: error, appName }, "service database purge failed");
+      return reply.status(502).send(errorBody("Service database purge failed.", { errorCode: "DEPLOYMENT_FAILED" }));
+    }
+  });
+
+  app.post("/admin/hosted-services/:appName/database/rotate", async (request, reply) => {
+    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+    if (!callerId.success || !isAdmin(callerId.data)) {
+      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    }
+    if (!serviceDatabase) {
+      return reply.status(503).send(errorBody("Service database is not configured.", { errorCode: "DATABASE_UNAVAILABLE" }));
+    }
+    const appName = ((request.params as { appName?: string }).appName ?? "").trim();
+    const parsed = serviceDatabaseRotationRequestSchema.safeParse(request.body);
+    if (!parsed.success || parsed.data.confirmation !== appName) {
+      return reply.status(400).send(errorBody("Rotation confirmation must exactly match appName.", { errorCode: "INVALID_REQUEST" }));
+    }
+    const current = await serviceDatabase.provisioner.getStatus(appName);
+    if (!current) return reply.status(404).send(notFoundBody("Service database not found."));
+    try {
+      const rotated = await serviceDatabase.provisioner.rotate(appName);
+      if (!rotated?.password) return reply.status(404).send(notFoundBody("Service database not found."));
+      const manifest = await buildService.getServiceManifest(appName);
+      const namespace = manifest?.manifest.deployment.namespace ?? "dib-hosted";
+      const url = serviceDatabaseUrl(serviceDatabase.gatewayHost, serviceDatabase.databaseName, rotated.roleName, rotated.password);
+      await serviceDatabase.secretWriter.write(namespace, rotated.secretName, { DATABASE_URL: url });
+      await serviceDatabase.provisioner.markReady(appName);
+      return reply.status(200).send(serviceDatabaseStatusSchema.parse({ ...rotated, status: "READY", password: undefined }));
+    } catch (error) {
+      await serviceDatabase.provisioner.markFailed(appName, error instanceof Error ? error.message : String(error));
+      request.log.error({ err: error, appName }, "service database rotation failed");
+      return reply.status(502).send(errorBody("Service database Secret rotation failed.", { errorCode: "DEPLOYMENT_FAILED" }));
+    }
   });
 
   // 관리 라이프사이클 (TASK-168 / P3-M3): stop/start/delete → kubectl.

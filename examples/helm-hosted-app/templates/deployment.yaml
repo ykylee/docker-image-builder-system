@@ -4,6 +4,7 @@ metadata:
   name: {{ include "dib-hosted-app.fullname" . }}
   labels:
     app.kubernetes.io/name: {{ include "dib-hosted-app.name" . }}
+    app.kubernetes.io/hosted-service: "true"
 spec:
   replicas: {{ .Values.replicaCount | default 1 }}
   selector:
@@ -13,7 +14,27 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: {{ include "dib-hosted-app.name" . }}
+        app.kubernetes.io/hosted-service: "true"
     spec:
+      {{- if .Values.database.migrationCommand }}
+      initContainers:
+        - name: service-database-migration
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          args: [{{ .Values.database.migrationCommand | quote }}]
+          {{- with .Values.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName | quote }}
+                  key: DATABASE_URL
+                  optional: false
+      {{- end }}
       containers:
         - name: app
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -21,6 +42,14 @@ spec:
           env:
             - name: APP_BASE_PATH
               value: {{ .Values.hosting.basePath | quote }}
+            {{- if .Values.database.secretName }}
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName | quote }}
+                  key: DATABASE_URL
+                  optional: true
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

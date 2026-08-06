@@ -18,6 +18,17 @@
   margin: 0;
 }
 
+.database-status {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.database-status .muted {
+  font-size: var(--dib-size-xs, 11px);
+}
+
 .hosting-page .mono {
   font-family: var(--dib-font-mono, ui-monospace, monospace);
 }
@@ -340,4 +351,3 @@
   color: #ffffff;
   border-color: var(--dib-color-accent-danger, #f15656);
 }
-

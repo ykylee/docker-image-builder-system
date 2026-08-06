@@ -68,6 +68,16 @@ type K8sDeployOptions struct {
 	HostingScheme string
 	BaseHost      string
 	Resources     *ResourceProfile
+	// APIServiceName/APIServicePort optionally expose a cluster-local control
+	// plane under <context>/api. Hosted bundles must use this route instead of
+	// learning a host IP or host port.
+	APIServiceName string
+	APIServicePort int
+	// DatabaseSecretName is an optional service-local Secret. The reference is
+	// optional so apps without database provisioning keep working; when the
+	// platform provisions it, DATABASE_URL is injected without exposing a host.
+	DatabaseSecretName       string
+	DatabaseMigrationCommand string
 	// Helm adapter 입력. Chart 는 chart directory/archive 경로이며, chart 는
 	// 표준 values contract(image.repository/image.tag/service.port/hosting.*)
 	// 을 소비해야 한다.

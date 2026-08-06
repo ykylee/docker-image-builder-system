@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -91,6 +92,9 @@ func (d *kubectlDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K
 	if opts.BuildID == "" {
 		return nil, fmt.Errorf("deploy: buildID is required")
 	}
+	if strings.TrimSpace(opts.DatabaseMigrationCommand) != "" && strings.TrimSpace(opts.DatabaseSecretName) == "" {
+		return nil, fmt.Errorf("deploy: database migration requires a Secret reference")
+	}
 
 	namespace := d.namespaceOf(opts)
 	name := deploymentName(opts.BuildID)
@@ -103,7 +107,7 @@ func (d *kubectlDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K
 	if contextPath == "" {
 		contextPath = name
 	}
-	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath, opts.StripPrefix, opts.HostingScheme, opts.BaseHost, opts.Resources)
+	manifest := renderK8sManifest(name, namespace, opts.SourceImage, port, contextPath, opts.StripPrefix, opts.HostingScheme, opts.BaseHost, opts.Resources, opts.APIServiceName, opts.APIServicePort, opts.DatabaseSecretName, opts.DatabaseMigrationCommand)
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, d.timeout)
 	defer cancel()
@@ -238,7 +242,7 @@ func deploymentName(buildID string) string {
 //     `/<cp>/...` 를 직접 서빙(base-path-aware 서버, 예: Next basePath).
 //
 // 어느 경우든 APP_BASE_PATH env 는 주입한다. ingressClassName=nginx 전제.
-func renderK8sManifest(name, namespace, image string, port int, contextPath string, stripPrefix bool, hostingScheme, baseHost string, resources *ResourceProfile) string {
+func renderK8sManifest(name, namespace, image string, port int, contextPath string, stripPrefix bool, hostingScheme, baseHost string, resources *ResourceProfile, apiServiceName string, apiServicePort int, databaseSecretNames ...string) string {
 	replicas := 1
 	resourceYaml := ""
 	quotaYaml := "---\n"
@@ -249,6 +253,9 @@ func renderK8sManifest(name, namespace, image string, port int, contextPath stri
 		}
 		resourceYaml = fmt.Sprintf("          resources:\n            requests:\n              cpu: %q\n              memory: %q\n            limits:\n              cpu: %q\n              memory: %q\n", resources.CPURequest, resources.MemoryRequest, resources.CPULimit, resources.MemoryLimit)
 		quota := quotaForTier(resources.Tier)
+		if strings.TrimSpace(apiServiceName) != "" && stripPrefix {
+			quota = quotaForTierWithControlPlane(resources.Tier)
+		}
 		quotaYaml = fmt.Sprintf("---\napiVersion: v1\nkind: ResourceQuota\nmetadata:\n  name: dib-%s-quota\n  namespace: %s\nspec:\n  hard:\n    requests.cpu: %q\n    requests.memory: %q\n    limits.cpu: %q\n    limits.memory: %q\n    pods: %q\n---\n", resources.Tier, namespace, quota.cpu, quota.memory, quota.cpuLimit, quota.memoryLimit, quota.pods)
 	}
 	// TASK-172 (v0.5.0): subdomain 스킴이면 Ingress host rule 로 라우팅하고
@@ -270,6 +277,34 @@ func renderK8sManifest(name, namespace, image string, port int, contextPath stri
 		ingressPath = fmt.Sprintf("/%s(/|$)(.*)", contextPath)
 		pathType = "ImplementationSpecific"
 	}
+	apiIngressPath := ""
+	databaseSecretName := ""
+	databaseMigrationCommand := ""
+	if len(databaseSecretNames) > 0 {
+		databaseSecretName = databaseSecretNames[0]
+	}
+	if len(databaseSecretNames) > 1 {
+		databaseMigrationCommand = databaseSecretNames[1]
+	}
+	databaseEnv := ""
+	databaseMigration := ""
+	if strings.TrimSpace(databaseSecretName) != "" {
+		databaseEnv = fmt.Sprintf("            - name: DATABASE_URL\n              valueFrom:\n                secretKeyRef:\n                  name: %s\n                  key: DATABASE_URL\n                  optional: true\n", databaseSecretName)
+		// The image is intentionally testable without a platform Secret. Once
+		// deployed with DB opt-in, select the persistent backend together with
+		// the injected connection string; otherwise a service can receive a
+		// valid DATABASE_URL while silently continuing to use in-memory state.
+		databaseEnv += "            - name: BUILD_REPOSITORY_BACKEND\n              value: postgres\n"
+	}
+	if strings.TrimSpace(databaseMigrationCommand) != "" {
+		databaseMigration = fmt.Sprintf("      initContainers:\n        - name: service-database-migration\n          image: %s\n          imagePullPolicy: IfNotPresent\n          command: [\"/bin/sh\", \"-c\"]\n          args: [%s]\n%s          env:\n            - name: DATABASE_URL\n              valueFrom:\n                secretKeyRef:\n                  name: %s\n                  key: DATABASE_URL\n                  optional: false\n", image, strconv.Quote(databaseMigrationCommand), resourceYaml, databaseSecretName)
+	}
+	if hostingScheme != "subdomain" && stripPrefix && strings.TrimSpace(apiServiceName) != "" && apiServicePort > 0 {
+		// The API route is intentionally path-hosting only for now. It strips
+		// /<context>/api and forwards /builds, /services, etc. to a cluster-local
+		// control-plane Service; no host IP or host port is exposed to the app.
+		apiIngressPath = fmt.Sprintf("          - path: /%s/api(/|$)(.*)\n            pathType: ImplementationSpecific\n            backend:\n              service:\n                name: %s\n                port:\n                  number: %d\n", contextPath, apiServiceName, apiServicePort)
+	}
 	return fmt.Sprintf(`apiVersion: v1
 kind: Namespace
 metadata:
@@ -282,6 +317,7 @@ metadata:
   labels:
     app.kubernetes.io/name: %[1]s
     app.kubernetes.io/managed-by: docker-image-builder-system
+    app.kubernetes.io/hosted-service: "true"
 spec:
   replicas: %[6]d
   selector:
@@ -291,7 +327,9 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: %[1]s
+        app.kubernetes.io/hosted-service: "true"
     spec:
+%[15]s
       containers:
         - name: app
           image: %[3]s
@@ -299,6 +337,7 @@ spec:
           env:
             - name: APP_BASE_PATH
               value: "%[5]s"
+%[14]s
           ports:
             - containerPort: %[4]d
 %[12]s
@@ -329,6 +368,7 @@ metadata:
   rules:
     - %[10]shttp:
         paths:
+%[13]s
           - path: %[8]s
             pathType: %[9]s
             backend:
@@ -336,7 +376,7 @@ metadata:
                 name: %[1]s
                 port:
                   number: %[4]d
-`, name, namespace, image, port, appBasePath, replicas, ingressAnnotations, ingressPath, pathType, ruleHost, quotaYaml, resourceYaml)
+`, name, namespace, image, port, appBasePath, replicas, ingressAnnotations, ingressPath, pathType, ruleHost, quotaYaml, resourceYaml, apiIngressPath, databaseEnv, databaseMigration)
 }
 
 type quotaValues struct{ cpu, memory, cpuLimit, memoryLimit, pods string }
@@ -349,5 +389,19 @@ func quotaForTier(tier string) quotaValues {
 		return quotaValues{"2", "2Gi", "2", "2Gi", "2"}
 	default:
 		return quotaValues{"250m", "256Mi", "500m", "512Mi", "1"}
+	}
+}
+
+func quotaForTierWithControlPlane(tier string) quotaValues {
+	switch tier {
+	case "production":
+		return quotaValues{"16", "16Gi", "16", "16Gi", "5"}
+	case "standard":
+		return quotaValues{"4", "4Gi", "4", "4Gi", "3"}
+	default:
+		// One hosted app plus the cluster-local control-plane and DB gateway
+		// pods. The gateway is part of the hosted runtime boundary and must be
+		// counted even though it is not created by this deployment.
+		return quotaValues{"2", "2Gi", "2", "2Gi", "3"}
 	}
 }

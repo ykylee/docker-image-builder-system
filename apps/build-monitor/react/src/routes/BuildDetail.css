@@ -235,7 +235,7 @@
   margin-top: 4px;
 }
 
-.runtime-url-link {
+.runtime-url-box a.runtime-url-link {
   display: inline-flex;
   align-items: center;
   gap: var(--dib-space-xs, 4px);
@@ -250,7 +250,7 @@
   transition: opacity var(--dib-motion-duration-fast, 150ms);
 }
 
-.runtime-url-link:hover {
+.runtime-url-box a.runtime-url-link:hover {
   opacity: 0.9;
   text-decoration: underline;
   box-shadow: var(--dib-shadow-glow);

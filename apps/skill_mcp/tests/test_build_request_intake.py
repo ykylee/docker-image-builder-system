@@ -117,6 +117,35 @@ class ShapeCoreTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any(e["code"] == "INVALID_ENV" for e in result.errors))
 
+    def test_service_database_connection_values_are_rejected(self) -> None:
+        result = shape(
+            {
+                "userId": "u",
+                "appName": "demo-app",
+                "sourceRef": "x",
+                "env": {"DATABASE_URL": "postgres://user:password@db/app"},
+            }
+        )
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(e["code"] == "SERVICE_DATABASE_POLICY_VIOLATION" for e in result.errors)
+        )
+
+    def test_dockerfile_override_cannot_declare_service_database(self) -> None:
+        result = shape(
+            {
+                "userId": "u",
+                "appName": "demo-app",
+                "sourceRef": "x",
+                "env": {},
+                "dockerfileOverride": "FROM node:22\nENV DB_HOST=postgres\n",
+            }
+        )
+        self.assertFalse(result.ok)
+        self.assertTrue(
+            any(e["code"] == "SERVICE_DATABASE_POLICY_VIOLATION" for e in result.errors)
+        )
+
     def test_unknown_top_level_fields_go_to_extra(self) -> None:
         result = shape(
             {

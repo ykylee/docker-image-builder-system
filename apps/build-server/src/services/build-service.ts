@@ -278,6 +278,15 @@ export class BuildService {
       result.response.build.buildId,
       "claimed"
     );
+    const manifest = await this.repository.getServiceManifest(result.response.build.appName);
+    if (manifest) {
+      result.response.build.database = {
+        enabled: manifest.manifest.database.enabled,
+        ...(manifest.manifest.database.migrationCommand
+          ? { migrationCommand: manifest.manifest.database.migrationCommand }
+          : {})
+      };
+    }
     return {
       claimed: true,
       build: result.response,
@@ -322,6 +331,10 @@ export class BuildService {
   // ---- Hosting management (TASK-166 / P3-M1) --------------------------------
   listHostedServices() {
     return this.repository.listHostedServices();
+  }
+
+  listHostedServicesByOwner(requestedBy: string) {
+    return this.repository.listHostedServicesByOwner(requestedBy);
   }
 
   getHostedService(appName: string) {

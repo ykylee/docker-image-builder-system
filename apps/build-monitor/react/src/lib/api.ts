@@ -9,15 +9,38 @@
 // inference 가 깨지는 known issue 가 있어서 helper 의 return 은
 // `unknown` 으로 두고 caller 가 inline cast 한다 (TASK-079 주석과 동일).
 //
-// baseUrl 은 `/api` — dev:react 의 vite proxy 가 :3000 으로 forward,
-// production preview 는 별도 (현재 preview server 는 Build Server 와
-// 같은 origin 가정 — TASK-093 Build Server swap 시점에 정합 검토).
+// 개발에서는 Vite proxy가 `/api/*`를 Build Server로 rewrite한다.
+// production에서는 Build Server가 same-origin으로 API와 SPA를 함께 서빙하므로
+// 307 redirect를 거치지 않고 실제 route를 직접 호출한다. redirect 중 일부
+// 브라우저/프록시가 X-Admin-Id header를 보존하지 않아 admin 목록이 비는 문제를
+// 피하기 위한 정렬이다.
 
 import createClient from "openapi-fetch";
 import type { paths, components } from "../../../.generated/openapi.d.ts";
 
+const APP_ROUTE_ROOTS = new Set(["login", "builds", "services", "build-request", "api-console", "admin"]);
+
+export function getApiBaseUrl(): string {
+  if (import.meta.env.DEV) return "/api";
+  if (typeof window !== "undefined") {
+    const firstSegment = window.location.pathname.split("/").filter(Boolean)[0] ?? "";
+    if (firstSegment !== "" && !APP_ROUTE_ROOTS.has(firstSegment)) {
+      // openapi-fetch concatenates baseUrl and schema paths as strings. An
+      // absolute context-aware base is therefore required; `./api` would be
+      // resolved from `/context/admin/` as `/context/admin/api/...` for a
+      // deep Admin route.
+      return `/${firstSegment}/api`;
+    }
+    return "/api";
+  }
+  return "/api";
+}
+
 export const api = createClient<paths>({
-  baseUrl: "/api"
+  // Hosted bundles use the cluster-local Ingress API route (`<context>/api`);
+  // they never receive or construct a host IP/port. Root Build Server hosting
+  // keeps the existing same-origin route.
+  baseUrl: getApiBaseUrl()
 });
 
 type ApiGetParams = {
@@ -75,6 +98,14 @@ export async function listBuilds(
     "/builds",
     { params: { query } }
   )) as BuildListResponse;
+}
+
+export async function listUserHostedServices(
+  userId: string
+): Promise<{ services: HostedServiceView[] }> {
+  return (await apiGet("/services", "/services", {
+    headers: { "X-User-Id": userId }
+  })) as { services: HostedServiceView[] };
 }
 
 // TASK-091: 단일 build 상세 조회 (GET /builds/{buildId}). path parameter 는
@@ -210,6 +241,29 @@ export async function listHostedServices(
   return (await apiGet("/admin/hosted-services", "/admin/hosted-services", {
     headers: { "X-Admin-Id": callerId }
   })) as { services: HostedServiceView[] };
+}
+
+export type ServiceDatabaseStatusView = {
+  appName: string;
+  engine: "postgres";
+  schemaName: string;
+  roleName: string;
+  secretName: string;
+  status: "PROVISIONING" | "READY" | "FAILED";
+  migrationCommand: string | null;
+  migrationRevision: number | null;
+  created: boolean;
+};
+
+export async function getHostedServiceDatabaseStatus(
+  callerId: string,
+  appName: string
+): Promise<ServiceDatabaseStatusView> {
+  return (await apiGet(
+    "/admin/hosted-services/{appName}/database",
+    `/admin/hosted-services/${encodeURIComponent(appName)}/database`,
+    { headers: { "X-Admin-Id": callerId }, params: { path: { appName } } }
+  )) as ServiceDatabaseStatusView;
 }
 
 export type HostingCapacityView = {

@@ -147,8 +147,10 @@ func (d *argoCDDeployer) Deploy(ctx context.Context, opts K8sDeployOptions) (*K8
 		ImageRepository: repo, ImageTag: tag, ServicePort: opts.ContainerPort,
 		ContextPath: contextPath, StripPrefix: opts.StripPrefix,
 		HostingScheme: defaultHostingScheme(opts.HostingScheme), BaseHost: opts.BaseHost,
-		Resources: opts.Resources,
-		BuildID:   opts.BuildID,
+		Resources:                opts.Resources,
+		DatabaseSecretName:       opts.DatabaseSecretName,
+		DatabaseMigrationCommand: opts.DatabaseMigrationCommand,
+		BuildID:                  opts.BuildID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("deploy: render ArgoCD application: %w", err)
@@ -218,14 +220,14 @@ func (d *argoCDDeployer) Cleanup(ctx context.Context, opts K8sCleanupOptions) er
 }
 
 type argoApplicationOptions struct {
-	Name, ArgoNamespace, Project, RepoURL, Path, Revision string
-	Destination, TargetNamespace                          string
-	ImageRepository, ImageTag                             string
-	ServicePort                                           int
-	ContextPath, HostingScheme                            string
-	StripPrefix                                           bool
-	BaseHost, BuildID                                     string
-	Resources                                             *ResourceProfile
+	Name, ArgoNamespace, Project, RepoURL, Path, Revision           string
+	Destination, TargetNamespace                                    string
+	ImageRepository, ImageTag                                       string
+	ServicePort                                                     int
+	ContextPath, HostingScheme                                      string
+	StripPrefix                                                     bool
+	BaseHost, BuildID, DatabaseSecretName, DatabaseMigrationCommand string
+	Resources                                                       *ResourceProfile
 }
 
 func renderArgoCDApplication(opts argoApplicationOptions) (string, error) {
@@ -243,6 +245,12 @@ func renderArgoCDApplication(opts argoApplicationOptions) (string, error) {
 		{"name": "hosting.scheme", "value": defaultHostingScheme(opts.HostingScheme), "forceString": true},
 		{"name": "hosting.baseHost", "value": opts.BaseHost, "forceString": true},
 		{"name": "build.id", "value": opts.BuildID, "forceString": true},
+	}
+	if strings.TrimSpace(opts.DatabaseSecretName) != "" {
+		parameters = append(parameters, map[string]any{"name": "database.secretName", "value": opts.DatabaseSecretName, "forceString": true})
+	}
+	if strings.TrimSpace(opts.DatabaseMigrationCommand) != "" {
+		parameters = append(parameters, map[string]any{"name": "database.migrationCommand", "value": opts.DatabaseMigrationCommand, "forceString": true})
 	}
 	if opts.Resources != nil {
 		quota := quotaForTier(opts.Resources.Tier)

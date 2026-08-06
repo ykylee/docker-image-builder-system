@@ -128,10 +128,11 @@ export const buildSummarySchema = z
     // TASK-160 (P2-M1 Step 3): `previewStatus` shim 제거. canonical `test`
     // 블록이 컨테이너 테스트 상태의 단일 출처다.
     // TASK-161 (P2-M2): `previewUrl` → `runtimeUrl` 로 최종 개명 완료.
-    // 이 필드는 실제 런타임 URL 을 나르는 유일한 요약 필드다.
+    // 이 필드는 public hosted runtime URL만 나른다. container-test의
+    // 내부 주소(container-test.local 등)는 test 단계 내부 정보다.
     runtimeUrl: z.string().url().nullable().meta({
       description:
-        "Runtime endpoint of the container under test (canonical name; `build_test.runtime_url` 과 동일 개념). TASK-161 에서 preview-era 의 `previewUrl` 을 대체했다."
+        "Public hosted runtime URL, populated only after a successful hosted deployment. Internal container-test addresses are not exposed here."
     }),
     // TASK-166/167 (P3): 호스팅 입력. context path 는 배포 시 runner 가 Ingress
     // path 로 쓰고, runtimePort 는 컨테이너 내부 포트다. claim 응답을 통해
@@ -155,6 +156,16 @@ export const buildSummarySchema = z
     hostingPolicyVersion: z.string().min(1).optional(),
     resources: hostingResourcesSchema.optional(),
     dockerfileMode: z.enum(dockerfileModes).optional(),
+    // Service manifest DB policy is attached to runner claims only. It contains
+    // no endpoint, schema, role, or credential; the runner derives the Secret
+    // name from appName and receives the URL through Kubernetes SecretRef.
+    database: z
+      .object({
+        enabled: z.boolean(),
+        migrationCommand: z.string().min(1).max(512).optional()
+      })
+      .strict()
+      .optional(),
     lifecycleStatus: z.enum(canonicalBuildStatuses).optional().meta({
       description:
         "Canonical lifecycle status projected from the build/test/deploy pipeline model. Optional during the migration window."
@@ -329,6 +340,7 @@ export const deploymentReportRequestSchema = z
     contextPath: z.string().min(1).nullable().optional(),
     namespace: z.string().min(1).nullable().optional(),
     deploymentName: z.string().min(1).nullable().optional(),
+    runtimeUrl: z.string().url().nullable().optional(),
     runnerId: z.string().min(1),
     responsePayloadJson: z.record(z.string(), z.unknown()).nullable().optional()
   })

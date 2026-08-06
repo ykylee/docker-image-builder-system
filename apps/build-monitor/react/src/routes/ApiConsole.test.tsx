@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 
-import { ApiConsole } from "./ApiConsole";
+import { ApiConsole, getApiDocsUrl } from "./ApiConsole";
 
 beforeEach(() => {
   vi.spyOn(window, "open").mockImplementation(() => null);
@@ -32,6 +32,13 @@ describe("ApiConsole (React) — TASK-099", () => {
     renderPage();
     const iframe = screen.getByTitle("Build Server Scalar API Reference") as HTMLIFrameElement;
     expect(iframe.src.endsWith("/docs/")).toBe(true);
+  });
+
+  it("keeps docs inside a hosted context path", () => {
+    expect(getApiDocsUrl("/docker-image-builder-system-admin-20260805-api-fixed/api-console")).toBe(
+      "/docker-image-builder-system-admin-20260805-api-fixed/docs/"
+    );
+    expect(getApiDocsUrl("/api-console")).toBe("/docs/");
   });
 
   it("renders the API Console heading and frame wrap", () => {

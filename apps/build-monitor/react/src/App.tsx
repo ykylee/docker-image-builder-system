@@ -48,6 +48,7 @@ import { Login } from "@/routes/Login";
 // 하나 더 붙는다. 나머지는 최소 한 번의 사용자 행동(로그인/탐색) 뒤에
 // 필요하므로 그 시점에 받아도 늦지 않다.
 const BuildsList = lazy(async () => ({ default: (await import("@/routes/BuildsList")).BuildsList }));
+const ServicesList = lazy(async () => ({ default: (await import("@/routes/ServicesList")).ServicesList }));
 const BuildDetail = lazy(async () => ({ default: (await import("@/routes/BuildDetail")).BuildDetail }));
 const BuildRequest = lazy(async () => ({ default: (await import("@/routes/BuildRequest")).BuildRequest }));
 const ApiConsole = lazy(async () => ({ default: (await import("@/routes/ApiConsole")).ApiConsole }));
@@ -85,6 +86,7 @@ export function App(): ReactElement {
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/builds" element={<BuildsList />} />
+          <Route path="/services" element={<ServicesList />} />
           <Route path="/builds/:buildId" element={<BuildDetail />} />
           <Route path="/build-request" element={<BuildRequest />} />
           <Route path="/api-console" element={<ApiConsole />} />
@@ -92,6 +94,8 @@ export function App(): ReactElement {
           <Route path="/admin/users" element={<AdminUsers />} />
           <Route path="/admin/admins" element={<AdminAdmins />} />
           <Route path="/admin/runners" element={<AdminRunners />} />
+          <Route path="/admin/services" element={<AdminHostedServices />} />
+          {/* Backward-compatible alias for the original hosting management URL. */}
           <Route path="/admin/hosting" element={<AdminHostedServices />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>

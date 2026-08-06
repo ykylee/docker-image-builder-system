@@ -1,6 +1,6 @@
 import { strict as assert } from "node:assert";
 import { describe, it, before, after } from "node:test";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -129,6 +129,21 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
     assert.match(body, /<svg-react/);
   });
 
+  it("serves nested Vite assets below a deep SPA route", async () => {
+    const nestedDir = join(reactDistDir, "assets");
+    mkdirSync(nestedDir);
+    writeFileSync(join(nestedDir, "index.js"), "console.log('nested');");
+    const res = await fetch(`${baseUrl}/admin/assets/index.js`);
+    assert.equal(res.status, 200);
+    assert.equal(await res.text(), "console.log('nested');");
+  });
+
+  it("serves a deep-link favicon", async () => {
+    const res = await fetch(`${baseUrl}/admin/favicon.svg`);
+    assert.equal(res.status, 200);
+    assert.match(await res.text(), /<svg-react/);
+  });
+
   it("preserves Build Server API routing — GET /health returns JSON", async () => {
     const res = await fetch(`${baseUrl}/health`);
     assert.equal(res.status, 200);
@@ -187,6 +202,15 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
     assert.match(await res.text(), new RegExp(REACT_STUB));
   });
 
+  it("Sec-Fetch-Dest 없이도 HTML 문서 요청은 SPA 를 받는다", async () => {
+    const res = await fetch(`${baseUrl}/admin/builds`, {
+      headers: { accept: "text/html,application/xhtml+xml" }
+    });
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get("content-type") ?? "", /text\/html/);
+    assert.match(await res.text(), new RegExp(REACT_STUB));
+  });
+
   it("Sec-Fetch-Dest 없는 API 호출은 종전대로 JSON — 계약 무변경", async () => {
     const res = await fetch(`${baseUrl}/builds`);
     assert.equal(res.status, 200);
@@ -241,6 +265,15 @@ describe("Build Server single-port reverse proxy (TASK-075 + TASK-093 + TASK-094
     assert.equal(res.status, 307);
     const location = res.headers.get("location") ?? "";
     assert.match(location, /^\/builds\//);
+  });
+
+  it("API_REWRITE_ALLOWED_PREFIXES: /api/services → /services 307", async () => {
+    const res = await fetch(`${baseUrl}/api/services`, {
+      headers: { ...NAV_HEADERS, "X-User-Id": "admin" },
+      redirect: "manual"
+    });
+    assert.equal(res.status, 307);
+    assert.equal(res.headers.get("location"), "/services");
   });
 });
 
