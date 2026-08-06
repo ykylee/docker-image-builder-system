@@ -401,6 +401,79 @@
   - legacy X-User-Id / X-Admin-Id sunset 정책 — cookie 인증 완전 전환 후 일정 기간 (운영 권장 1 release cycle) 후 legacy 코드 경로 (resolveCaller / enforceAdminGuard 의 legacy fallback) 자체를 제거하는 sunset 결정. 본 TASK 범위 밖.
   - 멀티 탭 logout 의 broadcast channel — `storage` event 기반 cross-tab cookie invalidation. 본 TASK 범위 밖.
 
+## 3.14 Phase 2 — Runner 인증 (HMAC lease token) 운영 패턴
+- 의도: Runner 가 Build Server 의 build-scoped API (`POST /builds/claim` / `/builds/:id/phase` / `/builds/:id/container-test/{start,result}` / `/builds/:id/deployment`) 를 호출할 때 인증이 부재했던 결함을 HMAC v2 lease token + principal preHandler 로 봉인. Phase 1 의 X-User-Id / X-Admin-Id 평문 헤더 위조 결함과 동일한 카테고리 — 운영자가 secret manager 로 secret 을 일관 관리하면 위조가 불가능. 1·2차 봉인: lease 발급 + 갱신 + build-scoped API enforce.
+- 결정:
+  - **`POST /auth/runner-login`** 신규 — Runner 가 자기 신원 (RUNNER_ID env 와 일치) 을 선언하며 lease token 발급. RUNNER_HMAC_SECRET 이 build-server 측에 셋업되어 있어야 하며, 동일 secret 이 runner 측 환경에도 있어야 한다. unknown runner 면 401 + Runner is not registered. DISABLED runner 면 403 + Runner is disabled by admin (TASK-069 의 RUNNER_DISABLED gate 와 정합).
+  - **`POST /auth/runner-lease-renew`** 신규 — Runner 가 만료 전 lease 갱신. 만료된 lease 는 401 reject. 갱신 시 동일 subject + role + 새 jti 발급 — 이전 jti 는 server 측 revoke Set 에 등록되어 stale client 의 lease 재사용 차단.
+  - **`ClaimResponse`** schema 확장 — `leaseToken` + `expiresAt` nullable 필드 추가. claim 성공 시 동봉. claimed=false 면 둘 다 null.
+  - **`BuildService.claimNextBuild`** 가 BuildService.runtime.identityProvider 가 셋업된 환경에서 lease 발급. 미셋업 환경 (단위 테스트 / legacy 운영 baseline) 에서는 lease 미발급.
+  - **`enforceRunnerLease`** helper 신규 — build-routes 의 5개 Runner API 진입 시 호출. cookie/Bearer 인증 + role=runner 면 통과, admin/user 면 silent skip (기존 owner policy), 인증 부재면 401 + Authentication required + hint. `leaseGateEnabled: false` 인 환경 (단위 테스트 / legacy 운영 baseline) 에서는 silent skip.
+- 신규 회귀 가드:
+  - **`apps/build-server/tests/runner-lease.test.ts`** 7 case (login 성공 / unknown 401 / DISABLED 403 / invalid body 400 / renew 성공 / 인증 부재 401 / admin role 403).
+  - runner Go test mock interface: `EnsureLease` / `RenewLease` / `LoginLease` no-op 추가 (interface 정합).
+- 핵심 변경:
+  - `packages/shared-contract/src/auth/index.ts` `principalRoleSchema` 에 `"runner"` 추가. `runnerLoginRequestSchema` + `runnerLeaseResponseSchema` 신규.
+  - `packages/shared-contract/src/build/response.ts` `claimResponseSchema` 에 `leaseToken` + `expiresAt` nullable 필드 추가.
+  - `apps/build-server/src/auth/hmac-identity-provider.ts` `issueWithExpiresAt(subject, role, ttlSeconds)` 신규. `role !== "user"/"admin"/"runner"` 검증 + v2 wire format (Phase 1 3단계와 동일).
+  - `apps/build-server/src/auth/identity-provider.ts` interface 에 `issueWithExpiresAt` 추가.
+  - `apps/build-server/src/services/build-service.ts` `getRunnerStatus` thin wrapper + `BuildService.runtime.identityProvider` + `leaseTtlSeconds` 옵션. `claimNextBuild` 가 identityProvider 셋업 시 lease 발급 후 `leaseToken` + `expiresAt` 동봉.
+  - `apps/build-server/src/routes/auth-routes.ts` `/auth/runner-login` + `/auth/runner-lease-renew` 신규. registerAuthRoutes 시그니처에 BuildService 인자 추가.
+  - `apps/build-server/src/routes/build-routes.ts` `enforceRunnerLease` helper + `leaseGateEnabled` option (OwnerPolicyOptions 신규 필드). 5개 Runner API 진입 시 호출.
+  - `apps/build-server/src/app/create-app.ts` BuildService instantiation 에 identityProvider + leaseTtlSeconds 추가. buildOwnerPolicyOptions.leaseGateEnabled = identityProvider !== undefined.
+  - `apps/runner/internal/hostclient/build_control_client.go` `HTTPBuildControlClient` 에 `lease atomic.Value` + `setAuthHeader` + `LoginLease` / `RenewLease` / `EnsureLease` / `GetLeaseExpiresAt` 메서드. BuildControlClient interface 에 3개 메서드 추가. 모든 claim/phase/container-test/deployment/source 호출에 lease Bearer 헤더 첨부.
+  - runner Go test mock interface (worker/services/source) 에 3개 lease 메서드 no-op 추가.
+- 운영 명령:
+  ```bash
+  # Production (build-server + runner 모두 셋업)
+  AUTH_HMAC_SECRET=$(cat /run/secrets/auth_hmac_secret) \
+    RUNNER_LEASE_TTL_SECONDS=${RUNNER_LEASE_TTL_SECONDS:-300} \
+    node apps/build-server/dist/apps/build-server/src/index.js
+
+  RUNNER_ID=runner-prod-east-1 \
+    BUILD_SERVER_HMAC_SECRET=$(cat /run/secrets/runner_hmac_secret) \
+    apps/runner/bin/runner
+  ```
+- 운영 검증 절차:
+  ```bash
+  # 1) health
+  curl -i http://<host>:3000/health                                  # → 200 {"status":"ok"}
+  # 2) admin /admin/runners 로 runner pre-register
+  curl -i -X POST http://<host>:3000/admin/runners \
+    -H "x-admin-id: admin" -H "content-type: application/json" \
+    -d '{"runnerId":"runner-verify"}'                                # → 201
+  # 3) /auth/runner-login — lease 발급
+  curl -i -X POST http://<host>:3000/auth/runner-login \
+    -H "content-type: application/json" \
+    -d '{"runnerId":"runner-verify"}'                                # → 200 + leaseToken
+  # 4) /builds/claim — lease 첨부
+  curl -i -X POST http://<host>:3000/builds/claim \
+    -H "content-type: application/json" \
+    -H "Authorization: Bearer <leaseToken>" \
+    -d '{"runnerId":"runner-verify"}'                                # → 200 + ClaimResponse
+  # 5) /auth/runner-lease-renew — 갱신
+  curl -i -X POST http://<host>:3000/auth/runner-lease-renew \
+    -H "Authorization: Bearer <leaseToken>"                          # → 200 + 새 leaseToken
+  # 6) lease 없이 /builds/claim 호출 → 401
+  curl -i -X POST http://<host>:3000/builds/claim \
+    -H "content-type: application/json" \
+    -d '{"runnerId":"runner-verify"}'                                # → 401 + Authentication required
+  ```
+- 사전 결함 + 보강 4건:
+  1. **Runner build-scoped API 무인증** — HMAC v2 lease token + Authorization Bearer 헤더 강제. unknown runner 401 + DISABLED 403 + 만료 401 + 갱신 200.
+  2. **Runner 가 무한히 lease 갱신해 stale build 활동 가능** — TTL 5분 default + 만료 60초 전 갱신 + DISABLED 시 갱신 거부. jti 갱신으로 stale client 의 lease 재사용 차단.
+  3. **lease 검증을 build-scoped API 의 모든 라우트에 적용 시 admin/user 정상 호출 차단** — `enforceRunnerLease` 가 role=runner 만 lease 검증 + admin/user silent skip. 단위 테스트는 lease gate 비활성으로 silent skip.
+  4. **HMAC v2 base64url encoding 이 subject 의 `:` 와 충돌** — HmacIdentityProvider.issueWithExpiresAt 가 `:` 차단. runner subject 는 raw runnerId (prefix 없이) — role === "runner" 로 식별.
+- 운영 영향: build-monitor 변경 0. SQL / schema / migration 변경 0. code 변경 0 (단, Phase 1 1·2차 봉인과 동일 wire format / secret 동일).
+- 회귀 baseline: TS 5 packages `--noEmit` clean, build-server node:test **285/285 PASS** (이전 278 + 신규 7), runner `go test ./...` **8 packages PASS** (interface 정합 no-op 추가). session-end 가드 9/9 PASS (release commit 후).
+- 운영 가이드: [`runner-lease-hmac-2026-08-06.md`](operations/runner-lease-hmac-2026-08-06.md) (8 섹션 — 의도 / 결정 / 회귀 baseline / 운영 명령 / 사용 절차 / 운영 환경 배포 절차 / 사전 결함 + 보강 4건 / 운영 환경 baseline / 한계와 follow-up 5종).
+- follow-up:
+  - 메모리 revoke Set 의 멀티 replica 영속화 (Phase 1 follow-up 후보와 동일).
+  - long-running build (multi-hour) 의 lease 자동 갱신 worker.
+  - secret rotation 자동화 (Phase 1 follow-up).
+  - Phase 2 3·4·5차 봉인: Runner별 K8s RBAC / build sandbox 격리 / resource limits + node/namespace 분리.
+  - DISABLED 토글 시 즉시 lease 회수 (WebSocket / SSE 기반 실시간 lease revoke).
+
 ## 다음에 읽을 문서
 - [세션 인계 문서](../ai-workflow/memory/active/session_handoff.md)
 - [작업 백로그](../ai-workflow/memory/active/work_backlog.md)
@@ -424,6 +497,7 @@
 - TASK-085 Production-semantic (memory variant) 운영 가이드 — TASK-112 (양 variant 운영 가이드 cross-reference): [production-semantic-2026-07-07.md](operations/production-semantic-2026-07-07.md)
 - TASK-113 Multi-runner Chunked Postgres 운영 가이드: [multi-runner-chunked-postgres-2026-07-20.md](operations/multi-runner-chunked-postgres-2026-07-20.md)
 - TASK-131 follow-up Phase 1 Identity + 테넌트 권한 (1·2·3·4단계) 운영 가이드: [identity-cookie-hmac-2026-08-06.md](operations/identity-cookie-hmac-2026-08-06.md)
+- Phase 2 Runner 인증 (HMAC lease token) 운영 가이드: [runner-lease-hmac-2026-08-06.md](operations/runner-lease-hmac-2026-08-06.md)
 - [CHANGELOG.md](../CHANGELOG.md) (TASK-123 v0.1.0 release staging anchor)
 - [v0.9.0 release notes](RELEASE_NOTES-v0.9.0-2026-08-04.md) (Helm/ArgoCD adapter + 실 e2e)
 - [Helm/ArgoCD e2e scripts](../apps/runner/scripts/e2e-helm-deploy.sh) / [`e2e-argocd-deploy.sh`](../apps/runner/scripts/e2e-argocd-deploy.sh)

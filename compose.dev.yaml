@@ -86,10 +86,14 @@ services:
       #   true 로 legacy X-User-Id / X-Admin-Id 헤더 fallback 허용.
       # - BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT: legacy ON 환경의 X-User-Id
       #   부재 시 default subject (default "<anonymous>"). self-dogfood 호환.
+      # - RUNNER_LEASE_TTL_SECONDS: Phase 2 (Runner 인증) lease token TTL.
+      #   default 300 (5min). runner 가 만료 60초 전에 /auth/runner-lease-renew
+      #   로 갱신.
       AUTH_HMAC_SECRET: ${AUTH_HMAC_SECRET:-}
       AUTH_TOKEN_TTL_SECONDS: ${AUTH_TOKEN_TTL_SECONDS:-28800}
       AUTH_LEGACY_HEADERS: ${AUTH_LEGACY_HEADERS:-false}
       BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT: ${BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT:-<anonymous>}
+      RUNNER_LEASE_TTL_SECONDS: ${RUNNER_LEASE_TTL_SECONDS:-300}
       NODE_ENV: production
     ports:
       # Override for isolated e2e runs; default remains the local dev port.
