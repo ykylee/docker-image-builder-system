@@ -3,7 +3,7 @@
 - 문서 목적: 본 프로젝트의 release version 별 누적 변경 + 운영 가이드 인덱스 + 회귀 baseline 종합
 - 범위: SemVer 정책, version 별 TASK 1-line 요약, 운영 가이드 인덱스, 회귀 baseline, follow-up 후보
 - 대상 독자: 운영자, release reviewer, AI agent, 프로젝트 온보딩 담당자
-- 상태: released (v0.10.0 — Phase 1 Identity + 테넌트 권한 1차 봉인)
+- 상태: released (v0.12.0 — Revoke / Lease 영속화 + 자동 갱신)
 - 최종 수정일: 2026-08-06
 - 관련 문서: [subdomain 설계](./docs/design/subdomain-hosting.md), [Phase 3 컨셉](./docs/PHASE-3-CONCEPT.md), [Phase 2 컨셉](./docs/PHASE-2-CONCEPT.md), [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md), [Release Notes v0.9.0](./docs/RELEASE_NOTES-v0.9.0-2026-08-04.md), [Release Notes v0.4.0](./docs/RELEASE_NOTES-v0.4.0-2026-07-24.md), [Release Notes v0.3.0](./docs/RELEASE_NOTES-v0.3.0-2026-07-24.md), [Release Notes 2026-07-23](./docs/RELEASE_NOTES-2026-07-23.md), [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md), [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md), [Project Profile](./docs/PROJECT_PROFILE.md), [Identity + 테넌트 권한 운영 가이드](./docs/operations/identity-cookie-hmac-2026-08-06.md)
 
@@ -12,8 +12,10 @@
 본 프로젝트는 **SemVer (Semantic Versioning)** 정책을 따르며 단일 release stream (main branch only) 으로 운영합니다.
 
 - **MAJOR.MINOR.PATCH** — `v0.9.0` 형식
-- **현재 release**: `v0.10.0` (2026-08-06, Phase 1 Identity + 테넌트 권한 1차 봉인)
+- **현재 release**: `v0.12.0` (2026-08-06, Revoke / Lease 영속화 + 자동 갱신)
 - **release history**:
+  - `v0.12.0` (2026-08-07) — minor. Revoke / Lease 영속화 + 자동 갱신. v0.10.0 / v0.11.0 의 in-memory revoke Set 한계 + lease TTL 한계 해소. (1) HMAC 토큰 jti revoke 를 Postgres 로 영속화하여 멀티 build-server replica 운영 시 한 replica 의 logout / lease 갱신 이 모든 replica 에 즉시 전파. (2) long-running build 의 lease TTL (5분) 초과 방지를 위한 background 자동 갱신 worker. 신규 schema `revoke_jti` (migration 0019) + `PersistentRevokeStore` + `HmacIdentityProvider.persistentRevokeStore` 옵션 + `LeaseRenewer` background worker (30s sweep + 만료 30% 시점 expiresAt += TTL). 운영 가이드 [`revoke-lease-persistence-2026-08-06.md`](./docs/operations/revoke-lease-persistence-2026-08-06.md) 신규. v0.11.0 위 호환 (no-breaking) — 기존 in-memory 환경은 동일 동작. postgres backend 환경만 자동으로 영속화 + 자동 갱신 활성. 신규 env 없음. 5 package version 변경 0. 운영자가 staging 에서 `psql \d revoke_jti` + `/auth/runner-login` + `/auth/logout` 6 단계 + LeaseRenewer 자동 갱신 실측 후 production 적용 권장.
+  - `v0.11.0` (2026-08-06) — minor. Phase 2 — Runner 인증 (HMAC lease token) 1·2차 봉인. Runner 가 build-server 의 build-scoped API (`POST /builds/claim` / `/builds/:id/phase` / `/builds/:id/container-test/{start,result}` / `/builds/:id/deployment`) 를 호출할 때 인증이 부재했던 결함을 HMAC v2 lease token + principal preHandler + 만료 전 자동 갱신 흐름으로 봉인. `/auth/runner-login` + `/auth/runner-lease-renew` 신규 + `ClaimResponse.leaseToken` + `ClaimResponse.expiresAt` 필드 추가 + `HmacIdentityProvider.issueWithExpiresAt` + `BuildService.getRunnerStatus` + `enforceRunnerLease` helper + Runner 측 `LoginLease`/`RenewLease`/`EnsureLease` 메서드 (atomic.Value lease 보관). 운영 가이드 [`runner-lease-hmac-2026-08-06.md`](./docs/operations/runner-lease-hmac-2026-08-06.md) 신규. v0.10.0 위 호환 — 신규 env `RUNNER_LEASE_TTL_SECONDS` (default 300) 미설정이면 legacy anonymous claim 동작 (BuildService.runtime.identityProvider 미주입). 5 package version 변경 0. 운영자가 staging 에서 `/auth/runner-login` round-trip 검증 + 동일 `RUNNER_HMAC_SECRET` 을 build-server + 모든 runner 측 env 에 secret manager 로 셋업 후 production 적용 권장.
   - `v0.10.0` (2026-08-06) — minor. Phase 1 — Identity + 테넌트 권한 1차 봉인. `X-User-Id` / `X-Admin-Id` 평문 헤더 위조 + `localStorage userId` 인증 결함을 HMAC 서명 Bearer cookie + principal preHandler + build/admin routes owner/admin policy 로 봉인. 1·2단계 (HMAC IdentityProvider + `/auth/login·logout·whoami` + cookie/Bearer 추출) + 3단계 (build-routes owner policy + v2 base64url wire format — subject `.` 충돌 회피, v1 reject) + 4단계 (admin-routes 14 라우트 inline 가드를 `enforceAdminGuard` + `resolveAdminCallerId` helper 로 일원화). 운영 가이드 [`identity-cookie-hmac-2026-08-06.md`](./docs/operations/identity-cookie-hmac-2026-08-06.md) 신규. 5 package version bump. v0.9.0 위 호환 — 신규 env (`AUTH_HMAC_SECRET` / `AUTH_TOKEN_TTL_SECONDS` / `AUTH_LEGACY_HEADERS` / `BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT`) 가 미설정이면 기존 X-User-Id / X-Admin-Id 호출은 reject (legacy OFF default). 운영자가 staging 에서 cookie 인증 검증 후 production 에 적용 권장.
   - `v0.9.0` (2026-08-04) — minor. Helm/ArgoCD adapter, hosted deployment UI follow-up, Helm/hosted HTTP/ArgoCD 실 e2e, and 5 package version bump. 상세: [Release Notes v0.9.0](./docs/RELEASE_NOTES-v0.9.0-2026-08-04.md).
   - `v0.8.13` (2026-07-27) — patch. 호스팅 e2e CI 운영 가이드 보강 + `session-end` skill 신설. salp 라인의 `docs/operations/hosting-e2e-ci-2026-07-27.md` 흡수(잡 신호 강도·환경·트러블슈팅 9 섹션 260줄) + `ai-workflow/skills/session-end/` 신설(skill 카드 + `run_session_end.py` 가드 5종) + `ai-workflow/core/session_end_skill_spec.md` 13 섹션 + `/workflow-session-end` 슬래시 명령 + standard-ai-workflow §3.4 / global_workflow_standard §8.1 cross-ref. workflow / 스크립트 / SQL / schema / migration 변경 0. `origin/ykylee/salp`(v0.7.1) 의 운영 가이드 1종을 본 단일 라인에 흡수해 단일 release stream 정합.
@@ -44,7 +46,22 @@
 - **release staging anchor**: 각 version 의 tagged commit 이 운영 환경의 release staging 의 단일 anchor.
 - **standard_ai_workflow kit 의 version (`ai-workflow/workflow_kit/pyproject.toml`) 은 별도 stream** — 본 저장소가 의존하는 표준 워크플로우 키트의 자체 versioning 이며 본 프로젝트 release 와 무관 (TASK-121 정책).
 
-## 2. v0.11.0 (2026-08-06) — Phase 2 Runner 인증 (HMAC lease token) 1·2차 봉인 (minor)
+## 2. v0.12.0 (2026-08-06) — Revoke / Lease 영속화 + 자동 갱신 (minor)
+
+본 minor 릴리스는 v0.10.0 / v0.11.0 의 in-memory revoke Set 한계와 lease TTL 한계를 해소한다. (1) HMAC 토큰 jti revoke 를 Postgres 로 영속화하여 멀티 build-server replica 운영 시 한 replica 의 logout / lease 갱신 이 모든 replica 에 즉시 전파. (2) long-running build 의 lease TTL (5분) 초과 방지를 위한 background 자동 갱신 worker. 운영자는 staging 에서 `psql \d revoke_jti` + `/auth/runner-login` + `/auth/logout` 6 단계 + LeaseRenewer 의 `expiresAt += TTL` 자동 갱신을 실측한 뒤 production 적용 권장. 상세 절차는 [Revoke / Lease 영속화 운영 가이드](./docs/operations/revoke-lease-persistence-2026-08-06.md)를 참조한다.
+
+- **§1 신규 schema + migration** — `revoke_jti` table (jti PK + expires_at timestamptz + created_at timestamptz) + `revoke_jti_expires_at_idx`. migration 0019. Postgres backend 운영 환경에서 boot 시 자동 적용.
+- **§2 PersistentRevokeStore** — `apps/build-server/src/auth/persistent-revoke-store.ts`. SELECT (`expires_at > now()` 조건) / INSERT (`ON CONFLICT (jti) DO NOTHING`) / `revokeAll` (no-op, admin 강제 전체 로그아웃 후속). fail-open 정책 — persistent 조회 실패 시 in-memory 만으로 reject. 다음 sweep / TTL 만료로 자연 안전망.
+- **§3 HmacIdentityProvider 확장** — `persistentRevokeStore` 옵션 + `#issuedJtis` map. `verify` 가 in-memory hit 시 fast-path, miss 면 persistent 조회. `revoke(jti)` 가 in-memory + persistent 양쪽 기록. 미주입 시 기존 in-memory only 동작.
+- **§4 LeaseRenewer background worker** — `apps/build-server/src/auth/lease-renewer.ts`. active lease registry (Map<buildId, ActiveLease>) + 30s sweep + 만료 30% 시점 `expiresAt += TTL` + 이전 jti revoke. `setInterval().unref()` + `stop()` + create-app.ts 의 onClose hook. process-local — multi-replica 한계는 follow-up.
+- **§5 BuildService 통합** — `leaseRenewer` 옵션 + `claimNextBuild` 가 identityProvider + leaseRenewer 셋업 시 lease 등록.
+- **§6 운영 환경 baseline** — `BUILD_REPOSITORY_BACKEND=postgres` 일 때만 persistent revoke store + lease renewer 활성. `BUILD_REPOSITORY_BACKEND=memory` 환경은 in-memory only (legacy / 단위 테스트). 신규 env 없음 — 기존 AUTH_HMAC_SECRET + RUNNER_LEASE_TTL_SECONDS + DATABASE_URL 로 충분.
+- **§7 업그레이드 안내 (no-breaking)** — v0.10.0 / v0.11.0 와 호환. 기존 in-memory 환경은 본 minor 적용 후에도 동일 동작. postgres backend 환경만 자동으로 영속화 + 자동 갱신 활성.
+- **§8 follow-up** — revoke_jti cleanup sweeper (Phase 3 follow-up, 현재는 운영자 manual cron 가능) / LeaseRenewer 의 multi-replica 정합 (persistent active_lease table) / fail-open 정책의 운영 metric + alert rule / admin 강제 전체 로그아웃 endpoint (revokeAll 의 TRUNCATE 호출) / DISABLED 토글 시 즉시 lease 회수 (Phase 2 follow-up) / secret rotation 자동화 (Phase 1 follow-up) / Phase 2 3·4·5차 봉인 (Runner별 K8s RBAC / build sandbox 격리 / resource limits + node/namespace 분리).
+
+**검증**: TS 5 packages `--noEmit` clean, build-server `node --import tsx --test tests/*.test.ts` **295/295 PASS** (이전 285 + v0.12.0 신규 10 case: lease-renewer 4 + persistent-revoke-store 6), runner `go test ./...` 8 packages PASS (변경 0), `git diff --check` clean, session-end 가드 9/9 PASS (release commit 후). **불변** — build-monitor / 5 package.json `0.10.0` 외 변경 0. workflow / 스크립트 / SQL / schema (revoke_jti 신규 외) / migration (0019 신규 외) 변경 0. 운영 baseline: AUTH_HMAC_SECRET 운영 secret manager 필수 (Phase 1 정책 정합) / RUNNER_LEASE_TTL_SECONDS default 300 (5분) / BUILD_REPOSITORY_BACKEND=postgres 일 때만 영속화 + 자동 갱신 활성.
+
+## 3. v0.11.0 (2026-08-06) — Phase 2 Runner 인증 (HMAC lease token) 1·2차 봉인 (minor)
 
 본 minor 릴리스는 production-readiness-roadmap Phase 2 의 1차 + 2차 봉인이다. Runner 가 build-server 의 build-scoped API (`POST /builds/claim` / `/builds/:id/phase` / `/builds/:id/container-test/{start,result}` / `/builds/:id/deployment`) 를 호출할 때 인증이 부재했던 결함을 HMAC v2 lease token + principal preHandler + 만료 전 자동 갱신 흐름으로 봉인한다. Phase 1 의 X-User-Id / X-Admin-Id 평문 헤더 위조 결함과 동일한 카테고리 — 운영자가 secret manager 로 secret 을 일관 관리하면 위조가 불가능. 상세 운영 절차는 [Runner 인증 운영 가이드](./docs/operations/runner-lease-hmac-2026-08-06.md)를 참조한다.
 
@@ -62,7 +79,7 @@
 
 **검증**: TS 5 packages `--noEmit` clean, build-server `node --import tsx --test tests/*.test.ts` **285/285 PASS** (이전 278 + Phase 2 신규 7 case: login 4 + renew 3), runner `go test ./...` **8 packages PASS** (stub interface 정합 no-op 추가), `git diff --check` clean, session-end 가드 9/9 PASS (release commit 후). **불변** — build-monitor / SQL / schema / migration / 5 package.json `0.10.0` 외 변경 0. workflow / 스크립트 / SQL / schema / migration 변경 0. 운영 baseline: AUTH_HMAC_SECRET 운영 secret manager 필수 (Phase 1 정책 정합) / AUTH_LEGACY_HEADERS default false / BUILD_OWNER_POLICY_LEGACY_DEFAULT_SUBJECT default `<anonymous>` (legacy ON 환경) / RUNNER_LEASE_TTL_SECONDS default 300.
 
-## 3. v0.10.0 (2026-08-06) — Phase 1 Identity + 테넌트 권한 1차 봉인 (minor)
+## 4. v0.10.0 (2026-08-06) — Phase 1 Identity + 테넌트 권한 1차 봉인 (minor)
 
 본 minor 릴리스는 production-readiness-roadmap Phase 1 의 1차 봉인이다. 기존 `X-User-Id` / `X-Admin-Id` 평문 헤더 + `localStorage userId` 의 위조 가능 + build-scoped / admin-scoped 라우트 무인증의 보안 결함을 HMAC 서명 Bearer cookie + principal preHandler + build/admin routes owner/admin policy 로 봉인한다. 상세 운영 절차는 [Identity + 테넌트 권한 운영 가이드](./docs/operations/identity-cookie-hmac-2026-08-06.md)를 참조한다.
 
@@ -118,7 +135,7 @@
 
 **검증**: TS 5 packages `--noEmit` clean, build-server `node --import tsx --test tests/*.test.ts` **278/278 PASS** (이전 246 + 1·2단계 14 + 3단계 14 + 4단계 6 = 32 신규 회귀 가드), `git diff --check` clean, session-end 가드 9/9 PASS. **불변** — build-monitor / runner / SQL / schema / migration / 5 package.json `0.10.0` 으로 bump 외 변경 0. workflow / 스크립트 / SQL / schema / migration 변경 0.
 
-## 4. v0.9.0 (2026-08-04) — Helm/ArgoCD adapter + 실 e2e (minor)
+## 5. v0.9.0 (2026-08-04) — Helm/ArgoCD adapter + 실 e2e (minor)
 
 Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter 위에 추가한 Phase 3 minor 릴리스다. 상세 내용은 [Release Notes v0.9.0](./docs/RELEASE_NOTES-v0.9.0-2026-08-04.md)를 참조한다.
 
@@ -130,7 +147,7 @@ Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter �
 
 **업그레이드 안내**: 신규 Helm/ArgoCD 환경 변수는 운영 가이드 §7/§8을 참조한다. ArgoCD는 Git repository credential과 project policy를 운영자가 준비해야 한다. 롤백 기준은 `v0.8.16`이다.
 
-## 5. v0.8.16 (2026-07-27) — session-end 가드 9종 확장 (G6~G9 신설) (patch)
+## 6. v0.8.16 (2026-07-27) — session-end 가드 9종 확장 (G6~G9 신설) (patch)
 
 본 patch 의 진원지는 v0.8.15 release(fda960c) 직후 backlog follow-up 으로 분류된 **session-end 가드 4종 확장**. 표준 ai-workflow 키트의 session-end skill 이 v0.8.13 부터 5종 가드(G1~G5) 운영 중이었으나, 본 저장소에서 발견된 drift 사례 2종을 자동 검출하기 위해 G6~G9 4종을 신설. **코드 변경 0** (운영 가드 + 운영 메타만).
 
@@ -147,7 +164,7 @@ Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter �
 
 **업그레이드 안내**: 표준 키트 session-end skill 가드 5종 → 9종 확장 (G6~G9 신설). 신규 env / 신규 파일 없음 (기존 구현체 확장만). 5 package.json `0.8.15`→`0.8.16` 통일. DB/API/스키마/migration 변경 0. 별도 조치 불요. 운영자가 pre-push hook helper(`scripts/pre-push-session-end.sh` + `.grok/hooks/install-pre-push.sh`) 설치 시 push 시점에 9종 가드 자동 검증.
 
-## 6. v0.8.13 (2026-07-27) — 호스팅 e2e CI 운영 가이드 보강 + session-end skill 신설 (patch)
+## 7. v0.8.13 (2026-07-27) — 호스팅 e2e CI 운영 가이드 보강 + session-end skill 신설 (patch)
 
 본 patch 의 진원지는 2026-07-27 세션 시작 시 발견된 **워크트리 v0.7.0 vs HEAD v0.8.12 사각지대**다. 원격 `origin/main`(`5ff9939`, v0.7.0) 위에 `origin/ykylee/salp`(`becba33`, v0.7.1) 와 `origin/ykylee/surgeonfish`(`49f3e99`, v0.8.12) 가 갈라져 단일 release stream 이 깨져 있었고, 그 중 salp 라인의 운영 가이드 1종이 본 라인에 흡수되지 않은 채 방치됐다. 본 patch 는 (a) salp 의 운영 가이드를 v0.8.13 으로 단일 라인에 흡수하고, (b) drift 의 구조적 원인 — 표준 ai-workflow 키트에 *session-end* skill 이 부재 — 을 표준 키트 차원에서 해소한다. **코드 변경 0** (운영 가이드 1종 신규 + 워크플로우 메타 + 표준 키트 보강).
 
@@ -159,7 +176,7 @@ Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter �
 
 **업그레이드 안내**: 신규 파일 2종(`docs/operations/hosting-e2e-ci-2026-07-27.md` + 표준 키트 4종) + 5 package.json `0.8.12`→`0.8.13` 통일. DB/API/스키마/migration/env 변경 0. 별도 조치 불요. 운영자가 nightly hosting-e2e 잡 결과 검토 시 본 운영 가이드 §4-§7 참조.
 
-## 7. v0.8.12 (2026-07-25) — PHASE-3-DESIGN v0.9.0 진입 결정 section (patch)
+## 8. v0.8.12 (2026-07-25) — PHASE-3-DESIGN v0.9.0 진입 결정 section (patch)
 
 `docs/PHASE-3-DESIGN.md` §10 신규(v0.9.0 진입 결정). 12연속 운영 보강 patch(v0.8.1~v0.8.11) 의 운영 정합 완료 + v0.9.0 minor 의 **신규 기능 표면 진입**. 4 잔여 후보(Helm/ArgoCD adapter / webhook 확장 / 실 k8s e2e sync 캐시 실측 / kind e2e nightly CI 자동화) 의 우선순위 정렬 + v0.9.0 의 첫 마일스톤 추천 = **Helm/ArgoCD adapter**. **코드 변경 0** (설계 문서 + CHANGELOG + state.json).
 
@@ -172,7 +189,7 @@ Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter �
 
 **업그레이드 안내**: 설계 문서 §10 신규. DB/API/스키마/migration 변경 0. 별도 조치 불요. v0.9.0 minor 작업 착수 시 본 §10.3 의 Helm/ArgoCD adapter 결정을 단일 entrypoint 로 사용.
 
-## 8. v0.8.11 (2026-07-25) — 일일 백로그 10연속 patch 정합 (patch)
+## 9. v0.8.11 (2026-07-25) — 일일 백로그 10연속 patch 정합 (patch)
 
 `ai-workflow/memory/active/backlog/2026-07-25.md` 에 v0.8.1~v0.8.10 10연속 patch 의 1-line 요약 누적(§2~§11) + `work_backlog.md` 인덱스 2026-07-25 entry 보강(rev 125→126). 10연속 운영 보강 patch 의 **일일 백로그 누락 사각지대 해소**. v0.9.0 진입 직전의 일일 백로그 단락. **코드 변경 0** (운영 메타만).
 
@@ -184,7 +201,7 @@ Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter �
 
 **업그레이드 안내**: 일일 백로그 + work_backlog 인덱스 정합만. DB/API/스키마/migration 변경 0. 별도 조치 불요. 후속 운영자가 standard_ai_workflow 키트의 session-start 절차로 본 일일 백로그 12개 section + work_backlog.md + state.json 의 정합성을 자동 점검 가능.
 
-## 9. v0.8.10 (2026-07-25) — session_handoff.md + state.json rev 정합 (patch)
+## 10. v0.8.10 (2026-07-25) — session_handoff.md + state.json rev 정합 (patch)
 
 9연속 운영 보강 patch(v0.8.1~v0.8.9) + 6종 release notes 의 누적 정합을 단일 entry 로 단락. 표준 ai-workflow 키트의 "세션 종료 전 session_handoff 갱신" 정합. v0.9.0 진입 직전의 마지막 운영 메타 정합. **코드 변경 0** (session_handoff.md 1 entry 추가 + state.json 3 rev 정합).
 
@@ -199,7 +216,7 @@ Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter �
 
 **업그레이드 안내**: 운영 메타 정합만. DB/API/스키마/migration 변경 0. 별도 조치 불요. 후속 운영자가 standard_ai_workflow 키트의 session-start 절차로 본 session_handoff rev 164 + state.json handoff_rev 164 + work_backlog.md 의 정합성을 자동 점검 가능.
 
-## 10. v0.8.9 (2026-07-25) — v0.8.x 8연속 patch 종합 RELEASE_NOTES (patch)
+## 11. v0.8.9 (2026-07-25) — v0.8.x 8연속 patch 종합 RELEASE_NOTES (patch)
 
 `docs/RELEASE_NOTES-v0.8.x-2026-07-25.md` 신규 (7 섹션 ~110 줄). v0.8.0 종합 release notes 의 §3 표가 **4종 patch**(v0.8.1~0.8.4) 에 머물렀던 사각지대를 v0.8.5 / v0.8.6 / v0.8.7 / v0.8.8 까지 **8연속 patch 표**로 확장 정합. 8연속 운영 보강 patch 의 마침표. **코드 변경 0** (운영 문서 1 종 + CHANGELOG §1 release history 1 entry + §2 신규 entry + state.json).
 
@@ -212,7 +229,7 @@ Helm chart 배포와 ArgoCD GitOps Application 배포를 기존 `k8s` adapter �
 
 **업그레이드 안내**: 운영 문서 1 종 신규. DB/API/스키마/migration 변경 0. 별도 조치 불요.
 
-## 11. v0.8.8 (2026-07-25) — CHANGELOG release history v0.4.0 / v0.5.0 entry 종합 리뷰 링크 (patch)
+## 12. v0.8.8 (2026-07-25) — CHANGELOG release history v0.4.0 / v0.5.0 entry 종합 리뷰 링크 (patch)
 
 CHANGELOG §1 release history 의 **v0.4.0 / v0.5.0 entry 에 종합 리뷰 링크 누락** 사각지대 해소. v0.8.5~v0.8.7 의 release notes 5 종 정합 라인의 자연스러운 종점. **코드 변경 0** (CHANGELOG §1 release history 2 entry 링크 + 1 entry 1 문장 정합).
 
@@ -225,7 +242,7 @@ CHANGELOG §1 release history 의 **v0.4.0 / v0.5.0 entry 에 종합 리뷰 링�
 
 **업그레이드 안내**: CHANGELOG §1 release history 정합만. DB/API/스키마/migration 변경 0. 별도 조치 불요.
 
-## 12. v0.8.7 (2026-07-25) — RELEASE_NOTES-v0.8.0 §3 표 정합 (patch)
+## 13. v0.8.7 (2026-07-25) — RELEASE_NOTES-v0.8.0 §3 표 정합 (patch)
 
 `docs/RELEASE_NOTES-v0.8.0-2026-07-25.md` §3 의 "후속 patch 4종 (v0.8.1~0.8.4)" 표를 "후속 patch 6종 (v0.8.1~0.8.6)" 으로 정합. v0.8.5 작성 시점엔 v0.8.5 / v0.8.6 이 미존재라 표가 4 종에 머물렀던 사각지대 해소. **코드 변경 0** (운영 문서 1 행 + 1 문장 갱신).
 
@@ -237,7 +254,7 @@ CHANGELOG §1 release history 의 **v0.4.0 / v0.5.0 entry 에 종합 리뷰 링�
 
 **업그레이드 안내**: 운영 문서 1 종 정합. DB/API/스키마/migration 변경 0. 별도 조치 불요.
 
-## 13. v0.8.6 (2026-07-25) — v0.6.0 / v0.7.0 종합 RELEASE_NOTES (patch)
+## 14. v0.8.6 (2026-07-25) — v0.6.0 / v0.7.0 종합 RELEASE_NOTES (patch)
 
 v0.8.5 의 잔여 — v0.6.0 / v0.7.0 종합 release notes 사각지대 해소. **코드 변경 0**. 신규 운영 문서 2 종:
 
@@ -250,7 +267,7 @@ v0.8.5 의 잔여 — v0.6.0 / v0.7.0 종합 release notes 사각지대 해소. 
 
 **업그레이드 안내**: 운영 문서 신규 2 건. DB/API/스키마/migration 변경 0. 별도 조치 불요.
 
-## 14. v0.8.5 (2026-07-25) — v0.8.0 종합 RELEASE_NOTES (patch)
+## 15. v0.8.5 (2026-07-25) — v0.8.0 종합 RELEASE_NOTES (patch)
 
 v0.6.0 / v0.7.0 / v0.8.0 / v0.8.1~0.8.4 (8 release) 의 종합 리뷰 사각지대 해소 — v0.4.0 / v0.5.0 release notes 형식 정합의 `docs/RELEASE_NOTES-v0.8.0-2026-07-25.md` 신규 작성. **코드 변경 0**.
 
@@ -262,7 +279,7 @@ v0.6.0 / v0.7.0 / v0.8.0 / v0.8.1~0.8.4 (8 release) 의 종합 리뷰 사각지�
 
 **업그레이드 안내**: 운영 문서 신규 1 건. DB/API/스키마/migration 변경 0. 별도 조치 불요.
 
-## 15. v0.8.4 (2026-07-25) — PROJECT_PROFILE 신규 운영 가이드 reference + BuildDetail.tsx stale 주석 정합 (patch)
+## 16. v0.8.4 (2026-07-25) — PROJECT_PROFILE 신규 운영 가이드 reference + BuildDetail.tsx stale 주석 정합 (patch)
 
 v0.7.0 / v0.8.x 의 운영 가이드 4종 + k8s e2e nightly 가 `docs/PROJECT_PROFILE.md` 에 reference 되지 않았던 사각지대 해소. **코드 변경 = 주석 19+/8-** (BuildDetail.tsx stale TASK-060/091/160 주석 정합), 회귀 영향 0.
 
@@ -275,7 +292,7 @@ v0.7.0 / v0.8.x 의 운영 가이드 4종 + k8s e2e nightly 가 `docs/PROJECT_PR
 
 **업그레이드 안내**: 운영 문서 보강 + BuildDetail.tsx 주석 정합. DB/API 계약 변경 0. 별도 조치 불요.
 
-## 16. v0.8.3 (2026-07-25) — release-checklist k8s 보강 (patch)
+## 17. v0.8.3 (2026-07-25) — release-checklist k8s 보강 (patch)
 
 `docs/operations/release-checklist-2026-07-20.md` 의 v0.4.0+ Phase 3 / v0.7.0 status cache / v0.8.1 nightly 편입 사각지대 4종을 보강한 patch release. **코드 변경 0** — 운영 가이드만.
 
@@ -289,7 +306,7 @@ v0.7.0 / v0.8.x 의 운영 가이드 4종 + k8s e2e nightly 가 `docs/PROJECT_PR
 
 **업그레이드 안내**: 운영 가이드 보강만. DB/API 계약 변경 0. 별도 조치 불요.
 
-## 17. v0.8.2 (2026-07-25) — k8s 운영 가이드 §6.6 보강 (patch)
+## 18. v0.8.2 (2026-07-25) — k8s 운영 가이드 §6.6 보강 (patch)
 
 `docs/operations/k8s-deploy-webhook-2026-07-24.md` §6 을 보강해 **E1/E2/E3 실측 절차** 를 명문화한 patch release. **코드 변경 0** — 운영 문서 보강 + workflow meta 만.
 
@@ -305,7 +322,7 @@ v0.7.0 / v0.8.x 의 운영 가이드 4종 + k8s e2e nightly 가 `docs/PROJECT_PR
 
 **업그레이드 안내**: 운영 문서 보강만. DB/API 계약 변경 0. 별도 조치 불요.
 
-## 18. v0.8.1 (2026-07-25) — k8s e2e nightly CI 편입 (patch)
+## 19. v0.8.1 (2026-07-25) — k8s e2e nightly CI 편입 (patch)
 
 수동 실행이던 k8s e2e(`apps/runner/scripts/e2e-k8s-deploy.sh` — TASK-165 P2-M5 의 산출물)를 nightly CI 에 편입. **코드 변경 0** — `.github/workflows/nightly-e2e.yml` 에 `k8s-deploy-e2e` job 추가만.
 
@@ -318,7 +335,7 @@ v0.7.0 / v0.8.x 의 운영 가이드 4종 + k8s e2e nightly 가 `docs/PROJECT_PR
 
 **업그레이드 안내**: workflow 파일만 추가(사용자 코드 영향 0). DB/API 계약 변경 0. 별도 조치 불요.
 
-## 19. v0.8.0 (2026-07-25) — k8s adapter 운영 결함 3종 해소 (minor)
+## 20. v0.8.0 (2026-07-25) — k8s adapter 운영 결함 3종 해소 (minor)
 
 k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**한 minor release. `v0.7.0` 이후 코드 델타 = **TASK-175**. 외부 인터페이스는 env opt-in 1종 + payload 필드 1블록만 확장했고, 기본 동작은 완전히 불변.
 
@@ -330,7 +347,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: **DB/API 계약 변경 0**. **신규 env(선택)**: `RUNNER_K8S_NAMESPACE_PER_BUILD` (`true`/`1`/`yes`/`on` accept, 기본 `false`). k8s 분기 비활성 환경은 완전 무영향. 운영 문서 [`docs/operations/k8s-deploy-webhook-2026-07-24.md` §6](./docs/operations/k8s-deploy-webhook-2026-07-24.md) 신규.
 
-## 20. v0.7.0 (2026-07-24) — 호스팅 status 캐시 (minor)
+## 21. v0.7.0 (2026-07-24) — 호스팅 status 캐시 (minor)
 
 호스팅 서비스의 **live k8s 상태를 주기적으로 캐시**하는 minor release. `v0.6.0` 이후 코드 델타 = **TASK-174**. 종전 `HostedService.status`(desired lifecycle)는 관리 명령·배포 upsert 로만 갱신돼 실 k8s 상태(파드 crash/OOM 로 replica 0)와 drift 해도 알 방법이 없었다.
 
@@ -343,7 +360,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: **API 계약(호환 확장)** — HostedService 에 `availableReplicas`/`lastSyncedAt`(nullable, sync 전 null). **DB**: migration 0012(`available_replicas`/`last_synced_at`, `ADD COLUMN IF NOT EXISTS`) — 자동 bootstrap 경로에서 적용. **신규 env(선택)**: `HOSTING_STATUS_SYNC_INTERVAL_MS`.
 
-## 21. v0.6.0 (2026-07-24) — 실패 경로 e2e (minor)
+## 22. v0.6.0 (2026-07-24) — 실패 경로 e2e (minor)
 
 **빌드 실패 보고 경로를 실 인프라 e2e 로 처음 검증**한 minor release. `v0.5.1` 이후 코드 델타 = **TASK-173**. 기존 e2e 13종은 전부 happy path(COMPLETED)만 실측했고, 빌드가 canonical 하게 `FAILED` + 단계별 errorCode 로 보고되는 경로(P2-M3 `stageFailure` 채널)는 단위 테스트만 있었다.
 
@@ -356,7 +373,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: DB/API 계약 변경 **0**(테스트 자산만 추가). 별도 조치 불요.
 
-## 22. v0.5.1 (2026-07-24) — HTTPS 미도입 확정 (patch)
+## 23. v0.5.1 (2026-07-24) — HTTPS 미도입 확정 (patch)
 
 **HTTPS/TLS 를 시스템 범위에서 제외**하고 조립 URL 을 평문 http 로 정합시킨 patch release. `v0.5.0` 직후의 스코프 정정(사용자 결정).
 
@@ -365,7 +382,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **검증**: build-server **199 PASS**(url http 기대값), TS 5 clean. 계약/스키마 변경 **0**(url 은 값). DB/API 계약 변경 0 — 별도 조치 불요.
 
-## 23. v0.5.0 (2026-07-24) — subdomain 호스팅 스킴 (minor)
+## 24. v0.5.0 (2026-07-24) — subdomain 호스팅 스킴 (minor)
 
 호스팅에 **subdomain URL 스킴**을 더한 minor release. `v0.4.1` 이후 코드 델타 = **TASK-172**. path-prefix(`host/<cp>/`)와 **병존**하며 per-build 로 선택한다.
 
@@ -388,7 +405,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 - **API 계약(호환 확장)**: BuildRequest·BuildSummary·HostedService 에 optional `hostingScheme`(기본 path — 미지정 시 종전 동작).
 - **신규 env(선택)**: `RUNNER_HOSTING_BASE_HOST`(runner, subdomain Ingress host rule 렌더용). subdomain 사용 시 **wildcard DNS** 필수.
 
-## 24. v0.4.1 (2026-07-24) — 호스팅 e2e nightly CI 편입 (patch)
+## 25. v0.4.1 (2026-07-24) — 호스팅 e2e nightly CI 편입 (patch)
 
 `v0.4.0`(Phase 3) 직후, 수동 실행이던 **호스팅 e2e 를 nightly CI 에 편입**한 patch release. 코드 변경 0 — CI 워크플로우만 추가. (TASK-171)
 
@@ -400,7 +417,7 @@ k8s adapter 의 **운영 결함 3종을 옵트인/내부 보강으로 해소**�
 
 **업그레이드 안내**: DB/API 계약 변경 0. 별도 조치 불요.
 
-## 25. v0.4.0 (2026-07-24) — Phase 3 완료 (호스팅 능력)
+## 26. v0.4.0 (2026-07-24) — Phase 3 완료 (호스팅 능력)
 
 **Phase 3 (호스팅 능력) 을 종결**하는 minor release. `v0.3.0` 이후 코드 델타 = **TASK-166 ~ TASK-170**. 빌드된 이미지가 k8s 에 **지속 호스팅**되고 `http(s)://<HOSTING_BASE_HOST>/<context-path>/` 로 접근·관리된다. 실 e2e(kind + ingress-nginx)로 라우팅+자산+관리를 실증. 컨셉/설계는 [Phase 3 컨셉](./docs/PHASE-3-CONCEPT.md)·[설계](./docs/PHASE-3-DESIGN.md) 참조.
 
@@ -434,7 +451,7 @@ Phase 3 완료 판정([PHASE-3-CONCEPT §9](./docs/PHASE-3-CONCEPT.md)) 5항 전
 - **API 계약(호환 확장)**: BuildRequest 에 optional `contextPath`/`runtimePort`/`stripPrefix` 추가(미지정 시 기본 동작 — 하위 호환). BuildSummary 에 `contextPath`/`runtimePort`/`stripPrefix`, DeploymentReportRequest 에 `contextPath`/`namespace`/`deploymentName` + targetType `K8S`, errorCode `CONTEXT_PATH_TAKEN` 추가. 신규 admin 엔드포인트 `/admin/hosted-services*`.
 - **신규 env(선택)**: `HOSTING_BASE_HOST`(설정해야 호스팅 upsert 활성)/`HOSTING_KUBE_CONTEXT`/`HOSTING_KUBECTL_BIN`(build-server 관리). 전제: 클러스터에 ingress-nginx, runner/build-server 에 kubectl+kubeconfig.
 
-## 26. v0.3.0 (2026-07-24) — Phase 2 완료 (preview-era 청산 → 배포 능력)
+## 27. v0.3.0 (2026-07-24) — Phase 2 완료 (preview-era 청산 → 배포 능력)
 
 **Phase 2 (preview-era 청산 → 배포 능력 완성) 를 종결**하는 minor release. `v0.2.1` 이후의 코드 델타 = **TASK-156 ~ TASK-165**. 제품 목적 4단계(`build → container test → deploy → result delivery`)가 모두 1급 phase 로 존재하고 실인프라 e2e 로 검증된다. 컨셉/서사는 [Phase 2 컨셉](./docs/PHASE-2-CONCEPT.md) 참조.
 
@@ -475,7 +492,7 @@ build phase **11 → 13** (result-delivery 2종 신설). Phase 2 완료 판정([
 - **API 계약 breaking**: preview-era 표면 제거 — 엔드포인트 `POST /builds/:id/preview`·`.../test-deployment/*`·`GET .../test-deployment` 삭제, `/builds/:id/container-test/{start,result}` 로 대체. 응답 `previewUrl`→`runtimeUrl`, `previewStatus`/`previewTtlMinutes` 제거. phase `PREVIEW_QUEUED`/`PREVIEW_READY` → `CONTAINER_TEST_STARTED`/`CONTAINER_TEST_PASSED`. **외부 소비자 0 결정** 하에 하위 호환 없이 정리(runner·skill_mcp·build-monitor 동시 정렬).
 - **신규 env(선택)**: `RUNNER_K8S_MODE`/`RUNNER_K8S_CLUSTER`/`RUNNER_K8S_NAMESPACE`/`RUNNER_K8S_MANIFEST`/`RUNNER_KUBECTL_BIN`/`RUNNER_K8S_CONTAINER_PORT`/`RUNNER_K8S_ROLLOUT_TIMEOUT_SECONDS`(k8s 배포), `RESULT_WEBHOOK_URL`(결과 전달). 전부 미설정 시 기존 동작.
 
-## 27. v0.2.1 (2026-07-23) — Phase 1 후속 패치
+## 28. v0.2.1 (2026-07-23) — Phase 1 후속 패치
 
 `v0.2.0` 태깅 직후 **실이미지 빌드 e2e 를 처음 돌리면서** 드러난 결함들을 수정한 patch release. 코드 델타 = **TASK-153 ~ TASK-155** (5 commits).
 
@@ -516,7 +533,7 @@ RUNNER   container-run / deploy-push                                            
 - 빌드 명령 변경: `apps/build-monitor` 는 이제 플래그 없는 `vite` / `vite build` 를 쓴다(`--config vite.react.config.ts` 불필요). `vite.react.config.ts` / 루트 `index.html` / `svelte.config.js` 삭제됨.
 - 신규 env(선택): `DIBS_POSTGRES_HOST_PORT` — 로컬 native PostgreSQL 이 5432 를 점유한 환경에서 compose postgres 호스트 포트를 바꿀 때 사용.
 
-## 28. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
+## 29. v0.2.0 (2026-07-22) — Phase 1 완료 baseline
 
 본 release 는 **Phase 1 (초기 시스템 구축 국면) 을 종결**하는 baseline anchor 다. `v0.1.0` (tagged `53adb75`) 이후의 코드 델타 = **TASK-124 ~ TASK-152** 를 한 자리에 누적한다. 전체 Phase 1 서사(백엔드 + runner + 프론트엔드 + 디자인 시스템 + 운영 가드)는 [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) 참조.
 
@@ -569,7 +586,7 @@ RUNNER   container-run / deploy-push                                            
 
 누적 운영 가이드 **37종** (v0.1.0 32종 + 5종 신규).
 
-## 29. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
+## 30. v0.1.0 (2026-07-20) — 백엔드/운영 성숙도 baseline
 
 `v0.1.0` 은 source archive scale-out + RFC 7233 Content-Range + Postgres 동등성 + e2e 를 봉인한 14 TASK (TASK-102~114 + TASK-122) 를 누적한다. 전체 상세는 [Release Notes 2026-07-20](./docs/RELEASE_NOTES-2026-07-20.md).
 
@@ -590,24 +607,24 @@ RUNNER   container-run / deploy-push                                            
 | 13 | TASK-114 | 종합 RELEASE_NOTES + 운영 가이드 인덱스 (10 섹션) | `d19038a` |
 | 14 | TASK-122 | untracked 52종 잔재 정리 (.gitignore 보강) | `53adb75` |
 
-## 29. 회귀 baseline 종합 (TASK-088 → v0.10.0)
+## 30. 회귀 baseline 종합 (TASK-088 → v0.12.0)
 
 Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-07-08) 대비 누적 변화:
 
-| 항목 | TASK-088 baseline | v0.2.1 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | v0.8.13 | v0.8.14 | v0.8.15 | v0.8.16 | v0.9.0 | **v0.10.0** | delta(088→v0.10.0) |
+| 항목 | TASK-088 baseline | v0.2.1 | v0.3.0 | v0.4.0 | v0.5.0 | v0.6.0 | v0.7.0 | v0.8.0 | v0.8.13 | v0.8.14 | v0.8.15 | v0.8.16 | v0.9.0 | v0.10.0 | v0.11.0 | **v0.12.0** | delta(088→v0.12.0) |
 |------|-------------------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|--------|-----------|-------|
-| vitest (build-monitor) | 7 | 277 | 275 | 279 | 279 | 279 | 279 | 279 | 278 (사전 환경 의존 1 fail v0.8.3 동일) | 278 (동일 baseline) | 278 (동일 baseline) | 278 | 282 | **282 (frontend 0 변경)** | +275 |
-| build-server (node:test) | 113 | 181 | 186 | 198 | 199 | 199 | 205 | 205 | 205 | 205 | 205 | 205 | 205 | **278 (+ Phase 1 4단계 32 신규)** | +165 |
-| runner (`go test ./...`) | 7 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | **8 pkg** | +1 |
-| skill_mcp (pytest) | — | 226 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | **225** | — |
-| TS `tsc --noEmit` (5 pkg) | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | **clean** | 0 |
-| build phase (canonical) | — | 11 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | **13** | +2 |
-| postgres migration | 0001 | 0001~0006 | 0001~0008 | 0001~0010 | 0001~0011 | 0001~0011 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | **0001~0012 (변경 0)** | +11 |
-| e2e scripts | 0 | 13종 | 13종+k8s | +호스팅(path) | +호스팅(path·subdomain) | +실패경로 | +호스팅 nightly | +k8s nightly | +hosting-e2e 운영 가이드 | +session-end pre-push hook helper | (변경 0) | (변경 0) | +Helm/ArgoCD 실 e2e | **+Helm/ArgoCD 실 e2e (변경 0)** | — |
-| 운영 가이드 | 0 | 37 | 42 | 45 | 45 | 45 | 45 | 45 | 45 | 46 (+ hosting-e2e-ci) | 46 | 46 | 47 (+ v0.9.0 notes) | **48 (+ identity-cookie-hmac-2026-08-06)** | +48 |
-| 운영 가드 (정적/실측) | 0 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 + session-end 5종 가드 | 4종 + session-end 5종 가드 + pre-push hook helper | 4종 + 5종 가드 + pre-push hook helper | 4종 + session-end 9종 가드 (5종→9종 확장) + pre-push hook helper | 4종 + session-end 9종 가드 (G1~G9, 5종→9종 확장) + pre-push hook helper | **4종 + session-end 9종 가드 (G1~G9, 5종→9종 확장) + pre-push hook helper** | +9 |
-| workflow meta 정합 | — | — | — | — | — | — | — | — | session-end 가드 5종 | session-end 가드 5종 (5/5 PASS) | session-end 가드 5종 (5/5 PASS) | session-end 가드 9종 (G1~G9, 5종→9종 확장) | session-end 가드 9종 (G1~G9) | **session-end 가드 9종 (9/9 PASS)** | — |
-| 5 package.json version | — | 0.2.1 | 0.3.0 | 0.4.0 | 0.5.0 | 0.6.0 | 0.7.0 | 0.8.0 | 0.8.13 | 0.8.14 | 0.8.15 | 0.8.16 | 0.9.0 | **0.10.0** | — |
+| vitest (build-monitor) | 7 | 277 | 275 | 279 | 279 | 279 | 279 | 279 | 278 (사전 환경 의존 1 fail v0.8.3 동일) | 278 (동일 baseline) | 278 (동일 baseline) | 278 | 282 | 282 (frontend 0 변경) | 282 (frontend 0 변경) | **282 (frontend 0 변경)** | +275 |
+| build-server (node:test) | 113 | 181 | 186 | 198 | 199 | 199 | 205 | 205 | 205 | 205 | 205 | 205 | 205 | 278 (+ Phase 1 4단계 32 신규) | 285 (+ Phase 2 1·2차 7 신규) | **295 (+ v0.12.0 follow-up 10 신규)** | +182 |
+| runner (`go test ./...`) | 7 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | 8 pkg | **8 pkg (변경 0)** | +1 |
+| skill_mcp (pytest) | — | 226 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | 225 | **225 (변경 0)** | — |
+| TS `tsc --noEmit` (5 pkg) | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | clean | **clean** | 0 |
+| build phase (canonical) | — | 11 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | **13 (변경 0)** | +2 |
+| postgres migration | 0001 | 0001~0006 | 0001~0008 | 0001~0010 | 0001~0011 | 0001~0011 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 | 0001~0012 (변경 0) | 0001~0012 (변경 0) | **0001~0019 (신규 0019_revoke_jti)** | +18 |
+| e2e scripts | 0 | 13종 | 13종+k8s | +호스팅(path) | +호스팅(path·subdomain) | +실패경로 | +호스팅 nightly | +k8s nightly | +hosting-e2e 운영 가이드 | +session-end pre-push hook helper | (변경 0) | (변경 0) | +Helm/ArgoCD 실 e2e | +Helm/ArgoCD 실 e2e (변경 0) | (변경 0) | **+Phase 2 1·2차 (변경 0)** | — |
+| 운영 가이드 | 0 | 37 | 42 | 45 | 45 | 45 | 45 | 45 | 45 | 46 (+ hosting-e2e-ci) | 46 | 46 | 47 (+ v0.9.0 notes) | 48 (+ identity-cookie-hmac-2026-08-06) | 49 (+ runner-lease-hmac-2026-08-06) | **50 (+ revoke-lease-persistence-2026-08-06)** | +50 |
+| 운영 가드 (정적/실측) | 0 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 | 4종 + session-end 5종 가드 | 4종 + session-end 5종 가드 + pre-push hook helper | 4종 + 5종 가드 + pre-push hook helper | 4종 + session-end 9종 가드 (5종→9종 확장) + pre-push hook helper | 4종 + session-end 9종 가드 (G1~G9, 5종→9종 확장) + pre-push hook helper | 4종 + session-end 9종 가드 (G1~G9, 5종→9종 확장) + pre-push hook helper | (변경 0) | **4종 + session-end 9종 가드 (G1~G9, 5종→9종 확장) + pre-push hook helper** | +9 |
+| workflow meta 정합 | — | — | — | — | — | — | — | — | session-end 가드 5종 | session-end 가드 5종 (5/5 PASS) | session-end 가드 5종 (5/5 PASS) | session-end 가드 9종 (G1~G9, 5종→9종 확장) | session-end 가드 9종 (G1~G9) | session-end 가드 9종 (9/9 PASS) | session-end 가드 9종 (9/9 PASS) | **session-end 가드 9종 (9/9 PASS)** | — |
+| 5 package.json version | — | 0.2.1 | 0.3.0 | 0.4.0 | 0.5.0 | 0.6.0 | 0.7.0 | 0.8.0 | 0.8.13 | 0.8.14 | 0.8.15 | 0.8.16 | 0.9.0 | 0.10.0 | 0.10.0 | **0.10.0 (변경 0)** | — |
 
 > **v0.8.14 patch 누적** (TASK-180): 14연속 운영 patch 정합 완료 — v0.8.1~v0.8.13 누적 + v0.8.14 `scripts/pre-push-session-end.sh` + `.grok/hooks/install-pre-push.sh` 운영 가드 2종 신설 (session-end 가드 5종을 pre-push hook 으로 편입) + PROJECT_PROFILE.md §2 운영 가이드 인덱스 4종→5종(`hosting-e2e-ci-2026-07-27.md` 신규) + §3 hosting-e2e CI 운영 가이드 + workflow meta drift 가드 + §4 검증 포인트 v0.8.13 baseline 단락. **코드 변경 0 / 스크립트 변경 0 / SQL 변경 0 / migration 변경 0**. session-end 가드 read-only 모드 실행 → 2/5 fail (G2 current_baseline drift / G3 rev drift) 검출 — 본 patch 의 운영 가드는 drift의 push 시점 차단을 가능케 함.
 >
@@ -619,7 +636,7 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 
 > **v0.2.0 초기 번들**: index js gzip 134.64 KB (AppShell 셸 + Astryx atomic 포함) / css gzip 24.08 KB. 라우트 지연 로드(TASK-139)로 BuildDetail(gzip 38.53) / buildColumns(9.85) / RegisterRunnerModal(5.74) 등은 필요 시 로드. 손 CSS 2,323 → 1,956줄.
 
-## 29. follow-up 후보
+## 30. follow-up 후보
 
 | # | 후보 | scope | reference |
 |---|------|-------|-----------|
@@ -636,7 +653,7 @@ Phase 1 회귀 baseline 은 TASK-088 (React + Astryx 부트스트랩 PoC, 2026-0
 
 > ~~실이미지 빌드 e2e 검증~~ — **TASK-153 (2026-07-23) 에서 해소** (Dockerfile 회귀 수정 + `e2e-production-semantic.sh` ALL PASS).
 
-## 30. 다음 release 가이드
+## 31. 다음 release 가이드
 
 - `v0.11.0` — minor 후보 (Phase 1 follow-up: 메모리 revoke Set 영속화 Redis/Postgres + SSO/OIDC/JWT 연동 + route-level preHandler 일원화 + legacy X-User-Id/X-Admin-Id sunset 정책)
 - `v1.0.0` — major (breaking change 또는 정식 GA)
@@ -645,7 +662,7 @@ v0.10.0 본 minor 의 follow-up 작업이 §30 의 v0.11.0 후보로 통합됐�
 
 운영자 release staging 검증 순서(5 phase)는 [`docs/operations/release-checklist-2026-07-20.md`](./docs/operations/release-checklist-2026-07-20.md) 참조.
 
-## 31. 관련 문서
+## 32. 관련 문서
 
 - [Phase 1 회고](./docs/PHASE-1-RETROSPECTIVE.md) — Phase 1 전체 범위·성과·회귀 baseline·미결·교훈
 - [Release Notes 2026-07-22](./docs/RELEASE_NOTES-2026-07-22.md) — v0.2.0 종합 리뷰
