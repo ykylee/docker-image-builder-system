@@ -19,6 +19,11 @@ import { registerBuildRoutes } from "../routes/build-routes.js";
 import { registerHealthRoute } from "../routes/health-route.js";
 import { BuildService } from "../services/build-service.js";
 import { HmacIdentityProvider } from "../auth/hmac-identity-provider.js";
+import {
+  createPersistentRevokeStore,
+  type PersistentRevokeStore
+} from "../auth/persistent-revoke-store.js";
+import { createLeaseRenewer, type LeaseRenewer } from "../auth/lease-renewer.js";
 import { registerPrincipalPreHandler } from "../auth/request-principal.js";
 import { ServiceDatabaseProvisioner } from "../services/service-database-provisioner.js";
 import { KubectlSecretWriter } from "../services/k8s-secret-writer.js";
@@ -105,6 +110,20 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   // AUTH_HMAC_SECRET 가 비어있고 NODE_ENV !== "production" 이면 dev default
   // secret 을 쓴다 — 운영에서는 secret manager 가 반드시 주입해야 한다.
   const isProduction = process.env.NODE_ENV === "production";
+
+  const app = Fastify({
+    logger: true
+  });
+
+  // v0.12.0 follow-up: postgres backend 운영 시 영속 revoke store 생성.
+  // memory backend / 단위 테스트 환경에서는 주입하지 않음 — 기존 in-memory
+  // Set 동작 유지.
+  let persistentRevokeStore: PersistentRevokeStore | undefined;
+  if (runtime.buildRepositoryBackend === "postgres") {
+    const pool = createDbPool(runtime.databaseUrl);
+    app.addHook("onClose", async () => pool.end());
+    persistentRevokeStore = createPersistentRevokeStore(pool);
+  }
   const identityProvider = new HmacIdentityProvider({
     secret: process.env.AUTH_HMAC_SECRET ?? "",
     ttlSeconds: (() => {
@@ -113,12 +132,10 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
       const n = Number.parseInt(raw, 10);
       return Number.isFinite(n) && n > 0 ? n : undefined;
     })(),
-    allowDevDefault: !isProduction
+    allowDevDefault: !isProduction,
+    persistentRevokeStore
   });
 
-  const app = Fastify({
-    logger: true
-  });
   await registerPrincipalPreHandler(app, identityProvider);
 
   // TASK-066: accept the raw source archive bytes uploaded by the
@@ -175,6 +192,21 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     process.env.HOSTING_BASE_HOST && process.env.HOSTING_BASE_HOST.trim() !== ""
       ? process.env.HOSTING_BASE_HOST.trim()
       : undefined;
+
+  // v0.12.0 follow-up: long-running build lease 자동 갱신 worker. postgres
+  // backend 운영 환경에서만 활성 (memory backend / 단위 테스트 환경에서는
+  // skip). identityProvider 가 셋업된 환경 = cookie 인증 + lease 발급
+  // 환경 = long-running build 가능 환경.
+  let leaseRenewer: LeaseRenewer | undefined;
+  if (runtime.buildRepositoryBackend === "postgres" && persistentRevokeStore) {
+    leaseRenewer = createLeaseRenewer({
+      identityProvider,
+      sweepIntervalMs: 30_000
+    });
+    leaseRenewer.start();
+    app.addHook("onClose", async () => leaseRenewer!.stop());
+  }
+
   const buildService = new BuildService(buildRepository, {
     strictContentRange,
     hostingCapacity: runtime.hostingCapacity,
@@ -187,7 +219,10 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
       if (!raw) return 300; // default 5 min
       const n = Number.parseInt(raw, 10);
       return Number.isFinite(n) && n > 0 ? n : 300;
-    })()
+    })(),
+    // v0.12.0 follow-up: long-running build lease 자동 갱신 worker.
+    // postgres backend + persistent revoke store 셋업 시에만 활성.
+    leaseRenewer
   });
 
   // Capacity drift monitoring is opt-in. When enabled, compare the configured
