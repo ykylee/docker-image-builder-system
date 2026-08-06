@@ -13,9 +13,16 @@ import { BuildService } from "../src/services/build-service.js";
 // 동작을 모두 다룬다.
 
 async function buildAppWithService(service: BuildService): Promise<FastifyInstance> {
-  const app = Fastify({ logger: false });
-  await registerAdminRoutes(app, service, createAdminAllowList(["admin"]));
-  return app;
+  const previous = process.env.AUTH_LEGACY_HEADERS;
+  process.env.AUTH_LEGACY_HEADERS = "true";
+  try {
+    const app = Fastify({ logger: false });
+    await registerAdminRoutes(app, service, createAdminAllowList(["admin"]));
+    return app;
+  } finally {
+    if (previous === undefined) delete process.env.AUTH_LEGACY_HEADERS;
+    else process.env.AUTH_LEGACY_HEADERS = previous;
+  }
 }
 
 describe("admin runners guard (TASK-069)", () => {

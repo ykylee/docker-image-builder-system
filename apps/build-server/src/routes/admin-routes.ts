@@ -154,6 +154,102 @@ export const ADMIN_ID_HEADER = "x-admin-id";
 
 const adminIdHeaderSchema = z.string().min(1);
 
+/**
+ * Phase 1 4단계 — admin 라우트 단일 가드 helper.
+ *
+ * 모든 admin-scoped 라우트 진입 직전에 호출되며, 두 정책 중 하나로 통과를 결정한다:
+ *
+ * 1. cookie/Bearer principal.role="admin" && subject 가 admin allow-list 에 있음 → 즉시 통과.
+ * 2. `legacyHeadersEnabled=true` 일 때만 X-Admin-Id 헤더가 allow-list 의
+ *    seed/mutation 결과와 일치하면 통과 (legacy 호환).
+ * 3. 위 둘 다 실패 시 401/403 envelope 으로 reject.
+ *
+ * `legacyHeadersEnabled=false` (default, build-routes 와 동일) 일 때는
+ * cookie/Bearer 인증만 인정되며, X-Admin-Id 헤더는 silent 무시 후 reject.
+ *
+ * preHandler 등록 시 (`legacyHeadersEnabled=true` + identityProvider 제공)
+ * helper 본문은 preHandler 안에서 inline 으로 실행되므로 route handler
+ * 내부에서 중복 호출되지 않는다. 테스트 환경 (identityProvider 미주입) 에선
+ * preHandler 미등록 → 모든 admin route handler 가 helper 를 inline 호출해
+ * 동일 envelope 을 재현.
+ */
+export function enforceAdminGuard(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  isAdmin: AdminAuthenticator,
+  options: { legacyHeadersEnabled: boolean }
+): boolean {
+  // 1) cookie/Bearer principal 우선 — request.principal 은 registerPrincipalPreHandler
+  //    가 위에서 등록한 경우에만 채워진다.
+  const principal = request.principal;
+  if (
+    principal &&
+    principal.role === "admin" &&
+    isAdmin(principal.subject)
+  ) {
+    return true;
+  }
+  // 2) legacy fallback: AUTH_LEGACY_HEADERS=true 일 때만 X-Admin-Id 헤더 인정.
+  //    운영 baseline (legacy OFF) 에서는 헤더가 와도 silent 무시 후 reject.
+  let legacyHeaderValue: string | null = null;
+  if (options.legacyHeadersEnabled) {
+    const headerId = adminIdHeaderSchema.safeParse(
+      request.headers[ADMIN_ID_HEADER]
+    );
+    if (headerId.success && isAdmin(headerId.data)) {
+      return true;
+    }
+    legacyHeaderValue = headerId.success ? headerId.data : null;
+  }
+  // 3) reject — legacy ON 에서 X-Admin-Id 가 있으면 그것이 caller 의 자격이므로
+  //    403 + allow-list mismatch envelope. legacy OFF + cookie 인증 부재는 401.
+  if (options.legacyHeadersEnabled && legacyHeaderValue !== null) {
+    reply.status(403).send({
+      message: "Caller is not in the admin allow-list.",
+      callerId: legacyHeaderValue
+    });
+    return false;
+  }
+  if (!principal) {
+    reply.status(401).send({
+      message: options.legacyHeadersEnabled
+        ? "Admin id header missing."
+        : "Authentication required.",
+      ...(options.legacyHeadersEnabled ? { header: ADMIN_ID_HEADER } : {}),
+      ...(options.legacyHeadersEnabled
+        ? {}
+        : { hint: "POST /auth/login to obtain a cookie." })
+    });
+    return false;
+  }
+  reply.status(403).send({
+    message: "Admin role or allow-list membership required.",
+    callerId: principal.subject
+  });
+  return false;
+}
+
+/**
+ * `enforceAdminGuard` 가 true 를 반환한 직후 호출 — callerId (admin 의
+ * canonical subject) 를 추출한다. preHandler 가 등록된 환경에서는
+ * principal.subject 만, preHandler 미등록 환경에서는 X-Admin-Id 헤더.
+ * updateServiceManifest 등 owner 추적용 인자에 전달.
+ */
+export function resolveAdminCallerId(
+  request: FastifyRequest,
+  options: { legacyHeadersEnabled: boolean }
+): string {
+  const principal = request.principal;
+  if (principal) return principal.subject;
+  if (options.legacyHeadersEnabled) {
+    const headerId = adminIdHeaderSchema.safeParse(
+      request.headers[ADMIN_ID_HEADER]
+    );
+    if (headerId.success) return headerId.data;
+  }
+  return "";
+}
+
 export async function registerAdminRoutes(
   app: FastifyInstance,
   buildService: BuildService,
@@ -168,55 +264,23 @@ export async function registerAdminRoutes(
 ): Promise<void> {
   const isAdmin = makeAdminAuthenticator(allowList);
   const legacyHeadersEnabled = process.env.AUTH_LEGACY_HEADERS === "true";
-  void identityProvider; // Phase 1 preHandler 통합은 후속 커밋에서.
 
-  // Phase 1: preHandler — request.principal.role === "admin" && subject in allowList.
-  // legacyHeadersEnabled 시 X-Admin-Id 헤더도 보조 인정. 미통과 시 401/403.
-  // 본 TASK 의 1차 봉인에서는 inline X-Admin-Id 가드를 그대로 두고
-  // (legacy 호환), 운영자가 명시적으로 새 인증 흐름을 켤 때만 본 preHandler 를
-  // 등록한다. identityProvider 가 제공되지 않은 환경 (테스트 등) 에서는
-  // 자동으로 비활성 — 기존 inline 가드가 동작한다.
-  const requireAdmin: import("fastify").preHandlerHookHandler | null =
-    identityProvider && legacyHeadersEnabled
-      ? async (request, reply) => {
-          const principal = request.principal;
-          if (principal && principal.role === "admin" && isAdmin(principal.subject)) {
-            return;
-          }
-          const headerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-          if (headerId.success && isAdmin(headerId.data)) {
-            return;
-          }
-          if (!principal) {
-            return reply.status(401).send({
-              message: "Authentication required.",
-              hint: "POST /auth/login to obtain a cookie."
-            });
-          }
-          return reply.status(403).send({
-            message: "Admin role or allow-list membership required.",
-            callerId: principal.subject
-          });
-        }
-      : null;
-  const routeConfig = requireAdmin ? { preHandler: requireAdmin } : {};
-  void routeConfig;
+  // Phase 1 4단계: helper `enforceAdminGuard` 가 cookie/Bearer 인증과
+  // X-Admin-Id 헤더 fallback 을 모두 처리. legacy ON 환경에서
+  // identityProvider 가 주입되면 request.principal 이 registerPrincipalPreHandler
+  // 에 의해 채워져 helper 가 cookie 인증 admin 을 우선 통과시킨다. legacy OFF
+  // (default) 또는 identityProvider 미주입 환경에서도 helper 가 동일 envelope
+  // 으로 reject — 모든 admin route handler 가 첫 줄에서 helper 를 호출한다.
+  //
+  // route-level preHandler 등록은 본 TASK 범위 밖. 향후 fastify route config
+  // 일원화 TASK 에서 admin/* route 등록을 withGuard helper 로 묶어
+  // preHandler 활성화 시 route 정의에 preHandler 를 주입하는 작업을 별도
+  // 봉인한다 (route-level preHandler vs inline guard 의 trade-off).
+  void identityProvider;
 
   app.get("/admin/builds", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(
-      request.headers[ADMIN_ID_HEADER]
-    );
-    if (!callerId.success) {
-      return reply.status(401).send({
-        message: "Admin id header missing.",
-        header: ADMIN_ID_HEADER
-      });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({
-        message: "Caller is not in the admin allow-list.",
-        callerId: callerId.data
-      });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
 
     const queryResult = adminListBuildsQuerySchema.safeParse(
@@ -235,20 +299,8 @@ export async function registerAdminRoutes(
   // ---- Hosting management (TASK-166 / P3-M1) --------------------------------
   // 목록 + 상세(registry). scale/stop/delete(kubectl 연동)는 P3-M3.
   app.get("/admin/hosted-services", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(
-      request.headers[ADMIN_ID_HEADER]
-    );
-    if (!callerId.success) {
-      return reply.status(401).send({
-        message: "Admin id header missing.",
-        header: ADMIN_ID_HEADER
-      });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({
-        message: "Caller is not in the admin allow-list.",
-        callerId: callerId.data
-      });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const services = await buildService.listHostedServices();
     return reply
@@ -257,32 +309,16 @@ export async function registerAdminRoutes(
   });
 
   app.get("/admin/hosting-capacity", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success) {
-      return reply.status(401).send({ message: "Admin id header missing.", header: ADMIN_ID_HEADER });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({ message: "Caller is not in the admin allow-list.", callerId: callerId.data });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const body = await buildService.getHostingCapacity();
     return reply.status(200).send(hostingCapacityResponseSchema.parse(body));
   });
 
   app.get("/admin/hosted-services/:appName", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(
-      request.headers[ADMIN_ID_HEADER]
-    );
-    if (!callerId.success) {
-      return reply.status(401).send({
-        message: "Admin id header missing.",
-        header: ADMIN_ID_HEADER
-      });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({
-        message: "Caller is not in the admin allow-list.",
-        callerId: callerId.data
-      });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const params = request.params as { appName?: string };
     const appName = (params.appName ?? "").trim();
@@ -301,9 +337,8 @@ export async function registerAdminRoutes(
   });
 
   app.get("/admin/hosted-services/:appName/manifest", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success || !isAdmin(callerId.data)) {
-      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const { appName } = request.params as { appName?: string };
     const manifest = await buildService.getServiceManifest((appName ?? "").trim());
@@ -312,9 +347,8 @@ export async function registerAdminRoutes(
   });
 
   app.get("/admin/hosted-services/:appName/manifest/revisions", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success || !isAdmin(callerId.data)) {
-      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const { appName } = request.params as { appName?: string };
     const revisions = await buildService.listServiceManifestRevisions((appName ?? "").trim());
@@ -322,9 +356,8 @@ export async function registerAdminRoutes(
   });
 
   app.put("/admin/hosted-services/:appName/manifest", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success || !isAdmin(callerId.data)) {
-      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const { appName } = request.params as { appName?: string };
     const normalizedAppName = (appName ?? "").trim();
@@ -335,14 +368,18 @@ export async function registerAdminRoutes(
     if (parsed.data.service.appName !== normalizedAppName) {
       return reply.status(400).send(errorBody("Manifest appName does not match the URL.", { errorCode: "INVALID_REQUEST" }));
     }
-    const saved = await buildService.updateServiceManifest(normalizedAppName, parsed.data, callerId.data);
+    const callerId = resolveAdminCallerId(request, { legacyHeadersEnabled });
+    const saved = await buildService.updateServiceManifest(
+      normalizedAppName,
+      parsed.data,
+      callerId
+    );
     return reply.status(200).send(serviceManifestResponseSchema.parse(saved));
   });
 
   app.post("/admin/hosted-services/:appName/database/provision", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success || !isAdmin(callerId.data)) {
-      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const appName = ((request.params as { appName?: string }).appName ?? "").trim();
     const manifest = await buildService.getServiceManifest(appName);
@@ -373,9 +410,8 @@ export async function registerAdminRoutes(
   });
 
   app.get("/admin/hosted-services/:appName/database", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success || !isAdmin(callerId.data)) {
-      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     if (!serviceDatabase) {
       return reply.status(503).send(errorBody("Service database is not configured.", { errorCode: "DATABASE_UNAVAILABLE" }));
@@ -387,9 +423,8 @@ export async function registerAdminRoutes(
   });
 
   app.post("/admin/hosted-services/:appName/database/purge", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success || !isAdmin(callerId.data)) {
-      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     if (!serviceDatabase) {
       return reply.status(503).send(errorBody("Service database is not configured.", { errorCode: "DATABASE_UNAVAILABLE" }));
@@ -415,9 +450,8 @@ export async function registerAdminRoutes(
   });
 
   app.post("/admin/hosted-services/:appName/database/rotate", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
-    if (!callerId.success || !isAdmin(callerId.data)) {
-      return reply.status(callerId.success ? 403 : 401).send({ message: "Admin access required." });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     if (!serviceDatabase) {
       return reply.status(503).send(errorBody("Service database is not configured.", { errorCode: "DATABASE_UNAVAILABLE" }));
@@ -450,19 +484,8 @@ export async function registerAdminRoutes(
     action: (appName: string) => Promise<HostingActionOutcome>
   ) {
     return async (request: FastifyRequest, reply: FastifyReply) => {
-      const callerId = adminIdHeaderSchema.safeParse(
-        request.headers[ADMIN_ID_HEADER]
-      );
-      if (!callerId.success) {
-        return reply
-          .status(401)
-          .send({ message: "Admin id header missing.", header: ADMIN_ID_HEADER });
-      }
-      if (!isAdmin(callerId.data)) {
-        return reply.status(403).send({
-          message: "Caller is not in the admin allow-list.",
-          callerId: callerId.data
-        });
+      if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+        return reply;
       }
       const params = request.params as { appName?: string };
       const appName = (params.appName ?? "").trim();
@@ -503,20 +526,8 @@ export async function registerAdminRoutes(
   );
 
   app.get("/admin/users", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(
-      request.headers[ADMIN_ID_HEADER]
-    );
-    if (!callerId.success) {
-      return reply.status(401).send({
-        message: "Admin id header missing.",
-        header: ADMIN_ID_HEADER
-      });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({
-        message: "Caller is not in the admin allow-list.",
-        callerId: callerId.data
-      });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
 
     const body = await buildService.listBuildOwners();
@@ -538,20 +549,8 @@ export async function registerAdminRoutes(
   // -------------------------------------------------------------------------
 
   app.get("/admin/admins", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(
-      request.headers[ADMIN_ID_HEADER]
-    );
-    if (!callerId.success) {
-      return reply.status(401).send({
-        message: "Admin id header missing.",
-        header: ADMIN_ID_HEADER
-      });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({
-        message: "Caller is not in the admin allow-list.",
-        callerId: callerId.data
-      });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     return reply
       .status(200)
@@ -559,20 +558,8 @@ export async function registerAdminRoutes(
   });
 
   app.post("/admin/admins", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(
-      request.headers[ADMIN_ID_HEADER]
-    );
-    if (!callerId.success) {
-      return reply.status(401).send({
-        message: "Admin id header missing.",
-        header: ADMIN_ID_HEADER
-      });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({
-        message: "Caller is not in the admin allow-list.",
-        callerId: callerId.data
-      });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const bodyResult = adminAllowListAddRequestSchema.safeParse(
       request.body ?? {}
@@ -591,20 +578,8 @@ export async function registerAdminRoutes(
   app.delete<{ Params: { adminId: string } }>(
     "/admin/admins/:adminId",
     async (request, reply) => {
-      const callerId = adminIdHeaderSchema.safeParse(
-        request.headers[ADMIN_ID_HEADER]
-      );
-      if (!callerId.success) {
-        return reply.status(401).send({
-          message: "Admin id header missing.",
-          header: ADMIN_ID_HEADER
-        });
-      }
-      if (!isAdmin(callerId.data)) {
-        return reply.status(403).send({
-          message: "Caller is not in the admin allow-list.",
-          callerId: callerId.data
-        });
+      if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+        return reply;
       }
       const target = request.params.adminId;
       // DELETE path param 도 동일한 정규식 검증. Fastify route 자체는
@@ -672,20 +647,8 @@ export async function registerAdminRoutes(
   app.post(
     "/admin/runners",
     async (request, reply) => {
-      const callerId = adminIdHeaderSchema.safeParse(
-        request.headers[ADMIN_ID_HEADER]
-      );
-      if (!callerId.success) {
-        return reply.status(401).send({
-          message: "Admin id header missing.",
-          header: ADMIN_ID_HEADER
-        });
-      }
-      if (!isAdmin(callerId.data)) {
-        return reply.status(403).send({
-          message: "Caller is not in the admin allow-list.",
-          callerId: callerId.data
-        });
+      if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+        return reply;
       }
       const body = adminRunnerRegisterRequestSchema.safeParse(request.body);
       if (!body.success) {
@@ -710,20 +673,8 @@ export async function registerAdminRoutes(
   );
 
   app.get("/admin/runners", async (request, reply) => {
-    const callerId = adminIdHeaderSchema.safeParse(
-      request.headers[ADMIN_ID_HEADER]
-    );
-    if (!callerId.success) {
-      return reply.status(401).send({
-        message: "Admin id header missing.",
-        header: ADMIN_ID_HEADER
-      });
-    }
-    if (!isAdmin(callerId.data)) {
-      return reply.status(403).send({
-        message: "Caller is not in the admin allow-list.",
-        callerId: callerId.data
-      });
+    if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+      return reply;
     }
     const body = await buildService.listAdminRunners();
     return reply
@@ -734,20 +685,8 @@ export async function registerAdminRoutes(
   app.patch<{ Params: { runnerId: string } }>(
     "/admin/runners/:runnerId",
     async (request, reply) => {
-      const callerId = adminIdHeaderSchema.safeParse(
-        request.headers[ADMIN_ID_HEADER]
-      );
-      if (!callerId.success) {
-        return reply.status(401).send({
-          message: "Admin id header missing.",
-          header: ADMIN_ID_HEADER
-        });
-      }
-      if (!isAdmin(callerId.data)) {
-        return reply.status(403).send({
-          message: "Caller is not in the admin allow-list.",
-          callerId: callerId.data
-        });
+      if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+        return reply;
       }
       const target = request.params.runnerId;
       // Runner id 는 admin id 와 달리 broad charset (host 의 어떤 환경 변수도
@@ -786,20 +725,8 @@ export async function registerAdminRoutes(
   app.delete<{ Params: { runnerId: string } }>(
     "/admin/runners/:runnerId",
     async (request, reply) => {
-      const callerId = adminIdHeaderSchema.safeParse(
-        request.headers[ADMIN_ID_HEADER]
-      );
-      if (!callerId.success) {
-        return reply.status(401).send({
-          message: "Admin id header missing.",
-          header: ADMIN_ID_HEADER
-        });
-      }
-      if (!isAdmin(callerId.data)) {
-        return reply.status(403).send({
-          message: "Caller is not in the admin allow-list.",
-          callerId: callerId.data
-        });
+      if (!enforceAdminGuard(request, reply, isAdmin, { legacyHeadersEnabled })) {
+        return reply;
       }
       const target = request.params.runnerId;
       // DELETE 는 idempotent — unknown runner 도 200 + { removedRunnerId }

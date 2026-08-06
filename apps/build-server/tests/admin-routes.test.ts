@@ -20,11 +20,30 @@ const baseRequest = (requestedBy: string, appName: string) => ({
 
 async function buildAppWithService(
   adminIds: string[],
-  service: BuildService
+  service: BuildService,
+  options: { legacyHeadersEnabled?: boolean } = {}
 ): Promise<FastifyInstance> {
-  const app = Fastify({ logger: false });
-  await registerAdminRoutes(app, service, createAdminAllowList(adminIds));
-  return app;
+  const previous = process.env.AUTH_LEGACY_HEADERS;
+  // 기본값은 legacy ON — 기존 admin-routes 테스트가 X-Admin-Id 헤더로 admin 을
+  // 호출하는 시나리오가 많아 default 를 legacy ON 으로 둔다. legacy OFF 의
+  // silent reject 검증은 admin-routes-prehandler.test.ts 신규 가드에서 처리.
+  const legacyEnabled = options.legacyHeadersEnabled ?? true;
+  if (legacyEnabled) {
+    process.env.AUTH_LEGACY_HEADERS = "true";
+  } else {
+    delete process.env.AUTH_LEGACY_HEADERS;
+  }
+  try {
+    const app = Fastify({ logger: false });
+    await registerAdminRoutes(app, service, createAdminAllowList(adminIds));
+    return app;
+  } finally {
+    if (previous === undefined) {
+      delete process.env.AUTH_LEGACY_HEADERS;
+    } else {
+      process.env.AUTH_LEGACY_HEADERS = previous;
+    }
+  }
 }
 
 async function seed(service: BuildService): Promise<void> {
