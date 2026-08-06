@@ -14,9 +14,12 @@ import { registerOpenApiRoutes } from "./openapi.js";
 import { createMemoryBuildRepository } from "../repositories/memory-build-repository.js";
 import { PostgresBuildRepository } from "../repositories/postgres-build-repository.js";
 import { registerAdminRoutes, createAdminAllowList } from "../routes/admin-routes.js";
+import { registerAuthRoutes } from "../routes/auth-routes.js";
 import { registerBuildRoutes } from "../routes/build-routes.js";
 import { registerHealthRoute } from "../routes/health-route.js";
 import { BuildService } from "../services/build-service.js";
+import { HmacIdentityProvider } from "../auth/hmac-identity-provider.js";
+import { registerPrincipalPreHandler } from "../auth/request-principal.js";
 import { ServiceDatabaseProvisioner } from "../services/service-database-provisioner.js";
 import { KubectlSecretWriter } from "../services/k8s-secret-writer.js";
 import {
@@ -97,9 +100,26 @@ const API_JSON_PREFIXES = ["/openapi", "/docs", "/health"];
 const SPA_NAVIGATION_EXCLUDED_PREFIXES = ["/api/", "/openapi", "/docs", "/health", "/assets/"];
 
 export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstance> {
+  // Phase 1 (Identity + 테넌트 권한): HMAC 기반 IdentityProvider. 모든 라우트
+  // 진입 직전에 principal preHandler 가 request.principal 을 채운다.
+  // AUTH_HMAC_SECRET 가 비어있고 NODE_ENV !== "production" 이면 dev default
+  // secret 을 쓴다 — 운영에서는 secret manager 가 반드시 주입해야 한다.
+  const isProduction = process.env.NODE_ENV === "production";
+  const identityProvider = new HmacIdentityProvider({
+    secret: process.env.AUTH_HMAC_SECRET ?? "",
+    ttlSeconds: (() => {
+      const raw = process.env.AUTH_TOKEN_TTL_SECONDS?.trim();
+      if (!raw) return undefined;
+      const n = Number.parseInt(raw, 10);
+      return Number.isFinite(n) && n > 0 ? n : undefined;
+    })(),
+    allowDevDefault: !isProduction
+  });
+
   const app = Fastify({
     logger: true
   });
+  await registerPrincipalPreHandler(app, identityProvider);
 
   // TASK-066: accept the raw source archive bytes uploaded by the
   // Skill as `application/octet-stream`. Fastify's default content
@@ -241,8 +261,6 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   }
 
   void registerHealthRoute(app);
-  void registerBuildRoutes(app, buildService);
-
   // Admin endpoints (ADMIN-004, ADMIN-049). The admin allow-list is a
   // mutable Set seeded from `runtime.adminIds` at boot; the list/add/remove
   // helpers (createAdminAllowList) are exposed via /admin/admins/* and the
@@ -251,12 +269,17 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   const adminAllowList = createAdminAllowList(runtime.adminIds);
   const serviceDatabasePool = runtime.buildRepositoryBackend === "postgres" ? createDbPool(runtime.databaseUrl) : undefined;
   if (serviceDatabasePool) app.addHook("onClose", async () => serviceDatabasePool.end());
-  await registerAdminRoutes(app, buildService, adminAllowList, serviceDatabasePool ? {
+  // Phase 1: /auth/login + /auth/logout + /auth/whoami 라우트. principal preHandler
+  // 가 위에서 등록되어 있으므로 /auth/login 은 preHandler 없이 진입해 토큰을
+  // 발급하고, /auth/logout + /auth/whoami 은 preHandler 가 principal 을 채운다.
+  await registerAuthRoutes(app, identityProvider, adminAllowList);
+  await registerAdminRoutes(app, buildService, adminAllowList, identityProvider, serviceDatabasePool ? {
     provisioner: new ServiceDatabaseProvisioner(serviceDatabasePool),
     secretWriter: new KubectlSecretWriter(),
     gatewayHost: process.env.SERVICE_DB_GATEWAY_HOST?.trim() ?? "",
     databaseName: process.env.SERVICE_DB_DATABASE_NAME?.trim() || "dibs"
   } : undefined);
+  void registerBuildRoutes(app, buildService);
 
   // TASK-075: build-monitor 의 vite build 산출물을 정적 서빙 + SPA
   // fallback 으로 mount. Build Server 의 자체 route (/api/*, /openapi,

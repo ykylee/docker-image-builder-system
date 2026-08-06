@@ -5,7 +5,29 @@ import {
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { ZodTypeAny } from "zod";
-import scalarApiReference from "@scalar/fastify-api-reference";
+// `@scalar/fastify-api-reference` 는 pnpm 워크스페이스 일부 환경에서
+// module 자체가 install 되지 않아 import 가 fail 한다. 정적 / dynamic
+// 어느 쪽이든 ERR_MODULE_NOT_FOUND 가 나면 boot 전체가 깨지므로, 부재
+// 환경에서도 Build Server 가 동작하도록 catch + log + skip 한다.
+// (해당 환경에서 /openapi.json 자체는 여전히 응답한다 — Scalar UI 만
+//  비활성. /docs 라우트는 404 가 되지만 API 자체는 정상.)
+let scalarPluginCache: unknown = null;
+async function loadScalarPlugin(): Promise<unknown | null> {
+  if (scalarPluginCache) return scalarPluginCache;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const mod = await import("@scalar/fastify-api-reference" as any);
+    scalarPluginCache = mod.default ?? mod;
+    return scalarPluginCache;
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      "[openapi] @scalar/fastify-api-reference not available — /docs UI disabled.",
+      err instanceof Error ? err.message : String(err)
+    );
+    return null;
+  }
+}
 
 import {
   adminListBuildsQuerySchema,
@@ -566,7 +588,10 @@ registry.registerPath({
 
 export function getOpenApiDocument(): unknown {
   const generator = new OpenApiGeneratorV3(registry.definitions);
-  return generator.generateDocument({
+  // Phase 1 (Identity + 테넌트 권한): securitySchemes 는
+  // zod-to-openapi 의 `generateComponents()` 결과로 합쳐진다 (config 의
+  // `components` 는 omit 처리되므로 직접 전달 불가).
+  const baseDoc = generator.generateDocument({
     openapi: "3.0.3",
     info: {
       title: "Docker Image Builder — Build Server API",
@@ -579,6 +604,32 @@ export function getOpenApiDocument(): unknown {
       description: tag.description
     }))
   });
+  // Phase 1: cookieAuth + bearerAuth 두 scheme 노출. 라우트 별 보안은
+  // 각 registerPath 의 `security: []` (anonymous) 또는 미지정 (default =
+  // 양쪽 scheme 모두 요구) 으로 표현한다.
+  const components = generator.generateComponents();
+  return {
+    ...baseDoc,
+    components: {
+      ...(components.components ?? {}),
+      securitySchemes: {
+        cookieAuth: {
+          type: "apiKey",
+          in: "cookie",
+          name: "auth_token",
+          description:
+            "POST /auth/login 응답으로 발급되는 HMAC 서명 쿠키. HttpOnly."
+        },
+        bearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "opaque",
+          description:
+            "POST /auth/login 응답 본문의 principal.jti 와 동일 토큰을 Authorization: Bearer 로 전달."
+        }
+      }
+    }
+  };
 }
 
 export async function registerOpenApiRoutes(
@@ -602,7 +653,11 @@ export async function registerOpenApiRoutes(
     const allowOrigin =
       options.corsOrigin === true ? "*" : options.corsOrigin;
     const allowMethods = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
-    const allowHeaders = "Content-Type,Authorization,X-Admin-Id,X-User-Id";
+    // Phase 1: Cookie 헤더를 허용한다. /auth/login 응답이 Set-Cookie 로
+      // auth_token 을 발급하고, 같은 origin SPA 가 매 요청마다 cookie 를
+      // 첨부한다. X-Admin-Id / X-User-Id 는 legacy 호환용 (default OFF).
+      const allowHeaders = "Content-Type,Cookie,Authorization,X-Admin-Id,X-User-Id";
+      const allowCredentials = allowOrigin === "*" ? "false" : "true";
 
     app.addHook("onRequest", async (request, reply) => {
       // Set the CORS headers on every request as early as possible so they
@@ -613,6 +668,7 @@ export async function registerOpenApiRoutes(
       reply.header("Access-Control-Allow-Origin", allowOrigin);
       reply.header("Access-Control-Allow-Methods", allowMethods);
       reply.header("Access-Control-Allow-Headers", allowHeaders);
+      reply.header("Access-Control-Allow-Credentials", allowCredentials);
       reply.header("Access-Control-Max-Age", "600");
     });
 
@@ -628,17 +684,21 @@ export async function registerOpenApiRoutes(
   // Scalar is the single interactive API documentation surface. The
   // generated document remains the contract SSOT at `/openapi.json`;
   // Scalar only renders that document and does not generate a second spec.
-  await app.register(scalarApiReference, {
-    routePrefix: "/docs",
-    configuration: {
-      title: "Docker Image Builder — API Reference",
-      content: getOpenApiDocument() as Record<string, unknown>,
-      layout: "modern",
-      hideModels: false,
-      hideDownloadButton: false
-    },
-    logLevel: "silent"
-  });
+  const scalarPlugin = await loadScalarPlugin();
+  if (scalarPlugin) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await app.register(scalarPlugin as any, {
+      routePrefix: "/docs",
+      configuration: {
+        title: "Docker Image Builder — API Reference",
+        content: getOpenApiDocument() as Record<string, unknown>,
+        layout: "modern",
+        hideModels: false,
+        hideDownloadButton: false
+      },
+      logLevel: "silent"
+    });
+  }
 
   // The full document is rebuilt from the registry on each request so route
   // definitions registered later in `createApp` are reflected. Cheap for our

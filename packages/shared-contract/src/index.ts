@@ -9,4 +9,5 @@ export * from "./build/response.js";
 export * from "./build/status.js";
 export * from "./build/admin.js";
 export * from "./build/runner-registry.js";
+export * from "./auth/index.js";
 export * from "./openapi.js";

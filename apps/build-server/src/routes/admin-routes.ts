@@ -36,6 +36,7 @@ import type {
 } from "../services/build-service.js";
 import type { SecretWriter } from "../services/k8s-secret-writer.js";
 import { serviceDatabaseUrl, ServiceDatabaseProvisioner } from "../services/service-database-provisioner.js";
+import type { IdentityProvider } from "../auth/identity-provider.js";
 
 // Admin guard (ADMIN-004, ADMIN-049). The admin allow-list is a mutable
 // Set owned by the process and seeded from `runtime.adminIds` at boot.
@@ -157,6 +158,7 @@ export async function registerAdminRoutes(
   app: FastifyInstance,
   buildService: BuildService,
   allowList: AdminAllowList,
+  identityProvider?: IdentityProvider,
   serviceDatabase?: {
     provisioner: ServiceDatabaseProvisioner;
     secretWriter: SecretWriter;
@@ -165,6 +167,40 @@ export async function registerAdminRoutes(
   }
 ): Promise<void> {
   const isAdmin = makeAdminAuthenticator(allowList);
+  const legacyHeadersEnabled = process.env.AUTH_LEGACY_HEADERS === "true";
+  void identityProvider; // Phase 1 preHandler 통합은 후속 커밋에서.
+
+  // Phase 1: preHandler — request.principal.role === "admin" && subject in allowList.
+  // legacyHeadersEnabled 시 X-Admin-Id 헤더도 보조 인정. 미통과 시 401/403.
+  // 본 TASK 의 1차 봉인에서는 inline X-Admin-Id 가드를 그대로 두고
+  // (legacy 호환), 운영자가 명시적으로 새 인증 흐름을 켤 때만 본 preHandler 를
+  // 등록한다. identityProvider 가 제공되지 않은 환경 (테스트 등) 에서는
+  // 자동으로 비활성 — 기존 inline 가드가 동작한다.
+  const requireAdmin: import("fastify").preHandlerHookHandler | null =
+    identityProvider && legacyHeadersEnabled
+      ? async (request, reply) => {
+          const principal = request.principal;
+          if (principal && principal.role === "admin" && isAdmin(principal.subject)) {
+            return;
+          }
+          const headerId = adminIdHeaderSchema.safeParse(request.headers[ADMIN_ID_HEADER]);
+          if (headerId.success && isAdmin(headerId.data)) {
+            return;
+          }
+          if (!principal) {
+            return reply.status(401).send({
+              message: "Authentication required.",
+              hint: "POST /auth/login to obtain a cookie."
+            });
+          }
+          return reply.status(403).send({
+            message: "Admin role or allow-list membership required.",
+            callerId: principal.subject
+          });
+        }
+      : null;
+  const routeConfig = requireAdmin ? { preHandler: requireAdmin } : {};
+  void routeConfig;
 
   app.get("/admin/builds", async (request, reply) => {
     const callerId = adminIdHeaderSchema.safeParse(
