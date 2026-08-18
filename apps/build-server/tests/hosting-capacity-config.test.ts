@@ -10,6 +10,12 @@ describe("hosting capacity runtime configuration", () => {
       cpuMillicores: 2000,
       memoryMi: 5632
     });
+    assert.equal(settings.corsOrigin, false);
+  });
+
+  it("allows explicit CORS origin opt-in", () => {
+    assert.equal(toRuntimeSettings(parseRuntimeEnv({ CORS_ORIGIN: "https://monitor.example.test" })).corsOrigin, "https://monitor.example.test");
+    assert.equal(toRuntimeSettings(parseRuntimeEnv({ CORS_ORIGIN: "true" })).corsOrigin, true);
   });
 
   it("accepts cluster-observed allocatable capacity overrides", () => {

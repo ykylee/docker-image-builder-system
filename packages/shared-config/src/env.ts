@@ -17,6 +17,11 @@ export const runtimeEnvSchema = z.object({
     .enum(["memory", "postgres"])
     .default(DEFAULT_BUILD_REPOSITORY_BACKEND),
   DB_AUTO_BOOTSTRAP: z.coerce.boolean().default(true),
+  // Optional during the migration window. When set, Build Server protects
+  // admin and Runner control APIs with the signed principal hook; public
+  // build intake remains unauthenticated by policy.
+  AUTH_SECRET: z.string().min(1).optional().default(""),
+  AUTH_MODE: z.enum(["legacy", "required"]).default("legacy"),
   RUNNER_POLL_INTERVAL_MS: z.coerce.number().int().positive().default(DEFAULT_RUNNER_POLL_INTERVAL_MS),
   BUILD_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(DEFAULT_BUILD_TIMEOUT_SECONDS),
   // Capacity values should be populated from cluster allocatable observation
@@ -31,10 +36,10 @@ export const runtimeEnvSchema = z.object({
   HOSTING_CAPACITY_DRIFT_ALERT_COOLDOWN_MS: z.coerce.number().int().nonnegative().default(900_000),
   CORS_ORIGIN: z
     .union([z.literal("true"), z.literal("false"), z.string().min(1)])
-    .default("true")
+    .default("false")
     .transform((value) => {
       if (value === "true") {
-        return DEFAULT_CORS_ORIGIN;
+        return true as const;
       }
       if (value === "false") {
         return false as const;

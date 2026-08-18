@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -122,16 +123,32 @@ type PhaseReport struct {
 
 // HTTPBuildControlClient 는 Host Server 와 HTTP 로 통신하는 client.
 type HTTPBuildControlClient struct {
-	baseURL  string
-	runnerID string
-	http     *http.Client
+	baseURL   string
+	runnerID  string
+	authToken string
+	http      *http.Client
 }
 
-func NewHTTPBuildControlClient(baseURL, runnerID string) *HTTPBuildControlClient {
+// NewHTTPBuildControlClient accepts an optional signed bearer token for
+// protected control-plane endpoints. Keeping the token optional preserves the
+// legacy local-development path while AUTH_MODE=required deployments can pass
+// RUNNER_AUTH_TOKEN from configuration.
+func NewHTTPBuildControlClient(baseURL, runnerID string, authToken ...string) *HTTPBuildControlClient {
+	token := ""
+	if len(authToken) > 0 {
+		token = strings.TrimSpace(authToken[0])
+	}
 	return &HTTPBuildControlClient{
-		baseURL:  baseURL,
-		runnerID: runnerID,
-		http:     &http.Client{Timeout: 10 * time.Second},
+		baseURL:   baseURL,
+		runnerID:  runnerID,
+		authToken: token,
+		http:      &http.Client{Timeout: 10 * time.Second},
+	}
+}
+
+func (c *HTTPBuildControlClient) authorize(req *http.Request) {
+	if c.authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+c.authToken)
 	}
 }
 
@@ -142,6 +159,7 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.authorize(req)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -197,6 +215,7 @@ func (c *HTTPBuildControlClient) ReportPhase(ctx context.Context, buildID string
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.authorize(req)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -267,6 +286,7 @@ func (c *HTTPBuildControlClient) DownloadSource(ctx context.Context, buildID str
 		return nil, "", 0, err
 	}
 	req.Header.Set("Accept", "application/octet-stream")
+	c.authorize(req)
 
 	res, err := c.http.Do(req)
 	if err != nil {
@@ -310,6 +330,7 @@ func (c *HTTPBuildControlClient) StartContainerTest(ctx context.Context, buildID
 		return err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	c.authorize(r)
 
 	res, err := c.http.Do(r)
 	if err != nil {
@@ -372,6 +393,7 @@ func (c *HTTPBuildControlClient) ReportContainerTestResult(ctx context.Context, 
 		return err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	c.authorize(r)
 
 	res, err := c.http.Do(r)
 	if err != nil {
@@ -394,6 +416,7 @@ func (c *HTTPBuildControlClient) ReportDeployment(ctx context.Context, buildID s
 		return err
 	}
 	r.Header.Set("Content-Type", "application/json")
+	c.authorize(r)
 
 	res, err := c.http.Do(r)
 	if err != nil {

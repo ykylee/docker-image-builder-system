@@ -11,6 +11,9 @@ type Config struct {
 	PollInterval      time.Duration
 	HostServerBaseURL string
 	RunnerID          string
+	// AuthToken is a signed bearer token for Build Server control endpoints.
+	// Empty keeps the legacy unauthenticated local-development path.
+	AuthToken string
 	// TASK-073 보강: docker CLI 의 registry 인증 config dir. nil/empty 면
 	// docker default (`~/.docker/config.json`) 를 그대로 사용 — cli mode
 	// deploy 가 local daemon 만 사용하거나 insecure localhost registry
@@ -52,6 +55,7 @@ func Load() Config {
 		PollInterval:          parseDuration("RUNNER_POLL_INTERVAL", 5*time.Second),
 		HostServerBaseURL:     parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
 		RunnerID:              parseString("RUNNER_ID", "runner-default"),
+		AuthToken:             parseString("RUNNER_AUTH_TOKEN", ""),
 		RegistryConfigDir:     parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
 		K8sMode:               parseString("RUNNER_K8S_MODE", ""),
 		K8sCluster:            parseString("RUNNER_K8S_CLUSTER", ""),

@@ -331,6 +331,7 @@ export async function registerAdminRoutes(
       await serviceDatabase.provisioner.markReady(appName);
       return reply.status(201).send(serviceDatabaseStatusSchema.parse({ ...provisioned, status: "READY", password: undefined }));
     } catch (error) {
+      await serviceDatabase.provisioner.markFailed(appName, error instanceof Error ? error.message : String(error));
       request.log.error({ err: error, appName }, "service database secret provisioning failed");
       return reply.status(502).send(errorBody("Service database Secret provisioning failed.", { errorCode: "DEPLOYMENT_FAILED" }));
     }

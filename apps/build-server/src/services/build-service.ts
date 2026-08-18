@@ -122,6 +122,8 @@ export class BuildService {
       // 를 조립한다. 미설정이면 호스팅 비활성(k8s 배포는 되지만 registry
       // upsert 안 함 — opt-in, 설계 §9-3).
       hostingBaseHost?: string;
+      // TASK-180: stale in-flight build lease timeout. Zero disables recovery.
+      leaseTimeoutMs?: number;
     } = {
       strictContentRange: false,
       hostingCapacity: DEFAULT_HOSTING_CAPACITY
@@ -191,6 +193,10 @@ export class BuildService {
     return this.repository.getBuild(buildId);
   }
 
+  async getBuildOwner(buildId: string): Promise<string | null> {
+    return this.repository.getBuildOwner(buildId);
+  }
+
   async getBuildLogs(buildId: string): Promise<BuildLogsResponse | null> {
     const logs = await this.repository.getBuildLogs(buildId);
     if (!logs) {
@@ -212,6 +218,10 @@ export class BuildService {
   // retries on the next poll cycle after the Skill finishes its
   // upload.
   async claimNextBuild(runnerId?: string): Promise<ClaimResponse> {
+    const leaseTimeoutMs = this.runtime.leaseTimeoutMs ?? 15 * 60 * 1000;
+    if (leaseTimeoutMs > 0) {
+      await this.repository.recoverStaleBuilds(new Date(Date.now() - leaseTimeoutMs));
+    }
     // Runner 가 자기 id 를 안 보냈거나 빈 문자열 — 호환을 위해 fallback id 로
     // auto-register 한다. 기존 빌드서버 호출 (runner_id 미전송) 도 그대로 동작.
     // 단, 신규 러너는 모두 id 를 보내므로 fallback branch 는 사실상

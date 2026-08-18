@@ -48,6 +48,11 @@ function safeSlug(appName: string): string {
   return slug.slice(0, 30) || "service";
 }
 
+function databaseStatus(value: unknown): ServiceDatabaseProvisioningRecord["status"] {
+  if (value === "READY" || value === "FAILED") return value;
+  return "PROVISIONING";
+}
+
 export function serviceDatabaseNames(appName: string) {
   const normalized = appName.trim();
   const suffix = stableServiceSuffix(normalized);
@@ -89,7 +94,7 @@ export class ServiceDatabaseProvisioner {
           schemaName: String(row.schema_name),
           roleName: String(row.role_name),
           secretName: String(row.secret_name),
-          status: row.status === "READY" ? "READY" : "PROVISIONING",
+          status: databaseStatus(row.status),
           migrationCommand: typeof row.migration_command === "string" ? row.migration_command : null,
           migrationRevision: typeof row.migration_revision === "number" ? row.migration_revision : null,
           created: false
@@ -141,6 +146,17 @@ export class ServiceDatabaseProvisioner {
     );
   }
 
+  // Reconcile rows left in PROVISIONING after a process/network failure. The
+  // database objects remain intact for an operator-led retry or purge, while
+  // status no longer falsely reports an in-progress operation forever.
+  async recoverStaleProvisioning(olderThan: Date, reason = "Provisioning timed out."): Promise<number> {
+    const result = await this.pool.query(
+      "UPDATE service_database SET status = 'FAILED', last_error = $2, updated_at = NOW() WHERE status = 'PROVISIONING' AND updated_at < $1",
+      [olderThan, reason.slice(0, 2000)]
+    );
+    return result.rowCount ?? 0;
+  }
+
   async rotate(appName: string): Promise<ServiceDatabaseProvisioningRecord | null> {
     const normalizedAppName = appName.trim();
     const client = await this.pool.connect();
@@ -190,7 +206,7 @@ export class ServiceDatabaseProvisioner {
     );
     if (result.rows.length === 0) return null;
     const row = result.rows[0] as Record<string, unknown>;
-    const status = row.status === "READY" || row.status === "FAILED" ? row.status : "PROVISIONING";
+    const status = databaseStatus(row.status);
     return {
       appName: String(row.app_name),
       engine: "postgres",

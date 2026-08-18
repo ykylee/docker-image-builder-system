@@ -49,6 +49,36 @@ type ApiGetParams = {
   body?: unknown;
 };
 
+/**
+ * Build Server bearer session bridge. The login flow may be backed by an
+ * external identity provider, so the client only forwards a token that has
+ * already been provisioned in browser storage; it never attempts to mint one.
+ */
+export function getAccessToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem("accessToken") ?? window.localStorage.getItem("accessToken");
+  } catch {
+    return null;
+  }
+}
+
+export function setAccessToken(token: string): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem("accessToken", token);
+}
+
+export function clearAccessToken(): void {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem("accessToken");
+  window.localStorage.removeItem("accessToken");
+}
+
+function withAuthHeaders(headers: Record<string, string> = {}): Record<string, string> {
+  const token = getAccessToken();
+  return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+}
+
 async function apiGet(
   path: keyof paths | string,
   _pathStr: string,
@@ -57,7 +87,7 @@ async function apiGet(
   const fetchFn = (api as unknown as {
     GET: (p: string, init: ApiGetParams) => Promise<unknown>;
   }).GET;
-  const result = (await fetchFn(path as string, init)) as {
+  const result = (await fetchFn(path as string, { ...init, headers: withAuthHeaders(init.headers) })) as {
     data?: unknown;
     error?: unknown;
     response?: { status?: number };
@@ -149,7 +179,7 @@ function apiSend(
 ): Promise<unknown> {
   const fn = (api as unknown as Record<string, (p: string, init: unknown) => Promise<unknown>>)[method];
   return fn(path, {
-    headers: { "X-Admin-Id": callerId },
+    headers: withAuthHeaders({ "X-Admin-Id": callerId }),
     body
   });
 }
@@ -157,7 +187,7 @@ function apiSend(
 async function apiPut(path: string, callerId: string, body: unknown): Promise<unknown> {
   const fn = (api as unknown as Record<string, (p: string, init: unknown) => Promise<unknown>>).PUT;
   const result = (await fn(path, {
-    headers: { "X-Admin-Id": callerId },
+    headers: withAuthHeaders({ "X-Admin-Id": callerId }),
     body
   })) as { data?: unknown; error?: unknown; response?: { status?: number } };
   if (result.data === undefined) {

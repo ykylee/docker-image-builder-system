@@ -392,6 +392,15 @@ export class PostgresBuildRepository implements BuildRepository {
     return toBuildStatusResponse(row.build, row.buildTest, row.deploymentAttempt);
   }
 
+  async getBuildOwner(buildId: string): Promise<string | null> {
+    const [row] = await this.db
+      .select({ requestedBy: buildRequestTable.requestedBy })
+      .from(buildRequestTable)
+      .where(eq(buildRequestTable.id, buildId))
+      .limit(1);
+    return row?.requestedBy ?? null;
+  }
+
   async getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null> {
     const [buildExists] = await this.db
       .select({ id: buildRequestTable.id })
@@ -525,6 +534,38 @@ export class PostgresBuildRepository implements BuildRepository {
         kind: "claimed",
         response: toBuildStatusResponse(updated)
       };
+    });
+  }
+
+  async recoverStaleBuilds(olderThan: Date): Promise<number> {
+    return this.db.transaction(async (tx) => {
+      const stale = await tx
+        .select()
+        .from(buildRequestTable)
+        .where(and(
+          inArray(buildRequestTable.status, ["PREPARING_SOURCE", "BUILDING", "TEST_SUCCESS"] as BuildStatus[]),
+          sql`${buildRequestTable.updatedAt} < ${olderThan}`
+        ));
+      const timestamp = new Date();
+      for (const row of stale) {
+        const history = advancePhaseHistory(
+          (row.phaseHistory ?? []) as Array<{ phase: BuildPhase; completedAt: string }>,
+          row.phase as BuildPhase,
+          "REQUEST_ACCEPTED",
+          timestamp.toISOString()
+        );
+        await tx.update(buildRequestTable).set({
+          status: "QUEUED",
+          phase: "REQUEST_ACCEPTED",
+          phaseHistory: history,
+          updatedAt: timestamp
+        }).where(and(eq(buildRequestTable.id, row.id), eq(buildRequestTable.status, row.status)));
+        await tx.insert(buildLogTable).values({
+          id: randomUUID(), buildId: row.id, phase: "REQUEST_ACCEPTED",
+          message: "Stale build lease recovered and returned to queue.", createdAt: timestamp
+        });
+      }
+      return stale.length;
     });
   }
 

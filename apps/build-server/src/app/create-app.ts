@@ -24,6 +24,7 @@ import {
   shouldSendDriftAlert,
   startHostingCapacityMonitor
 } from "../services/hosting-capacity-monitor.js";
+import { bearerToken, verifyPrincipalToken } from "../auth/principal.js";
 
 // TASK-064 운영 baseline — postgres backend 부팅 시
 // `apps/build-server/migrations/` 의 미적용 SQL 을 자동 적용한다.
@@ -88,18 +89,76 @@ const API_REWRITE_ALLOWED_PREFIXES = ["/builds", "/services", "/admin/"];
 // path (예: /admin/builds, /admin/users, /admin/runners, /admin/login,
 // /admin/admins) 만 catch 하고 나머지는 SPA fallback 으로 떨어지도록
 // wildcard 제외에서 제외한다.
-const API_JSON_PREFIXES = ["/openapi", "/docs", "/health"];
+const API_JSON_PREFIXES = ["/openapi", "/docs", "/health", "/ready"];
 
 // 브라우저 문서 내비게이션이어도 SPA 로 가로채지 않을 prefix. Scalar API Reference
 // (`/docs`) 와 OpenAPI 문서는 운영자가 주소창으로 직접 여는 대상이고,
 // `/api/*` 는 프론트엔드 fetch 의 정식 진입점이라 리다이렉트 계약을
 // 유지해야 한다. `/assets/` 는 빌드 산출물 정적 경로.
-const SPA_NAVIGATION_EXCLUDED_PREFIXES = ["/api/", "/openapi", "/docs", "/health", "/assets/"];
+const SPA_NAVIGATION_EXCLUDED_PREFIXES = ["/api/", "/openapi", "/docs", "/health", "/ready", "/assets/"];
 
 export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstance> {
   const app = Fastify({
     logger: true
   });
+
+  // Identity boundary for deployments that provide AUTH_SECRET. The legacy
+  // header mode remains available when unset so existing local fixtures can
+  // migrate independently; once enabled, the server derives owner/admin
+  // headers from the verified principal and ignores caller-supplied values.
+  const authSecret = runtime.authSecret?.trim() || process.env.AUTH_SECRET?.trim() || "";
+  const authMode = runtime.authMode ?? (process.env.AUTH_MODE === "required" ? "required" : "legacy");
+  if (authMode === "required" && !authSecret) {
+    throw new Error("AUTH_MODE=required needs AUTH_SECRET to be configured.");
+  }
+  if (runtime.nodeEnv === "production") {
+    if (runtime.corsOrigin === true) {
+      app.log.warn("CORS wildcard is enabled in production; set CORS_ORIGIN to an explicit origin.");
+    }
+    if (authMode === "legacy") {
+      app.log.warn("AUTH_MODE=legacy is enabled in production; set AUTH_MODE=required after provisioning tokens.");
+    }
+  }
+  if (authSecret) {
+    app.addHook("onRequest", async (request, reply) => {
+      const path = request.url.split("?", 1)[0] ?? "";
+      const segments = path.split("/").filter(Boolean);
+      const isPublicBuildApi =
+        (path === "/builds" && request.method === "POST") ||
+        (segments[0] === "builds" && segments.length >= 2 && segments[1] !== "claim" &&
+          ((segments.length === 3 && segments[2] === "source" && request.method === "POST") ||
+            (segments.length === 4 && segments[2] === "source" && segments[3] === "chunk" && request.method === "POST")));
+      if (
+        path === "/health" ||
+        path === "/openapi.json" ||
+        path.startsWith("/docs") ||
+        path.startsWith("/assets/")
+      ) {
+        return;
+      }
+      // Build intake is intentionally public: untrusted users may submit a
+      // build and identify themselves through the request's appName and
+      // requestedBy fields. Only admin and runner control surfaces require a
+      // cryptographic principal in this phase.
+      if (isPublicBuildApi) return;
+      if (!(path === "/services" || path.startsWith("/builds") || path.startsWith("/admin/"))) {
+        return;
+      }
+      const principal = verifyPrincipalToken(
+        bearerToken(request.headers.authorization),
+        authSecret
+      );
+      if (!principal) {
+        return reply.status(401).send({ message: "Bearer authentication required." });
+      }
+      if (path.startsWith("/admin/") && !principal.roles.includes("admin")) {
+        return reply.status(403).send({ message: "Admin role required." });
+      }
+      request.headers["x-user-id"] = principal.subject;
+      request.headers["x-admin-id"] = principal.subject;
+      request.headers["x-principal-role"] = principal.roles.includes("admin") ? "admin" : "user";
+    });
+  }
 
   // TASK-066: accept the raw source archive bytes uploaded by the
   // Skill as `application/octet-stream`. Fastify's default content
@@ -155,11 +214,18 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
     process.env.HOSTING_BASE_HOST && process.env.HOSTING_BASE_HOST.trim() !== ""
       ? process.env.HOSTING_BASE_HOST.trim()
       : undefined;
+  const leaseTimeoutMs = (() => {
+    const raw = process.env.BUILD_LEASE_TIMEOUT_MS?.trim();
+    if (!raw) return 15 * 60 * 1000;
+    const value = Number(raw);
+    return Number.isFinite(value) && value >= 0 ? value : 15 * 60 * 1000;
+  })();
   const buildService = new BuildService(buildRepository, {
     strictContentRange,
     hostingCapacity: runtime.hostingCapacity,
     resultWebhookUrl,
-    hostingBaseHost
+    hostingBaseHost,
+    leaseTimeoutMs
   });
 
   // Capacity drift monitoring is opt-in. When enabled, compare the configured
@@ -434,7 +500,7 @@ async function mountBuildMonitorDist(app: FastifyInstance): Promise<void> {
       }
       return reply.code(404).send({ error: "not_found", path });
     }
-    const isApiPath = ["/openapi", "/docs", "/health"].some((prefix) =>
+    const isApiPath = ["/openapi", "/docs", "/health", "/ready"].some((prefix) =>
       path.startsWith(prefix)
     );
     if (isApiPath) {

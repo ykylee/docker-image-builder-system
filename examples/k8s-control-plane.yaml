@@ -40,6 +40,14 @@ spec:
               value: memory
             - name: ADMIN_IDS
               value: admin
+            - name: AUTH_MODE
+              value: legacy
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dib-control-plane-auth
+                  key: AUTH_SECRET
+                  optional: true
             - name: HOST
               value: 0.0.0.0
             - name: PORT

@@ -56,6 +56,29 @@ test("getStatus returns sanitized provisioning metadata", async () => {
   });
 });
 
+test("getStatus preserves FAILED lifecycle state", async () => {
+  const pool = {
+    async query() {
+      return { rows: [{ app_name: "demo-app", schema_name: "svc_demo", role_name: "svc_role", secret_name: "dib-service-demo-db", status: "FAILED", migration_command: null, migration_revision: null }] };
+    }
+  } as never;
+  const status = await new ServiceDatabaseProvisioner(pool).getStatus("demo-app");
+  assert.equal(status?.status, "FAILED");
+});
+
+test("recoverStaleProvisioning marks orphaned rows failed", async () => {
+  let query = "";
+  const pool = {
+    async query(text: string) {
+      query = text;
+      return { rowCount: 2, rows: [] };
+    }
+  } as never;
+  const count = await new ServiceDatabaseProvisioner(pool).recoverStaleProvisioning(new Date(0), "timeout");
+  assert.equal(count, 2);
+  assert.match(query, /status = 'FAILED'/);
+});
+
 test("purge drops owned schema and role before deleting metadata", async () => {
   const queries: string[] = [];
   const client = {

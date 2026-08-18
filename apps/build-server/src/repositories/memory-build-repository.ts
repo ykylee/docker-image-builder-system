@@ -338,6 +338,10 @@ export function createMemoryBuildRepository(
       });
     },
 
+    async getBuildOwner(buildId: string): Promise<string | null> {
+      return builds.get(buildId)?.requestedBy ?? null;
+    },
+
     async getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null> {
       const build = builds.get(buildId);
       if (!build) {
@@ -442,6 +446,34 @@ export function createMemoryBuildRepository(
           deploymentAttempt: next.deploymentAttempt
         })
       };
+    },
+
+    async recoverStaleBuilds(olderThan: Date): Promise<number> {
+      const staleStatuses = new Set(["PREPARING_SOURCE", "BUILDING", "TEST_SUCCESS"]);
+      let recovered = 0;
+      const timestamp = nowIsoString();
+      for (const build of builds.values()) {
+        if (!staleStatuses.has(build.summary.status) || build.summary.updatedAt >= olderThan.toISOString()) {
+          continue;
+        }
+        const previousPhase = build.summary.phase;
+        build.summary = {
+          ...enrichBuildSummary(build.summary),
+          status: "QUEUED",
+          phase: "REQUEST_ACCEPTED",
+          updatedAt: timestamp
+        };
+        build.phaseHistory = [...build.phaseHistory, { phase: previousPhase, completedAt: timestamp }];
+        build.logs.push({
+          id: randomUUID(),
+          buildId: build.summary.buildId,
+          phase: "REQUEST_ACCEPTED",
+          message: "Stale build lease recovered and returned to queue.",
+          createdAt: timestamp
+        });
+        recovered++;
+      }
+      return recovered;
     },
 
     async updatePhase(

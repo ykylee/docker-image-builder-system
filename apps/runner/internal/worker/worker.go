@@ -27,7 +27,7 @@ type Worker struct {
 // is reused by the source fetcher so the per-build source tree
 // lives under the same root as the docker workspace.
 func New(cfg config.Config) *Worker {
-	client := hostclient.NewHTTPBuildControlClient(cfg.HostServerBaseURL, cfg.RunnerID)
+	client := hostclient.NewHTTPBuildControlClient(cfg.HostServerBaseURL, cfg.RunnerID, cfg.AuthToken)
 	return newWorkerWithDeps(cfg, client)
 }
 

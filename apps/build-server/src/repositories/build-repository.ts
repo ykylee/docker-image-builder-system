@@ -344,8 +344,11 @@ export type GetSourceArchiveMetadataResult =
 export interface BuildRepository {
   createBuild(input: BuildRequest): Promise<CreateBuildResult>;
   getBuild(buildId: string): Promise<BuildStatusResponse | null>;
+  getBuildOwner(buildId: string): Promise<string | null>;
   getBuildLogs(buildId: string): Promise<BuildLogEntry[] | null>;
   claimNextBuild(): Promise<ClaimNextBuildResult>;
+  /** Requeues non-terminal builds whose lease heartbeat has gone stale. */
+  recoverStaleBuilds(olderThan: Date): Promise<number>;
   // TASK-162 (P2-M3): FAILED phase 는 실패 이유를 함께 받는다. 이전에는
   // 채널이 없어 `build_request.last_error_code/message` 가 한 번도 기록되지
   // 않았고 모든 실패 빌드의 `lastError` 가 null 이었다.

@@ -260,3 +260,9 @@
 - 최종 수정일: 2026-07-07 (rev 73→74: TASK-085 (production-semantic 운영 검증 보강) PR #36 squash merge main 합류 `c5e3008`. workflow meta sync 같은 commit 안에 포함.)
 - 최종 수정일: 2026-07-06 (rev 69→70: TASK-081-B multi-runner 운영 검증 PR #32 squash merge main 합류 `ddae46a`. workflow meta sync 같은 commit 안에 포함.)
 - Updated: 2026-08-04 — ServiceManifest 1차 vertical slice 완료. shared contract, `0016_service_manifest.sql`, memory/Postgres current+immutable revision 저장, admin API 3종, OpenAPI/CORS, `/admin/hosting` JSON 편집 UI를 구현하고 `e75709f`로 `origin/main`에 push했다. 검증은 build-server 232 PASS, frontend Vitest 284 PASS, 관련 TypeScript clean, `git diff --check` PASS. 다음은 사용자 owner 권한/화면, 배포 성공 시 자동 seed, validate/render/diff 및 Helm/ArgoCD apply·rollback이다.
+
+## 날짜별 백로그 문서
+- [2026-08-16 작업 백로그](backlog/2026-08-16.md)
+- [2026-08-16 작업 백로그](main/backlog/2026-08-16.md)
+- [2026-08-17 작업 백로그](main/backlog/2026-08-17.md)
+- [2026-08-18 작업 백로그](main/backlog/2026-08-18.md)

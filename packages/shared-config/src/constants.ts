@@ -1,7 +1,9 @@
 export const DEFAULT_RUNNER_POLL_INTERVAL_MS = 5000;
 export const DEFAULT_BUILD_TIMEOUT_SECONDS = 900;
 export const DEFAULT_BUILD_REPOSITORY_BACKEND = "memory";
-export const DEFAULT_CORS_ORIGIN = true;
+// Same-origin is the safe runtime default. Local callers that need cross-origin
+// browser access must opt in with CORS_ORIGIN=true or an explicit origin.
+export const DEFAULT_CORS_ORIGIN = false;
 
 // Admin identifier allow-list. The env value is a comma-separated string
 // (e.g. "admin,yky.lee,other-admin"). The default below seeds the two

@@ -58,6 +58,17 @@ import {
 
 const registry = new OpenAPIRegistry();
 
+// AUTH_SECRET-enabled deployments use this scheme for admin and Runner
+// control operations. Public build intake operations intentionally omit a
+// security requirement so anonymous build submission remains discoverable in
+// the contract.
+registry.registerComponent("securitySchemes", "bearerAuth", {
+  type: "http",
+  scheme: "bearer",
+  bearerFormat: "JWT",
+  description: "Signed principal token required for admin and Runner control APIs when AUTH_SECRET is enabled."
+});
+
 // Register every canonical schema once so it lands in `components.schemas`.
 // The `id` set via `.meta({ id })` is what binds each component to its
 // `$ref` site. Re-registering with the same id is a no-op for the generator.
@@ -339,6 +350,14 @@ registry.registerPath({
 
 registry.registerPath({
   method: "get",
+  path: "/ready",
+  description: 'Readiness probe. Returns 200 after repository initialization and migrations complete.',
+  tags: ["Health"],
+  responses: { 200: { description: "Service is ready to accept traffic." } }
+});
+
+registry.registerPath({
+  method: "get",
   path: "/admin/builds",
   description:
     "Admin-only. List build summaries across all owners. Requires the X-Admin-Id header to be in the build-server ADMIN_IDS env.",
@@ -566,7 +585,7 @@ registry.registerPath({
 
 export function getOpenApiDocument(): unknown {
   const generator = new OpenApiGeneratorV3(registry.definitions);
-  return generator.generateDocument({
+  const document = generator.generateDocument({
     openapi: "3.0.3",
     info: {
       title: "Docker Image Builder — Build Server API",
@@ -579,6 +598,22 @@ export function getOpenApiDocument(): unknown {
       description: tag.description
     }))
   });
+  // Build submission and source upload remain unauthenticated. Build reads
+  // and every control operation are documented with the same bearer scheme used by the
+  // AUTH_SECRET runtime hook, so generated clients and operators can see the
+  // boundary without needing deployment-specific environment knowledge.
+  const protectedTags = new Set(["Runner Claim", "Container Test", "Deployment", "Admin"]);
+  for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
+    for (const [method, operation] of Object.entries(pathItem ?? {})) {
+      if (!operation || typeof operation !== "object" || !("tags" in operation)) continue;
+      const tags = (operation as { tags?: unknown }).tags;
+      const ownerRead = Array.isArray(tags) && tags.includes("Builds") && method.toLowerCase() === "get";
+      if (ownerRead || (Array.isArray(tags) && tags.some((tag) => typeof tag === "string" && protectedTags.has(tag)))) {
+        (operation as { security?: unknown }).security = [{ bearerAuth: [] }];
+      }
+    }
+  }
+  return document;
 }
 
 export async function registerOpenApiRoutes(

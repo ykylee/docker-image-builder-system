@@ -51,7 +51,8 @@ describe("openapi document", () => {
       "/builds/{buildId}/logs",
       "/builds/{buildId}/phase",
       "/builds/{buildId}/source",
-      "/health"
+      "/health",
+      "/ready"
       , "/services"
     ]);
 

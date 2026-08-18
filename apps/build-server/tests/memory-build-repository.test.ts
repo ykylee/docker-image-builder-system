@@ -129,6 +129,21 @@ describe("MemoryBuildRepository: claimNextBuild", () => {
     assert.equal(claimLog!.message, "Build claimed by runner.");
   });
 
+  it("requeues a stale in-flight build and records a recovery log", async () => {
+    const repo = createMemoryBuildRepository();
+    const buildId = await seedBuild(repo, { appName: baseRequest.appName, requestedBy: baseRequest.requestedBy });
+    const claimed = await repo.claimNextBuild();
+    assert.equal(claimed.kind, "claimed");
+
+    const recovered = await repo.recoverStaleBuilds(new Date(Date.now() + 1));
+    assert.equal(recovered, 1);
+    const status = await repo.getBuild(buildId);
+    assert.equal(status?.build.status, "QUEUED");
+    assert.equal(status?.build.phase, "REQUEST_ACCEPTED");
+    const logs = await repo.getBuildLogs(buildId);
+    assert.ok(logs?.some((entry) => entry.message.includes("Stale build lease recovered")));
+  });
+
   it("picks oldest QUEUED when previous build is COMPLETED", async () => {
     const repo = createMemoryBuildRepository();
     await seedBuild(repo, { appName: baseRequest.appName, requestedBy: baseRequest.requestedBy });

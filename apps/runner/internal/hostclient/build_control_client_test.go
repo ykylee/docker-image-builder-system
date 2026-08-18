@@ -72,6 +72,23 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 	}
 }
 
+func TestHTTPBuildControlClient_SendsConfiguredBearerToken(t *testing.T) {
+	const want = "signed-runner-token"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer "+want {
+			t.Errorf("expected bearer token, got %q", got)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"claimed": false, "reason": "NO_BUILD_AVAILABLE"})
+	}))
+	defer srv.Close()
+
+	c := NewHTTPBuildControlClient(srv.URL, "runner-1", "  "+want+"  ")
+	if _, err := c.ClaimNextBuild(context.Background()); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+}
+
 func TestHTTPBuildControlClient_ClaimNextBuild_NoBuildAvailable(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

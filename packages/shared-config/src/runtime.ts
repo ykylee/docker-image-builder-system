@@ -1,10 +1,13 @@
 import type { RuntimeEnv } from "./env.js";
 
 export type RuntimeSettings = {
+  nodeEnv?: "development" | "test" | "production";
   port: number;
   databaseUrl: string;
   buildRepositoryBackend: "memory" | "postgres";
   dbAutoBootstrap: boolean;
+  authSecret?: string;
+  authMode?: "legacy" | "required";
   runnerPollIntervalMs: number;
   buildTimeoutSeconds: number;
   corsOrigin: string | true | false;
@@ -22,10 +25,13 @@ export type RuntimeSettings = {
 
 export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
   return {
+    nodeEnv: env.NODE_ENV,
     port: env.PORT,
     databaseUrl: env.DATABASE_URL,
     buildRepositoryBackend: env.BUILD_REPOSITORY_BACKEND,
     dbAutoBootstrap: env.DB_AUTO_BOOTSTRAP,
+    authSecret: env.AUTH_SECRET,
+    authMode: env.AUTH_MODE,
     runnerPollIntervalMs: env.RUNNER_POLL_INTERVAL_MS,
     buildTimeoutSeconds: env.BUILD_TIMEOUT_SECONDS,
     corsOrigin: env.CORS_ORIGIN,

@@ -37,6 +37,14 @@ const buildIdParamsSchema = z.object({
 });
 
 const userIdHeader = "x-user-id";
+const principalRoleHeader = "x-principal-role";
+
+function tenantOwner(request: { headers: Record<string, unknown> }): string | undefined {
+  const role = request.headers[principalRoleHeader];
+  if (role === "admin") return undefined;
+  const value = request.headers[userIdHeader];
+  return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
+}
 
 export async function registerBuildRoutes(
   app: FastifyInstance,
@@ -49,12 +57,22 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid list query", queryResult.error.issues)
       );
     }
-    const body = await buildService.listBuilds(queryResult.data);
+    const owner = tenantOwner(request);
+    const body = await buildService.listBuilds(owner ? { ...queryResult.data, requestedBy: owner } : queryResult.data);
     return reply.status(200).send(body);
   });
 
   app.get("/services", async (request, reply) => {
-    const requestedBy = z.string().min(1).safeParse(request.headers[userIdHeader]);
+    // Authenticated admins may inspect the complete hosting inventory. Regular
+    // principals are always tenant-scoped; the explicit header fallback keeps
+    // legacy AUTH_SECRET-less deployments compatible.
+    if (request.headers[principalRoleHeader] === "admin") {
+      const services = await buildService.listHostedServices();
+      return reply.status(200).send({ services });
+    }
+
+    const owner = tenantOwner(request);
+    const requestedBy = z.string().min(1).safeParse(owner ?? request.headers[userIdHeader]);
     if (!requestedBy.success) {
       return reply.status(401).send({ message: "X-User-Id header missing.", header: "X-User-Id" });
     }
@@ -120,6 +138,10 @@ export async function registerBuildRoutes(
     if (!result) {
       return reply.status(404).send(notFoundBody("Build not found."));
     }
+    const owner = tenantOwner(request);
+    if (owner && (await buildService.getBuildOwner(paramsResult.data.buildId)) !== owner) {
+      return reply.status(404).send(notFoundBody("Build not found."));
+    }
 
     const body = buildStatusResponseSchema.parse(result);
     return reply.status(200).send(body);
@@ -135,6 +157,10 @@ export async function registerBuildRoutes(
     const result = await buildService.getBuildLogs(paramsResult.data.buildId);
 
     if (!result) {
+      return reply.status(404).send(notFoundBody("Build logs not found."));
+    }
+    const owner = tenantOwner(request);
+    if (owner && (await buildService.getBuildOwner(paramsResult.data.buildId)) !== owner) {
       return reply.status(404).send(notFoundBody("Build logs not found."));
     }
 
@@ -399,6 +425,11 @@ export async function registerBuildRoutes(
       );
     }
 
+    const owner = tenantOwner(request);
+    if (owner && (await buildService.getBuildOwner(paramsResult.data.buildId)) !== owner) {
+      return reply.status(404).send(notFoundBody("Source archive not found for build."));
+    }
+
     const result = await buildService.getSourceArchive(paramsResult.data.buildId);
     if (result.kind === "not_found") {
       return reply.status(404).send(notFoundBody("Source archive not found for build."));
@@ -541,6 +572,10 @@ export async function registerBuildRoutes(
       return reply.status(400).send(
         validationErrorBody("Invalid buildId parameter", paramsResult.error.issues)
       );
+    }
+    const owner = tenantOwner(request);
+    if (owner && (await buildService.getBuildOwner(paramsResult.data.buildId)) !== owner) {
+      return reply.status(404).send(notFoundBody("Build not found."));
     }
     const result = await buildService.deleteSourceArchive(
       paramsResult.data.buildId

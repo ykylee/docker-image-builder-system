@@ -14,12 +14,24 @@ func TestLoadRegistryConfigDirDefaultEmpty(t *testing.T) {
 	for _, k := range []string{
 		"RUNNER_POLL_INTERVAL", "HOST_SERVER_BASE_URL", "RUNNER_ID",
 		"RUNNER_REGISTRY_CONFIG_DIR",
+		"RUNNER_AUTH_TOKEN",
 	} {
 		t.Setenv(k, "")
 	}
 	cfg := Load()
 	if cfg.RegistryConfigDir != "" {
 		t.Errorf("expected RegistryConfigDir to default to empty, got %q", cfg.RegistryConfigDir)
+	}
+}
+
+func TestLoadAuthToken(t *testing.T) {
+	t.Setenv("RUNNER_AUTH_TOKEN", "signed-token")
+	if got := Load().AuthToken; got != "signed-token" {
+		t.Fatalf("expected AuthToken from env, got %q", got)
+	}
+	t.Setenv("RUNNER_AUTH_TOKEN", "")
+	if got := Load().AuthToken; got != "" {
+		t.Fatalf("expected empty AuthToken by default, got %q", got)
 	}
 }
 
