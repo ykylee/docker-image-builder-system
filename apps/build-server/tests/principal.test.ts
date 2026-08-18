@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { bearerToken, signPrincipalToken, verifyPrincipalToken } from "../src/auth/principal.js";
 import { createApp } from "../src/app/create-app.js";
+import { createHmacSessionAdapter } from "../src/auth/session-adapter.js";
 import { getOpenApiDocument } from "../src/app/openapi.js";
 import { toRuntimeSettings, parseRuntimeEnv } from "@docker-image-builder-system/shared-config";
 
@@ -29,6 +30,14 @@ test("bearer parser only accepts the Authorization bearer form", () => {
   assert.equal(bearerToken("bearer abc"), "abc");
   assert.equal(bearerToken("Basic abc"), undefined);
   assert.equal(bearerToken(undefined), undefined);
+});
+
+test("session adapter exposes a replaceable principal verification boundary", () => {
+  const adapter = createHmacSessionAdapter(secret);
+  const token = signPrincipalToken(secret, { subject: "alice", roles: ["user"], expiresAt: 4102444800 });
+  assert.equal(adapter.kind, "hmac");
+  assert.deepEqual(adapter.verifyAuthorization(`Bearer ${token}`)?.subject, "alice");
+  assert.equal(adapter.verifyAuthorization("Basic not-a-token"), null);
 });
 
 test("AUTH_SECRET keeps public build intake open but protects control APIs", async () => {

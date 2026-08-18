@@ -24,7 +24,7 @@ import {
   shouldSendDriftAlert,
   startHostingCapacityMonitor
 } from "../services/hosting-capacity-monitor.js";
-import { bearerToken, verifyPrincipalToken } from "../auth/principal.js";
+import { createHmacSessionAdapter } from "../auth/session-adapter.js";
 
 // TASK-064 운영 baseline — postgres backend 부팅 시
 // `apps/build-server/migrations/` 의 미적용 SQL 을 자동 적용한다.
@@ -107,6 +107,7 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   // migrate independently; once enabled, the server derives owner/admin
   // headers from the verified principal and ignores caller-supplied values.
   const authSecret = runtime.authSecret?.trim() || process.env.AUTH_SECRET?.trim() || "";
+  const sessionAdapter = authSecret ? createHmacSessionAdapter(authSecret) : null;
   const authMode = runtime.authMode ?? (process.env.AUTH_MODE === "required" ? "required" : "legacy");
   if (authMode === "required" && !authSecret) {
     throw new Error("AUTH_MODE=required needs AUTH_SECRET to be configured.");
@@ -144,10 +145,7 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
       if (!(path === "/services" || path.startsWith("/builds") || path.startsWith("/admin/"))) {
         return;
       }
-      const principal = verifyPrincipalToken(
-        bearerToken(request.headers.authorization),
-        authSecret
-      );
+      const principal = sessionAdapter?.verifyAuthorization(request.headers.authorization) ?? null;
       if (!principal) {
         return reply.status(401).send({ message: "Bearer authentication required." });
       }

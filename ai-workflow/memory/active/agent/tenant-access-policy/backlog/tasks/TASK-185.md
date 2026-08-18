@@ -25,12 +25,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: token 활성 React 요청에서 X-User-Id/X-Admin-Id caller header를 제거하고 Authorization만 전송하도록 api helper를 정리했다. Build Server auth hook이 검증 principal에서 내부 호환 header를 파생한다. PROJECT_PROFILE에 adapter 경계를 기록했고 auth browser E2E가 header 부재와 owner policy를 검증한다.
+- 진행 현황: Build Server에 SessionAdapter 인터페이스와 기본 HMAC adapter를 추가하고 HTTP auth hook을 adapter 경계로 분리했다. React token-active 요청은 legacy identity header를 제거하며, auth E2E가 이를 검증한다.
 - 다음 세션 시작 포인트: OIDC/httpOnly session adapter의 issuer/callback/session cookie 계약을 결정하고 서버·React 교체 지점을 설계한다.
 - 남은 리스크:
 
 ## ✅ Outcome
 
-- 작업 결과: auth Playwright E2E 1/1 PASS; frontend vitest 289/289 PASS; pnpm check PASS; git diff --check PASS
-- 검증 결과: auth Playwright E2E 1/1 PASS; frontend vitest 289/289 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: principal tests 10/10 PASS; auth Playwright E2E 1/1 PASS; pnpm check PASS; git diff --check PASS
+- 검증 결과: principal tests 10/10 PASS; auth Playwright E2E 1/1 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:
