@@ -29,12 +29,13 @@
   "session": {
     "current_baseline": null,
     "current_axis": null,
-    "current_focus": "TASK-185",
+    "current_focus": "TASK-186",
     "in_progress_items": [
-      "TASK-185"
+      "TASK-186"
     ],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-185 — identity-session-adapter",
       "TASK-184 — auth-contract-and-e2e",
       "TASK-183 — tenant-access-policy"
     ],
@@ -43,14 +44,15 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
-    "task_count": 3,
+    "task_count": 4,
     "in_progress_items": [
-      "TASK-185 — identity-session-adapter"
+      "TASK-186 — oidc-session-runtime-foundation"
     ],
     "blocked_items": [],
     "done_items": [
       "TASK-183 — tenant-access-policy",
-      "TASK-184 — auth-contract-and-e2e"
+      "TASK-184 — auth-contract-and-e2e",
+      "TASK-185 — identity-session-adapter"
     ]
   },
   "next_documents": [

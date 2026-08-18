@@ -10,15 +10,20 @@ import { bearerToken, verifyPrincipalToken } from "./principal.js";
  * principal or null.
  */
 export interface SessionAdapter {
-  readonly kind: "hmac" | "oidc";
-  verifyAuthorization(authorization: unknown): Principal | null;
+  readonly kind: "hmac" | "oidc" | "composite";
+  verifyRequest(input: SessionRequest): Promise<Principal | null>;
 }
+
+export type SessionRequest = {
+  authorization?: unknown;
+  cookie?: string;
+};
 
 export function createHmacSessionAdapter(secret: string): SessionAdapter {
   return {
     kind: "hmac",
-    verifyAuthorization(authorization) {
-      return verifyPrincipalToken(bearerToken(authorization), secret);
+    async verifyRequest(input) {
+      return verifyPrincipalToken(bearerToken(input.authorization), secret);
     }
   };
 }

@@ -145,7 +145,11 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
       if (!(path === "/services" || path.startsWith("/builds") || path.startsWith("/admin/"))) {
         return;
       }
-      const principal = sessionAdapter?.verifyAuthorization(request.headers.authorization) ?? null;
+      const principal =
+        (await sessionAdapter?.verifyRequest({
+          authorization: request.headers.authorization,
+          cookie: request.headers.cookie
+        })) ?? null;
       if (!principal) {
         return reply.status(401).send({ message: "Bearer authentication required." });
       }

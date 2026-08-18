@@ -1,6 +1,6 @@
 ---
 id: TASK-185
-status: in_progress
+status: done
 created_at: 2026-08-18
 source_anchor: generic-task-185
 source_path: backlog/2026-08-18.md
@@ -11,7 +11,7 @@ kind: generic
 
 ## 📝 Description
 
-- 상태: in_progress
+- 상태: done
 - 우선순위: high
 - 요청일: 2026-08-18
 - 담당:
@@ -27,12 +27,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: OIDC authorization-code+PKCE, opaque Secure HttpOnly session cookie, server-side session store, async SessionAdapter request contract, React token bridge removal, HMAC Runner compatibility, and fail-closed operational rules documented in .omx/plans/task-185-oidc-http-session-contract.md.
-- 다음 세션 시작 포인트: 실제 IdP issuer·role claim·redirect origin과 Redis/Postgres session store를 선택한 뒤 구현 task로 분해한다.
+- 진행 현황: OIDC authorization-code+PKCE, opaque Secure HttpOnly session cookie, server-side session store, async SessionAdapter request contract, React token bridge removal, HMAC Runner compatibility, and fail-closed rules documented.
+- 다음 세션 시작 포인트: TASK-186에서 provider-neutral async adapter와 session store contract 구현
 - 남은 리스크: Provider claim drift, reverse-proxy Secure cookie 설정, session store 장애 시 fail-open 가능성
 
 ## ✅ Outcome
 
-- 작업 결과: 구현 전 계약 설계안 작성 완료; 실제 OIDC provider 선택 전까지 TASK-185 유지
+- 작업 결과: 설계 문서와 acceptance/verification/pre-mortem을 작성하고 1차 adapter 구현 및 회귀 검증을 완료했다.
 - 검증 결과: principal tests 10/10 PASS; auth Playwright E2E 1/1 PASS; pnpm check PASS; git diff --check PASS
-- 후속 작업:
+- 후속 작업: TASK-186

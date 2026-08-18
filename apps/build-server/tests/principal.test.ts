@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { bearerToken, signPrincipalToken, verifyPrincipalToken } from "../src/auth/principal.js";
 import { createApp } from "../src/app/create-app.js";
 import { createHmacSessionAdapter } from "../src/auth/session-adapter.js";
+import { MemorySessionStore } from "../src/auth/session-store.js";
 import { getOpenApiDocument } from "../src/app/openapi.js";
 import { toRuntimeSettings, parseRuntimeEnv } from "@docker-image-builder-system/shared-config";
 
@@ -32,12 +33,32 @@ test("bearer parser only accepts the Authorization bearer form", () => {
   assert.equal(bearerToken(undefined), undefined);
 });
 
-test("session adapter exposes a replaceable principal verification boundary", () => {
+test("session adapter exposes a replaceable principal verification boundary", async () => {
   const adapter = createHmacSessionAdapter(secret);
   const token = signPrincipalToken(secret, { subject: "alice", roles: ["user"], expiresAt: 4102444800 });
   assert.equal(adapter.kind, "hmac");
-  assert.deepEqual(adapter.verifyAuthorization(`Bearer ${token}`)?.subject, "alice");
-  assert.equal(adapter.verifyAuthorization("Basic not-a-token"), null);
+  assert.deepEqual((await adapter.verifyRequest({ authorization: `Bearer ${token}` }))?.subject, "alice");
+  assert.equal(await adapter.verifyRequest({ authorization: "Basic not-a-token" }), null);
+});
+
+test("memory session store enforces TTL and one-time OIDC flow consumption", async () => {
+  const store = new MemorySessionStore();
+  const record = await store.createSession(
+    { subject: "alice", roles: ["user"], expiresAt: 200 },
+    60
+  );
+  assert.equal((await store.getSession(record.id, record.expiresAt - 1))?.principal.subject, "alice");
+  assert.equal(await store.getSession(record.id, record.expiresAt), null);
+
+  await store.saveOidcFlow({
+    state: "state-1",
+    nonce: "nonce-1",
+    codeVerifier: "verifier-1",
+    returnTo: "/builds",
+    expiresAt: 200
+  });
+  assert.equal((await store.consumeOidcFlow("state-1", 199))?.nonce, "nonce-1");
+  assert.equal(await store.consumeOidcFlow("state-1", 199), null);
 });
 
 test("AUTH_SECRET keeps public build intake open but protects control APIs", async () => {
