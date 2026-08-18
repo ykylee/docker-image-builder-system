@@ -29,8 +29,10 @@
   "session": {
     "current_baseline": null,
     "current_axis": null,
-    "current_focus": null,
-    "in_progress_items": [],
+    "current_focus": "TASK-185",
+    "in_progress_items": [
+      "TASK-185"
+    ],
     "blocked_items": [],
     "recent_done_items": [
       "TASK-184 — auth-contract-and-e2e",
@@ -41,8 +43,10 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
-    "task_count": 2,
-    "in_progress_items": [],
+    "task_count": 3,
+    "in_progress_items": [
+      "TASK-185 — identity-session-adapter"
+    ],
     "blocked_items": [],
     "done_items": [
       "TASK-183 — tenant-access-policy",

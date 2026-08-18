@@ -76,7 +76,17 @@ export function clearAccessToken(): void {
 
 function withAuthHeaders(headers: Record<string, string> = {}): Record<string, string> {
   const token = getAccessToken();
-  return token ? { ...headers, Authorization: `Bearer ${token}` } : headers;
+  if (!token) return headers;
+
+  // Once a cryptographic principal is present, do not send caller-supplied
+  // identity headers. The Build Server auth hook derives these compatibility
+  // headers from the verified token for legacy route guards; keeping the
+  // browser values out avoids implying that userId/adminId is an identity
+  // assertion.
+  const { "X-User-Id": _userId, "X-Admin-Id": _adminId, ...nonIdentityHeaders } = headers;
+  void _userId;
+  void _adminId;
+  return { ...nonIdentityHeaders, Authorization: `Bearer ${token}` };
 }
 
 async function apiGet(

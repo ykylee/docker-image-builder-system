@@ -67,7 +67,17 @@ test("public submission, owner reads, cross-tenant denial, and logout token clea
   await uploadSource(request, aliceBuild);
 
   await setBrowserSession(page, "alice");
+  const expectedToken = token("alice");
+  // Re-seed the same token so the outgoing client request can be inspected.
+  await page.evaluate((accessToken) => sessionStorage.setItem("accessToken", accessToken), expectedToken);
+  const clientRequest = page.waitForRequest(
+    (candidate) => candidate.url().includes("/api/builds") && candidate.method() === "GET"
+  );
   await page.goto("/builds");
+  const requestHeaders = (await clientRequest).headers();
+  expect(requestHeaders.authorization).toBe(`Bearer ${expectedToken}`);
+  expect(requestHeaders["x-user-id"]).toBeUndefined();
+  expect(requestHeaders["x-admin-id"]).toBeUndefined();
 
   const ownList = await page.evaluate(async () => {
     const response = await fetch("/api/builds", {
