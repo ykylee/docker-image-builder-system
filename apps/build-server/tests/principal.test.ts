@@ -2,6 +2,7 @@ import test from "node:test";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import Fastify from "fastify";
+import { exportJWK, generateKeyPair, SignJWT } from "jose";
 import { bearerToken, signPrincipalToken, verifyPrincipalToken } from "../src/auth/principal.js";
 import { createApp } from "../src/app/create-app.js";
 import {
@@ -175,6 +176,60 @@ test("Postgres session store preserves parameterized session and flow contracts"
   assert.equal((await store.consumeOidcFlow("s"))?.codeVerifier, "v");
   assert.match(queries[0]?.text ?? "", /INSERT INTO auth_session/);
   assert.ok(queries.every(({ text }) => !text.includes("${")));
+});
+
+test("OIDC client completes discovery, token exchange and JWKS verification against a fake issuer", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+  const jwk = await exportJWK(publicKey);
+  jwk.kid = "fake-key-1";
+  const provider = Fastify();
+  let expectedNonce = "";
+  provider.addContentTypeParser(
+    "application/x-www-form-urlencoded",
+    { parseAs: "string" },
+    (_request, _payload, done) => done(null, "")
+  );
+  provider.get("/.well-known/openid-configuration", async (request, reply) => {
+    const origin = `http://${request.headers.host}`;
+    reply.send({
+      issuer: origin,
+      authorization_endpoint: `${origin}/authorize`,
+      token_endpoint: `${origin}/token`,
+      jwks_uri: `${origin}/jwks`
+    });
+  });
+  provider.get("/jwks", async (_request, reply) => reply.send({ keys: [jwk] }));
+  provider.post("/token", async (request, reply) => {
+    const origin = `http://${request.headers.host}`;
+    const idToken = await new SignJWT({ sub: "oidc-alice", roles: ["user"], nonce: expectedNonce })
+      .setProtectedHeader({ alg: "RS256", kid: "fake-key-1" })
+      .setIssuer(origin)
+      .setAudience("dib-test")
+      .setExpirationTime("5m")
+      .setIssuedAt()
+      .sign(privateKey);
+    return reply.send({ id_token: idToken, access_token: "server-only-access-token" });
+  });
+  await provider.listen({ host: "127.0.0.1", port: 0 });
+  const providerAddress = provider.server.address();
+  if (!providerAddress || typeof providerAddress === "string") throw new Error("fake issuer did not bind");
+  const issuer = `http://127.0.0.1:${providerAddress.port}`;
+  const client = new OidcClient({
+    issuerUrl: issuer,
+    clientId: "dib-test",
+    clientSecret: "server-only",
+    redirectUri: `${issuer}/auth/callback`
+  });
+  try {
+    const flow = await client.beginLogin("/builds");
+    expectedNonce = flow.nonce;
+    const principal = await client.exchangeCode("fake-code", flow);
+    assert.equal(principal.subject, "oidc-alice");
+    assert.deepEqual(principal.roles, ["user"]);
+    assert.ok(principal.expiresAt > Math.floor(Date.now() / 1000));
+  } finally {
+    await provider.close();
+  }
 });
 
 test("AUTH_SECRET keeps public build intake open but protects control APIs", async () => {

@@ -30,12 +30,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: 기존 dibs-postgres를 일시 기동해 migration 0019의 두 테이블/인덱스 생성과 session·OIDC flow insert/select/delete 왕복을 실제 검증하고 컨테이너를 stopped 상태로 복원했다.
-- 다음 세션 시작 포인트: 실제 OIDC issuer/JWKS provider browser E2E 검증
-- 남은 리스크: 실제 provider endpoint 및 role claim mapping 미결정
+- 진행 현황: ephemeral fake OIDC issuer를 사용해 discovery·PKCE token exchange·RS256 JWKS·issuer/audience/nonce 검증·principal 정규화의 실제 HTTP 왕복 E2E를 추가했다.
+- 다음 세션 시작 포인트: 실제 IdP issuer와 role claim mapping을 확정하고 production browser E2E로 전환
+- 남은 리스크: fake issuer는 외부 IdP cookie/redirect 정책을 검증하지 않음
 
 ## ✅ Outcome
 
-- 작업 결과: migration 0019 실DB 왕복 검증 완료
-- 검증 결과: real Postgres migration/session round-trip PASS; build-server principal tests 16/16 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: provider-neutral OIDC client E2E 검증 완료
+- 검증 결과: build-server principal tests 17/17 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:
