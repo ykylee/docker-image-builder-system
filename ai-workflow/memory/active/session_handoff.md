@@ -2,6 +2,18 @@
 
 # Session Handoff
 
+- Updated: 2026-08-18 (세션 종료 — TASK-186 OIDC role claim/HTTP cookie 설정 보강, TASK-2026-08-18-main-187 인증 비활성 배포 모드, TASK-2026-08-18-main-188 등록 ID 소유권·조회 범위 완료). `AUTH_MODE=disabled`는 `AUTH_SECRET`과 무관하게 인증 hook을 끄며, `X-User-Id`를 canonical `requestedBy`/tenant view 기준으로 사용한다. `SESSION_COOKIE_SECURE` 기본값은 false다. principal 19/19, Playwright auth E2E 1/1, TypeScript check, git diff --check 통과. 다음 세션은 배포 manifest/compose에 `AUTH_MODE=disabled`와 등록 ID 전달 계약을 반영한다.
+
+- Current focus: 배포 manifest/compose의 AUTH_MODE=disabled 및 등록 ID 전달 계약
+- In progress:
+  -
+- Blocked:
+  -
+- Recently completed:
+- TASK-2026-08-18-main-188 — registration-id-ownership-views
+  - TASK-2026-08-18-main-187 — auth-disabled-deployment-mode
+  - TASK-186 — oidc-session-runtime-foundation (provider-neutral foundation; 실제 IdP는 후속)
+
 - Updated: 2026-08-18 (세션 종료 — TASK-185 설계 완료 및 TASK-186 OIDC/session runtime foundation 진행). 현재 브랜치 `agent/tenant-access-policy`, HEAD `cf8ebb5`, PR [#62](https://github.com/ykylee/docker-image-builder-system/pull/62). SessionAdapter 비동기 request 경계, HMAC/OIDC/composite adapter, Postgres session store와 migration 0019, provider-neutral OIDC discovery/PKCE/JWKS client, `/auth/login|callback|session|logout`, React session bootstrap/logout, fake issuer HTTP E2E, 실제 Postgres migration 왕복, cookie CSRF/cache 보강을 완료했다. 검증은 Build Server principal 17/17, frontend Vitest 289/289, real Postgres migration/session round-trip, `pnpm check`, `git diff --check` 통과. 기본 실행은 provider/store 미주입 시 OIDC route를 활성화하지 않으며, 다음 세션은 실제 IdP issuer/role claim과 production browser E2E 확정부터 시작한다.
 
 - Current focus: TASK-186 실제 IdP issuer/role claim 확정 및 production browser E2E

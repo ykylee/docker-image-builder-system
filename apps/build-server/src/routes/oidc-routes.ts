@@ -6,11 +6,12 @@ export type OidcRouteOptions = {
   client: OidcClient;
   store: SessionStore;
   cookieName: string;
+  cookieSecure?: boolean;
   sessionTtlSeconds: number;
 };
 
-function serializeCookie(name: string, value: string, maxAge: number): string {
-  return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+function serializeCookie(name: string, value: string, maxAge: number, secure: boolean): string {
+  return `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; HttpOnly;${secure ? " Secure;" : ""} SameSite=Lax`;
 }
 
 function readCookie(header: string | undefined, name: string): string | undefined {
@@ -51,7 +52,7 @@ export function registerOidcRoutes(app: FastifyInstance, options: OidcRouteOptio
     try {
       const principal = await options.client.exchangeCode(request.query.code, flow);
       const session = await options.store.createSession(principal, options.sessionTtlSeconds);
-      reply.header("set-cookie", serializeCookie(options.cookieName, session.id, options.sessionTtlSeconds));
+      reply.header("set-cookie", serializeCookie(options.cookieName, session.id, options.sessionTtlSeconds, options.cookieSecure ?? false));
       return reply.redirect(flow.returnTo, 303);
     } catch {
       return reply.code(401).send({ message: "OIDC callback verification failed." });
@@ -78,7 +79,7 @@ export function registerOidcRoutes(app: FastifyInstance, options: OidcRouteOptio
     }
     const id = readCookie(request.headers.cookie, options.cookieName);
     if (id) await options.store.revokeSession(id);
-    reply.header("set-cookie", serializeCookie(options.cookieName, "", 0));
+    reply.header("set-cookie", serializeCookie(options.cookieName, "", 0, options.cookieSecure ?? false));
     return reply.code(204).send();
   });
 }

@@ -22,13 +22,15 @@ async function main(): Promise<void> {
       clientId: runtime.oidcClientId,
       clientSecret: runtime.oidcClientSecret,
       redirectUri: runtime.oidcRedirectUri,
-      scopes: runtime.oidcScopes
+      scopes: runtime.oidcScopes,
+      roleClaim: runtime.oidcRoleClaim
     });
     const app = await createApp(runtime, {
       oidc: {
         client: oidcClient,
         store: sessionStore,
         cookieName: runtime.sessionCookieName,
+        cookieSecure: runtime.sessionCookieSecure,
         sessionTtlSeconds: runtime.sessionTtlSeconds
       }
     });

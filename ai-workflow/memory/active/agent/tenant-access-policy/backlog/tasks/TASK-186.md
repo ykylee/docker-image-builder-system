@@ -18,9 +18,8 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `apps/build-server/src/auth/postgres-session-store.ts`
-  - `apps/build-server/migrations/0019_auth_session.sql`
-  - `apps/build-server/src/index.ts`
+  - `apps/build-server/src/auth`
+  - `apps/build-monitor/react`
 
 - 작업 내용: Implement provider-neutral async session adapter and server-side session store contract without selecting a concrete IdP; preserve HMAC Runner compatibility and fail closed in AUTH_MODE=oidc.
 - 완료 기준: Async request-based SessionAdapter contract is implemented with HMAC compatibility.
@@ -30,12 +29,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: cookie session 보안 보강으로 /auth/session no-store와 logout Origin 검증을 추가하고 cross-origin 403 회귀 테스트를 봉인했다.
-- 다음 세션 시작 포인트: 실제 provider role mapping과 browser cookie E2E 확정
-- 남은 리스크: Origin 없는 비브라우저 logout은 호환 허용되며 실제 IdP 정책은 미검증
+- 진행 현황: HTTPS를 사용하지 않는 운영 결정에 맞춰 SESSION_COOKIE_SECURE 기본값을 false로 분리하고 HttpOnly/SameSite/Origin 검증은 유지했다.
+- 다음 세션 시작 포인트: 실제 IdP issuer/role claim을 주입한 HTTP production browser OIDC E2E
+- 남은 리스크: HTTP 세션은 네트워크 구간 암호화를 제공하지 않으므로 내부 신뢰 네트워크 전용이며 외부 노출 금지
 
 ## ✅ Outcome
 
-- 작업 결과: OIDC cookie CSRF/cache hardening 완료
-- 검증 결과: build-server principal tests 17/17 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: shared-config/build-server tsc --noEmit PASS; principal 18/18 PASS; Playwright auth-contract 1/1 PASS; git diff --check PASS
+- 검증 결과: shared-config/build-server tsc --noEmit PASS; principal 18/18 PASS; Playwright auth-contract 1/1 PASS; git diff --check PASS
 - 후속 작업:

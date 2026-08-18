@@ -125,6 +125,21 @@ export async function createApp(runtime: RuntimeSettings, options: CreateAppOpti
     throw new Error("AUTH_MODE=oidc requires an OIDC session adapter to be configured.");
   }
   if (options.oidc) registerOidcRoutes(app, options.oidc);
+  if (authMode === "disabled") {
+    // Explicit open-deployment mode: identity is still supplied by the
+    // caller's registration ID for tenant-scoped views, but it is not
+    // cryptographically authenticated. Admin route guards retain the seed
+    // identity solely for legacy compatibility; normal build/service views
+    // use the supplied X-User-Id and are marked as a regular user.
+    const openIdentity = runtime.adminIds[0] ?? "public";
+    app.addHook("onRequest", async (request) => {
+      const supplied = request.headers["x-user-id"] ?? request.headers["x-admin-id"];
+      const callerId = typeof supplied === "string" && supplied.trim() !== "" ? supplied.trim() : "public";
+      request.headers["x-admin-id"] = openIdentity;
+      request.headers["x-user-id"] = callerId;
+      request.headers["x-principal-role"] = "user";
+    });
+  }
   if (runtime.nodeEnv === "production") {
     if (runtime.corsOrigin === true) {
       app.log.warn("CORS wildcard is enabled in production; set CORS_ORIGIN to an explicit origin.");
@@ -133,7 +148,7 @@ export async function createApp(runtime: RuntimeSettings, options: CreateAppOpti
       app.log.warn("AUTH_MODE=legacy is enabled in production; set AUTH_MODE=required after provisioning tokens.");
     }
   }
-  if (sessionAdapter) {
+  if (sessionAdapter && authMode !== "disabled") {
     app.addHook("onRequest", async (request, reply) => {
       const path = request.url.split("?", 1)[0] ?? "";
       const segments = path.split("/").filter(Boolean);

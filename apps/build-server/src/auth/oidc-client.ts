@@ -26,6 +26,7 @@ export type OidcClientOptions = {
   clientSecret: string;
   redirectUri: string;
   scopes?: string;
+  roleClaim?: string;
   fetchFn?: typeof fetch;
 };
 
@@ -104,7 +105,7 @@ export class OidcClient {
     if (verified.payload.nonce !== flow.nonce) {
       throw new Error("OIDC id_token nonce mismatch");
     }
-    return principalFromClaims(verified.payload);
+    return principalFromClaims(verified.payload, this.options.roleClaim ?? "roles");
   }
 
   private async fetchDiscovery(): Promise<OidcDiscovery> {
@@ -125,12 +126,18 @@ export class OidcClient {
   }
 }
 
-function principalFromClaims(claims: JWTPayload): Principal {
+function principalFromClaims(claims: JWTPayload, roleClaim = "roles"): Principal {
   if (typeof claims.sub !== "string" || !claims.sub || typeof claims.exp !== "number") {
     throw new Error("OIDC id_token is missing sub or exp");
   }
-  const roles = Array.isArray(claims.roles)
-    ? claims.roles.filter((role): role is string => typeof role === "string")
-    : [];
+  const value = roleClaim.split(".").reduce<unknown>((current, segment) => {
+    if (!current || typeof current !== "object") return undefined;
+    return (current as Record<string, unknown>)[segment];
+  }, claims);
+  const roles = typeof value === "string"
+    ? (value.trim() ? [value.trim()] : [])
+    : Array.isArray(value)
+      ? value.filter((role): role is string => typeof role === "string").map((role) => role.trim()).filter(Boolean)
+      : [];
   return { subject: claims.sub, roles, expiresAt: claims.exp };
 }

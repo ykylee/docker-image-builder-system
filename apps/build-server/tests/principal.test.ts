@@ -143,6 +143,7 @@ test("OIDC routes keep callback state server-side and issue an opaque cookie", a
   });
   assert.equal(callback.statusCode, 303);
   assert.match(callback.headers["set-cookie"]?.toString() ?? "", /HttpOnly/);
+  assert.doesNotMatch(callback.headers["set-cookie"]?.toString() ?? "", /Secure/);
   const cookie = callback.headers["set-cookie"]?.toString().split(";", 1)[0];
   const session = await app.inject({ method: "GET", url: "/auth/session", headers: { cookie } });
   assert.deepEqual(session.json(), { authenticated: true, subject: "alice", roles: ["user"] });
@@ -207,7 +208,7 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
   provider.get("/jwks", async (_request, reply) => reply.send({ keys: [jwk] }));
   provider.post("/token", async (request, reply) => {
     const origin = `http://${request.headers.host}`;
-    const idToken = await new SignJWT({ sub: "oidc-alice", roles: ["user"], nonce: expectedNonce })
+    const idToken = await new SignJWT({ sub: "oidc-alice", realm_access: { roles: ["user"] }, nonce: expectedNonce })
       .setProtectedHeader({ alg: "RS256", kid: "fake-key-1" })
       .setIssuer(origin)
       .setAudience("dib-test")
@@ -224,7 +225,8 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
     issuerUrl: issuer,
     clientId: "dib-test",
     clientSecret: "server-only",
-    redirectUri: `${issuer}/auth/callback`
+    redirectUri: `${issuer}/auth/callback`,
+    roleClaim: "realm_access.roles"
   });
   try {
     const flow = await client.beginLogin("/builds");
@@ -279,6 +281,48 @@ test("AUTH_SECRET is carried through shared runtime settings", () => {
   );
   assert.equal(settings.authSecret, secret);
   assert.equal(settings.authMode, "legacy");
+});
+
+test("AUTH_MODE=disabled leaves all APIs open even when AUTH_SECRET is present", async () => {
+  const runtime = toRuntimeSettings(parseRuntimeEnv({
+    AUTH_SECRET: secret,
+    AUTH_MODE: "disabled",
+    BUILD_REPOSITORY_BACKEND: "memory",
+    ADMIN_IDS: "admin",
+    CORS_ORIGIN: "false"
+  }));
+  const app = await createApp(runtime);
+  try {
+    assert.equal((await app.inject({ method: "GET", url: "/admin/users" })).statusCode, 200);
+    assert.equal((await app.inject({ method: "POST", url: "/builds/claim", payload: {} })).statusCode, 400);
+    const alice = await app.inject({
+      method: "POST",
+      url: "/builds",
+      headers: { "x-user-id": "alice" },
+      payload: { appName: "disabled-alice", requestedBy: "alice", sourceArchive: { objectKey: "alice.tgz", checksumSha256: "a".repeat(64), sizeBytes: 1 }, entrypointPath: "Dockerfile" }
+    });
+    const bob = await app.inject({
+      method: "POST",
+      url: "/builds",
+      headers: { "x-user-id": "bob" },
+      payload: { appName: "disabled-bob", requestedBy: "bob", sourceArchive: { objectKey: "bob.tgz", checksumSha256: "b".repeat(64), sizeBytes: 1 }, entrypointPath: "Dockerfile" }
+    });
+    assert.equal(alice.statusCode, 202);
+    assert.equal(bob.statusCode, 202);
+    const aliceView = await app.inject({ method: "GET", url: "/builds", headers: { "x-user-id": "alice" } });
+    assert.deepEqual(aliceView.json().builds.map((build: { appName: string }) => build.appName), ["disabled-alice"]);
+  } finally {
+    await app.close();
+  }
+});
+
+test("OIDC role claim configuration defaults safely and accepts nested paths", () => {
+  assert.equal(toRuntimeSettings(parseRuntimeEnv({})).oidcRoleClaim, "roles");
+  assert.equal(
+    toRuntimeSettings(parseRuntimeEnv({ OIDC_ROLE_CLAIM: "realm_access.roles" })).oidcRoleClaim,
+    "realm_access.roles"
+  );
+  assert.throws(() => parseRuntimeEnv({ OIDC_ROLE_CLAIM: "../roles" }));
 });
 
 test("AUTH_MODE=required refuses to start without AUTH_SECRET", async () => {

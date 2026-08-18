@@ -87,7 +87,12 @@ export async function registerBuildRoutes(
         validationErrorBody("Invalid build request payload", payloadResult.error.issues)
       );
     }
-    const outcome = await buildService.createBuild(payloadResult.data);
+    const callerId = request.headers[userIdHeader];
+    const callerRole = request.headers[principalRoleHeader];
+    const requestedBy = callerRole === "user" && typeof callerId === "string" && callerId.trim()
+      ? callerId.trim()
+      : payloadResult.data.requestedBy;
+    const outcome = await buildService.createBuild({ ...payloadResult.data, requestedBy });
 
     // TASK-166 (P3-M1): 호스팅 context path 할당 실패.
     if (outcome.kind === "context_path_invalid") {
