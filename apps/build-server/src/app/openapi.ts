@@ -607,7 +607,11 @@ export function getOpenApiDocument(): unknown {
     for (const [method, operation] of Object.entries(pathItem ?? {})) {
       if (!operation || typeof operation !== "object" || !("tags" in operation)) continue;
       const tags = (operation as { tags?: unknown }).tags;
-      const ownerRead = Array.isArray(tags) && tags.includes("Builds") && method.toLowerCase() === "get";
+      const normalizedMethod = method.toLowerCase();
+      const ownerRead =
+        (path === "/builds" && normalizedMethod === "get") ||
+        (path === "/services" && normalizedMethod === "get") ||
+        (path.startsWith("/builds/") && ["get", "delete"].includes(normalizedMethod));
       if (ownerRead || (Array.isArray(tags) && tags.some((tag) => typeof tag === "string" && protectedTags.has(tag)))) {
         (operation as { security?: unknown }).security = [{ bearerAuth: [] }];
       }

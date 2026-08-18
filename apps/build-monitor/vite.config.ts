@@ -5,6 +5,7 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const buildServerPort = process.env.BUILD_SERVER_PORT ?? "3000";
 
 // TASK-153: dual vite config 통일. 이전에는 `vite.config.ts`(dev 5173 + test,
 // root 미설정 → stale 루트 index.html→/src/main.ts 로 build 불가) 와
@@ -46,7 +47,7 @@ export default defineConfig({
       // dev 시 vite dev server 의 /api/* 요청을 Build Server(:3000) 로 프록시.
       // production 은 Build Server 가 SPA + /api 를 단일 포트로 서빙.
       "/api": {
-        target: "http://127.0.0.1:3000",
+        target: `http://127.0.0.1:${buildServerPort}`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, "")
       }

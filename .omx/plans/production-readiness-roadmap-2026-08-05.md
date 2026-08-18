@@ -86,7 +86,7 @@
 - `X-User-Id`/`X-Admin-Id`를 신뢰하지 않고 request principal에서 subject/role 추출
 - `/builds`, detail, logs, source, services에 owner policy 적용
 - admin API에 role/permission policy 적용
-- browser storage에는 token 대신 짧은 수명의 secure httpOnly session 사용
+- browser storage에는 token 대신 짧은 수명의 secure httpOnly session 사용. 현재 React의 `accessToken` storage bridge는 IdP/OIDC adapter가 정해지기 전 개발·검증용 임시 호환 경로로만 허용한다.
 - CSRF 보호와 CORS origin allow-list 적용
 
 대상:

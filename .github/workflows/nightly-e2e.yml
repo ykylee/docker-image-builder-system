@@ -53,6 +53,8 @@ on:
       - 'Dockerfile'
       - 'apps/runner/Dockerfile'
       - '.github/workflows/nightly-e2e.yml'
+      - 'apps/build-monitor/playwright.auth.config.ts'
+      - 'apps/build-monitor/tests/e2e-auth/**'
   workflow_dispatch:
     inputs:
       group:
@@ -160,6 +162,51 @@ jobs:
         run: |
           docker rm -f $(docker ps -aq --filter "name=dibs-") 2>/dev/null || true
           docker volume ls -q | grep -i dibs | xargs -r docker volume rm 2>/dev/null || true
+
+  # ---------------------------------------------------------------------------
+  # 인증 계약 브라우저 e2e (TASK-184) — public submission과 authenticated
+  # owner read/cross-tenant denial/logout을 실제 Vite proxy + Build Server
+  # HTTP 경로에서 검증한다. IdP 대신 테스트 전용 signed fixture token을
+  # 사용하며, 운영 issuer를 만들거나 secret을 외부에 노출하지 않는다.
+  # ---------------------------------------------------------------------------
+  auth-browser-e2e:
+    name: auth browser e2e
+    if: github.event_name == 'schedule' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build auth E2E artifacts
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/tsc -p packages/shared-contract/tsconfig.json
+          ./node_modules/.bin/tsc -p packages/shared-config/tsconfig.json
+          ./node_modules/.bin/tsc -p packages/db/tsconfig.json
+          ./node_modules/.bin/tsc -p apps/build-server/tsconfig.json
+          (cd apps/build-monitor && ./node_modules/.bin/vite build)
+
+      - name: Install Chrome
+        uses: browser-actions/setup-chrome@v1
+        with:
+          chrome-version: stable
+          install-dependencies: true
+
+      - name: Run auth browser contract
+        env:
+          NO_COLOR: "1"
+        run: pnpm --filter @docker-image-builder-system/build-monitor test:e2e:auth
 
   # ---------------------------------------------------------------------------
   # 시각 QA — capture + 구조 검증. baseline 픽셀 diff 는 LFS 정책 확정 후.

@@ -59,6 +59,9 @@ test("OpenAPI marks control operations protected and build intake public", () =>
   assert.deepEqual(document.paths["/builds"]?.get.security, [{ bearerAuth: [] }]);
   assert.equal(document.paths["/builds"]?.post.security, undefined);
   assert.deepEqual(document.paths["/services"]?.get.security, [{ bearerAuth: [] }]);
+  assert.equal(document.paths["/builds/{buildId}/source"]?.post.security, undefined);
+  assert.deepEqual(document.paths["/builds/{buildId}/source"]?.get.security, [{ bearerAuth: [] }]);
+  assert.deepEqual(document.paths["/builds/{buildId}/source"]?.delete.security, [{ bearerAuth: [] }]);
   assert.deepEqual(document.paths["/builds/claim"]?.post.security, [{ bearerAuth: [] }]);
   assert.deepEqual(document.paths["/admin/users"]?.get.security, [{ bearerAuth: [] }]);
 });
