@@ -148,6 +148,12 @@ test("OIDC routes keep callback state server-side and issue an opaque cookie", a
   assert.deepEqual(session.json(), { authenticated: true, subject: "alice", roles: ["user"] });
   const logout = await app.inject({ method: "POST", url: "/auth/logout", headers: { cookie } });
   assert.equal(logout.statusCode, 204);
+  const crossOriginLogout = await app.inject({
+    method: "POST",
+    url: "/auth/logout",
+    headers: { origin: "https://evil.example", host: "127.0.0.1:80" }
+  });
+  assert.equal(crossOriginLogout.statusCode, 403);
   await app.close();
 });
 

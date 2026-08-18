@@ -30,12 +30,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: ephemeral fake OIDC issuer를 사용해 discovery·PKCE token exchange·RS256 JWKS·issuer/audience/nonce 검증·principal 정규화의 실제 HTTP 왕복 E2E를 추가했다.
-- 다음 세션 시작 포인트: 실제 IdP issuer와 role claim mapping을 확정하고 production browser E2E로 전환
-- 남은 리스크: fake issuer는 외부 IdP cookie/redirect 정책을 검증하지 않음
+- 진행 현황: cookie session 보안 보강으로 /auth/session no-store와 logout Origin 검증을 추가하고 cross-origin 403 회귀 테스트를 봉인했다.
+- 다음 세션 시작 포인트: 실제 provider role mapping과 browser cookie E2E 확정
+- 남은 리스크: Origin 없는 비브라우저 logout은 호환 허용되며 실제 IdP 정책은 미검증
 
 ## ✅ Outcome
 
-- 작업 결과: provider-neutral OIDC client E2E 검증 완료
+- 작업 결과: OIDC cookie CSRF/cache hardening 완료
 - 검증 결과: build-server principal tests 17/17 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:

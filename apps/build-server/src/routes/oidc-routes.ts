@@ -59,6 +59,7 @@ export function registerOidcRoutes(app: FastifyInstance, options: OidcRouteOptio
   });
 
   app.get("/auth/session", async (request, reply) => {
+    reply.header("cache-control", "no-store");
     const id = readCookie(request.headers.cookie, options.cookieName);
     const session = id ? await options.store.getSession(id) : null;
     if (!session) return reply.send({ authenticated: false });
@@ -66,6 +67,15 @@ export function registerOidcRoutes(app: FastifyInstance, options: OidcRouteOptio
   });
 
   app.post("/auth/logout", async (request, reply) => {
+    const origin = request.headers.origin;
+    if (origin) {
+      const forwardedProto = request.headers["x-forwarded-proto"];
+      const protocol = typeof forwardedProto === "string" ? forwardedProto.split(",", 1)[0] : "http";
+      const expectedOrigin = `${protocol}://${request.headers.host}`;
+      if (origin !== expectedOrigin) {
+        return reply.code(403).send({ message: "Cross-origin logout is not allowed." });
+      }
+    }
     const id = readCookie(request.headers.cookie, options.cookieName);
     if (id) await options.store.revokeSession(id);
     reply.header("set-cookie", serializeCookie(options.cookieName, "", 0));
