@@ -27,12 +27,14 @@
 // pages 는 자체 svelte-spa-router 의 Routes 를 사용하고 React 측은 별도
 // 빌드 (TASK-093 의 mount 구조).
 
-import { Suspense, lazy, type ReactElement } from "react";
+import { Suspense, lazy, useEffect, type ReactElement } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@astryxdesign/core";
 
 import { AppHeader } from "@/components/AppHeader";
 import { Login } from "@/routes/Login";
+import { getAuthSession } from "@/lib/auth-session";
+import { setUserId } from "@/lib/useUserId";
 
 // TASK-139: 라우트 지연 로드.
 //
@@ -59,6 +61,21 @@ const AdminRunners = lazy(async () => ({ default: (await import("@/routes/AdminR
 const AdminHostedServices = lazy(async () => ({ default: (await import("@/routes/AdminHostedServices")).AdminHostedServices }));
 
 export function App(): ReactElement {
+  useEffect(() => {
+    let active = true;
+    getAuthSession()
+      .then((session) => {
+        if (active && session.authenticated && session.subject) setUserId(session.subject);
+      })
+      .catch(() => {
+        // Local/test deployments may not expose OIDC routes yet. The existing
+        // development login bridge remains available in that case.
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     // TASK-144: 손수 만든 <header> + <main class=app-main> 셸 →
     // Astryx AppShell. skip-to-content 링크와 responsive mobile nav 를

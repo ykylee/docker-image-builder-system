@@ -18,8 +18,8 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `apps/build-server/src/routes/oidc-routes.ts`
-  - `docs/PROJECT_PROFILE.md`
+  - `apps/build-monitor/react/src/lib/auth-session.ts`
+  - `apps/build-monitor/react/src/App.tsx`
 
 - 작업 내용: Implement provider-neutral async session adapter and server-side session store contract without selecting a concrete IdP; preserve HMAC Runner compatibility and fail closed in AUTH_MODE=oidc.
 - 완료 기준: Async request-based SessionAdapter contract is implemented with HMAC compatibility.
@@ -29,12 +29,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: 명시적으로 주입된 OIDC client/session store에 한해 /auth/login·callback·session·logout route를 등록하고 PKCE flow state, opaque Secure HttpOnly cookie, revoke lifecycle을 연결했다.
-- 다음 세션 시작 포인트: 실제 provider/store 주입 경로와 React session bootstrap을 연결
-- 남은 리스크: 기본 실행에는 provider/store가 없어 route가 비활성화되며, production store 구현이 필요
+- 진행 현황: React에 /auth/session bootstrap, OIDC login redirect, cookie logout 호출을 연결하고 기존 local userId/token fixture 호환을 유지했다.
+- 다음 세션 시작 포인트: 실제 OIDC provider/store 주입과 browser e2e cookie lifecycle 검증
+- 남은 리스크: 현재 manual userId login bridge가 남아 있으며 production에서 OIDC-only 전환 필요
 
 ## ✅ Outcome
 
-- 작업 결과: OIDC callback route foundation 구현 및 Fastify lifecycle 테스트 완료
-- 검증 결과: build-server principal tests 15/15 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: React session lifecycle foundation 구현 완료
+- 검증 결과: frontend vitest 289/289 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:

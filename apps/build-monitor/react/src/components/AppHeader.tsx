@@ -24,6 +24,7 @@ import {
 
 import { setUserId, useUserId } from "@/lib/useUserId";
 import { clearAccessToken } from "@/lib/api";
+import { logoutAuthSession } from "@/lib/auth-session";
 import { useAdminAllowListStore } from "@/lib/stores/adminAllowListStore";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -47,11 +48,14 @@ export function AppHeader(): ReactElement {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 
-  function logout(): void {
+  async function logout(): Promise<void> {
     // userId 가 null 이 되면 autoAdminEnabled 도 false 가 되어 admin
     // 진입점이 자연히 사라진다.
     setUserId(null);
     clearAccessToken();
+    await logoutAuthSession().catch(() => {
+      // Keep local navigation deterministic when the OIDC route is disabled.
+    });
     navigate("/");
   }
 

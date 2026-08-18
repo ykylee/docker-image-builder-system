@@ -19,6 +19,7 @@ import { useEffect, useState, type FormEvent, type ReactElement } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useUserId } from "@/lib/useUserId";
+import { beginOidcLogin } from "@/lib/auth-session";
 import "./Login.css";
 
 export function Login(): ReactElement {
@@ -68,6 +69,9 @@ export function Login(): ReactElement {
           </div>
           <button type="submit" className="btn-primary">Enter</button>
         </form>
+        <button type="button" className="btn-secondary" onClick={() => beginOidcLogin("/builds")}>
+          Continue with organization login
+        </button>
       </div>
     </section>
   );
