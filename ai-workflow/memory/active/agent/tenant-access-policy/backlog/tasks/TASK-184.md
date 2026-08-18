@@ -1,6 +1,6 @@
 ---
 id: TASK-184
-status: in_progress
+status: done
 created_at: 2026-08-18
 source_anchor: generic-task-184
 source_path: backlog/2026-08-18.md
@@ -11,7 +11,7 @@ kind: generic
 
 ## 📝 Description
 
-- 상태: in_progress
+- 상태: done
 - 우선순위: high
 - 요청일: 2026-08-18
 - 담당:
@@ -25,12 +25,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: nightly-e2e workflow에 auth-browser-e2e job을 추가해 테스트 전용 signed fixture token 기반 Playwright 계약 테스트를 CI/nightly로 연결했다. 로컬 test:e2e:auth 명령과 Project Profile 운영 문서도 갱신했다.
-- 다음 세션 시작 포인트: CI에서 auth-browser-e2e 실제 실행을 확인하고, OIDC/httpOnly session adapter가 확정되면 fixture token을 교체한다.
+- 진행 현황: 인증 계약 문서·OpenAPI 회귀·Playwright browser harness·nightly CI job을 모두 반영했고 원격 auth-browser-e2e 및 e2e/local job이 성공했다.
+- 다음 세션 시작 포인트: TASK-185: 실제 OIDC/httpOnly session adapter 계약을 결정하고 fixture token 경로를 운영 인증으로 교체한다.
 - 남은 리스크:
 
 ## ✅ Outcome
 
-- 작업 결과: auth Playwright E2E 1/1 PASS; frontend vitest 289/289 PASS; pnpm check PASS; git diff --check PASS
-- 검증 결과: auth Playwright E2E 1/1 PASS; frontend vitest 289/289 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: public build/source submission, owner read, cross-tenant 404, logout token cleanup을 테스트 전용 signed fixture token으로 브라우저 HTTP에서 검증하고 CI/nightly에 연결했다.
+- 검증 결과: auth browser e2e CI success; e2e/local CI success; local auth Playwright 1/1 PASS; frontend vitest 289/289 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:
