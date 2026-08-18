@@ -7,7 +7,14 @@ export type RuntimeSettings = {
   buildRepositoryBackend: "memory" | "postgres";
   dbAutoBootstrap: boolean;
   authSecret?: string;
-  authMode?: "legacy" | "required";
+  authMode?: "legacy" | "required" | "oidc";
+  oidcIssuerUrl?: string;
+  oidcClientId?: string;
+  oidcClientSecret?: string;
+  oidcRedirectUri?: string;
+  oidcScopes: string;
+  sessionCookieName: string;
+  sessionTtlSeconds: number;
   runnerPollIntervalMs: number;
   buildTimeoutSeconds: number;
   corsOrigin: string | true | false;
@@ -32,6 +39,13 @@ export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
     dbAutoBootstrap: env.DB_AUTO_BOOTSTRAP,
     authSecret: env.AUTH_SECRET,
     authMode: env.AUTH_MODE,
+    oidcIssuerUrl: env.OIDC_ISSUER_URL,
+    oidcClientId: env.OIDC_CLIENT_ID,
+    oidcClientSecret: env.OIDC_CLIENT_SECRET,
+    oidcRedirectUri: env.OIDC_REDIRECT_URI,
+    oidcScopes: env.OIDC_SCOPES,
+    sessionCookieName: env.SESSION_COOKIE_NAME,
+    sessionTtlSeconds: env.SESSION_TTL_SECONDS,
     runnerPollIntervalMs: env.RUNNER_POLL_INTERVAL_MS,
     buildTimeoutSeconds: env.BUILD_TIMEOUT_SECONDS,
     corsOrigin: env.CORS_ORIGIN,

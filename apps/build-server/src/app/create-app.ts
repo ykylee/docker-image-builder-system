@@ -112,6 +112,9 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   if (authMode === "required" && !authSecret) {
     throw new Error("AUTH_MODE=required needs AUTH_SECRET to be configured.");
   }
+  if (authMode === "oidc") {
+    throw new Error("AUTH_MODE=oidc requires an OIDC session adapter to be configured.");
+  }
   if (runtime.nodeEnv === "production") {
     if (runtime.corsOrigin === true) {
       app.log.warn("CORS wildcard is enabled in production; set CORS_ORIGIN to an explicit origin.");

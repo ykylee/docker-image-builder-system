@@ -3,7 +3,11 @@ import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import { bearerToken, signPrincipalToken, verifyPrincipalToken } from "../src/auth/principal.js";
 import { createApp } from "../src/app/create-app.js";
-import { createHmacSessionAdapter } from "../src/auth/session-adapter.js";
+import {
+  createCompositeSessionAdapter,
+  createHmacSessionAdapter,
+  createOidcSessionAdapter
+} from "../src/auth/session-adapter.js";
 import { MemorySessionStore } from "../src/auth/session-store.js";
 import { getOpenApiDocument } from "../src/app/openapi.js";
 import { toRuntimeSettings, parseRuntimeEnv } from "@docker-image-builder-system/shared-config";
@@ -61,6 +65,24 @@ test("memory session store enforces TTL and one-time OIDC flow consumption", asy
   assert.equal(await store.consumeOidcFlow("state-1", 199), null);
 });
 
+test("OIDC session adapter resolves only the opaque session cookie", async () => {
+  const store = new MemorySessionStore();
+  const record = await store.createSession(
+    { subject: "alice", roles: ["user"], expiresAt: 4_102_444_800 },
+    3600
+  );
+  const oidc = createOidcSessionAdapter(store);
+  assert.equal(
+    (await oidc.verifyRequest({ cookie: `dib_session=${encodeURIComponent(record.id)}; X-User-Id=mallory` }))?.subject,
+    "alice"
+  );
+  assert.equal(await oidc.verifyRequest({ cookie: "dib_session=unknown" }), null);
+
+  const composite = createCompositeSessionAdapter([oidc, createHmacSessionAdapter(secret)]);
+  const token = signPrincipalToken(secret, { subject: "runner", roles: ["user"], expiresAt: 4102444800 });
+  assert.equal((await composite.verifyRequest({ authorization: `Bearer ${token}` }))?.subject, "runner");
+});
+
 test("AUTH_SECRET keeps public build intake open but protects control APIs", async () => {
   const previous = process.env.AUTH_SECRET;
   process.env.AUTH_SECRET = secret;
@@ -109,6 +131,13 @@ test("AUTH_MODE=required refuses to start without AUTH_SECRET", async () => {
     parseRuntimeEnv({ AUTH_MODE: "required", ADMIN_IDS: "admin" })
   );
   await assert.rejects(() => createApp(runtime), /AUTH_MODE=required needs AUTH_SECRET/);
+});
+
+test("AUTH_MODE=oidc refuses to start before an OIDC session adapter is wired", async () => {
+  await assert.rejects(
+    () => createApp({ ...toRuntimeSettings(parseRuntimeEnv({})), authMode: "oidc" }),
+    /AUTH_MODE=oidc requires an OIDC session adapter/
+  );
 });
 
 test("AUTH_MODE=required accepts a signed Runner token on control APIs", async () => {

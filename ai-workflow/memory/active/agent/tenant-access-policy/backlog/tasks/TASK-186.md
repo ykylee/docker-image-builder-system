@@ -18,9 +18,7 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `.omx/plans/task-185-oidc-http-session-contract.md`
-  - `apps/build-server/src/auth/session-adapter.ts`
-  - `packages/shared-config/src/env.ts`
+  - `docs/PROJECT_PROFILE.md`
 
 - 작업 내용: Implement provider-neutral async session adapter and server-side session store contract without selecting a concrete IdP; preserve HMAC Runner compatibility and fail closed in AUTH_MODE=oidc.
 - 완료 기준: Async request-based SessionAdapter contract is implemented with HMAC compatibility.
@@ -30,12 +28,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: SessionAdapter를 비동기 verifyRequest({authorization,cookie}) 계약으로 전환하고 HMAC adapter를 정렬했다. SessionStore/MemorySessionStore에 opaque session TTL, revoke, one-time OIDC flow state 계약을 추가했다.
-- 다음 세션 시작 포인트: 실제 IdP와 session store 선택 후 OIDC callback 및 cookie adapter 구현
-- 남은 리스크: 실제 Redis/Postgres adapter와 provider claim mapping은 아직 미결정
+- 진행 현황: OIDC cookie adapter, composite HMAC/OIDC adapter, shared OIDC/session runtime configuration, and AUTH_MODE=oidc fail-closed startup guard를 구현했다.
+- 다음 세션 시작 포인트: 실제 IdP 선택 후 discovery/JWKS, authorization-code callback, cookie lifecycle route 구현
+- 남은 리스크: provider-specific claims, callback exchange, production session store 미구현
 
 ## ✅ Outcome
 
-- 작업 결과: provider-neutral runtime foundation 구현 완료
-- 검증 결과: build-server principal tests 11/11 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: provider-neutral OIDC runtime foundation 구현 및 문서 반영 완료
+- 검증 결과: build-server principal tests 13/13 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:
