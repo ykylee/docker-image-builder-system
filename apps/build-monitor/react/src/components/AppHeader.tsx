@@ -23,6 +23,7 @@ import {
 } from "@astryxdesign/core";
 
 import { setUserId, useUserId } from "@/lib/useUserId";
+import { clearAccessToken } from "@/lib/api";
 import { useAdminAllowListStore } from "@/lib/stores/adminAllowListStore";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -50,6 +51,7 @@ export function AppHeader(): ReactElement {
     // userId 가 null 이 되면 autoAdminEnabled 도 false 가 되어 admin
     // 진입점이 자연히 사라진다.
     setUserId(null);
+    clearAccessToken();
     navigate("/");
   }
 

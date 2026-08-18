@@ -7,10 +7,10 @@
     "project_profile_path": "docs/PROJECT_PROFILE.md",
     "session_handoff_path": null,
     "work_backlog_index_path": "ai-workflow/memory/active/work_backlog.md",
-    "daily_backlog_dir": "ai-workflow/memory/active/main/backlog",
-    "tasks_dir": "ai-workflow/memory/active/main/backlog/tasks",
-    "sessions_dir": "ai-workflow/memory/active/main/sessions",
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-18.md",
+    "daily_backlog_dir": "ai-workflow/memory/active/agent/tenant-access-policy/backlog",
+    "tasks_dir": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/tasks",
+    "sessions_dir": "ai-workflow/memory/active/agent/tenant-access-policy/sessions",
+    "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
     "repository_assessment_path": null
   },
   "project": {
@@ -34,17 +34,12 @@
       "TASK-183"
     ],
     "blocked_items": [],
-    "recent_done_items": [
-      "TASK-182 — runtime-hardening-observability",
-      "TASK-181 — service-db-lifecycle-recovery",
-      "TASK-180 — queue-lease-recovery",
-      "TASK-179 — runner-auth-isolation"
-    ],
+    "recent_done_items": [],
     "unknown_status_items": [],
     "environment_constraints": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/main/backlog/2026-08-18.md",
+    "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
     "task_count": 1,
     "in_progress_items": [
       "TASK-183 — tenant-access-policy"
@@ -55,7 +50,7 @@
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
     "ai-workflow/memory/active/work_backlog.md",
-    "ai-workflow/memory/active/main/backlog/2026-08-18.md"
+    "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md"
   ],
   "repository_assessment": {
     "path": null,

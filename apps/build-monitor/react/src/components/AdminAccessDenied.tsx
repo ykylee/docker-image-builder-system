@@ -30,6 +30,7 @@ import { useNavigate } from "react-router-dom";
 import type { CSSProperties, ReactElement } from "react";
 
 import { setUserId } from "@/lib/useUserId";
+import { clearAccessToken } from "@/lib/api";
 
 import "./AdminAccessDenied.css";
 
@@ -65,6 +66,7 @@ export function AdminAccessDenied({
 
   function switchUser(): void {
     setUserId(null);
+    clearAccessToken();
     navigate("/");
   }
 

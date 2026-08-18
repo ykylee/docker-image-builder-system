@@ -94,11 +94,13 @@ describe("AppHeader", () => {
 
   it("logout 시 userId 를 지우고 / 로 이동한다", async () => {
     localStorage.setItem("userId", "yklee");
+    sessionStorage.setItem("accessToken", "stale-token");
     renderHeader();
     fireEvent.click(screen.getByTestId("hdr-logout"));
     await waitFor(() => {
       expect(localStorage.getItem("userId")).toBeNull();
     });
+    expect(sessionStorage.getItem("accessToken")).toBeNull();
     expect(navigateMock).toHaveBeenCalledWith("/");
   });
 
