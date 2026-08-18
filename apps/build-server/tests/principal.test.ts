@@ -12,6 +12,7 @@ import {
 import { MemorySessionStore } from "../src/auth/session-store.js";
 import { OidcClient } from "../src/auth/oidc-client.js";
 import { registerOidcRoutes } from "../src/routes/oidc-routes.js";
+import { PostgresSessionStore } from "../src/auth/postgres-session-store.js";
 import { getOpenApiDocument } from "../src/app/openapi.js";
 import { toRuntimeSettings, parseRuntimeEnv } from "@docker-image-builder-system/shared-config";
 
@@ -147,6 +148,33 @@ test("OIDC routes keep callback state server-side and issue an opaque cookie", a
   const logout = await app.inject({ method: "POST", url: "/auth/logout", headers: { cookie } });
   assert.equal(logout.statusCode, 204);
   await app.close();
+});
+
+test("Postgres session store preserves parameterized session and flow contracts", async () => {
+  const queries: Array<{ text: string; values: unknown[] }> = [];
+  const pool = {
+    async query(text: string, values: unknown[] = []) {
+      queries.push({ text, values });
+      if (text.startsWith("SELECT id")) {
+        return { rows: [{ id: values[0], subject: "alice", roles: ["user"], expires_at: 4102444800 }] };
+      }
+      if (text.startsWith("DELETE FROM auth_oidc_flow")) {
+        return { rows: [{ state: "s", nonce: "n", code_verifier: "v", return_to: "/builds", expires_at: 4102444800 }] };
+      }
+      return { rows: [] };
+    }
+  } as never;
+  const store = new PostgresSessionStore(pool);
+  const session = await store.createSession(
+    { subject: "alice", roles: ["user"], expiresAt: 4102444800 },
+    3600
+  );
+  assert.equal((await store.getSession(session.id))?.principal.subject, "alice");
+  await store.revokeSession(session.id);
+  await store.saveOidcFlow({ state: "s", nonce: "n", codeVerifier: "v", returnTo: "/builds", expiresAt: 4102444800 });
+  assert.equal((await store.consumeOidcFlow("s"))?.codeVerifier, "v");
+  assert.match(queries[0]?.text ?? "", /INSERT INTO auth_session/);
+  assert.ok(queries.every(({ text }) => !text.includes("${")));
 });
 
 test("AUTH_SECRET keeps public build intake open but protects control APIs", async () => {

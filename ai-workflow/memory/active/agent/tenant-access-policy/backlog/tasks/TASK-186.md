@@ -30,12 +30,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: PostgresSessionStore와 auth_session/auth_oidc_flow migration을 추가하고 AUTH_MODE=oidc 부팅 시 Postgres store·OIDC client를 명시적으로 주입하도록 index runtime wiring을 연결했다.
-- 다음 세션 시작 포인트: Postgres migration 실DB 검증과 provider-specific browser E2E 실행
-- 남은 리스크: 실제 issuer/JWKS 네트워크 및 provider claim mapping 검증 필요
+- 진행 현황: 프로젝트용 Postgres 컨테이너가 로컬 포트에 노출되지 않아 실제 DB 왕복 대신 fake pool 기반 PostgresSessionStore SQL/parameter 계약 테스트를 추가했다.
+- 다음 세션 시작 포인트: 실제 Postgres 환경에서 migration 0019 적용 및 OIDC browser E2E 검증
+- 남은 리스크: 현재 환경에 프로젝트 DB endpoint가 없어 migration 실적용은 미검증
 
 ## ✅ Outcome
 
-- 작업 결과: OIDC production wiring foundation 구현 완료; 실제 IdP 외부 연동 전 마지막 단계
-- 검증 결과: build-server principal tests 15/15 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: Postgres store 계약 회귀 검증 완료; 실제 DB 검증은 환경 준비 후 수행
+- 검증 결과: build-server principal tests 16/16 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:
