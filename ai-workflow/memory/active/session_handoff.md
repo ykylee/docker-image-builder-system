@@ -2,14 +2,15 @@
 
 # Session Handoff
 
-- Updated: 2026-08-18 (세션 종료 — TASK-183/184 인증·테넌트 경계와 브라우저 계약 검증 봉인). 현재 브랜치 `agent/tenant-access-policy`, HEAD `0b1bc59`, PR [#62](https://github.com/ykylee/docker-image-builder-system/pull/62). `POST /builds`·source upload은 public으로 유지하고 build list/detail/log/source/delete 및 `/services`는 Bearer principal owner/admin 범위로 제한했다. React accessToken bridge와 logout cleanup, OpenAPI 보안 선언, 인증 전용 Playwright harness를 추가했다. `auth-browser-e2e`와 `e2e / local` 원격 CI는 성공했으며, 같은 수동 workflow의 `k8s-deploy-e2e`는 별도 배포 경로 실패로 남아 있다. 로컬 검증은 auth Playwright 1/1, frontend Vitest 289/289, Build Server principal 9/9, `pnpm check`, `git diff --check` 통과. 다음 세션은 실제 OIDC/httpOnly session adapter 계약 결정(TASK-185)부터 시작한다.
+- Updated: 2026-08-18 (세션 종료 — TASK-185 설계 완료 및 TASK-186 OIDC/session runtime foundation 진행). 현재 브랜치 `agent/tenant-access-policy`, HEAD `cf8ebb5`, PR [#62](https://github.com/ykylee/docker-image-builder-system/pull/62). SessionAdapter 비동기 request 경계, HMAC/OIDC/composite adapter, Postgres session store와 migration 0019, provider-neutral OIDC discovery/PKCE/JWKS client, `/auth/login|callback|session|logout`, React session bootstrap/logout, fake issuer HTTP E2E, 실제 Postgres migration 왕복, cookie CSRF/cache 보강을 완료했다. 검증은 Build Server principal 17/17, frontend Vitest 289/289, real Postgres migration/session round-trip, `pnpm check`, `git diff --check` 통과. 기본 실행은 provider/store 미주입 시 OIDC route를 활성화하지 않으며, 다음 세션은 실제 IdP issuer/role claim과 production browser E2E 확정부터 시작한다.
 
-- Current focus: TASK-185 identity/session adapter 계약 결정 및 fixture token 경로의 운영 인증 교체
+- Current focus: TASK-186 실제 IdP issuer/role claim 확정 및 production browser E2E
 - In progress:
   -
 - Blocked:
   -
 - Recently completed:
+- TASK-185 — identity-session-adapter (OIDC/httpOnly 계약·adapter 경계·React caller header 제거)
   - TASK-184 — auth-contract-and-e2e (문서·OpenAPI·Playwright·nightly CI)
   - TASK-183 — tenant-access-policy (owner/admin 접근 정책 및 Bearer bridge)
 
