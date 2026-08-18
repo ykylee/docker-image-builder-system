@@ -24,7 +24,9 @@ import {
   shouldSendDriftAlert,
   startHostingCapacityMonitor
 } from "../services/hosting-capacity-monitor.js";
-import { createHmacSessionAdapter } from "../auth/session-adapter.js";
+import { createHmacSessionAdapter, createOidcSessionAdapter, type SessionAdapter } from "../auth/session-adapter.js";
+import type { OidcRouteOptions } from "../routes/oidc-routes.js";
+import { registerOidcRoutes } from "../routes/oidc-routes.js";
 
 // TASK-064 운영 baseline — postgres backend 부팅 시
 // `apps/build-server/migrations/` 의 미적용 SQL 을 자동 적용한다.
@@ -97,7 +99,12 @@ const API_JSON_PREFIXES = ["/openapi", "/docs", "/health", "/ready"];
 // 유지해야 한다. `/assets/` 는 빌드 산출물 정적 경로.
 const SPA_NAVIGATION_EXCLUDED_PREFIXES = ["/api/", "/openapi", "/docs", "/health", "/ready", "/assets/"];
 
-export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstance> {
+export type CreateAppOptions = {
+  oidc?: OidcRouteOptions;
+  sessionAdapter?: SessionAdapter;
+};
+
+export async function createApp(runtime: RuntimeSettings, options: CreateAppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
     logger: true
   });
@@ -107,14 +114,17 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
   // migrate independently; once enabled, the server derives owner/admin
   // headers from the verified principal and ignores caller-supplied values.
   const authSecret = runtime.authSecret?.trim() || process.env.AUTH_SECRET?.trim() || "";
-  const sessionAdapter = authSecret ? createHmacSessionAdapter(authSecret) : null;
+  const sessionAdapter = options.sessionAdapter ??
+    (options.oidc ? createOidcSessionAdapter(options.oidc.store, options.oidc.cookieName) : null) ??
+    (authSecret ? createHmacSessionAdapter(authSecret) : null);
   const authMode = runtime.authMode ?? (process.env.AUTH_MODE === "required" ? "required" : "legacy");
   if (authMode === "required" && !authSecret) {
     throw new Error("AUTH_MODE=required needs AUTH_SECRET to be configured.");
   }
-  if (authMode === "oidc") {
+  if (authMode === "oidc" && !options.oidc && !options.sessionAdapter) {
     throw new Error("AUTH_MODE=oidc requires an OIDC session adapter to be configured.");
   }
+  if (options.oidc) registerOidcRoutes(app, options.oidc);
   if (runtime.nodeEnv === "production") {
     if (runtime.corsOrigin === true) {
       app.log.warn("CORS wildcard is enabled in production; set CORS_ORIGIN to an explicit origin.");
@@ -123,7 +133,7 @@ export async function createApp(runtime: RuntimeSettings): Promise<FastifyInstan
       app.log.warn("AUTH_MODE=legacy is enabled in production; set AUTH_MODE=required after provisioning tokens.");
     }
   }
-  if (authSecret) {
+  if (sessionAdapter) {
     app.addHook("onRequest", async (request, reply) => {
       const path = request.url.split("?", 1)[0] ?? "";
       const segments = path.split("/").filter(Boolean);

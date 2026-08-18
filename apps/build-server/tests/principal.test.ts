@@ -1,6 +1,7 @@
 import test from "node:test";
 import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
+import Fastify from "fastify";
 import { bearerToken, signPrincipalToken, verifyPrincipalToken } from "../src/auth/principal.js";
 import { createApp } from "../src/app/create-app.js";
 import {
@@ -10,6 +11,7 @@ import {
 } from "../src/auth/session-adapter.js";
 import { MemorySessionStore } from "../src/auth/session-store.js";
 import { OidcClient } from "../src/auth/oidc-client.js";
+import { registerOidcRoutes } from "../src/routes/oidc-routes.js";
 import { getOpenApiDocument } from "../src/app/openapi.js";
 import { toRuntimeSettings, parseRuntimeEnv } from "@docker-image-builder-system/shared-config";
 
@@ -110,6 +112,41 @@ test("OIDC client builds PKCE login URL and rejects issuer drift", async () => {
   assert.equal(login.searchParams.get("code_challenge_method"), "S256");
   assert.ok(login.searchParams.get("code_challenge"));
   assert.equal(calls[0], "https://issuer.example.test/.well-known/openid-configuration");
+});
+
+test("OIDC routes keep callback state server-side and issue an opaque cookie", async () => {
+  const app = Fastify();
+  const store = new MemorySessionStore();
+  const client = {
+    async beginLogin() {
+      return {
+        state: "state-route",
+        nonce: "nonce-route",
+        codeVerifier: "verifier-route",
+        authorizationUrl: "https://issuer.example.test/authorize?state=state-route"
+      };
+    },
+    async exchangeCode() {
+      return { subject: "alice", roles: ["user"], expiresAt: 4_102_444_800 };
+    }
+  } as unknown as OidcClient;
+  registerOidcRoutes(app, { client, store, cookieName: "dib_session", sessionTtlSeconds: 3600 });
+
+  const login = await app.inject({ method: "GET", url: "/auth/login?returnTo=/builds" });
+  assert.equal(login.statusCode, 302);
+  assert.match(login.headers.location ?? "", /state-route/);
+  const callback = await app.inject({
+    method: "GET",
+    url: "/auth/callback?code=code-route&state=state-route"
+  });
+  assert.equal(callback.statusCode, 303);
+  assert.match(callback.headers["set-cookie"]?.toString() ?? "", /HttpOnly/);
+  const cookie = callback.headers["set-cookie"]?.toString().split(";", 1)[0];
+  const session = await app.inject({ method: "GET", url: "/auth/session", headers: { cookie } });
+  assert.deepEqual(session.json(), { authenticated: true, subject: "alice", roles: ["user"] });
+  const logout = await app.inject({ method: "POST", url: "/auth/logout", headers: { cookie } });
+  assert.equal(logout.statusCode, 204);
+  await app.close();
 });
 
 test("AUTH_SECRET keeps public build intake open but protects control APIs", async () => {
