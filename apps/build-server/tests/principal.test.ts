@@ -9,6 +9,7 @@ import {
   createOidcSessionAdapter
 } from "../src/auth/session-adapter.js";
 import { MemorySessionStore } from "../src/auth/session-store.js";
+import { OidcClient } from "../src/auth/oidc-client.js";
 import { getOpenApiDocument } from "../src/app/openapi.js";
 import { toRuntimeSettings, parseRuntimeEnv } from "@docker-image-builder-system/shared-config";
 
@@ -81,6 +82,34 @@ test("OIDC session adapter resolves only the opaque session cookie", async () =>
   const composite = createCompositeSessionAdapter([oidc, createHmacSessionAdapter(secret)]);
   const token = signPrincipalToken(secret, { subject: "runner", roles: ["user"], expiresAt: 4102444800 });
   assert.equal((await composite.verifyRequest({ authorization: `Bearer ${token}` }))?.subject, "runner");
+});
+
+test("OIDC client builds PKCE login URL and rejects issuer drift", async () => {
+  const calls: string[] = [];
+  const client = new OidcClient({
+    issuerUrl: "https://issuer.example.test",
+    clientId: "dib",
+    clientSecret: "server-only",
+    redirectUri: "https://dib.example.test/auth/callback",
+    fetchFn: async (input) => {
+      calls.push(String(input));
+      return new Response(
+        JSON.stringify({
+          issuer: "https://issuer.example.test",
+          authorization_endpoint: "https://issuer.example.test/authorize",
+          token_endpoint: "https://issuer.example.test/token",
+          jwks_uri: "https://issuer.example.test/jwks"
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    }
+  });
+  const flow = await client.beginLogin("/builds");
+  const login = new URL(flow.authorizationUrl);
+  assert.equal(login.searchParams.get("client_id"), "dib");
+  assert.equal(login.searchParams.get("code_challenge_method"), "S256");
+  assert.ok(login.searchParams.get("code_challenge"));
+  assert.equal(calls[0], "https://issuer.example.test/.well-known/openid-configuration");
 });
 
 test("AUTH_SECRET keeps public build intake open but protects control APIs", async () => {

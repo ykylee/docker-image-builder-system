@@ -18,6 +18,7 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
+  - `apps/build-server/src/auth/oidc-client.ts`
   - `docs/PROJECT_PROFILE.md`
 
 - 작업 내용: Implement provider-neutral async session adapter and server-side session store contract without selecting a concrete IdP; preserve HMAC Runner compatibility and fail closed in AUTH_MODE=oidc.
@@ -28,12 +29,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: OIDC cookie adapter, composite HMAC/OIDC adapter, shared OIDC/session runtime configuration, and AUTH_MODE=oidc fail-closed startup guard를 구현했다.
-- 다음 세션 시작 포인트: 실제 IdP 선택 후 discovery/JWKS, authorization-code callback, cookie lifecycle route 구현
-- 남은 리스크: provider-specific claims, callback exchange, production session store 미구현
+- 진행 현황: 표준 OIDC discovery, authorization-code+PKCE(S256), issuer/audience/JWKS/nonce 검증, principal 정규화 client를 추가하고 jose 의존성을 Build Server에 연결했다.
+- 다음 세션 시작 포인트: OIDC provider 및 session store 선택 후 /auth/login·callback·logout route 연결
+- 남은 리스크: 실제 provider callback, Redis/Postgres store, role claim mapping 미결정
 
 ## ✅ Outcome
 
-- 작업 결과: provider-neutral OIDC runtime foundation 구현 및 문서 반영 완료
-- 검증 결과: build-server principal tests 13/13 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: provider-neutral OIDC client foundation 구현 완료; callback route 연결 전 단계
+- 검증 결과: build-server principal tests 14/14 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:
