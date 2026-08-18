@@ -1,6 +1,6 @@
 ---
 id: TASK-183
-status: in_progress
+status: done
 created_at: 2026-08-18
 source_anchor: generic-task-183
 source_path: backlog/2026-08-18.md
@@ -11,7 +11,7 @@ kind: generic
 
 ## 📝 Description
 
-- 상태: in_progress
+- 상태: done
 - 우선순위: high
 - 요청일: 2026-08-18
 - 담당:
@@ -25,11 +25,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: 로그아웃 및 사용자 전환 시 sessionStorage/localStorage에 남아 있는 accessToken을 함께 제거하도록 React 세션 수명 주기를 보강했다. 사용자 ID 로그인은 실제 IdP 토큰 발급 경로가 아니므로 토큰 임의 생성은 하지 않았다.
-- 다음 세션 시작 포인트: 실제 IdP/session 발급 계약을 결정한 뒤 accessToken 저장 adapter와 인증 활성 브라우저 E2E를 연결한다.
+- 진행 현황: public build/source submission과 protected owner/admin reads, React Bearer bridge, logout token cleanup, OpenAPI security, cross-tenant 회귀를 구현했고 TASK-184 browser contract E2E로 실제 HTTP 경계를 검증했다.
+- 다음 세션 시작 포인트: TASK-185 identity/session adapter 계약 결정
 - 남은 리스크:
 
 ## ✅ Outcome
 
-- 작업 결과: AppHeader/AdminAccessDenied 15/15 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: owner mismatch는 404로 격리하고 admin은 전체 조회를 허용한다. 실제 IdP 발급은 TASK-185로 이관.
+- 검증 결과: principal tests 9/9 PASS; auth Playwright E2E 1/1 PASS; frontend vitest 289/289 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:

@@ -2,6 +2,17 @@
 
 # Session Handoff
 
+- Updated: 2026-08-18 (세션 종료 — TASK-183/184 인증·테넌트 경계와 브라우저 계약 검증 봉인). 현재 브랜치 `agent/tenant-access-policy`, HEAD `0b1bc59`, PR [#62](https://github.com/ykylee/docker-image-builder-system/pull/62). `POST /builds`·source upload은 public으로 유지하고 build list/detail/log/source/delete 및 `/services`는 Bearer principal owner/admin 범위로 제한했다. React accessToken bridge와 logout cleanup, OpenAPI 보안 선언, 인증 전용 Playwright harness를 추가했다. `auth-browser-e2e`와 `e2e / local` 원격 CI는 성공했으며, 같은 수동 workflow의 `k8s-deploy-e2e`는 별도 배포 경로 실패로 남아 있다. 로컬 검증은 auth Playwright 1/1, frontend Vitest 289/289, Build Server principal 9/9, `pnpm check`, `git diff --check` 통과. 다음 세션은 실제 OIDC/httpOnly session adapter 계약 결정(TASK-185)부터 시작한다.
+
+- Current focus: TASK-185 identity/session adapter 계약 결정 및 fixture token 경로의 운영 인증 교체
+- In progress:
+  -
+- Blocked:
+  -
+- Recently completed:
+  - TASK-184 — auth-contract-and-e2e (문서·OpenAPI·Playwright·nightly CI)
+  - TASK-183 — tenant-access-policy (owner/admin 접근 정책 및 Bearer bridge)
+
 - Updated: 2026-08-06 (wiki anchor 구축). 누락되어 있던 `ai-workflow/wiki/index.md`를 canonical 문서 탐색 허브로 신설하고 README 및 최신 backlog에 연결했다. 다음 세션은 wiki 링크 검증 또는 Phase 1 인증·테넌트 권한 구현으로 진입한다.
 
 - Updated: 2026-08-05 (구현 현황 문서화 및 실서비스 진입 로드맵). `docs/operations/current-state-and-readiness-2026-08-05.md`에 현재 기능·검증 기준선·운영 제한·self-dogfood/MVP 판정과 실서비스 차단 이슈를 정리했다. `.omx/plans/production-readiness-roadmap-2026-08-05.md`에는 Phase 0 운영 경계 봉인 → Phase 1 인증/테넌트 권한 → Phase 2 Runner 인증/격리 → Phase 3 control-plane 영속성/queue recovery → Phase 4 서비스 DB lifecycle → Phase 5 운영성 → Phase 6 private beta 로드맵과 테스트/진입 게이트를 작성했다. 다음 구현은 Phase 1 인증·소유권 경계부터 시작한다.

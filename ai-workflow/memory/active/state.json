@@ -29,13 +29,12 @@
   "session": {
     "current_baseline": null,
     "current_axis": null,
-    "current_focus": "TASK-183",
-    "in_progress_items": [
-      "TASK-183"
-    ],
+    "current_focus": null,
+    "in_progress_items": [],
     "blocked_items": [],
     "recent_done_items": [
-      "TASK-184 — auth-contract-and-e2e"
+      "TASK-184 — auth-contract-and-e2e",
+      "TASK-183 — tenant-access-policy"
     ],
     "unknown_status_items": [],
     "environment_constraints": []
@@ -43,11 +42,10 @@
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
     "task_count": 2,
-    "in_progress_items": [
-      "TASK-183 — tenant-access-policy"
-    ],
+    "in_progress_items": [],
     "blocked_items": [],
     "done_items": [
+      "TASK-183 — tenant-access-policy",
       "TASK-184 — auth-contract-and-e2e"
     ]
   },
