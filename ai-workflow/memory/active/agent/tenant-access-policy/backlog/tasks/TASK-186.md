@@ -30,12 +30,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: 프로젝트용 Postgres 컨테이너가 로컬 포트에 노출되지 않아 실제 DB 왕복 대신 fake pool 기반 PostgresSessionStore SQL/parameter 계약 테스트를 추가했다.
-- 다음 세션 시작 포인트: 실제 Postgres 환경에서 migration 0019 적용 및 OIDC browser E2E 검증
-- 남은 리스크: 현재 환경에 프로젝트 DB endpoint가 없어 migration 실적용은 미검증
+- 진행 현황: 기존 dibs-postgres를 일시 기동해 migration 0019의 두 테이블/인덱스 생성과 session·OIDC flow insert/select/delete 왕복을 실제 검증하고 컨테이너를 stopped 상태로 복원했다.
+- 다음 세션 시작 포인트: 실제 OIDC issuer/JWKS provider browser E2E 검증
+- 남은 리스크: 실제 provider endpoint 및 role claim mapping 미결정
 
 ## ✅ Outcome
 
-- 작업 결과: Postgres store 계약 회귀 검증 완료; 실제 DB 검증은 환경 준비 후 수행
-- 검증 결과: build-server principal tests 16/16 PASS; pnpm check PASS; git diff --check PASS
+- 작업 결과: migration 0019 실DB 왕복 검증 완료
+- 검증 결과: real Postgres migration/session round-trip PASS; build-server principal tests 16/16 PASS; pnpm check PASS; git diff --check PASS
 - 후속 작업:
