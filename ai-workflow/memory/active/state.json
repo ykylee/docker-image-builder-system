@@ -37,6 +37,7 @@
     "recent_done_items": [
       "TASK-2026-08-18-main-188 — registration-id-ownership-views",
       "TASK-2026-08-18-main-187 — auth-disabled-deployment-mode",
+      "TASK-189 — disabled-deployment-registration-id-contract",
       "TASK-185 — identity-session-adapter",
       "TASK-184 — auth-contract-and-e2e",
       "TASK-183 — tenant-access-policy"
@@ -46,7 +47,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
-    "task_count": 6,
+    "task_count": 7,
     "in_progress_items": [
       "TASK-186 — oidc-session-runtime-foundation"
     ],
@@ -56,7 +57,8 @@
       "TASK-184 — auth-contract-and-e2e",
       "TASK-185 — identity-session-adapter",
       "TASK-2026-08-18-main-187 — auth-disabled-deployment-mode",
-      "TASK-2026-08-18-main-188 — registration-id-ownership-views"
+      "TASK-2026-08-18-main-188 — registration-id-ownership-views",
+      "TASK-189 — disabled-deployment-registration-id-contract"
     ]
   },
   "next_documents": [

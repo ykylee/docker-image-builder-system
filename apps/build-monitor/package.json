@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:e2e:auth": "playwright test --config=playwright.auth.config.ts",
+    "test:e2e:oidc": "playwright test --config=playwright.oidc.config.ts",
     "check:theme-contrast": "node scripts/check-theme-contrast.mjs",
     "check:css-leak": "node scripts/check-css-leak.mjs",
     "predev": "tsx scripts/generate-openapi.ts",

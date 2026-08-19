@@ -42,7 +42,9 @@ import { registerOidcRoutes } from "../routes/oidc-routes.js";
 // postgres backend 부팅 시 ENOENT. TASK-075 와 동일한 함정이었으나
 // memory backend 가 applyMigrations 를 호출하지 않아 기존엔 잠복.
 // TASK-082 multi-runner postgres 운영 검증에서 봉인.
-const MIGRATIONS_DIR = join(process.cwd(), "apps/build-server/migrations");
+const MIGRATIONS_DIR = existsSync(join(process.cwd(), "apps/build-server/migrations"))
+  ? join(process.cwd(), "apps/build-server/migrations")
+  : join(process.cwd(), "migrations");
 
 // TASK-110: STRICT_CONTENT_RANGE env flag parser. Recognised truthy
 // values are `"true"`, `"1"`, `"yes"` (case-insensitive); anything

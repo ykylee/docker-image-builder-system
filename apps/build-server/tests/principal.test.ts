@@ -158,6 +158,78 @@ test("OIDC routes keep callback state server-side and issue an opaque cookie", a
   await app.close();
 });
 
+test("OIDC session cookie scopes owner APIs and role claim gates admin APIs", async () => {
+  const store = new MemorySessionStore();
+  const client = {} as OidcClient;
+  const runtime = toRuntimeSettings(parseRuntimeEnv({
+    AUTH_MODE: "oidc",
+    BUILD_REPOSITORY_BACKEND: "memory",
+    ADMIN_IDS: "admin",
+    CORS_ORIGIN: "false"
+  }));
+  const app = await createApp(runtime, {
+    oidc: {
+      client,
+      store,
+      cookieName: "dib_session",
+      sessionTtlSeconds: 3600
+    }
+  });
+  try {
+    const ownerSession = await store.createSession(
+      { subject: "oidc-alice", roles: ["user"], expiresAt: 4_102_444_800 },
+      3600
+    );
+    const adminSession = await store.createSession(
+      { subject: "admin", roles: ["admin"], expiresAt: 4_102_444_800 },
+      3600
+    );
+
+    const unauthenticated = await app.inject({ method: "GET", url: "/builds" });
+    assert.equal(unauthenticated.statusCode, 401);
+
+    const ownerBuild = await app.inject({
+      method: "POST",
+      url: "/builds",
+      payload: {
+        appName: "oidc-owned-build",
+        requestedBy: "oidc-alice",
+        sourceArchive: {
+          objectKey: "oidc-owned.tgz",
+          checksumSha256: "a".repeat(64),
+          sizeBytes: 1
+        },
+        entrypointPath: "Dockerfile"
+      }
+    });
+    assert.equal(ownerBuild.statusCode, 202);
+
+    const ownerView = await app.inject({
+      method: "GET",
+      url: "/builds",
+      headers: { cookie: `dib_session=${ownerSession.id}` }
+    });
+    assert.equal(ownerView.statusCode, 200);
+    assert.deepEqual(ownerView.json().builds.map((build: { appName: string }) => build.appName), ["oidc-owned-build"]);
+
+    const ownerAdminView = await app.inject({
+      method: "GET",
+      url: "/admin/users",
+      headers: { cookie: `dib_session=${ownerSession.id}` }
+    });
+    assert.equal(ownerAdminView.statusCode, 403);
+
+    const adminView = await app.inject({
+      method: "GET",
+      url: "/admin/users",
+      headers: { cookie: `dib_session=${adminSession.id}` }
+    });
+    assert.equal(adminView.statusCode, 200);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Postgres session store preserves parameterized session and flow contracts", async () => {
   const queries: Array<{ text: string; values: unknown[] }> = [];
   const pool = {

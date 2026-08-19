@@ -40,14 +40,12 @@ spec:
               value: memory
             - name: ADMIN_IDS
               value: admin
+            # Internal deployment mode: callers provide the registration ID
+            # in X-User-Id, which becomes the build/service owner scope.
+            # This is not authentication; keep the control plane on a trusted
+            # network. Use AUTH_MODE=required/oidc for externally exposed runs.
             - name: AUTH_MODE
-              value: legacy
-            - name: AUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: dib-control-plane-auth
-                  key: AUTH_SECRET
-                  optional: true
+              value: disabled
             - name: HOST
               value: 0.0.0.0
             - name: PORT

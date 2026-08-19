@@ -1,0 +1,30 @@
+# Optional Keycloak/OIDC overlay.
+#
+# This file intentionally does not start Keycloak. Supply the values from the
+# reachable Keycloak realm (or an external secret manager) before applying it:
+#
+#   export DOCKER_SOCKET_GID=...
+#   export ADMIN_IDS=...
+#   export OIDC_ISSUER_URL=https://keycloak.example.internal/realms/builders
+#   export OIDC_CLIENT_ID=docker-image-builder
+#   export OIDC_CLIENT_SECRET=...
+#   export OIDC_REDIRECT_URI=https://build.example.internal/auth/callback
+#   docker compose -f compose.dev.yaml -f compose.dev.oidc-keycloak.yaml up -d
+#
+# The base compose file remains AUTH_MODE=disabled by default. This overlay is
+# deliberately opt-in and requires a Postgres-backed session store.
+
+services:
+  build-server:
+    environment:
+      AUTH_MODE: oidc
+      BUILD_REPOSITORY_BACKEND: postgres
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?OIDC_ISSUER_URL must point to the Keycloak realm issuer}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:?OIDC_CLIENT_ID must match the Keycloak confidential client}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?OIDC_CLIENT_SECRET must come from a secret manager}
+      OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:?OIDC_REDIRECT_URI must match the Keycloak client redirect URI}
+      OIDC_ROLE_CLAIM: ${OIDC_ROLE_CLAIM:-realm_access.roles}
+      OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email}
+      SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-dib_session}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-28800}

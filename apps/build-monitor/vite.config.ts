@@ -50,6 +50,13 @@ export default defineConfig({
         target: `http://127.0.0.1:${buildServerPort}`,
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, "")
+      },
+      // OIDC browser flows start at the same-origin `/auth/login` route.
+      // Forward the redirect/callback/session endpoints to Build Server in
+      // dev just like `/api/*`; production keeps them same-origin directly.
+      "/auth": {
+        target: `http://127.0.0.1:${buildServerPort}`,
+        changeOrigin: true
       }
     }
   },

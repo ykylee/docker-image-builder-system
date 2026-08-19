@@ -65,7 +65,10 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://dibs:dibs@postgres:5432/dibs}
       DB_AUTO_BOOTSTRAP: "true"
       ADMIN_IDS: ${ADMIN_IDS:?ADMIN_IDS must be set, e.g. "admin,yky.lee"}
-      AUTH_MODE: ${AUTH_MODE:-legacy}
+      # This compose profile is an internal, registration-ID scoped deployment.
+      # Callers send X-User-Id; the server uses it as requestedBy/scope.
+      # Set AUTH_MODE=required or AUTH_MODE=oidc explicitly for protected runs.
+      AUTH_MODE: ${AUTH_MODE:-disabled}
       AUTH_SECRET: ${AUTH_SECRET:-}
       CORS_ORIGIN: ${CORS_ORIGIN:-false}
       BUILD_LEASE_TIMEOUT_MS: ${BUILD_LEASE_TIMEOUT_MS:-900000}
