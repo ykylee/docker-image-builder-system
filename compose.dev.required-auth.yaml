@@ -1,0 +1,14 @@
+# Optional required-auth overlay for protected local/staging-like runs.
+# Both the Build Server signing secret and the externally-issued Runner token
+# must be supplied; neither value has a repository default.
+
+services:
+  build-server:
+    environment:
+      AUTH_MODE: required
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be supplied for required mode}
+
+  runner:
+    environment:
+      RUNNER_AUTH_REQUIRED: "true"
+      RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:?RUNNER_AUTH_TOKEN must be supplied for required mode}

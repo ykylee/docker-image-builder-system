@@ -57,4 +57,10 @@ docker compose \
    확인한다.
 
 외부 Keycloak이 unavailable한 동안에는 저장소의 fake OIDC browser E2E와
-   Postgres E2E를 대체 회귀로 사용한다.
+Postgres E2E를 대체 회귀로 사용한다.
+
+## Runner required-mode 대체 경로
+
+Keycloak을 사용하지 않는 보호된 staging 검증은 `compose.dev.required-auth.yaml`을
+사용한다. `AUTH_SECRET`과 외부 발급 `RUNNER_AUTH_TOKEN`을 모두 주입해야 하며,
+Runner는 token이 없으면 시작하지 않는다.

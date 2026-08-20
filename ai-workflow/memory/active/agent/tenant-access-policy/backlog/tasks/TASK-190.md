@@ -18,23 +18,21 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `apps/runner/internal/config/config.go`
-  - `apps/runner/internal/config/config_test.go`
-  - `apps/runner/cmd/runner/main.go`
-  - `compose.dev.yaml`
+  - `compose.dev.required-auth.yaml`
   - `docs/PROJECT_PROFILE.md`
+  - `docs/operations/keycloak-oidc-deployment-2026-08-18.md`
 
 - 작업 내용: AUTH_MODE=required control-plane에서 RUNNER_AUTH_TOKEN 누락 시 Runner를 시작 단계에서 종료해 401 polling loop를 방지한다.
 - 완료 기준:
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: RUNNER_AUTH_REQUIRED 설정과 Config.Validate를 추가하고 token 누락 시 fail-fast를 구현했다.
-- 다음 세션 시작 포인트: required mode Compose/Kubernetes 배포에서 RUNNER_AUTH_REQUIRED=true와 token Secret 주입을 실제 manifest까지 정렬한다.
-- 남은 리스크: 현재는 Runner 시작 검증만 추가했으며 실제 배포 Secret 주입 경로는 후속 정렬 필요.
+- 진행 현황: required-auth Compose overlay 추가: AUTH_MODE=required, AUTH_SECRET, RUNNER_AUTH_REQUIRED=true, RUNNER_AUTH_TOKEN을 함께 주입.
+- 다음 세션 시작 포인트: Kubernetes runner/control-plane manifest가 존재하는 배포 경로에서 동일 Secret 주입 계약을 정렬한다.
+- 남은 리스크: 현재 Kubernetes runner 예시는 없어 Compose overlay만 정렬됨.
 
 ## ✅ Outcome
 
-- 작업 결과: Go config/hostclient/worker 및 전체 go test ./... 통과.
-- 검증 결과: go test ./... PASS; git diff --check 예정.
+- 작업 결과: credential 누락 config 실패와 placeholder credential config 렌더링을 검증했다.
+- 검증 결과: missing secret docker compose config FAIL as expected; supplied secret config PASS; git diff --check PASS.
 - 후속 작업:
