@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -51,32 +52,46 @@ type Config struct {
 	// K8sNamespacePerBuild 가 true 면 buildID 별 namespace 를 새로 만들어
 	// 격리(deployment/ingress DNS 충돌 + audit 개선). 기본(false) 은 기존
 	// 공유 namespace (RUNNER_K8S_NAMESPACE=기본 dib-builds) 호환.
-	K8sNamespacePerBuild bool
+	K8sNamespacePerBuild      bool
+	ArtifactFactoryURL        string
+	ArtifactPackageProxyURL   string
+	ArtifactRegistryMirrorURL string
+	ArtifactEcosystem         string
+	ArtifactMode              string
+	ArtifactPrefetchEnabled   bool
+	ArtifactMaxBuildRetries   int
 }
 
 func Load() Config {
 	return Config{
-		PollInterval:          parseDuration("RUNNER_POLL_INTERVAL", 5*time.Second),
-		HostServerBaseURL:     parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
-		RunnerID:              parseString("RUNNER_ID", "runner-default"),
-		AuthToken:             parseString("RUNNER_AUTH_TOKEN", ""),
-		AuthRequired:          parseBool("RUNNER_AUTH_REQUIRED", false),
-		RegistryConfigDir:     parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
-		K8sMode:               parseString("RUNNER_K8S_MODE", ""),
-		K8sCluster:            parseString("RUNNER_K8S_CLUSTER", ""),
-		K8sNamespace:          parseString("RUNNER_K8S_NAMESPACE", ""),
-		K8sManifest:           parseString("RUNNER_K8S_MANIFEST", ""),
-		HelmChart:             parseString("RUNNER_HELM_CHART", ""),
-		HelmRelease:           parseString("RUNNER_HELM_RELEASE", "dib-build"),
-		HelmValuesFile:        parseString("RUNNER_HELM_VALUES_FILE", ""),
-		HelmSetValues:         parseString("RUNNER_HELM_SET_VALUES", ""),
-		ArgoCDNamespace:       parseString("RUNNER_ARGOCD_NAMESPACE", "argocd"),
-		ArgoCDProject:         parseString("RUNNER_ARGOCD_PROJECT", "default"),
-		ArgoCDRepoURL:         parseString("RUNNER_ARGOCD_REPO_URL", ""),
-		ArgoCDPath:            parseString("RUNNER_ARGOCD_PATH", ""),
-		ArgoCDTargetRevision:  parseString("RUNNER_ARGOCD_TARGET_REVISION", "HEAD"),
-		ArgoCDDestinationHost: parseString("RUNNER_ARGOCD_DESTINATION_HOST", "https://kubernetes.default.svc"),
-		K8sNamespacePerBuild:  parseBool("RUNNER_K8S_NAMESPACE_PER_BUILD", false),
+		PollInterval:              parseDuration("RUNNER_POLL_INTERVAL", 5*time.Second),
+		HostServerBaseURL:         parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
+		RunnerID:                  parseString("RUNNER_ID", "runner-default"),
+		AuthToken:                 parseString("RUNNER_AUTH_TOKEN", ""),
+		AuthRequired:              parseBool("RUNNER_AUTH_REQUIRED", false),
+		RegistryConfigDir:         parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
+		K8sMode:                   parseString("RUNNER_K8S_MODE", ""),
+		K8sCluster:                parseString("RUNNER_K8S_CLUSTER", ""),
+		K8sNamespace:              parseString("RUNNER_K8S_NAMESPACE", ""),
+		K8sManifest:               parseString("RUNNER_K8S_MANIFEST", ""),
+		HelmChart:                 parseString("RUNNER_HELM_CHART", ""),
+		HelmRelease:               parseString("RUNNER_HELM_RELEASE", "dib-build"),
+		HelmValuesFile:            parseString("RUNNER_HELM_VALUES_FILE", ""),
+		HelmSetValues:             parseString("RUNNER_HELM_SET_VALUES", ""),
+		ArgoCDNamespace:           parseString("RUNNER_ARGOCD_NAMESPACE", "argocd"),
+		ArgoCDProject:             parseString("RUNNER_ARGOCD_PROJECT", "default"),
+		ArgoCDRepoURL:             parseString("RUNNER_ARGOCD_REPO_URL", ""),
+		ArgoCDPath:                parseString("RUNNER_ARGOCD_PATH", ""),
+		ArgoCDTargetRevision:      parseString("RUNNER_ARGOCD_TARGET_REVISION", "HEAD"),
+		ArgoCDDestinationHost:     parseString("RUNNER_ARGOCD_DESTINATION_HOST", "https://kubernetes.default.svc"),
+		K8sNamespacePerBuild:      parseBool("RUNNER_K8S_NAMESPACE_PER_BUILD", false),
+		ArtifactFactoryURL:        parseString("RUNNER_ARTIFACT_FACTORY_URL", ""),
+		ArtifactPackageProxyURL:   parseString("RUNNER_ARTIFACT_PACKAGE_PROXY_URL", ""),
+		ArtifactRegistryMirrorURL: parseString("RUNNER_ARTIFACT_REGISTRY_MIRROR_URL", ""),
+		ArtifactEcosystem:         parseString("RUNNER_ARTIFACT_ECOSYSTEM", ""),
+		ArtifactMode:              parseString("RUNNER_ARTIFACT_MODE", ""),
+		ArtifactPrefetchEnabled:   parseBool("RUNNER_ARTIFACT_PREFETCH_ENABLED", false),
+		ArtifactMaxBuildRetries:   parseInt("RUNNER_ARTIFACT_MAX_BUILD_RETRIES", 1),
 	}
 }
 
@@ -86,6 +101,44 @@ func Load() Config {
 func (c Config) Validate() error {
 	if c.AuthRequired && strings.TrimSpace(c.AuthToken) == "" {
 		return fmt.Errorf("RUNNER_AUTH_REQUIRED=true requires RUNNER_AUTH_TOKEN")
+	}
+	if err := c.validateArtifactProfile(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (c Config) validateArtifactProfile() error {
+	configured := strings.TrimSpace(c.ArtifactFactoryURL) != "" || strings.TrimSpace(c.ArtifactPackageProxyURL) != "" || strings.TrimSpace(c.ArtifactRegistryMirrorURL) != "" || strings.TrimSpace(c.ArtifactEcosystem) != "" || strings.TrimSpace(c.ArtifactMode) != ""
+	if !configured {
+		return nil
+	}
+	if strings.TrimSpace(c.ArtifactFactoryURL) == "" {
+		return fmt.Errorf("artifact profile requires RUNNER_ARTIFACT_FACTORY_URL")
+	}
+	for name, raw := range map[string]string{
+		"RUNNER_ARTIFACT_FACTORY_URL":         c.ArtifactFactoryURL,
+		"RUNNER_ARTIFACT_PACKAGE_PROXY_URL":   c.ArtifactPackageProxyURL,
+		"RUNNER_ARTIFACT_REGISTRY_MIRROR_URL": c.ArtifactRegistryMirrorURL,
+	} {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		u, err := url.Parse(raw)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return fmt.Errorf("%s must be an absolute URL", name)
+		}
+	}
+	if c.ArtifactMode != "required" && c.ArtifactMode != "fallback" {
+		return fmt.Errorf("RUNNER_ARTIFACT_MODE must be required or fallback")
+	}
+	switch c.ArtifactEcosystem {
+	case "python", "npm", "go", "rust":
+	default:
+		return fmt.Errorf("RUNNER_ARTIFACT_ECOSYSTEM must be python, npm, go, or rust")
+	}
+	if c.ArtifactMaxBuildRetries < 0 || c.ArtifactMaxBuildRetries > 1 {
+		return fmt.Errorf("RUNNER_ARTIFACT_MAX_BUILD_RETRIES must be 0 or 1")
 	}
 	return nil
 }
@@ -124,4 +177,16 @@ func parseDuration(key string, def time.Duration) time.Duration {
 		return time.Duration(n) * time.Second
 	}
 	return def
+}
+
+func parseInt(key string, def int) int {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		return def
+	}
+	return n
 }

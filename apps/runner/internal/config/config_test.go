@@ -23,6 +23,55 @@ func TestAuthRequiredAcceptsToken(t *testing.T) {
 	}
 }
 
+func TestArtifactProfileAcceptsSupportedEcosystems(t *testing.T) {
+	for _, ecosystem := range []string{"python", "npm", "go", "rust"} {
+		t.Run(ecosystem, func(t *testing.T) {
+			t.Setenv("RUNNER_ARTIFACT_FACTORY_URL", "https://factory.internal")
+			t.Setenv("RUNNER_ARTIFACT_PACKAGE_PROXY_URL", "https://factory.internal/packages")
+			t.Setenv("RUNNER_ARTIFACT_ECOSYSTEM", ecosystem)
+			t.Setenv("RUNNER_ARTIFACT_MODE", "required")
+			t.Setenv("RUNNER_ARTIFACT_MAX_BUILD_RETRIES", "1")
+			if err := Load().Validate(); err != nil {
+				t.Fatalf("expected %s artifact profile to validate: %v", ecosystem, err)
+			}
+		})
+	}
+}
+
+func TestArtifactProfileRejectsInvalidConfiguration(t *testing.T) {
+	tests := []struct {
+		name  string
+		key   string
+		value string
+		want  string
+	}{
+		{"missing factory url", "RUNNER_ARTIFACT_PACKAGE_PROXY_URL", "https://factory.internal/packages", "FACTORY_URL"},
+		{"invalid ecosystem", "RUNNER_ARTIFACT_ECOSYSTEM", "java", "ECOSYSTEM"},
+		{"invalid mode", "RUNNER_ARTIFACT_MODE", "best-effort", "ARTIFACT_MODE"},
+		{"retry over cap", "RUNNER_ARTIFACT_MAX_BUILD_RETRIES", "2", "MAX_BUILD_RETRIES"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("RUNNER_ARTIFACT_FACTORY_URL", "https://factory.internal")
+			t.Setenv("RUNNER_ARTIFACT_ECOSYSTEM", "npm")
+			t.Setenv("RUNNER_ARTIFACT_MODE", "required")
+			t.Setenv("RUNNER_ARTIFACT_MAX_BUILD_RETRIES", "1")
+			for _, key := range []string{
+				"RUNNER_ARTIFACT_PACKAGE_PROXY_URL", "RUNNER_ARTIFACT_REGISTRY_MIRROR_URL",
+			} {
+				t.Setenv(key, "")
+			}
+			if tc.name == "missing factory url" {
+				t.Setenv("RUNNER_ARTIFACT_FACTORY_URL", "")
+			}
+			t.Setenv(tc.key, tc.value)
+			if err := Load().Validate(); err == nil || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("expected %s validation error, got %v", tc.want, err)
+			}
+		})
+	}
+}
+
 // TASK-073 보강: RUNNER_REGISTRY_CONFIG_DIR env 가 Config.RegistryConfigDir
 // 로 정확히 read 되는지 — default 가 빈 string 으로 (docker default
 // `~/.docker/config.json` 가 그대로 사용됨) 잡혀야 한다.
