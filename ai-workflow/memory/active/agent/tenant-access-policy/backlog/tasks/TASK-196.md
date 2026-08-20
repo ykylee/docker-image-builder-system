@@ -20,8 +20,11 @@ kind: generic
 - 영향 문서:
   - `.omx/plans/proxy-artifact-factory-implementation-2026-08-20.md`
   - `docs/design/proxy-artifact-factory-design-2026-08-20.md`
-  - `packages/shared-contract/src/build/artifact.ts`
   - `docs/design/proxy-artifact-factory-wbs-2026-08-20.md`
+  - `apps/runner/internal/artifact/client.go`
+  - `apps/runner/internal/artifact/client_test.go`
+  - `apps/runner/internal/config/config.go`
+  - `packages/shared-contract/src/build/artifact.ts`
   - `docs/PROJECT_PROFILE.md`
 
 - 작업 내용: Artifact Factory dependency proxy MVP의 구현 계획, milestone, WBS, critical path와 완료 게이트를 수립한다.
@@ -30,12 +33,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: 지원 ecosystem을 Python/npm/Go/Rust로 확정하고 ArtifactFactoryProfile/ArtifactManifest 계약과 Runner profile parsing/validation을 구현했다.
-- 다음 세션 시작 포인트: 4개 ecosystem package proxy fixture와 registry mirror fixture를 구현한다.
-- 남은 리스크: package proxy 제품 선택과 실제 staging 네트워크가 미확정이다.
+- 진행 현황: 4개 ecosystem 공통 Artifact Factory client를 추가하고 cache lookup, prefetch, digest/provenance 검증 fixture를 구현했다.
+- 다음 세션 시작 포인트: Runner BuildService에 artifact profile을 연결하고 M1 proxy compose fixture를 만든다.
+- 남은 리스크: 실제 proxy 제품과 staging 네트워크 검증은 아직 미실행.
 
 ## ✅ Outcome
 
-- 작업 결과: Python/npm/Go/Rust 지원 범위와 M0 ArtifactFactoryProfile/ArtifactManifest 계약을 구현하고 계획/WBS를 갱신했다.
-- 검증 결과: shared-contract tsc --noEmit PASS; Runner config/worker/services targeted Go tests PASS; git diff --check PASS; 실제 proxy staging 미실행.
+- 작업 결과: 4개 ecosystem 공통 Artifact Factory client를 추가하고 cache lookup, prefetch, digest/provenance 검증 fixture를 구현했다.
+- 검증 결과: artifact/config/worker/services Go tests PASS; shared-contract tsc --noEmit PASS; git diff --check PASS; 실제 proxy staging 미실행.
 - 후속 작업: 4개 ecosystem fixture와 registry mirror 구현을 별도 WBS 작업으로 착수한다.
