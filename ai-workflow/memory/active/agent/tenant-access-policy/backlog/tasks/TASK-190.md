@@ -20,6 +20,7 @@ kind: generic
 - 영향 문서:
   - `examples/k8s-control-plane-required-auth.yaml`
   - `examples/k8s-runner-required-auth.yaml`
+  - `docs/operations/runner-isolation-rbac-2026-08-20.md`
   - `docs/PROJECT_PROFILE.md`
   - `docs/operations/keycloak-oidc-deployment-2026-08-18.md`
 
@@ -28,12 +29,13 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: Kubernetes control-plane/Runner standalone required-auth manifest를 추가해 AUTH_SECRET과 RUNNER_AUTH_TOKEN Secret 주입을 문서화했다.
-- 다음 세션 시작 포인트: 실제 cluster apply 또는 rootless worker/RBAC 격리 설계를 검증한다.
-- 남은 리스크: Runner 예시는 host Docker socket을 사용하며 실제 cluster/RBAC 검증은 미실행.
+- 진행 현황: Runner 격리/RBAC 전환 문서와 socket 제거 수용 기준을 추가했다.
+- 다음 세션 시작 포인트: apps/runner Kubernetes API 호출을 감사하고 kind/staging에서 rootless 경로와 최소 RBAC를 검증한다.
+- 남은 리스크: 실제 cluster/RBAC 및 rootless build 검증은 아직 실행하지 않았다.
 
 ## ✅ Outcome
 
-- 작업 결과: Runner manifest는 cluster-local control-plane URL, RUNNER_AUTH_REQUIRED=true, token SecretRef를 포함한다.
-- 검증 결과: Kubernetes YAML Ruby parse PASS (4+2 docs); git diff --check PASS.
+- 작업 결과: required-auth Kubernetes manifest와 Runner 격리/RBAC 전환 설계를 문서화했다.
+- 검증 결과: Kubernetes YAML Ruby parse PASS (control-plane 4개 + Runner 2개); `git diff --check` PASS.
+- 문서 검증: 격리 전환 설계 문서와 PROJECT_PROFILE cross-reference 확인 PASS.
 - 후속 작업:
