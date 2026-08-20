@@ -224,6 +224,12 @@ func (s *BuildService) prepareArtifact(ctx context.Context, profile *hostclient.
 	}
 	coordinate := strings.TrimSpace(os.Getenv("RUNNER_ARTIFACT_COORDINATE"))
 	if coordinate == "" {
+		if profile.Mode == "required" {
+			return &stageFailure{
+				errorCode: contract.ErrorCodeUnknownError,
+				err:       fmt.Errorf("artifact profile requires RUNNER_ARTIFACT_COORDINATE"),
+			}
+		}
 		log.Printf("runner %s artifact profile present but RUNNER_ARTIFACT_COORDINATE is empty; skipping lookup", s.runnerID)
 		return nil
 	}

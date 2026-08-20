@@ -76,6 +76,17 @@ func TestPrepareArtifactSupportsAllClaimEcosystems(t *testing.T) {
 	}
 }
 
+func TestPrepareArtifactRequiredProfileRejectsMissingCoordinate(t *testing.T) {
+	t.Setenv("RUNNER_ARTIFACT_COORDINATE", "")
+	svc := NewBuildService(&fakeClient{}, docker.NewClient(), nil, "r-required").WithArtifactClient(&fakeArtifactClient{})
+	failure := svc.prepareArtifact(context.Background(), &hostclient.ArtifactFactoryProfile{
+		Version: 1, Ecosystem: "npm", Mode: "required", FactoryURL: "https://factory.internal", MaxBuildRetries: 1,
+	})
+	if failure == nil || !strings.Contains(failure.Error(), "RUNNER_ARTIFACT_COORDINATE") {
+		t.Fatalf("expected required profile coordinate failure, got %v", failure)
+	}
+}
+
 // fakeClient 는 테스트용 hostclient.
 type fakeClient struct {
 	mu           sync.Mutex
