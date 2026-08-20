@@ -151,6 +151,7 @@ export async function createApp(runtime: RuntimeSettings, options: CreateAppOpti
     }
   }
   if (sessionAdapter && authMode !== "disabled") {
+    const adminRole = authMode === "oidc" ? runtime.oidcAdminRole : "admin";
     app.addHook("onRequest", async (request, reply) => {
       const path = request.url.split("?", 1)[0] ?? "";
       const segments = path.split("/").filter(Boolean);
@@ -183,12 +184,12 @@ export async function createApp(runtime: RuntimeSettings, options: CreateAppOpti
       if (!principal) {
         return reply.status(401).send({ message: "Bearer authentication required." });
       }
-      if (path.startsWith("/admin/") && !principal.roles.includes("admin")) {
+      if (path.startsWith("/admin/") && !principal.roles.includes(adminRole)) {
         return reply.status(403).send({ message: "Admin role required." });
       }
       request.headers["x-user-id"] = principal.subject;
       request.headers["x-admin-id"] = principal.subject;
-      request.headers["x-principal-role"] = principal.roles.includes("admin") ? "admin" : "user";
+      request.headers["x-principal-role"] = principal.roles.includes(adminRole) ? "admin" : "user";
     });
   }
 

@@ -14,6 +14,7 @@ export type RuntimeSettings = {
   oidcRedirectUri?: string;
   oidcScopes: string;
   oidcRoleClaim: string;
+  oidcAdminRole: string;
   sessionCookieName: string;
   sessionCookieSecure: boolean;
   sessionTtlSeconds: number;
@@ -47,6 +48,7 @@ export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
     oidcRedirectUri: env.OIDC_REDIRECT_URI,
     oidcScopes: env.OIDC_SCOPES,
     oidcRoleClaim: env.OIDC_ROLE_CLAIM,
+    oidcAdminRole: env.OIDC_ADMIN_ROLE,
     sessionCookieName: env.SESSION_COOKIE_NAME,
     sessionCookieSecure: env.SESSION_COOKIE_SECURE,
     sessionTtlSeconds: env.SESSION_TTL_SECONDS,

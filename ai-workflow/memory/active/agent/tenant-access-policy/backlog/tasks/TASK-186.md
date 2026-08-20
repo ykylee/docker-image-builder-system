@@ -18,9 +18,11 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `apps/build-server/src/auth/oidc-client.ts`
+  - `packages/shared-config/src/env.ts`
+  - `packages/shared-config/src/runtime.ts`
+  - `apps/build-server/src/app/create-app.ts`
   - `apps/build-server/tests/principal.test.ts`
-  - `docs/PROJECT_PROFILE.md`
+  - `compose.dev.oidc-keycloak.yaml`
   - `docs/operations/keycloak-oidc-deployment-2026-08-18.md`
 
 - 작업 내용: Implement provider-neutral async session adapter and server-side session store contract without selecting a concrete IdP; preserve HMAC Runner compatibility and fail closed in AUTH_MODE=oidc.
@@ -31,12 +33,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: Keycloak 스타일 access_token의 realm_access.roles를 검증된 fallback source로 지원하고 ID/access token sub 불일치를 거부한다.
-- 다음 세션 시작 포인트: Keycloak 연결 가능 환경에서 실제 realm login/callback/logout 및 admin role smoke를 실행하고 TASK-186을 종료한다.
-- 남은 리스크: 현재 외부 Keycloak 네트워크가 없어 실제 issuer/client mapper 설정은 미검증.
+- 진행 현황: OIDC_ADMIN_ROLE runtime/env 설정 추가; OIDC admin guard가 해당 role을 사용하고 non-OIDC 모드는 기존 admin role을 유지한다.
+- 다음 세션 시작 포인트: Keycloak 연결 가능 환경에서 실제 realm role 이름과 admin smoke를 확인한 뒤 TASK-186 종료 검토.
+- 남은 리스크: 실제 Keycloak realm의 role naming과 audience mapper는 네트워크 복구 전 미검증.
 
 ## ✅ Outcome
 
-- 작업 결과: ID token에는 role 없음, access token에 realm_access.roles만 있는 fake issuer 회귀를 추가했다.
-- 검증 결과: Build Server typecheck PASS; Build Monitor React typecheck PASS; principal.test.ts 20/20 PASS; OIDC browser E2E 1/1 PASS; git diff --check PASS.
+- 작업 결과: Keycloak custom role dib-admin 회귀를 추가하고 Compose overlay와 운영 문서를 갱신했다.
+- 검증 결과: Build Server/Build Monitor typecheck PASS; principal.test.ts 20/20 PASS; Compose config with OIDC_ADMIN_ROLE=dib-admin PASS; git diff --check PASS.
 - 후속 작업:

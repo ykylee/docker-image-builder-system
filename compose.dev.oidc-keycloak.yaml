@@ -24,6 +24,7 @@ services:
       OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:?OIDC_CLIENT_SECRET must come from a secret manager}
       OIDC_REDIRECT_URI: ${OIDC_REDIRECT_URI:?OIDC_REDIRECT_URI must match the Keycloak client redirect URI}
       OIDC_ROLE_CLAIM: ${OIDC_ROLE_CLAIM:-realm_access.roles}
+      OIDC_ADMIN_ROLE: ${OIDC_ADMIN_ROLE:-admin}
       OIDC_SCOPES: ${OIDC_SCOPES:-openid profile email}
       SESSION_COOKIE_NAME: ${SESSION_COOKIE_NAME:-dib_session}
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}

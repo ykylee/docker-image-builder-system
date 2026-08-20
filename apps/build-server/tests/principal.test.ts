@@ -165,6 +165,7 @@ test("OIDC session cookie scopes owner APIs and role claim gates admin APIs", as
     AUTH_MODE: "oidc",
     BUILD_REPOSITORY_BACKEND: "memory",
     ADMIN_IDS: "admin",
+    OIDC_ADMIN_ROLE: "dib-admin",
     CORS_ORIGIN: "false"
   }));
   const app = await createApp(runtime, {
@@ -181,7 +182,7 @@ test("OIDC session cookie scopes owner APIs and role claim gates admin APIs", as
       3600
     );
     const adminSession = await store.createSession(
-      { subject: "admin", roles: ["admin"], expiresAt: 4_102_444_800 },
+      { subject: "admin", roles: ["dib-admin"], expiresAt: 4_102_444_800 },
       3600
     );
 
@@ -402,11 +403,17 @@ test("AUTH_MODE=disabled leaves all APIs open even when AUTH_SECRET is present",
 
 test("OIDC role claim configuration defaults safely and accepts nested paths", () => {
   assert.equal(toRuntimeSettings(parseRuntimeEnv({})).oidcRoleClaim, "roles");
+  assert.equal(toRuntimeSettings(parseRuntimeEnv({})).oidcAdminRole, "admin");
+  assert.equal(
+    toRuntimeSettings(parseRuntimeEnv({ OIDC_ADMIN_ROLE: "dib-admin" })).oidcAdminRole,
+    "dib-admin"
+  );
   assert.equal(
     toRuntimeSettings(parseRuntimeEnv({ OIDC_ROLE_CLAIM: "realm_access.roles" })).oidcRoleClaim,
     "realm_access.roles"
   );
   assert.throws(() => parseRuntimeEnv({ OIDC_ROLE_CLAIM: "../roles" }));
+  assert.throws(() => parseRuntimeEnv({ OIDC_ADMIN_ROLE: "../admin" }));
 });
 
 test("AUTH_MODE=required refuses to start without AUTH_SECRET", async () => {

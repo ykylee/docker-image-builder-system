@@ -28,6 +28,7 @@ export const runtimeEnvSchema = z.object({
   OIDC_REDIRECT_URI: z.string().url().optional(),
   OIDC_SCOPES: z.string().min(1).default("openid profile email"),
   OIDC_ROLE_CLAIM: z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/).default("roles"),
+  OIDC_ADMIN_ROLE: z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/).default("admin"),
   SESSION_COOKIE_NAME: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,63}$/).default("dib_session"),
   SESSION_COOKIE_SECURE: z.coerce.boolean().default(false),
   SESSION_TTL_SECONDS: z.coerce.number().int().positive().default(28_800),
