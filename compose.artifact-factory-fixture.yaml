@@ -1,0 +1,15 @@
+services:
+  artifact-factory-fixture:
+    build:
+      context: ./apps/runner
+      dockerfile: cmd/artifact-factory-fixture/Dockerfile
+    environment:
+      ARTIFACT_FACTORY_ADDR: :8090
+      ARTIFACT_FACTORY_TOKEN: fixture-token
+    ports:
+      - "8090:8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
