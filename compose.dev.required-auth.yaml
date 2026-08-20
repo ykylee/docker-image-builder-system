@@ -1,6 +1,8 @@
 # Optional required-auth overlay for protected local/staging-like runs.
 # Both the Build Server signing secret and the externally-issued Runner token
 # must be supplied; neither value has a repository default.
+# Pass this file last when combining it with runner-multi overrides so its
+# required values win the Compose environment merge.
 
 services:
   build-server:
@@ -9,6 +11,16 @@ services:
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET must be supplied for required mode}
 
   runner:
+    environment:
+      RUNNER_AUTH_REQUIRED: "true"
+      RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:?RUNNER_AUTH_TOKEN must be supplied for required mode}
+
+  runner2:
+    environment:
+      RUNNER_AUTH_REQUIRED: "true"
+      RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:?RUNNER_AUTH_TOKEN must be supplied for required mode}
+
+  runner3:
     environment:
       RUNNER_AUTH_REQUIRED: "true"
       RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:?RUNNER_AUTH_TOKEN must be supplied for required mode}

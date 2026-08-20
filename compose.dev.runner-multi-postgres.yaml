@@ -70,6 +70,8 @@ services:
       HOST_SERVER_BASE_URL: http://build-server:3000
       RUNNER_ID: runner-multi-2
       RUNNER_POLL_INTERVAL: 5s
+      RUNNER_AUTH_REQUIRED: ${RUNNER_AUTH_REQUIRED:-false}
+      RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
@@ -90,6 +92,8 @@ services:
       HOST_SERVER_BASE_URL: http://build-server:3000
       RUNNER_ID: runner-multi-3
       RUNNER_POLL_INTERVAL: 5s
+      RUNNER_AUTH_REQUIRED: ${RUNNER_AUTH_REQUIRED:-false}
+      RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     group_add:
