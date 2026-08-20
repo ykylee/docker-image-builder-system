@@ -7,6 +7,72 @@ daemon registry mirror, dependency cache를 전달하지 않는다. 조직망에
 또는 build container가 proxy를 거쳐야 하는 경우 `FROM` pull이나 package manager
 호출이 실패할 수 있다.
 
+## 요구사항 요약
+
+### 목표
+
+- Docker build가 외부 package registry에 직접 의존하지 않도록 한다.
+- cache hit와 cache miss를 같은 내부 endpoint 계약으로 처리한다.
+- 실패 후 prefetch/retry가 필요한 경우에도 dependency와 image의 무결성을 보장한다.
+- proxy credential과 upstream 인증 정보를 사용자 build에 노출하지 않는다.
+
+### 비목표
+
+- Artifact Factory가 임의 사용자 Dockerfile 전체를 대신 실행하지 않는다.
+- 첫 단계에서 모든 언어·패키지 생태계를 동시에 지원하지 않는다.
+- mutable tag를 source of truth로 삼거나 공급망 검증을 생략하지 않는다.
+
+### 행위자와 경계
+
+| 행위자 | 책임 | 신뢰 경계 |
+|---|---|---|
+| Runner/Docker daemon | 내부 endpoint를 통해 base image와 dependency 요청 | untrusted build 실행 영역 |
+| Artifact Factory | cache lookup, allow-listed upstream fetch, checksum/manifest 저장 | trusted platform 영역 |
+| Upstream registry/index | factory가 승인한 외부 원천 | 외부 네트워크 |
+| Operator | upstream allow-list, credential, retention, digest policy 관리 | 운영자 권한 |
+
+### 기능 요구사항
+
+- **FR-1 기본 경로**: Runner는 지원된 package ecosystem과 base image에 대해 내부
+  factory endpoint를 기본 사용해야 한다. 직접 외부 endpoint는 명시적 opt-in 없이는
+  사용하지 않는다.
+- **FR-2 cache hit**: 동일한 canonical coordinate와 digest가 있으면 upstream 호출 없이
+  artifact를 반환한다.
+- **FR-3 cache miss**: allow-list된 upstream만 조회하고, 응답 checksum/서명 검증 후
+  immutable digest로 저장한 뒤 요청을 완료한다.
+- **FR-4 prefetch**: 요청-응답 proxy가 어려운 ecosystem은 lockfile 기반 prefetch API를
+  제공하고, 성공 시 Docker build를 한 번만 재시도한다.
+- **FR-5 fallback**: local dependency materialization은 지원 ecosystem에서만 명시적으로
+  활성화하며, 결과는 동일한 artifact manifest 계약으로 등록한다.
+- **FR-6 무결성**: artifact manifest에는 coordinate, content digest, recipe/lockfile
+  digest, base image digest, source/provenance를 포함한다.
+- **FR-7 실패 분류**: `ARTIFACT_UNAVAILABLE`, `ARTIFACT_INTEGRITY_FAILED`,
+  `UPSTREAM_BLOCKED`, `PREFETCH_FAILED`를 구분해 보고한다.
+- **FR-8 재현성**: 동일 recipe와 입력 digest에 대해 동일 artifact를 재사용하거나,
+  차이가 발생하면 provenance에 원인을 남긴다.
+
+### 비기능 요구사항
+
+- **보안**: proxy/upstream credential은 secret store 또는 BuildKit secret으로만 전달하고
+  Dockerfile ARG, image history/layer, build log, artifact metadata에 기록하지 않는다.
+- **공급망**: upstream host/경로 allow-list, digest pinning, 서명 검증 정책을 지원한다.
+- **격리**: factory credential과 Runner build 권한을 분리하고, factory가 Runner의 host
+  Docker socket 또는 cluster-admin 권한을 요구하지 않는다.
+- **운영성**: cache hit/miss, upstream fetch, prefetch, integrity failure, eviction을
+  correlation ID와 함께 관측한다.
+- **보존**: artifact retention/eviction과 감사 로그를 제공하며, immutable artifact는
+  참조 중 삭제하지 않는다.
+
+### MVP 범위 제안
+
+1. Docker base image registry pull-through mirror
+2. 프로젝트와 동일한 Node 계열을 대상으로 한 npm repository proxy 또는 npm bundle
+3. cache hit/miss/upstream 차단/integrity failure를 재현하는 fixture
+4. 이후 Python/Maven/Go를 adapter 단위로 추가
+
+Dockerfile을 임의로 변조해 package URL을 바꾸기보다, registry mirror 설정과 지원
+ecosystem별 표준 proxy 설정을 명시적으로 주입하는 방식을 우선한다.
+
 ## 제안 시나리오
 
 Artifact Factory를 사전 산출물 생성기보다 **내부 dependency proxy/pull-through cache**로
