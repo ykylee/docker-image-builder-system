@@ -12,6 +12,7 @@ export type RuntimeSettings = {
   oidcClientId?: string;
   oidcClientSecret?: string;
   oidcRedirectUri?: string;
+  oidcAccessTokenAudience?: string;
   oidcScopes: string;
   oidcRoleClaim: string;
   oidcAdminRole: string;
@@ -46,6 +47,7 @@ export function toRuntimeSettings(env: RuntimeEnv): RuntimeSettings {
     oidcClientId: env.OIDC_CLIENT_ID,
     oidcClientSecret: env.OIDC_CLIENT_SECRET,
     oidcRedirectUri: env.OIDC_REDIRECT_URI,
+    oidcAccessTokenAudience: env.OIDC_ACCESS_TOKEN_AUDIENCE,
     oidcScopes: env.OIDC_SCOPES,
     oidcRoleClaim: env.OIDC_ROLE_CLAIM,
     oidcAdminRole: env.OIDC_ADMIN_ROLE,

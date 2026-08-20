@@ -20,7 +20,8 @@ kind: generic
 - 영향 문서:
   - `packages/shared-config/src/env.ts`
   - `packages/shared-config/src/runtime.ts`
-  - `apps/build-server/src/app/create-app.ts`
+  - `apps/build-server/src/auth/oidc-client.ts`
+  - `apps/build-server/src/index.ts`
   - `apps/build-server/tests/principal.test.ts`
   - `compose.dev.oidc-keycloak.yaml`
   - `docs/operations/keycloak-oidc-deployment-2026-08-18.md`
@@ -33,12 +34,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: OIDC_ADMIN_ROLE runtime/env 설정 추가; OIDC admin guard가 해당 role을 사용하고 non-OIDC 모드는 기존 admin role을 유지한다.
-- 다음 세션 시작 포인트: Keycloak 연결 가능 환경에서 실제 realm role 이름과 admin smoke를 확인한 뒤 TASK-186 종료 검토.
-- 남은 리스크: 실제 Keycloak realm의 role naming과 audience mapper는 네트워크 복구 전 미검증.
+- 진행 현황: ID token은 client ID audience를 유지하고 access token audience를 OIDC_ACCESS_TOKEN_AUDIENCE로 분리했다. 미설정 시 client ID fallback.
+- 다음 세션 시작 포인트: Keycloak 연결 가능 환경에서 실제 audience mapper와 realm role smoke를 확인한 뒤 TASK-186 종료 검토.
+- 남은 리스크: 실제 Keycloak access token aud 값과 audience mapper는 네트워크 복구 전 미검증.
 
 ## ✅ Outcome
 
-- 작업 결과: Keycloak custom role dib-admin 회귀를 추가하고 Compose overlay와 운영 문서를 갱신했다.
-- 검증 결과: Build Server/Build Monitor typecheck PASS; principal.test.ts 20/20 PASS; Compose config with OIDC_ADMIN_ROLE=dib-admin PASS; git diff --check PASS.
+- 작업 결과: fake issuer access token aud=keycloak-api 회귀와 shared runtime 설정을 추가했다.
+- 검증 결과: Build Server/Build Monitor typecheck PASS; principal.test.ts 20/20 PASS; Compose explicit/default audience config PASS; git diff --check PASS.
 - 후속 작업:

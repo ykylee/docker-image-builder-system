@@ -26,6 +26,7 @@ export type OidcClientOptions = {
   clientId: string;
   clientSecret: string;
   redirectUri: string;
+  accessTokenAudience?: string;
   scopes?: string;
   roleClaim?: string;
   fetchFn?: typeof fetch;
@@ -115,7 +116,7 @@ export class OidcClient {
     if (token.access_token && idTokenRoles.length === 0) {
       const accessToken = await jwtVerify(token.access_token, jwks, {
         issuer: discovery.issuer,
-        audience: this.options.clientId
+        audience: this.options.accessTokenAudience ?? this.options.clientId
       });
       if (accessToken.payload.sub !== verified.payload.sub) {
         throw new Error("OIDC access_token subject mismatch");

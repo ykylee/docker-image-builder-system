@@ -26,6 +26,7 @@ export const runtimeEnvSchema = z.object({
   OIDC_CLIENT_ID: z.string().min(1).optional(),
   OIDC_CLIENT_SECRET: z.string().min(1).optional(),
   OIDC_REDIRECT_URI: z.string().url().optional(),
+  OIDC_ACCESS_TOKEN_AUDIENCE: z.string().min(1).optional(),
   OIDC_SCOPES: z.string().min(1).default("openid profile email"),
   OIDC_ROLE_CLAIM: z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/).default("roles"),
   OIDC_ADMIN_ROLE: z.string().regex(/^[A-Za-z][A-Za-z0-9_.-]{0,127}$/).default("admin"),

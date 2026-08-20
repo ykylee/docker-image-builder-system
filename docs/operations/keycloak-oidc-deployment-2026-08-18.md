@@ -17,6 +17,7 @@ export OIDC_CLIENT_ID="<confidential-client-id>"
 export OIDC_CLIENT_SECRET="<secret-manager-value>"
 export OIDC_REDIRECT_URI="https://<build-host>/auth/callback"
 export OIDC_ADMIN_ROLE="admin"
+export OIDC_ACCESS_TOKEN_AUDIENCE="<keycloak-access-token-audience>"
 
 docker compose \
   -f compose.dev.yaml \
@@ -33,6 +34,8 @@ docker compose \
 - Client는 confidential client로 만들고 authorization code flow와 PKCE(S256)를
   허용한다.
 - Valid redirect URI는 `OIDC_REDIRECT_URI`와 완전히 일치해야 한다.
+- ID token은 client ID를 audience로 검증하고, access token은 `OIDC_ACCESS_TOKEN_AUDIENCE`를
+  audience로 검증한다. 별도 값을 주입하지 않으면 client ID를 fallback으로 사용한다.
 - Web origin/CORS는 실제 Build Monitor origin만 허용한다.
 - 역할은 ID token에 claim이 있으면 이를 우선 사용하고, 없으면 검증된 access token의
   `realm_access.roles`에서 읽는다. 다른 mapper를 사용하면 `OIDC_ROLE_CLAIM`을 dotted

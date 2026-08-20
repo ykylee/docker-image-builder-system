@@ -22,6 +22,7 @@ async function main(): Promise<void> {
       clientId: runtime.oidcClientId,
       clientSecret: runtime.oidcClientSecret,
       redirectUri: runtime.oidcRedirectUri,
+      accessTokenAudience: runtime.oidcAccessTokenAudience,
       scopes: runtime.oidcScopes,
       roleClaim: runtime.oidcRoleClaim
     });

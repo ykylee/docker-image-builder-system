@@ -292,7 +292,7 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
     const accessToken = await new SignJWT({ sub: accessSubject, realm_access: { roles: ["user"] } })
       .setProtectedHeader({ alg: "RS256", kid: "fake-key-1" })
       .setIssuer(origin)
-      .setAudience("dib-test")
+      .setAudience("keycloak-api")
       .setExpirationTime("5m")
       .setIssuedAt()
       .sign(privateKey);
@@ -307,6 +307,7 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
     clientId: "dib-test",
     clientSecret: "server-only",
     redirectUri: `${issuer}/auth/callback`,
+    accessTokenAudience: "keycloak-api",
     roleClaim: "realm_access.roles"
   });
   try {
@@ -404,6 +405,10 @@ test("AUTH_MODE=disabled leaves all APIs open even when AUTH_SECRET is present",
 test("OIDC role claim configuration defaults safely and accepts nested paths", () => {
   assert.equal(toRuntimeSettings(parseRuntimeEnv({})).oidcRoleClaim, "roles");
   assert.equal(toRuntimeSettings(parseRuntimeEnv({})).oidcAdminRole, "admin");
+  assert.equal(
+    toRuntimeSettings(parseRuntimeEnv({ OIDC_ACCESS_TOKEN_AUDIENCE: "keycloak-api" })).oidcAccessTokenAudience,
+    "keycloak-api"
+  );
   assert.equal(
     toRuntimeSettings(parseRuntimeEnv({ OIDC_ADMIN_ROLE: "dib-admin" })).oidcAdminRole,
     "dib-admin"
