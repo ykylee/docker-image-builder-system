@@ -19,11 +19,18 @@ import (
 )
 
 const digest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+const registryDigest = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 
 type server struct {
-	mu    sync.RWMutex
-	cache map[string]artifact.Manifest
-	token string
+	mu               sync.RWMutex
+	cache            map[string]artifact.Manifest
+	token            string
+	allowedUpstreams map[string]struct{}
+}
+
+func (s *server) upstreamAllowed(host string) bool {
+	_, ok := s.allowedUpstreams[strings.TrimSpace(host)]
+	return ok
 }
 
 func (s *server) authorize(w http.ResponseWriter, r *http.Request) bool {
@@ -105,12 +112,70 @@ func (s *server) prefetch(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(manifest)
 }
 
+func (s *server) registry(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
+	// The fixture models a single immutable base image. The upstream host is
+	// explicit so tests can prove the allow-list boundary without making a
+	// network request to a real registry.
+	if host := r.Header.Get("X-Upstream-Host"); host != "" && !s.upstreamAllowed(host) {
+		http.Error(w, "upstream host is not allow-listed", http.StatusForbidden)
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/v2/")
+	if path == "" || path == "_catalog" {
+		_ = json.NewEncoder(w).Encode(map[string]any{"repositories": []string{"fixture/base"}})
+		return
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 || parts[len(parts)-2] != "manifests" && parts[len(parts)-2] != "blobs" {
+		http.NotFound(w, r)
+		return
+	}
+	kind := parts[len(parts)-2]
+	ref := parts[len(parts)-1]
+	if strings.Join(parts[:len(parts)-2], "/") != "fixture/base" {
+		http.NotFound(w, r)
+		return
+	}
+	if kind == "manifests" {
+		if ref != registryDigest {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Docker-Content-Digest", registryDigest)
+		w.Header().Set("Content-Type", "application/vnd.oci.image.manifest.v1+json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"schemaVersion": 2,
+			"mediaType":     "application/vnd.oci.image.manifest.v1+json",
+			"config":        map[string]any{"mediaType": "application/vnd.oci.image.config.v1+json", "digest": registryDigest, "size": 0},
+			"layers":        []any{},
+		})
+		return
+	}
+	if ref != registryDigest {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Docker-Content-Digest", registryDigest)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	_, _ = w.Write([]byte("artifact-factory base image blob\n"))
+}
+
 func main() {
-	s := &server{cache: make(map[string]artifact.Manifest), token: strings.TrimSpace(os.Getenv("ARTIFACT_FACTORY_TOKEN"))}
+	allowed := make(map[string]struct{})
+	for _, host := range strings.Split(os.Getenv("ARTIFACT_FACTORY_ALLOWED_UPSTREAMS"), ",") {
+		if host = strings.TrimSpace(host); host != "" {
+			allowed[host] = struct{}{}
+		}
+	}
+	s := &server{cache: make(map[string]artifact.Manifest), token: strings.TrimSpace(os.Getenv("ARTIFACT_FACTORY_TOKEN")), allowedUpstreams: allowed}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"status":"ok"}`)) })
 	mux.HandleFunc("/v1/artifacts/", s.artifacts)
 	mux.HandleFunc("/v1/prefetch", s.prefetch)
+	mux.HandleFunc("/v2/", s.registry)
 	addr := os.Getenv("ARTIFACT_FACTORY_ADDR")
 	if addr == "" {
 		addr = ":8090"

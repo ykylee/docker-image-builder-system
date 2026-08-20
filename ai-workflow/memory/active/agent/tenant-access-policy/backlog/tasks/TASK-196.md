@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: 4개 ecosystem fixture가 coordinate별 deterministic payload를 제공하고 manifest contentDigest·응답 헤더·실제 바이트 SHA-256을 검증하도록 확장했다. Runner artifact client에 Fetch 무결성 검증을 추가했다.
-- Next session starting point: registry mirror와 ecosystem별 실제 package-manager install fixture를 추가하고 upstream deny 시나리오를 검증한다.
-- Remaining risks: 실제 외부 Keycloak 및 프록시 네트워크는 로컬 환경에서 검증 불가
+- Progress: Registry mirror fixture에 OCI manifest/blob digest endpoint를 추가하고 ARTIFACT_FACTORY_ALLOWED_UPSTREAMS 기반 upstream allow-list를 적용했다. 허용 host hit, 비허용 host 403, unknown digest 404를 smoke로 검증했다.
+- Next session starting point: ecosystem별 실제 package-manager install fixture를 추가하고 proxy miss에서 허용 upstream fetch를 검증한다.
+- Remaining risks: 실제 외부 Keycloak 및 프록시 네트워크는 로컬 환경에서 검증 불가; Docker daemon 전역 mirror 설정은 staging에서 별도 검증 필요
 
 ## ✅ Outcome
 
-- Result: registry fixture content integrity 경계 구현 및 4개 ecosystem smoke 검증 완료.
-- Verification: go test ./... (apps/runner) PASS; bash scripts/smoke-artifact-factory-ecosystems.sh PASS: python/npm/go/rust content digest verified
-- Follow-up: registry mirror/base image digest fixture 및 upstream allow-list deny 테스트
+- Result: M1 registry mirror 및 upstream 정책 fixture 완료.
+- Verification: go test ./... (apps/runner) PASS; bash scripts/smoke-registry-mirror-fixture.sh PASS: manifest/blob hit, upstream deny, digest miss
+- Follow-up: Python/npm/Go/Rust package-manager install 및 upstream fetch/deny/integrity matrix

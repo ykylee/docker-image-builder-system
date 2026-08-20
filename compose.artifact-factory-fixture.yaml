@@ -6,6 +6,7 @@ services:
     environment:
       ARTIFACT_FACTORY_ADDR: :8090
       ARTIFACT_FACTORY_TOKEN: fixture-token
+      ARTIFACT_FACTORY_ALLOWED_UPSTREAMS: registry.example.test
     ports:
       - "8090:8090"
     healthcheck:

@@ -18,12 +18,12 @@
 | 1.1 | Artifact profile 계약 | shared contract schema | - | factory URL/ecosystem/mode 검증 |
 | 1.2 | Manifest/digest 계약 | manifest type + parser | 1.1 | lock/base/recipe digest 단언 |
 | 1.3 | Error/retry 계약 | 오류 enum + mapping | 1.1 | 5개 오류와 retry cap 단언 |
-| 2.1 | Registry mirror fixture | compose/example | 1.x | `FROM @sha256` hit/miss PASS |
+| 2.1 | Registry mirror fixture | compose/example | 1.x | OCI manifest/blob digest-pinned hit/miss PASS |
 | 2.2 | Python proxy fixture | compose/example | 1.x | deterministic package payload + content digest integrity PASS |
 | 2.3 | npm proxy fixture | compose/example | 1.x | deterministic package payload + content digest integrity PASS |
 | 2.4 | Go module proxy fixture | compose/example | 1.x | deterministic package payload + content digest integrity PASS |
 | 2.5 | Rust crate proxy fixture | compose/example | 1.x | deterministic package payload + content digest integrity PASS |
-| 2.6 | Upstream allow-list/deny fixture | policy config + tests | 2.1~2.5 | 비허용 host 차단 |
+| 2.6 | Upstream allow-list/deny fixture | policy config + tests | 2.1~2.5 | 허용 host hit, 비허용 host 403, digest miss 404 |
 | 2.7 | Cache volume/health/retention | ops config/runbook | 2.1~2.5 | restart/eviction 정책 확인 |
 | 3.1 | Runner profile parsing/enforcement | config + unit tests | 1.1 | production fail-closed; required profile coordinate 누락 거부 |
 | 3.2 | Docker/package profile 주입 | BuildImage integration + 4 ecosystem fixtures | 2.x/3.1 | internal endpoint 사용 및 Docker build PASS |

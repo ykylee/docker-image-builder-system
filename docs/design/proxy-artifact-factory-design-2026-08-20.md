@@ -140,6 +140,12 @@ Runner client의 content fetch는 manifest digest, 응답 헤더, 바이트 해�
 불일치 시 `ARTIFACT_INTEGRITY_FAILED`로 종료한다. 이는 실제 외부 registry 제품을 대체하지
 않고, proxy adapter 통합 테스트에서 cache hit와 integrity 경계를 재현하기 위한 fixture다.
 
+Registry mirror fixture는 `/v2/fixture/base/manifests/<digest>`와
+`/v2/fixture/base/blobs/<digest>`의 OCI 응답을 제공한다. `X-Upstream-Host`가
+`ARTIFACT_FACTORY_ALLOWED_UPSTREAMS`에 없으면 403으로 차단하고, 허용된 upstream에서도
+알 수 없는 digest는 404로 거부한다. 실제 Docker daemon mirror 설정은 운영 배포 단계에서
+검증하며, 현재 fixture는 manifest/blob 및 allow-list 정책의 결정론적 경계만 검증한다.
+
 ## 8. 대안과 선택 기준
 
 - **기존 registry/repository proxy 사용**: MVP 권장. 구현량이 작고 표준 호환성이 높다.
