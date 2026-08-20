@@ -50,7 +50,7 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-20.md",
-    "task_count": 7,
+    "task_count": 8,
     "in_progress_items": [
       "TASK-186 — oidc-session-runtime-foundation",
       "TASK-190 — runner-auth-fail-fast",
