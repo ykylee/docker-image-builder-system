@@ -18,19 +18,19 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `apps/build-server/src/repositories/memory-build-repository.ts`
+  - `compose.dev.artifact-factory.yaml`
 
 - 작업 내용: Artifact Factory dependency proxy MVP의 구현 계획, milestone, WBS, critical path와 완료 게이트를 수립한다.
-- Completion criteria: 업로드 직후 claim이 발생해도 source bytes가 build record에서 유지되어 Runner GET이 404가 되지 않는다.
+- Completion criteria: Runner source fetch 성공 후 preflight lookup/prefetch 로그 확인
 
 ## 🛠️ Implementation / Content
 
-- Progress: Memory StoredBuild에 uploadedSourceArchive snapshot을 추가하고 claim source gate, GET, DELETE가 이를 우선 사용하도록 보강했다. memory repository 테스트 33건 통과.
-- Next session starting point: 수정 이미지로 Runner compose E2E를 재실행해 artifact preflight 로그 확인
-- Remaining risks: memory backend source archive lifecycle race 또는 Runner claim/upload 순서 문제로 preflight E2E가 차단됨
+- Progress: 수정 이미지로 E2E를 재실행했으나 source upload 201 이후 Runner GET source가 계속 404여서 preflight 로그에 도달하지 못했다. build-server logs에서도 동일 GET 404를 확인했다.
+- Next session starting point: Runner 미기동 상태에서 upload 직후 직접 GET을 수행해 저장소 경계를 분리하고, 필요 시 Postgres backend로 전환
+- Remaining risks: memory repository source map과 실제 runtime repository 경계 또는 route lifecycle 추가 원인 확인 필요
 
 ## ✅ Outcome
 
-- Result: build-server tsc 및 memory-build-repository 테스트 33건 통과
-- Verification: build-server tsc 및 memory-build-repository 테스트 33건 통과
+- Result: build-server rebuild 및 compose 기동 성공; Runner source GET 404 재현
+- Verification: build-server rebuild 및 compose 기동 성공; Runner source GET 404 재현
 - 후속 작업: 4개 ecosystem fixture와 registry mirror 구현을 별도 WBS 작업으로 착수한다.
