@@ -1,6 +1,6 @@
 ---
 id: TASK-196
-status: blocked
+status: in_progress
 created_at: 2026-08-20
 source_anchor: generic-task-196
 source_path: backlog/2026-08-20.md
@@ -11,7 +11,7 @@ kind: generic
 
 ## 📝 Description
 
-- Status: blocked
+- Status: in_progress
 - Priority: high
 - 요청일: 2026-08-20
 - Owner: codex
@@ -25,8 +25,8 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: Runner까지 포함한 compose를 기동하고 build 생성/source upload 후 Runner claim을 확인했다. 그러나 memory backend source archive가 Runner GET 시 404로 사라져 preflight 단계까지 도달하지 못했다.
-- Next session starting point: Postgres backend 또는 source archive lifecycle race를 먼저 해결한 뒤 동일 E2E 재시도
+- Progress: Runner claim 후 source GET 404가 재현되어 preflight는 미실행 상태다. 원인 확인을 위해 다음 단계에서 source archive lifecycle을 점검한다.
+- Next session starting point: Postgres backend 또는 memory source archive lifecycle race를 점검하고 preflight E2E 재시도
 - Remaining risks: memory backend source archive lifecycle race 또는 Runner claim/upload 순서 문제로 preflight E2E가 차단됨
 
 ## ✅ Outcome
