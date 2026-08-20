@@ -25,8 +25,8 @@
 | 2.5 | Rust crate proxy fixture | compose/example | 1.x | crate checksum/lock integrity PASS |
 | 2.6 | Upstream allow-list/deny fixture | policy config + tests | 2.1~2.5 | 비허용 host 차단 |
 | 2.7 | Cache volume/health/retention | ops config/runbook | 2.1~2.5 | restart/eviction 정책 확인 |
-| 3.1 | Runner profile parsing | config + unit tests | 1.1 | production fail-closed |
-| 3.2 | Docker/package profile 주입 | BuildImage integration | 2.x/3.1 | internal endpoint 사용 |
+| 3.1 | Runner profile parsing/enforcement | config + unit tests | 1.1 | production fail-closed; required profile coordinate 누락 거부 |
+| 3.2 | Docker/package profile 주입 | BuildImage integration + 4 ecosystem fixtures | 2.x/3.1 | internal endpoint 사용 및 Docker build PASS |
 | 3.3 | Prefetch client | Runner client + contract | 1.3/2.2~2.5 | idempotent prefetch |
 | 3.4 | Retry orchestration | BuildService flow | 3.3 | build당 1회 재시도 |
 | 3.5 | Secret redaction/cleanup | tests + logs | 3.2 | history/layer/log 누출 0 |

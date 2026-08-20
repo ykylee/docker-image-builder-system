@@ -64,6 +64,17 @@ proxy가 요청-응답 중 miss를 처리할 수 없는 ecosystem만 prefetch를
 4. Runner는 동일 build를 **한 번만** 내부 endpoint 기준으로 재시도한다.
 5. 재시도에도 실패하면 원래 오류와 prefetch 오류를 모두 기록한다.
 
+### 3.4 Profile enforcement
+
+- `required`: Runner는 `RUNNER_ARTIFACT_COORDINATE`가 없으면 Docker build를 시작하지
+  않고 실패한다. 내부 factory lookup/prefetch를 거치지 않는 외부 네트워크 우회를
+  허용하지 않는다.
+- `fallback`: coordinate가 없는 legacy build는 기존 경로를 유지한다. coordinate가
+  있으면 factory lookup을 우선하고, cache miss/upstream 차단 시 prefetch 정책을
+  적용한다.
+- 두 모드 모두 factory URL과 ecosystem은 shared contract의 허용 값(Python/npm/Go/Rust)
+  으로 검증하며 credential은 profile에 저장하지 않는다.
+
 ## 4. Artifact manifest 계약
 
 ```json
