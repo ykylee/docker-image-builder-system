@@ -64,16 +64,23 @@ func TestClientGetRejectsIntegrityMismatch(t *testing.T) {
 
 func TestClientStatusMappingAndPrefetchRetryContract(t *testing.T) {
 	calls := 0
+	cache := map[string]Manifest{}
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls++
 		if r.URL.Path == "/v1/artifacts/npm/npm/example" {
+			if manifest, ok := cache["npm/example"]; ok {
+				_ = json.NewEncoder(w).Encode(manifest)
+				return
+			}
 			w.WriteHeader(http.StatusNotFound)
 			return
 		}
 		if r.URL.Path != "/v1/prefetch" || r.Method != http.MethodPost {
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 		}
-		_ = json.NewEncoder(w).Encode(testManifest(NPM, "npm/example"))
+		manifest := testManifest(NPM, "npm/example")
+		cache["npm/example"] = manifest
+		_ = json.NewEncoder(w).Encode(manifest)
 	}))
 	defer srv.Close()
 	client, _ := NewClient(srv.URL, "")
@@ -89,6 +96,10 @@ func TestClientStatusMappingAndPrefetchRetryContract(t *testing.T) {
 	}
 	if manifest.Coordinate != "npm/example" || calls != 2 {
 		t.Fatalf("unexpected prefetch result/call count: %+v calls=%d", manifest, calls)
+	}
+	manifest, err = client.Get(context.Background(), NPM, "npm/example")
+	if err != nil || manifest.Coordinate != "npm/example" || calls != 3 {
+		t.Fatalf("expected cache hit after prefetch, manifest=%+v err=%v calls=%d", manifest, err, calls)
 	}
 }
 
