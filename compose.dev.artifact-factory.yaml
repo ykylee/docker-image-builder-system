@@ -1,0 +1,31 @@
+# Local override for exercising Runner -> Artifact Factory network routing.
+# Use with compose.dev.yaml after setting its normal required variables.
+services:
+  artifact-factory:
+    build:
+      context: ./apps/runner
+      dockerfile: cmd/artifact-factory-fixture/Dockerfile
+    image: dibs/artifact-factory-fixture:dev
+    environment:
+      ARTIFACT_FACTORY_ADDR: :8090
+      ARTIFACT_FACTORY_TOKEN: ${ARTIFACT_FACTORY_TOKEN:-fixture-token}
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/health"]
+      interval: 5s
+      timeout: 2s
+      retries: 10
+
+  runner:
+    depends_on:
+      artifact-factory:
+        condition: service_healthy
+    environment:
+      RUNNER_ARTIFACT_FACTORY_URL: http://artifact-factory:8090
+      RUNNER_ARTIFACT_PACKAGE_PROXY_URL: http://artifact-factory:8090/npm
+      RUNNER_ARTIFACT_REGISTRY_MIRROR_URL: http://artifact-factory:8090/registry
+      RUNNER_ARTIFACT_ECOSYSTEM: ${RUNNER_ARTIFACT_ECOSYSTEM:-npm}
+      RUNNER_ARTIFACT_MODE: ${RUNNER_ARTIFACT_MODE:-fallback}
+      RUNNER_ARTIFACT_PREFETCH_ENABLED: ${RUNNER_ARTIFACT_PREFETCH_ENABLED:-true}
+      RUNNER_ARTIFACT_MAX_BUILD_RETRIES: ${RUNNER_ARTIFACT_MAX_BUILD_RETRIES:-1}
