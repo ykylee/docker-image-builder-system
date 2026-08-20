@@ -10,6 +10,8 @@ proxy/pull-through cache로 둔다. cache miss는 factory가 allow-listed upstre
 MVP에서는 registry/package proxy 자체를 새로 구현하지 않고 검증된 proxy 제품 또는
 registry mirror를 우선 배치한다. 지원 ecosystem은 **Python, npm, Go, Rust**로 고정한다.
 Build Server/Runner는 profile, digest, 오류 계약과 fallback orchestration만 소유한다.
+BuildRequest의 선택적 `artifactProfile`은 Build Server가 JSONB로 보존하고 claim 응답으로
+Runner에 전달한다. profile이 없는 기존 요청은 기존 경로를 그대로 사용한다.
 
 ## 2. 논리 구성
 
@@ -116,6 +118,10 @@ URL은 로그에 기록하지 않는다.
 4. Runner build profile 주입과 오류 매핑을 구현한다.
 5. prefetch/retry는 proxy가 처리하지 못하는 fixture에 한해 추가한다.
 6. retention, audit, metrics를 staging에서 확인한다.
+
+현재 구현 상태: shared contract → Build Server memory/Postgres 저장(`0020_artifact_profile`)
+→ Runner hostclient/queue claim DTO까지 연결했다. 실제 build executor의 profile 주입과
+artifact client 호출은 다음 milestone에서 수행한다.
 
 ## 8. 대안과 선택 기준
 

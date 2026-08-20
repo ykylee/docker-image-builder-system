@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { boolean, integer, jsonb, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core";
+import type { ArtifactFactoryProfile } from "@docker-image-builder-system/shared-contract";
 
 // v0.2 schema (TASK-045): appName 이 canonical identifier 다. legacy
 // project_id / repository_id 컬럼은 bootstrap.ts 의 bootstrapStatements
@@ -44,6 +45,7 @@ export const buildRequestTable = pgTable("build_request", {
     memoryLimit: string;
     replicas: number;
   }>().notNull().default(sql`'{}'::jsonb`),
+  artifactProfile: jsonb("artifact_profile").$type<ArtifactFactoryProfile | null>(),
   // TASK-161 (P2-M2): canonical 이름으로 정렬 — build_test.runtime_url 과
   // 같은 개념이다. 구 preview_url 은 migration 0008 에서 rename 됐다.
   runtimeUrl: text("runtime_url"),

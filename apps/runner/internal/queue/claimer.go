@@ -23,6 +23,7 @@ type ClaimedBuild struct {
 	HostingPolicyVersion string
 	Resources            *hostclient.ResourceProfile
 	DockerfileMode       string
+	ArtifactProfile      *hostclient.ArtifactFactoryProfile
 	Database             *hostclient.DatabasePolicy
 }
 
@@ -64,6 +65,7 @@ func (c *HostServerClaimer) ClaimNext(ctx context.Context) (*ClaimedBuild, error
 		HostingPolicyVersion: response.HostingPolicyVersion,
 		Resources:            response.Resources,
 		DockerfileMode:       response.DockerfileMode,
+		ArtifactProfile:      response.ArtifactProfile,
 		Database:             response.Database,
 	}, nil
 }

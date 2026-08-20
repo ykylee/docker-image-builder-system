@@ -52,13 +52,25 @@ type ClaimedBuildResponse struct {
 	// TASK-169 (P3-M4): Ingress prefix strip 여부(기본 true).
 	StripPrefix bool `json:"stripPrefix"`
 	// TASK-172 (v0.5.0): 호스팅 URL 스킴(path|subdomain, 기본 path).
-	HostingScheme        string           `json:"hostingScheme"`
-	EffectiveTier        string           `json:"effectiveTier"`
-	ServiceSize          string           `json:"serviceSize"`
-	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
-	Resources            *ResourceProfile `json:"resources"`
-	DockerfileMode       string           `json:"dockerfileMode"`
-	Database             *DatabasePolicy  `json:"database,omitempty"`
+	HostingScheme        string                  `json:"hostingScheme"`
+	EffectiveTier        string                  `json:"effectiveTier"`
+	ServiceSize          string                  `json:"serviceSize"`
+	HostingPolicyVersion string                  `json:"hostingPolicyVersion"`
+	Resources            *ResourceProfile        `json:"resources"`
+	DockerfileMode       string                  `json:"dockerfileMode"`
+	ArtifactProfile      *ArtifactFactoryProfile `json:"artifactProfile,omitempty"`
+	Database             *DatabasePolicy         `json:"database,omitempty"`
+}
+
+type ArtifactFactoryProfile struct {
+	Version           int    `json:"version"`
+	Ecosystem         string `json:"ecosystem"`
+	Mode              string `json:"mode"`
+	FactoryURL        string `json:"factoryUrl"`
+	PackageProxyURL   string `json:"packageProxyUrl,omitempty"`
+	RegistryMirrorURL string `json:"registryMirrorUrl,omitempty"`
+	PrefetchEnabled   bool   `json:"prefetchEnabled"`
+	MaxBuildRetries   int    `json:"maxBuildRetries"`
 }
 
 type DatabasePolicy struct {
@@ -91,22 +103,23 @@ type buildStatusResponseBody struct {
 }
 
 type buildSummaryBody struct {
-	BuildID              string           `json:"buildId"`
-	AppName              string           `json:"appName"`
-	Status               string           `json:"status"`
-	Phase                string           `json:"phase"`
-	LifecycleStatus      string           `json:"lifecycleStatus"`
-	UpdatedAt            string           `json:"updatedAt"`
-	ContextPath          string           `json:"contextPath"`
-	RuntimePort          int              `json:"runtimePort"`
-	StripPrefix          bool             `json:"stripPrefix"`
-	HostingScheme        string           `json:"hostingScheme"`
-	EffectiveTier        string           `json:"effectiveTier"`
-	ServiceSize          string           `json:"serviceSize"`
-	HostingPolicyVersion string           `json:"hostingPolicyVersion"`
-	Resources            *ResourceProfile `json:"resources"`
-	DockerfileMode       string           `json:"dockerfileMode"`
-	Database             *DatabasePolicy  `json:"database,omitempty"`
+	BuildID              string                  `json:"buildId"`
+	AppName              string                  `json:"appName"`
+	Status               string                  `json:"status"`
+	Phase                string                  `json:"phase"`
+	LifecycleStatus      string                  `json:"lifecycleStatus"`
+	UpdatedAt            string                  `json:"updatedAt"`
+	ContextPath          string                  `json:"contextPath"`
+	RuntimePort          int                     `json:"runtimePort"`
+	StripPrefix          bool                    `json:"stripPrefix"`
+	HostingScheme        string                  `json:"hostingScheme"`
+	EffectiveTier        string                  `json:"effectiveTier"`
+	ServiceSize          string                  `json:"serviceSize"`
+	HostingPolicyVersion string                  `json:"hostingPolicyVersion"`
+	Resources            *ResourceProfile        `json:"resources"`
+	DockerfileMode       string                  `json:"dockerfileMode"`
+	ArtifactProfile      *ArtifactFactoryProfile `json:"artifactProfile,omitempty"`
+	Database             *DatabasePolicy         `json:"database,omitempty"`
 }
 
 // PhaseReport 는 phase 보고 payload. TASK-162 (P2-M3) 에서 ErrorCode /
@@ -203,6 +216,7 @@ func (c *HTTPBuildControlClient) ClaimNextBuild(ctx context.Context) (*ClaimedBu
 		HostingPolicyVersion: inner.HostingPolicyVersion,
 		Resources:            inner.Resources,
 		DockerfileMode:       inner.DockerfileMode,
+		ArtifactProfile:      inner.ArtifactProfile,
 		Database:             inner.Database,
 	}, nil
 }

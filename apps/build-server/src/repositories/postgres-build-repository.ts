@@ -119,6 +119,7 @@ function mapBuildRowToSummary(row: BuildRequestRow): BuildSummary {
       ? row.resourceProfile
       : undefined,
     dockerfileMode: row.dockerfileMode as BuildSummary["dockerfileMode"],
+    artifactProfile: row.artifactProfile ?? undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString()
   });
@@ -345,6 +346,7 @@ export class PostgresBuildRepository implements BuildRepository {
           effectiveTier: policy.effectiveTier,
           hostingPolicyVersion: policy.hostingPolicyVersion,
           resourceProfile: policy.resources,
+          artifactProfile: input.artifactProfile ?? null,
           runtimeUrl: null,
           lastErrorCode: null,
           lastErrorMessage: null,

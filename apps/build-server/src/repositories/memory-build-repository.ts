@@ -15,6 +15,7 @@ import type {
   BuildRequest,
   BuildStatusResponse,
   BuildSummary,
+  ArtifactFactoryProfile,
   HostedService,
   ServiceManifest,
   ServiceManifestResponse,
@@ -84,6 +85,7 @@ type StoredBuild = {
   // (not on the source archive store) because the metadata is the
   // canonical truth and the bytes are auxiliary.
   sourceArchive: SourceArchive;
+  artifactProfile?: ArtifactFactoryProfile;
   lastError: BuildError | null;
   logs: BuildLogEntry[];
   buildTest: BuildTestSnapshot | null;
@@ -269,6 +271,7 @@ export function createMemoryBuildRepository(
         hostingPolicyVersion: policy.hostingPolicyVersion,
         resources: policy.resources,
         dockerfileMode: input.dockerfileMode ?? "required",
+        artifactProfile: input.artifactProfile,
         createdAt: timestamp,
         updatedAt: timestamp
       };
@@ -304,7 +307,8 @@ export function createMemoryBuildRepository(
         effectiveTier: policy.effectiveTier,
         hostingPolicyVersion: policy.hostingPolicyVersion,
         resources: policy.resources,
-        dockerfileMode: input.dockerfileMode ?? "required"
+        dockerfileMode: input.dockerfileMode ?? "required",
+        artifactProfile: input.artifactProfile
       });
 
       return {

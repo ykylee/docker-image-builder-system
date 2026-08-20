@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { buildStatuses } from "./status.js";
+import { artifactFactoryProfileSchema } from "./artifact.js";
 import {
   hostingResourceInputSchema,
   hostingSchemes,
@@ -85,6 +86,9 @@ export const buildRequestSchema = z
     serviceSize: z.enum(serviceSizes).optional(),
     requestedTier: z.enum(hostingTiers).optional(),
     resources: hostingResourceInputSchema.optional(),
+    // Artifact routing is optional for backward compatibility. When present,
+    // the profile is persisted and returned to the Runner claim boundary.
+    artifactProfile: artifactFactoryProfileSchema.optional(),
     // TASK-160 (P2-M1 Step 3): `previewTtlMinutes` 제거. preview 런타임의
     // 보존 시간 knob 이었으나 canonical build/test/deploy 모델에는 대응
     // 개념이 없고 실제로 소비되는 곳도 없었다.

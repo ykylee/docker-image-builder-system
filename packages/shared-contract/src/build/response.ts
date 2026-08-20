@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { errorCodes } from "./errors.js";
+import { artifactFactoryProfileSchema } from "./artifact.js";
 import { buildPhases } from "./phase.js";
 import {
   buildStatuses,
@@ -156,6 +157,7 @@ export const buildSummarySchema = z
     hostingPolicyVersion: z.string().min(1).optional(),
     resources: hostingResourcesSchema.optional(),
     dockerfileMode: z.enum(dockerfileModes).optional(),
+    artifactProfile: artifactFactoryProfileSchema.optional(),
     // Service manifest DB policy is attached to runner claims only. It contains
     // no endpoint, schema, role, or credential; the runner derives the Secret
     // name from appName and receives the URL through Kubernetes SecretRef.

@@ -30,6 +30,11 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 					"status":         contract.StatusPreparingSource,
 					"phase":          contract.PhaseQueueClaimed,
 					"dockerfileMode": "auto",
+					"artifactProfile": map[string]any{
+						"version": 1, "ecosystem": "npm", "mode": "required",
+						"factoryUrl": "https://factory.internal", "prefetchEnabled": true,
+						"maxBuildRetries": 1,
+					},
 					"database": map[string]any{
 						"enabled":          true,
 						"migrationCommand": "npm run db:migrate",
@@ -69,6 +74,9 @@ func TestHTTPBuildControlClient_ClaimNextBuild_ClaimedTrue(t *testing.T) {
 	}
 	if resp.Database == nil || resp.Database.MigrationCommand != "npm run db:migrate" {
 		t.Errorf("expected database migration policy, got %+v", resp.Database)
+	}
+	if resp.ArtifactProfile == nil || resp.ArtifactProfile.Ecosystem != "npm" || !resp.ArtifactProfile.PrefetchEnabled {
+		t.Errorf("expected artifact profile, got %+v", resp.ArtifactProfile)
 	}
 }
 
