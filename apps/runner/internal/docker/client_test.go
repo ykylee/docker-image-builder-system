@@ -106,12 +106,39 @@ func TestArtifactBuildArgsAreDeterministicAndOptional(t *testing.T) {
 		"ARTIFACT_PACKAGE_PROXY_URL=https://packages.internal/npm",
 		"ARTIFACT_REGISTRY_MIRROR_URL=https://registry.internal",
 		"ARTIFACT_ECOSYSTEM=npm",
+		"NPM_CONFIG_REGISTRY=https://packages.internal/npm",
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("artifact build args = %#v, want %#v", got, want)
 	}
 	if got := artifactBuildArgs(ArtifactBuildOptions{}); len(got) != 0 {
 		t.Fatalf("expected no args for empty profile, got %#v", got)
+	}
+}
+
+func TestArtifactBuildArgsMapSupportedEcosystems(t *testing.T) {
+	tests := []struct {
+		ecosystem string
+		key       string
+	}{
+		{"python", "PIP_INDEX_URL="},
+		{"npm", "NPM_CONFIG_REGISTRY="},
+		{"go", "GOPROXY="},
+		{"rust", "CARGO_REGISTRIES_CRATES_IO_INDEX="},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ecosystem, func(t *testing.T) {
+			args := artifactBuildArgs(ArtifactBuildOptions{Ecosystem: tt.ecosystem, PackageProxyURL: "https://packages.internal"})
+			found := false
+			for _, arg := range args {
+				if strings.HasPrefix(arg, tt.key) {
+					found = true
+				}
+			}
+			if !found {
+				t.Fatalf("expected %s in %#v", tt.key, args)
+			}
+		})
 	}
 }
 

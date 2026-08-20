@@ -19,15 +19,14 @@ kind: generic
 - 호스트 IP:
 - 영향 문서:
   - `apps/runner/internal/docker/client.go`
-  - `apps/runner/internal/services/build_service.go`
 
 - 작업 내용: Artifact Factory dependency proxy MVP의 구현 계획, milestone, WBS, critical path와 완료 게이트를 수립한다.
-- 완료 기준: profile이 없는 빌드는 기존 docker build와 동일하고 profile이 있는 빌드는 endpoint build args를 전달한다.
+- 완료 기준: 4개 지원 ecosystem 모두 표준 proxy build arg가 생성되고 기존 빈 profile은 추가 arg를 만들지 않는다.
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: Docker Client에 ArtifactBuildOptions와 결정적 build arg 생성기를 추가하고 BuildService가 claim profile을 build 옵션으로 전달하도록 연결했다.
-- 다음 세션 시작 포인트: 실제 Dockerfile fixture에서 Python/npm/Go/Rust별 표준 package manager 설정과 cache hit/miss를 검증
+- 진행 현황: Package proxy URL을 Python(PIP_INDEX_URL), npm(NPM_CONFIG_REGISTRY), Go(GOPROXY), Rust(CARGO_REGISTRIES_CRATES_IO_INDEX) 표준 변수로 매핑하고 4개 ecosystem 테스트를 추가했다.
+- 다음 세션 시작 포인트: 실제 Dockerfile fixture에서 각 package manager가 proxy 변수로 동작하는 통합 검증
 - 남은 리스크: 실제 proxy 제품과 staging 네트워크 검증은 아직 미실행.
 
 ## ✅ Outcome

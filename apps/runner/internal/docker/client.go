@@ -312,6 +312,18 @@ func artifactBuildArgs(options ArtifactBuildOptions) []string {
 	if options.Ecosystem != "" {
 		args = append(args, "ARTIFACT_ECOSYSTEM="+options.Ecosystem)
 	}
+	if options.PackageProxyURL != "" {
+		switch options.Ecosystem {
+		case "python":
+			args = append(args, "PIP_INDEX_URL="+options.PackageProxyURL)
+		case "npm":
+			args = append(args, "NPM_CONFIG_REGISTRY="+options.PackageProxyURL)
+		case "go":
+			args = append(args, "GOPROXY="+options.PackageProxyURL)
+		case "rust":
+			args = append(args, "CARGO_REGISTRIES_CRATES_IO_INDEX="+options.PackageProxyURL)
+		}
+	}
 	return args
 }
 
