@@ -34,7 +34,7 @@
 | 4.2 | Digest/signature policy | verifier + tests | 1.2/2.x | mutable tag 거부 |
 | 4.3 | Metrics/audit | metrics/log/runbook | 3.x | buildId/runnerId/artifactId 추적 |
 | 4.4 | Retention/eviction | policy + dry-run | 2.4/4.1 | 참조 중 삭제 방지 |
-| 5.1 | Full e2e matrix | scripts/CI | 3.x/4.x | hit/miss/deny/integrity/auth/retry PASS |
+| 5.1 | Full e2e matrix | scripts/CI | 3.x/4.x | hit/miss/deny/integrity/auth/retry + Runner phase/error mapping PASS |
 | 5.2 | 장애주입/복구 | staging runbook | 4.x | proxy/registry restart와 rollback |
 | 5.3 | 채택 판정 | decision record | 5.1/5.2 | adopt/hold 결정 및 후속 TASK |
 

@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: Runner preflight가 integrity/upstream/auth/prefetch 오류를 안전한 메시지 코드로 매핑하고, cache miss prefetch를 build당 1회로 제한한다. Worker startup은 factory URL을 로그에 출력하지 않으며 token/password 패턴을 redaction한다.
-- Next session starting point: Runner artifact preflight e2e에서 실제 오류 응답과 phase/errorCode 전달을 검증한다.
-- Remaining risks: canonical public errorCode union은 UNKNOWN_ERROR를 유지하므로 상세 Artifact code는 안전한 ErrorMessage에 포함; 실제 Keycloak은 로컬 검증 불가
+- Progress: Compose Runner E2E에서 잘못된 factory token으로 실제 build를 실행해 artifact lookup 401을 유도했다. Build detail이 FAILED, lastError.code=UNKNOWN_ERROR, message=FACTORY_AUTH_FAILED, phase history QUEUE_CLAIMED→SOURCE_PREPARED→FAILED를 남기는 것을 검증했다.
+- Next session starting point: integrity mismatch 및 prefetch failure를 실제 compose build에서 각각 검증하고 full artifact E2E matrix를 CI smoke로 묶는다.
+- Remaining risks: 현재 E2E는 memory backend와 fixture auth failure 기준; 실제 upstream proxy와 Keycloak은 로컬 검증 불가
 
 ## ✅ Outcome
 
-- Result: M2 Runner 오류 매핑·retry cap·credential redaction 회귀 가드 완료.
-- Verification: go test ./... (apps/runner) PASS: error mapping, retry cap, credential redaction tests
-- Follow-up: compose 기반 artifact auth/integrity failure e2e 및 build log redaction
+- Result: Runner artifact auth failure phase/error mapping E2E 완료.
+- Verification: bash scripts/smoke-runner-artifact-failure-e2e.sh PASS; go test ./... (apps/runner) PASS
+- Follow-up: Runner integrity/prefetch failure E2E, CI matrix integration

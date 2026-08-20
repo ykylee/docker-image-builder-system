@@ -165,6 +165,12 @@ Runner preflight는 `ARTIFACT_INTEGRITY_FAILED`, `UPSTREAM_BLOCKED`,
 결합한 안전한 오류 메시지로 전달한다. lookup miss에 대한 prefetch는 build당 1회로
 제한하며, Runner startup 로그에는 factory URL·Authorization·token을 출력하지 않는다.
 
+Compose E2E에서는 의도적으로 잘못된 Runner token을 주입해 `POST /builds`부터 source
+upload, claim, artifact lookup까지 진행한 뒤 build가 `FAILED`로 종료되는 흐름을 검증한다.
+Build detail의 public `lastError.code`는 `UNKNOWN_ERROR`로 유지하고 message에만
+`FACTORY_AUTH_FAILED`를 포함하며, phase history에는 `QUEUE_CLAIMED` → `SOURCE_PREPARED`
+→ `FAILED`가 남아야 한다.
+
 ## 8. 대안과 선택 기준
 
 - **기존 registry/repository proxy 사용**: MVP 권장. 구현량이 작고 표준 호환성이 높다.
