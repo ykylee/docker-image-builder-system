@@ -120,6 +120,9 @@ services:
     environment:
       HOST_SERVER_BASE_URL: ${HOST_SERVER_BASE_URL:-http://build-server:3000}
       RUNNER_AUTH_TOKEN: ${RUNNER_AUTH_TOKEN:-}
+      # Set true together with AUTH_MODE=required so a runner without a token
+      # fails at startup instead of polling protected APIs forever.
+      RUNNER_AUTH_REQUIRED: ${RUNNER_AUTH_REQUIRED:-false}
       RUNNER_ID: runner-compose-1
       RUNNER_POLL_INTERVAL: 5s
       # self-dogfood must exercise the real Docker daemon through the mounted

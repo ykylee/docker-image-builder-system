@@ -16,6 +16,9 @@ func main() {
 	defer stop()
 
 	cfg := config.Load()
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("runner configuration invalid: %v", err)
+	}
 
 	// TASK-073 보강: docker CLI 의 registry 인증 config dir 를
 	// `RUNNER_REGISTRY_CONFIG_DIR` env 로 주입 가능. nil/empty 면 docker

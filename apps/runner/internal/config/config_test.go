@@ -2,9 +2,26 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestAuthRequiredFailsWithoutToken(t *testing.T) {
+	t.Setenv("RUNNER_AUTH_REQUIRED", "true")
+	t.Setenv("RUNNER_AUTH_TOKEN", "")
+	if err := Load().Validate(); err == nil || !strings.Contains(err.Error(), "RUNNER_AUTH_TOKEN") {
+		t.Fatalf("expected missing RUNNER_AUTH_TOKEN validation error, got %v", err)
+	}
+}
+
+func TestAuthRequiredAcceptsToken(t *testing.T) {
+	t.Setenv("RUNNER_AUTH_REQUIRED", "true")
+	t.Setenv("RUNNER_AUTH_TOKEN", "signed-token")
+	if err := Load().Validate(); err != nil {
+		t.Fatalf("expected configured auth token to validate, got %v", err)
+	}
+}
 
 // TASK-073 보강: RUNNER_REGISTRY_CONFIG_DIR env 가 Config.RegistryConfigDir
 // 로 정확히 read 되는지 — default 가 빈 string 으로 (docker default

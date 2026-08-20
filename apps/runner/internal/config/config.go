@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -14,6 +15,9 @@ type Config struct {
 	// AuthToken is a signed bearer token for Build Server control endpoints.
 	// Empty keeps the legacy unauthenticated local-development path.
 	AuthToken string
+	// AuthRequired makes missing runner credentials a startup error instead of
+	// allowing an authenticated control plane to be polled indefinitely.
+	AuthRequired bool
 	// TASK-073 보강: docker CLI 의 registry 인증 config dir. nil/empty 면
 	// docker default (`~/.docker/config.json`) 를 그대로 사용 — cli mode
 	// deploy 가 local daemon 만 사용하거나 insecure localhost registry
@@ -56,6 +60,7 @@ func Load() Config {
 		HostServerBaseURL:     parseString("HOST_SERVER_BASE_URL", "http://127.0.0.1:3000"),
 		RunnerID:              parseString("RUNNER_ID", "runner-default"),
 		AuthToken:             parseString("RUNNER_AUTH_TOKEN", ""),
+		AuthRequired:          parseBool("RUNNER_AUTH_REQUIRED", false),
 		RegistryConfigDir:     parseString("RUNNER_REGISTRY_CONFIG_DIR", ""),
 		K8sMode:               parseString("RUNNER_K8S_MODE", ""),
 		K8sCluster:            parseString("RUNNER_K8S_CLUSTER", ""),
@@ -73,6 +78,16 @@ func Load() Config {
 		ArgoCDDestinationHost: parseString("RUNNER_ARGOCD_DESTINATION_HOST", "https://kubernetes.default.svc"),
 		K8sNamespacePerBuild:  parseBool("RUNNER_K8S_NAMESPACE_PER_BUILD", false),
 	}
+}
+
+// Validate checks startup invariants that cannot be represented by the
+// lenient environment parser. Local development keeps the token optional, but
+// protected deployments must fail before entering the worker poll loop.
+func (c Config) Validate() error {
+	if c.AuthRequired && strings.TrimSpace(c.AuthToken) == "" {
+		return fmt.Errorf("RUNNER_AUTH_REQUIRED=true requires RUNNER_AUTH_TOKEN")
+	}
+	return nil
 }
 
 // parseBool 는 env boolean 을 lenient 하게 받는다. "true"/"1"/"yes"/"on" (대소문자 무시) 만 true.
