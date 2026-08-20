@@ -188,7 +188,7 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return s.fail(ctx, buildID, failure)
 	}
 
-	if failure := s.buildImage(ctx, buildID, sourceDir); failure != nil {
+	if failure := s.buildImage(ctx, buildID, sourceDir, claim.ArtifactProfile); failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
 
@@ -361,12 +361,19 @@ func (s *BuildService) prepareSourceFallback(ctx context.Context, buildID string
 
 // buildImage — docker build 단계. 실패는 canonical DOCKER_BUILD_FAILED 로
 // 보고한다 (TASK-162 이전에는 이 코드를 emit 하는 곳이 없었다).
-func (s *BuildService) buildImage(ctx context.Context, buildID, sourceDir string) *stageFailure {
+func (s *BuildService) buildImage(ctx context.Context, buildID, sourceDir string, profile *hostclient.ArtifactFactoryProfile) *stageFailure {
 	if err := s.reportPhase(ctx, buildID, contract.PhaseDockerBuildStarted); err != nil {
 		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: err}
 	}
 
-	if err := s.docker.BuildImage(ctx, buildID, sourceDir, s.dockerfilePath); err != nil {
+	options := docker.ArtifactBuildOptions{}
+	if profile != nil {
+		options = docker.ArtifactBuildOptions{
+			FactoryURL: profile.FactoryURL, PackageProxyURL: profile.PackageProxyURL,
+			RegistryMirrorURL: profile.RegistryMirrorURL, Ecosystem: profile.Ecosystem,
+		}
+	}
+	if err := s.docker.BuildImageWithOptions(ctx, buildID, sourceDir, s.dockerfilePath, options); err != nil {
 		return &stageFailure{errorCode: contract.ErrorCodeDockerBuildFailed, err: err}
 	}
 

@@ -44,6 +44,16 @@ type ContainerRunOptions struct {
 	Network string
 }
 
+// ArtifactBuildOptions contains non-secret dependency proxy endpoints. Values
+// are passed as Docker build args only; credentials remain outside the build
+// context and are injected by the runtime environment.
+type ArtifactBuildOptions struct {
+	FactoryURL        string
+	PackageProxyURL   string
+	RegistryMirrorURL string
+	Ecosystem         string
+}
+
 // ContainerStatus 는 RunContainer + WaitForHealth 가 채워서 돌려주는
 // container lifecycle snapshot. BuildService.ProcessClaim 은 이 값을
 // 그대로 ReportContainerTestResult 의 입력으로 사용한다.
@@ -200,6 +210,10 @@ func (c *Client) sourceMarkerPath(buildID string) string {
 // tagged with the build ID. The scratch-Dockerfile path is gone:
 // the user's Dockerfile is the source of truth.
 func (c *Client) BuildImage(ctx context.Context, buildID, sourceDir, dockerfileRelPath string) error {
+	return c.BuildImageWithOptions(ctx, buildID, sourceDir, dockerfileRelPath, ArtifactBuildOptions{})
+}
+
+func (c *Client) BuildImageWithOptions(ctx context.Context, buildID, sourceDir, dockerfileRelPath string, artifactOptions ArtifactBuildOptions) error {
 	workspaceDir := c.workspaceDir(buildID)
 	// TASK-066: ensure the per-build workspace exists. The
 	// fetcher usually creates this before BuildImage runs, but
@@ -265,16 +279,12 @@ func (c *Client) BuildImage(ctx context.Context, buildID, sourceDir, dockerfileR
 		return nil
 	}
 
-	cmd := exec.CommandContext(
-		ctx,
-		c.dockerBin,
-		"build",
-		"-f",
-		dockerfilePath,
-		"-t",
-		imageTag,
-		sourceDir,
-	)
+	args := []string{"build", "-f", dockerfilePath, "-t", imageTag}
+	for _, buildArg := range artifactBuildArgs(artifactOptions) {
+		args = append(args, "--build-arg", buildArg)
+	}
+	args = append(args, sourceDir)
+	cmd := exec.CommandContext(ctx, c.dockerBin, args...)
 	// The runner image ships docker-cli-buildx. Set this explicitly so a host
 	// daemon/client combination cannot silently fall back to the removed legacy
 	// builder when `docker build` is invoked through the mounted socket.
@@ -286,6 +296,23 @@ func (c *Client) BuildImage(ctx context.Context, buildID, sourceDir, dockerfileR
 	}
 
 	return nil
+}
+
+func artifactBuildArgs(options ArtifactBuildOptions) []string {
+	args := make([]string, 0, 4)
+	if options.FactoryURL != "" {
+		args = append(args, "ARTIFACT_FACTORY_URL="+options.FactoryURL)
+	}
+	if options.PackageProxyURL != "" {
+		args = append(args, "ARTIFACT_PACKAGE_PROXY_URL="+options.PackageProxyURL)
+	}
+	if options.RegistryMirrorURL != "" {
+		args = append(args, "ARTIFACT_REGISTRY_MIRROR_URL="+options.RegistryMirrorURL)
+	}
+	if options.Ecosystem != "" {
+		args = append(args, "ARTIFACT_ECOSYSTEM="+options.Ecosystem)
+	}
+	return args
 }
 
 // LoadImageToKind imports a locally built image into a kind node's containerd

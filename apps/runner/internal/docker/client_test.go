@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -90,6 +91,27 @@ func TestBuildImageMissingDockerfileReturnsError(t *testing.T) {
 	err := client.BuildImage(context.Background(), "b-3", sourceDir, "Dockerfile")
 	if err == nil {
 		t.Fatal("expected error for missing Dockerfile, got nil")
+	}
+}
+
+func TestArtifactBuildArgsAreDeterministicAndOptional(t *testing.T) {
+	got := artifactBuildArgs(ArtifactBuildOptions{
+		FactoryURL:        "https://factory.internal",
+		PackageProxyURL:   "https://packages.internal/npm",
+		RegistryMirrorURL: "https://registry.internal",
+		Ecosystem:         "npm",
+	})
+	want := []string{
+		"ARTIFACT_FACTORY_URL=https://factory.internal",
+		"ARTIFACT_PACKAGE_PROXY_URL=https://packages.internal/npm",
+		"ARTIFACT_REGISTRY_MIRROR_URL=https://registry.internal",
+		"ARTIFACT_ECOSYSTEM=npm",
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("artifact build args = %#v, want %#v", got, want)
+	}
+	if got := artifactBuildArgs(ArtifactBuildOptions{}); len(got) != 0 {
+		t.Fatalf("expected no args for empty profile, got %#v", got)
 	}
 }
 
