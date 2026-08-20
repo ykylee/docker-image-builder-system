@@ -74,7 +74,7 @@ async function seedBuildWithSource(
 
 async function seedRouteBuildWithSource(
   app: Awaited<ReturnType<typeof buildApp>>,
-  base: { appName: string; requestedBy: string; entrypointPath?: string }
+  base: { appName: string; requestedBy: string; entrypointPath?: string; artifactProfile?: unknown }
 ): Promise<string> {
   const bytes = Buffer.from(randomBytes(64));
   const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
@@ -90,7 +90,8 @@ async function seedRouteBuildWithSource(
         checksumSha256,
         sizeBytes
       },
-      entrypointPath: base.entrypointPath ?? baseBody.entrypointPath
+      entrypointPath: base.entrypointPath ?? baseBody.entrypointPath,
+      ...(base.artifactProfile ? { artifactProfile: base.artifactProfile } : {})
     }
   });
   if (enq.statusCode !== 202) {
@@ -143,6 +144,33 @@ describe("POST /builds/claim", () => {
     const body = claim.json();
     assert.equal(body.claimed, true);
     assert.equal(body.build.build.status, "PREPARING_SOURCE");
+    await app.close();
+  });
+
+  it("returns the artifact profile through the claim response", async () => {
+    const app = await buildApp();
+    const artifactProfile = {
+      version: 1,
+      ecosystem: "npm",
+      mode: "fallback",
+      factoryUrl: "https://factory.internal",
+      packageProxyUrl: "https://factory.internal/npm",
+      registryMirrorUrl: "https://factory.internal/registry",
+      prefetchEnabled: true,
+      maxBuildRetries: 1
+    };
+    await seedRouteBuildWithSource(app, {
+      appName: "artifact-profile-app",
+      requestedBy: "yklee",
+      artifactProfile
+    });
+    const claim = await app.inject({
+      method: "POST",
+      url: "/builds/claim",
+      payload: { runnerId: "r-artifact" }
+    });
+    assert.equal(claim.statusCode, 200);
+    assert.deepEqual(claim.json().build.build.artifactProfile, artifactProfile);
     await app.close();
   });
 
