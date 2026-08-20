@@ -1,6 +1,6 @@
 {
   "schema_version": "1",
-  "generated_at": "2026-08-18",
+  "generated_at": "2026-08-20",
   "purpose_digest": null,
   "purpose_digest_rev": null,
   "source_of_truth": {
@@ -10,7 +10,7 @@
     "daily_backlog_dir": "ai-workflow/memory/active/agent/tenant-access-policy/backlog",
     "tasks_dir": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/tasks",
     "sessions_dir": "ai-workflow/memory/active/agent/tenant-access-policy/sessions",
-    "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
+    "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-20.md",
     "repository_assessment_path": null
   },
   "project": {
@@ -46,25 +46,18 @@
     "environment_constraints": []
   },
   "backlog": {
-    "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md",
-    "task_count": 7,
+    "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-20.md",
+    "task_count": 1,
     "in_progress_items": [
       "TASK-186 — oidc-session-runtime-foundation"
     ],
     "blocked_items": [],
-    "done_items": [
-      "TASK-183 — tenant-access-policy",
-      "TASK-184 — auth-contract-and-e2e",
-      "TASK-185 — identity-session-adapter",
-      "TASK-2026-08-18-main-187 — auth-disabled-deployment-mode",
-      "TASK-2026-08-18-main-188 — registration-id-ownership-views",
-      "TASK-189 — disabled-deployment-registration-id-contract"
-    ]
+    "done_items": []
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",
     "ai-workflow/memory/active/work_backlog.md",
-    "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-18.md"
+    "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-20.md"
   ],
   "repository_assessment": {
     "path": null,

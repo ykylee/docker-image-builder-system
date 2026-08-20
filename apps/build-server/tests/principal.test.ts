@@ -263,6 +263,7 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
   jwk.kid = "fake-key-1";
   const provider = Fastify();
   let expectedNonce = "";
+  let accessSubject = "oidc-alice";
   provider.addContentTypeParser(
     "application/x-www-form-urlencoded",
     { parseAs: "string" },
@@ -280,14 +281,21 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
   provider.get("/jwks", async (_request, reply) => reply.send({ keys: [jwk] }));
   provider.post("/token", async (request, reply) => {
     const origin = `http://${request.headers.host}`;
-    const idToken = await new SignJWT({ sub: "oidc-alice", realm_access: { roles: ["user"] }, nonce: expectedNonce })
+    const idToken = await new SignJWT({ sub: "oidc-alice", nonce: expectedNonce })
       .setProtectedHeader({ alg: "RS256", kid: "fake-key-1" })
       .setIssuer(origin)
       .setAudience("dib-test")
       .setExpirationTime("5m")
       .setIssuedAt()
       .sign(privateKey);
-    return reply.send({ id_token: idToken, access_token: "server-only-access-token" });
+    const accessToken = await new SignJWT({ sub: accessSubject, realm_access: { roles: ["user"] } })
+      .setProtectedHeader({ alg: "RS256", kid: "fake-key-1" })
+      .setIssuer(origin)
+      .setAudience("dib-test")
+      .setExpirationTime("5m")
+      .setIssuedAt()
+      .sign(privateKey);
+    return reply.send({ id_token: idToken, access_token: accessToken });
   });
   await provider.listen({ host: "127.0.0.1", port: 0 });
   const providerAddress = provider.server.address();
@@ -307,6 +315,10 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
     assert.equal(principal.subject, "oidc-alice");
     assert.deepEqual(principal.roles, ["user"]);
     assert.ok(principal.expiresAt > Math.floor(Date.now() / 1000));
+    accessSubject = "oidc-mallory";
+    const mismatchedFlow = await client.beginLogin("/builds");
+    expectedNonce = mismatchedFlow.nonce;
+    await assert.rejects(() => client.exchangeCode("mismatched-subject", mismatchedFlow), /subject mismatch/);
   } finally {
     await provider.close();
   }

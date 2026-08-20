@@ -11,6 +11,7 @@ type OidcDiscovery = {
 
 type OidcTokenResponse = {
   id_token?: string;
+  access_token?: string;
 };
 
 export type OidcFlow = {
@@ -105,7 +106,23 @@ export class OidcClient {
     if (verified.payload.nonce !== flow.nonce) {
       throw new Error("OIDC id_token nonce mismatch");
     }
-    return principalFromClaims(verified.payload, this.options.roleClaim ?? "roles");
+    const roleClaim = this.options.roleClaim ?? "roles";
+    // Providers such as Keycloak commonly place realm roles in the access
+    // token. Keep an ID-token role claim authoritative when present, and only
+    // fall back to a separately verified access token when it is empty.
+    const idTokenRoles = rolesFromClaims(verified.payload, roleClaim);
+    let roles = idTokenRoles;
+    if (token.access_token && idTokenRoles.length === 0) {
+      const accessToken = await jwtVerify(token.access_token, jwks, {
+        issuer: discovery.issuer,
+        audience: this.options.clientId
+      });
+      if (accessToken.payload.sub !== verified.payload.sub) {
+        throw new Error("OIDC access_token subject mismatch");
+      }
+      roles = rolesFromClaims(accessToken.payload, roleClaim);
+    }
+    return principalFromClaims(verified.payload, roleClaim, roles);
   }
 
   private async fetchDiscovery(): Promise<OidcDiscovery> {
@@ -126,10 +143,14 @@ export class OidcClient {
   }
 }
 
-function principalFromClaims(claims: JWTPayload, roleClaim = "roles"): Principal {
+function principalFromClaims(claims: JWTPayload, roleClaim = "roles", roles = rolesFromClaims(claims, roleClaim)): Principal {
   if (typeof claims.sub !== "string" || !claims.sub || typeof claims.exp !== "number") {
     throw new Error("OIDC id_token is missing sub or exp");
   }
+  return { subject: claims.sub, roles, expiresAt: claims.exp };
+}
+
+function rolesFromClaims(claims: JWTPayload, roleClaim: string): string[] {
   const value = roleClaim.split(".").reduce<unknown>((current, segment) => {
     if (!current || typeof current !== "object") return undefined;
     return (current as Record<string, unknown>)[segment];
@@ -139,5 +160,5 @@ function principalFromClaims(claims: JWTPayload, roleClaim = "roles"): Principal
     : Array.isArray(value)
       ? value.filter((role): role is string => typeof role === "string").map((role) => role.trim()).filter(Boolean)
       : [];
-  return { subject: claims.sub, roles, expiresAt: claims.exp };
+  return roles;
 }

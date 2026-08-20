@@ -267,3 +267,4 @@
 - [2026-08-17 작업 백로그](main/backlog/2026-08-17.md)
 - [2026-08-18 작업 백로그](main/backlog/2026-08-18.md)
 - [2026-08-18 작업 백로그](agent/tenant-access-policy/backlog/2026-08-18.md)
+- [2026-08-20 작업 백로그](agent/tenant-access-policy/backlog/2026-08-20.md)

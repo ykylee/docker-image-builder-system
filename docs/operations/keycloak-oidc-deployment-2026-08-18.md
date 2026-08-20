@@ -33,8 +33,9 @@ docker compose \
   허용한다.
 - Valid redirect URI는 `OIDC_REDIRECT_URI`와 완전히 일치해야 한다.
 - Web origin/CORS는 실제 Build Monitor origin만 허용한다.
-- 역할은 기본적으로 access token의 `realm_access.roles`에서 읽는다. 다른 mapper를
-  사용하면 `OIDC_ROLE_CLAIM`을 dotted path로 바꾼다.
+- 역할은 ID token에 claim이 있으면 이를 우선 사용하고, 없으면 검증된 access token의
+  `realm_access.roles`에서 읽는다. 다른 mapper를 사용하면 `OIDC_ROLE_CLAIM`을 dotted
+  path로 바꾼다. 두 token의 `sub`가 다르면 callback을 거부한다.
 - Build Server는 `BUILD_REPOSITORY_BACKEND=postgres`와 Postgres-backed session
   store를 요구한다. OIDC mode에서 memory backend로 기동하지 않는다.
 
