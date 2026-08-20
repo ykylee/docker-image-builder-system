@@ -1,9 +1,49 @@
 # 실서비스 진입 계획 및 로드맵
 
-- 작성일: 2026-08-05
+- 작성일: 2026-08-05 (2026-08-20 상태 리뷰 갱신)
 - 목표: 현재 self-dogfood/MVP를 제한적 private beta를 거쳐 실서비스 수준으로 전환
 - 현재 판정: 내부 self-dogfood 가능, 외부 다중 사용자 실서비스 불가
 - 기준 문서: `docs/operations/current-state-and-readiness-2026-08-05.md`
+
+## 0. 2026-08-20 상태 리뷰
+
+### 현재 판정
+
+내부 self-dogfood은 계속 가능하지만, private beta 진입은 보류한다. Phase 1의
+provider-neutral session/OIDC 기반과 tenant owner/admin policy, `AUTH_MODE=required`
+signed Runner token 경로가 구현되었고, TASK-180 stale build lease recovery도 반영됐다.
+다만 실제 Keycloak audience/role mapper smoke, Runner credential 발급·lease token,
+rootless build 격리와 namespace-scoped RBAC는 아직 운영 검증되지 않았다.
+
+### 검증된 기준선
+
+- Build Server 관련 TypeScript `tsc --noEmit` 4개 패키지 PASS
+- Runner `go test ./...` PASS
+- fake OIDC issuer 기반 principal/session 및 negative claim 회귀 PASS
+- required-auth Compose/Kubernetes manifest 정적 YAML 검증 PASS
+
+### 잔여 차단 게이트
+
+1. **Identity 외부 연동** — Keycloak 연결 가능 환경에서 access-token audience와
+   `realm_access.roles`/`OIDC_ADMIN_ROLE`을 실 token으로 검증한다.
+2. **Runner 권한 경계** — required token은 fail-fast와 bearer 검증까지 제공하지만,
+   per-runner credential 발급·claim lease token·runner 간 phase mutation 차단은 남아 있다.
+3. **실행 격리** — 현재 Kubernetes Runner 예시는 `/var/run/docker.sock` hostPath를
+   사용한다. rootless BuildKit, 최소 RBAC, NetworkPolicy, malicious Dockerfile 회귀가
+   완료되기 전에는 untrusted build를 허용하지 않는다.
+4. **복구·운영성** — stale lease recovery는 구현됐지만 dead-letter/retry 상한,
+   control-plane restart persistence/backup-restore, DB provisioning 보상·재시도,
+   artifact retention과 alert/soak 기준은 남아 있다.
+
+### 우선순위 조정
+
+| 순위 | 다음 작업 | 완료 게이트 |
+|---:|---|---|
+| 1 | Runner API least-privilege 설계 및 rootless worker spike | socket 없는 build + RBAC deny 회귀 |
+| 2 | Keycloak 실환경 smoke 및 OIDC 운영 체크리스트 | audience/role/expiry/rotation 실측 |
+| 3 | runner-bound lease token과 phase ownership | 다른 Runner의 claim/phase 변경 401/403 |
+| 4 | control-plane Postgres/backup 및 DB retry 보강 | restart·restore·provision retry PASS |
+| 5 | retention, quota, metrics/alerts, private beta rehearsal | 24시간 soak + rollback rehearsal |
 
 ## 1. 목표와 비목표
 
@@ -112,7 +152,8 @@
 작업:
 
 - Runner registration 시 per-runner credential 발급
-- claim/phase/container-test/deployment API에 mTLS 또는 signed token 적용
+- claim/phase/container-test/deployment API에 signed token 적용 (현재 required mode의
+  공통 `AUTH_SECRET` bearer까지 구현; per-runner credential은 후속)
 - claim 응답에 lease token과 expiry 추가
 - Runner별 K8s RBAC 최소 권한
 - build sandbox를 host Docker socket 공유에서 분리

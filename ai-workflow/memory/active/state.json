@@ -36,6 +36,7 @@
     ],
     "blocked_items": [],
     "recent_done_items": [
+      "TASK-191 — readiness-review-and-roadmap-refresh",
       "TASK-2026-08-18-main-188 — registration-id-ownership-views",
       "TASK-2026-08-18-main-187 — auth-disabled-deployment-mode",
       "TASK-189 — disabled-deployment-registration-id-contract",
@@ -48,13 +49,15 @@
   },
   "backlog": {
     "latest_backlog_path": "ai-workflow/memory/active/agent/tenant-access-policy/backlog/2026-08-20.md",
-    "task_count": 2,
+    "task_count": 3,
     "in_progress_items": [
       "TASK-186 — oidc-session-runtime-foundation",
       "TASK-190 — runner-auth-fail-fast"
     ],
     "blocked_items": [],
-    "done_items": []
+    "done_items": [
+      "TASK-191 — readiness-review-and-roadmap-refresh"
+    ]
   },
   "next_documents": [
     "docs/PROJECT_PROFILE.md",

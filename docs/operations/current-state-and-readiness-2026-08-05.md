@@ -1,9 +1,19 @@
 # 현재 구현 현황 및 실사용 준비도
 
-- 작성일: 2026-08-05
+- 작성일: 2026-08-05 (2026-08-20 상태 리뷰 갱신)
 - 상태: 현재 구현 기준선
 - 범위: Build Server, React Build Monitor, Runner, K8s hosted service, 서비스별 DB
-- 판정: 신뢰된 내부 self-dogfood/MVP에는 사용 가능. 외부 다중 사용자 실서비스에는 미준비.
+- 판정: 신뢰된 내부 self-dogfood/MVP에는 사용 가능. 인증·격리·복구 게이트가 남아 외부 다중 사용자 실서비스와 private beta에는 미준비.
+
+## 1.1 2026-08-20 갱신 요약
+
+- `AUTH_MODE=oidc` provider-neutral session runtime, OIDC role/audience 설정과 fake issuer
+  negative 회귀가 추가됐다. 실제 Keycloak issuer 연결은 환경 제약으로 미검증이다.
+- `AUTH_MODE=required`에서 signed Runner bearer token을 검증하고, `RUNNER_AUTH_REQUIRED=true`
+  및 token 누락 시 Runner가 fail-fast한다. 기본 legacy/disabled 경로는 내부 호환용으로 남아 있다.
+- TASK-180 stale build lease recovery가 다음 claim 시 active build를 queue로 되돌린다.
+- Kubernetes required-auth 예시는 Postgres control-plane과 Secret 주입을 제공하지만,
+  Runner는 여전히 host Docker socket을 사용한다. 따라서 untrusted build 운영에는 사용할 수 없다.
 
 ## 1. 한눈에 보는 결론
 
@@ -141,16 +151,18 @@ localStorage 사용자 ID도 요청자가 임의로 바꿀 수 있다.
 - admin ID를 아는 요청자가 admin API 호출 가능
 - public network에 노출하면 사용자·관리자 API가 보호되지 않음
 
-### CRITICAL: Runner API 무인증
+### CRITICAL: Runner 인증은 보호 모드에서만 활성
 
-claim/phase/deployment API가 runner secret, mTLS, signed request 없이 호출된다.
-runner ID 문자열만으로 claim과 상태 보고가 가능하다.
+`AUTH_MODE=required`와 `RUNNER_AUTH_REQUIRED=true`를 함께 사용하면 signed bearer token을
+검증하고 token 누락 Runner는 시작 단계에서 종료한다. 그러나 기본 Compose 호환 경로는
+legacy/disabled이며, per-runner credential 발급·claim lease token·runner별 phase ownership은
+아직 없다. 외부 운영은 required mode를 강제하고 남은 runner-bound 권한 게이트를 완료해야 한다.
 
 ### CRITICAL: 비신뢰 build 격리 부족
 
-Runner가 host Docker socket과 Kubernetes kubeconfig를 공유한다. 비신뢰
-Dockerfile을 실행하는 다중 테넌트 운영에는 별도 sandbox, 최소 권한, network
-egress 제한이 필요하다.
+현재 Kubernetes Runner 예시와 Compose 실행 경로는 host Docker socket을 mount한다.
+Kubernetes 배포 권한도 namespace-scoped RBAC로 확정되지 않았다. 비신뢰 Dockerfile을
+실행하는 다중 테넌트 운영에는 rootless worker, 최소 권한, network egress 제한이 필요하다.
 
 ### HIGH: Control Plane 영속성 분리
 
@@ -159,10 +171,11 @@ egress 제한이 필요하다.
 build/service registry가 분리된다. control-plane 재시작 시 데이터가 사라질 수
 있다.
 
-### HIGH: Claim lease/recovery 부재
+### HIGH: Claim ownership/복구 확장 미완료
 
-runner가 build를 claim한 뒤 죽으면 `PREPARING_SOURCE`/`BUILDING` 등 active 상태가
-남아 후속 queue를 막을 수 있다. lease expiry, heartbeat, stale requeue가 없다.
+TASK-180으로 기본 stale lease recovery는 구현되어 다음 claim 시 heartbeat가 끊긴
+active build를 재queue한다. 다만 runner-bound lease token, retry 상한/dead-letter,
+중복 phase mutation 방지와 장애 주입 e2e는 남아 있다.
 
 ### HIGH: DB provisioning 실패 재시도 결함
 
