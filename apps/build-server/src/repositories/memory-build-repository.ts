@@ -85,6 +85,7 @@ type StoredBuild = {
   // (not on the source archive store) because the metadata is the
   // canonical truth and the bytes are auxiliary.
   sourceArchive: SourceArchive;
+  uploadedSourceArchive?: StoredSourceArchive;
   artifactProfile?: ArtifactFactoryProfile;
   lastError: BuildError | null;
   logs: BuildLogEntry[];
@@ -400,7 +401,7 @@ export function createMemoryBuildRepository(
       // repo 와 동일하게 (legacy 존재) OR (chunk 1건 이상 + 누적 size 가
       // 선언 total 이상 = 업로드 완료) 를 자격으로 본다.
       const hasClaimableSource = (buildId: string): boolean => {
-        if (sourceArchives.has(buildId)) {
+        if (builds.get(buildId)?.uploadedSourceArchive || sourceArchives.has(buildId)) {
           return true;
         }
         const envelope = sourceArchivesChunked.get(buildId);
@@ -986,6 +987,11 @@ export function createMemoryBuildRepository(
         checksumSha256: actualChecksumSha256,
         sizeBytes: actualSizeBytes
       });
+      stored.uploadedSourceArchive = {
+        bytes: new Uint8Array(bytes),
+        checksumSha256: actualChecksumSha256,
+        sizeBytes: actualSizeBytes
+      };
       // TASK-106: a re-upload via the legacy single-shot path wipes
       // any prior chunked upload for the same buildId, so the two
       // sides never disagree on which bytes are current.
@@ -1190,6 +1196,15 @@ export function createMemoryBuildRepository(
     // `await` cannot see the bytes get replaced by a concurrent
     // re-upload.
     async getSourceArchive(buildId: string): Promise<GetSourceArchiveResult> {
+      const build = builds.get(buildId);
+      if (build?.uploadedSourceArchive) {
+        return {
+          kind: "ok",
+          bytes: new Uint8Array(build.uploadedSourceArchive.bytes),
+          checksumSha256: build.uploadedSourceArchive.checksumSha256,
+          sizeBytes: build.uploadedSourceArchive.sizeBytes
+        };
+      }
       const chunked = sourceArchivesChunked.get(buildId);
       if (chunked) {
         const sortedEntries = Array.from(chunked.chunks.entries()).sort(
@@ -1265,7 +1280,9 @@ export function createMemoryBuildRepository(
       }
       const hadChunked = sourceArchivesChunked.delete(buildId);
       const hadLegacy = sourceArchives.delete(buildId);
-      if (!hadChunked && !hadLegacy) {
+      const hadEmbedded = Boolean(stored.uploadedSourceArchive);
+      stored.uploadedSourceArchive = undefined;
+      if (!hadChunked && !hadLegacy && !hadEmbedded) {
         return { kind: "not_found" };
       }
       return { kind: "ok" };
