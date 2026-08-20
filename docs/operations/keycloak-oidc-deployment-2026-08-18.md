@@ -64,3 +64,9 @@ Postgres E2E를 대체 회귀로 사용한다.
 Keycloak을 사용하지 않는 보호된 staging 검증은 `compose.dev.required-auth.yaml`을
 사용한다. `AUTH_SECRET`과 외부 발급 `RUNNER_AUTH_TOKEN`을 모두 주입해야 하며,
 Runner는 token이 없으면 시작하지 않는다.
+
+Kubernetes에서는 `examples/k8s-control-plane-required-auth.yaml`과
+`examples/k8s-runner-required-auth.yaml`을 함께 참고한다. Runner Secret에는
+`AUTH_SECRET`으로 서명된 token만 저장하며, `AUTH_SECRET` 자체를 Runner에 주입하지
+않는다. Runner manifest의 Docker socket mount는 현재 예시 호환을 위한 것이므로
+untrusted build를 운영하기 전에 rootless worker와 최소 RBAC로 교체해야 한다.

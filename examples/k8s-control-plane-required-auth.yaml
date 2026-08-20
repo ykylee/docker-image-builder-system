@@ -1,0 +1,100 @@
+# Required-auth control-plane example for staging-like protected runs.
+# Replace the Secret placeholders through a secret manager before applying.
+# This file is intentionally separate from k8s-control-plane.yaml, whose
+# AUTH_MODE=disabled contract is reserved for trusted internal self-dogfood.
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dib-hosted
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dib-control-plane-required-auth
+  namespace: dib-hosted
+type: Opaque
+stringData:
+  AUTH_SECRET: REPLACE_WITH_SIGNING_SECRET
+  DATABASE_URL: postgres://USER:PASSWORD@POSTGRES_HOST:5432/DB_NAME
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dib-control-plane
+  namespace: dib-hosted
+  labels:
+    app.kubernetes.io/name: dib-control-plane
+    app.kubernetes.io/part-of: docker-image-builder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dib-control-plane
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dib-control-plane
+        app.kubernetes.io/part-of: docker-image-builder
+    spec:
+      containers:
+        - name: build-server
+          image: dibs/build-server:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: BUILD_REPOSITORY_BACKEND
+              value: postgres
+            - name: DB_AUTO_BOOTSTRAP
+              value: "true"
+            - name: AUTH_MODE
+              value: required
+            - name: AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: dib-control-plane-required-auth
+                  key: AUTH_SECRET
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: dib-control-plane-required-auth
+                  key: DATABASE_URL
+            - name: ADMIN_IDS
+              value: admin
+            - name: HOST
+              value: 0.0.0.0
+            - name: PORT
+              value: "3000"
+            - name: BUILD_MONITOR_DIST_PATH
+              value: /app/apps/build-monitor/dist
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dib-control-plane
+  namespace: dib-hosted
+  labels:
+    app.kubernetes.io/name: dib-control-plane
+    app.kubernetes.io/part-of: docker-image-builder
+spec:
+  selector:
+    app.kubernetes.io/name: dib-control-plane
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

@@ -1,0 +1,71 @@
+# Required-auth Runner example for a protected staging-like control plane.
+# Replace the Secret placeholder before applying. This is a contract example,
+# not a production sandbox: host Docker socket access and RBAC must be hardened
+# before running untrusted builds.
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dib-runner-auth
+  namespace: dib-hosted
+type: Opaque
+stringData:
+  # Externally issued AUTH_SECRET-signed principal token for this runner.
+  RUNNER_AUTH_TOKEN: REPLACE_WITH_RUNNER_TOKEN
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dib-runner
+  namespace: dib-hosted
+  labels:
+    app.kubernetes.io/name: dib-runner
+    app.kubernetes.io/part-of: docker-image-builder
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dib-runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: dib-runner
+        app.kubernetes.io/part-of: docker-image-builder
+    spec:
+      containers:
+        - name: runner
+          image: dibs/runner:dev
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: HOST_SERVER_BASE_URL
+              value: http://dib-control-plane:3000
+            - name: RUNNER_ID
+              value: runner-k8s-1
+            - name: RUNNER_AUTH_REQUIRED
+              value: "true"
+            - name: RUNNER_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: dib-runner-auth
+                  key: RUNNER_AUTH_TOKEN
+            - name: RUNNER_K8S_MODE
+              value: k8s
+            - name: RUNNER_K8S_CLUSTER
+              value: kind-dib
+            - name: RUNNER_K8S_NAMESPACE
+              value: dib-hosted
+          volumeMounts:
+            - name: docker-socket
+              mountPath: /var/run/docker.sock
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: docker-socket
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
