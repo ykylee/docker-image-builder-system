@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: Registry mirror fixture에 OCI manifest/blob digest endpoint를 추가하고 ARTIFACT_FACTORY_ALLOWED_UPSTREAMS 기반 upstream allow-list를 적용했다. 허용 host hit, 비허용 host 403, unknown digest 404를 smoke로 검증했다.
-- Next session starting point: ecosystem별 실제 package-manager install fixture를 추가하고 proxy miss에서 허용 upstream fetch를 검증한다.
-- Remaining risks: 실제 외부 Keycloak 및 프록시 네트워크는 로컬 환경에서 검증 불가; Docker daemon 전역 mirror 설정은 staging에서 별도 검증 필요
+- Progress: Python Simple Index, npm metadata/tarball, Go @v module proxy, Rust sparse index/download 표준 URL fixture와 deterministic payload checksum smoke를 추가했다.
+- Next session starting point: containerized pip install/npm install/go mod download/cargo fetch를 fixture endpoint에 연결해 실제 install gate를 추가한다.
+- Remaining risks: 현재 payload는 deterministic fixture bytes라 native package-manager archive 규격 검증은 다음 단계 필요; 실제 외부 Keycloak/프록시 네트워크는 로컬 검증 불가
 
 ## ✅ Outcome
 
-- Result: M1 registry mirror 및 upstream 정책 fixture 완료.
-- Verification: go test ./... (apps/runner) PASS; bash scripts/smoke-registry-mirror-fixture.sh PASS: manifest/blob hit, upstream deny, digest miss
-- Follow-up: Python/npm/Go/Rust package-manager install 및 upstream fetch/deny/integrity matrix
+- Result: 4개 package-manager registry URL shape 및 payload 무결성 fixture 완료.
+- Verification: go test ./... (apps/runner) PASS; bash scripts/smoke-package-manager-fixtures.sh PASS: python/npm/go/rust metadata and payload endpoints
+- Follow-up: 실제 package-manager install 및 cache miss→allow-listed upstream fetch matrix

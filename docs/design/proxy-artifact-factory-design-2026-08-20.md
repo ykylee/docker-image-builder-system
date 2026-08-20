@@ -146,6 +146,13 @@ Registry mirror fixture는 `/v2/fixture/base/manifests/<digest>`와
 알 수 없는 digest는 404로 거부한다. 실제 Docker daemon mirror 설정은 운영 배포 단계에서
 검증하며, 현재 fixture는 manifest/blob 및 allow-list 정책의 결정론적 경계만 검증한다.
 
+Package-manager fixture는 Python Simple Index, npm registry metadata/tarball, Go module
+proxy (`@v`), Rust sparse index/download의 표준 URL shape를 제공한다. 네 endpoint 모두
+동일한 deterministic payload와 SHA-256 응답 헤더를 사용하므로 adapter 테스트가 manager별
+metadata 조회와 payload 무결성을 같은 방식으로 비교할 수 있다. 실제 `pip install`,
+`npm install`, `go mod download`, `cargo fetch` 실행은 다음 단계의 containerized install
+gate에서 수행한다.
+
 ## 8. 대안과 선택 기준
 
 - **기존 registry/repository proxy 사용**: MVP 권장. 구현량이 작고 표준 호환성이 높다.

@@ -59,6 +59,65 @@ func packageContent(ecosystem artifact.Ecosystem, coordinate string) []byte {
 	return []byte("artifact-fixture/" + string(ecosystem) + "/" + coordinate + "\n")
 }
 
+func packagePayload(ecosystem artifact.Ecosystem) []byte {
+	return []byte("package-manager-fixture/" + string(ecosystem) + "/fixture-package@1.0.0\n")
+}
+
+func writePackagePayload(w http.ResponseWriter, ecosystem artifact.Ecosystem) {
+	payload := packagePayload(ecosystem)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	w.Header().Set("X-Artifact-Digest", "sha256:"+fmt.Sprintf("%x", sha256.Sum256(payload)))
+	_, _ = w.Write(payload)
+}
+
+func (s *server) packages(w http.ResponseWriter, r *http.Request) {
+	if !s.authorize(w, r) {
+		return
+	}
+	path := strings.TrimPrefix(r.URL.Path, "/v1/packages/")
+	// Each response mirrors the stable URL shape consumed by its native
+	// package manager. Payloads are deterministic fixture bytes; a production
+	// proxy would replace them with validated upstream archives.
+	switch {
+	case strings.HasPrefix(path, "python/simple/fixture-package"):
+		if strings.HasSuffix(path, "/") {
+			_, _ = w.Write([]byte(`<a href="/v1/packages/python/files/fixture-package-1.0.0.tar.gz">fixture-package-1.0.0.tar.gz</a>`))
+			return
+		}
+	case strings.HasSuffix(path, "python/files/fixture-package-1.0.0.tar.gz"):
+		writePackagePayload(w, artifact.Python)
+		return
+	case path == "npm/fixture-package" || path == "npm/fixture-package/":
+		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "dist-tags": map[string]string{"latest": "1.0.0"}, "versions": map[string]any{"1.0.0": map[string]any{"name": "fixture-package", "version": "1.0.0", "dist": map[string]string{"tarball": "/v1/packages/npm/fixture-package/-/fixture-package-1.0.0.tgz"}}}})
+		return
+	case strings.HasSuffix(path, "fixture-package/-/fixture-package-1.0.0.tgz"):
+		writePackagePayload(w, artifact.NPM)
+		return
+	case strings.HasPrefix(path, "go/example.com/fixture/@v/"):
+		name := strings.TrimPrefix(path, "go/example.com/fixture/@v/")
+		switch name {
+		case "list":
+			_, _ = w.Write([]byte("v1.0.0\n"))
+		case "v1.0.0.info":
+			_ = json.NewEncoder(w).Encode(map[string]string{"Version": "v1.0.0", "Time": "2026-08-20T00:00:00Z"})
+		case "v1.0.0.mod":
+			_, _ = w.Write([]byte("module example.com/fixture\n\ngo 1.23\n"))
+		case "v1.0.0.zip":
+			writePackagePayload(w, artifact.Go)
+		default:
+			http.NotFound(w, r)
+		}
+		return
+	case strings.HasPrefix(path, "rust/index/"):
+		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "vers": "1.0.0", "cksum": fmt.Sprintf("%x", sha256.Sum256(packagePayload(artifact.Rust))), "dl": "/v1/packages/rust/api/v1/crates/fixture-package/1.0.0/download"})
+		return
+	case strings.HasSuffix(path, "rust/api/v1/crates/fixture-package/1.0.0/download"):
+		writePackagePayload(w, artifact.Rust)
+		return
+	}
+	http.NotFound(w, r)
+}
+
 func (s *server) artifacts(w http.ResponseWriter, r *http.Request) {
 	if !s.authorize(w, r) {
 		return
@@ -174,6 +233,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"status":"ok"}`)) })
 	mux.HandleFunc("/v1/artifacts/", s.artifacts)
+	mux.HandleFunc("/v1/packages/", s.packages)
 	mux.HandleFunc("/v1/prefetch", s.prefetch)
 	mux.HandleFunc("/v2/", s.registry)
 	addr := os.Getenv("ARTIFACT_FACTORY_ADDR")
