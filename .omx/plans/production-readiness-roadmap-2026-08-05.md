@@ -40,10 +40,11 @@ rootless build 격리와 namespace-scoped RBAC는 아직 운영 검증되지 않
 | 순위 | 다음 작업 | 완료 게이트 |
 |---:|---|---|
 | 1 | Runner API least-privilege 설계 및 rootless worker spike | socket 없는 build + RBAC deny 회귀 |
-| 2 | Keycloak 실환경 smoke 및 OIDC 운영 체크리스트 | audience/role/expiry/rotation 실측 |
-| 3 | runner-bound lease token과 phase ownership | 다른 Runner의 claim/phase 변경 401/403 |
-| 4 | control-plane Postgres/backup 및 DB retry 보강 | restart·restore·provision retry PASS |
-| 5 | retention, quota, metrics/alerts, private beta rehearsal | 24시간 soak + rollback rehearsal |
+| 2 | Proxy 대응 spike 및 간이 artifact factory 판단 | proxy e2e + credential 비노출 + digest 소비 |
+| 3 | Keycloak 실환경 smoke 및 OIDC 운영 체크리스트 | audience/role/expiry/rotation 실측 |
+| 4 | runner-bound lease token과 phase ownership | 다른 Runner의 claim/phase 변경 401/403 |
+| 5 | control-plane Postgres/backup 및 DB retry 보강 | restart·restore·provision retry PASS |
+| 6 | retention, quota, metrics/alerts, private beta rehearsal | 24시간 soak + rollback rehearsal |
 
 ## 1. 목표와 비목표
 
