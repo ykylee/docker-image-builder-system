@@ -121,6 +121,10 @@ COPY --from=builder    /repo/apps/build-server/dist         apps/build-server/di
 COPY --from=builder    /repo/packages/shared-contract       packages/shared-contract
 COPY --from=builder    /repo/packages/shared-config         packages/shared-config
 COPY --from=builder    /repo/packages/db                    packages/db
+# The db package imports shared-contract source through the workspace path
+# during tsc, so TypeScript emits its entry under dist/db/src. Normalize that
+# entry to the package's declared dist/index.js export in the runtime image.
+COPY --from=builder    /repo/packages/db/dist/db/src         packages/db/dist
 # build-monitor: vite.react.config.ts 는 dist-react/ 로 emit. 런타임은
 # BUILD_MONITOR_DIST_PATH=.../dist 를 서빙하므로 dist-react → dist 로 COPY.
 COPY --from=builder    /repo/apps/build-monitor/dist-react   apps/build-monitor/dist

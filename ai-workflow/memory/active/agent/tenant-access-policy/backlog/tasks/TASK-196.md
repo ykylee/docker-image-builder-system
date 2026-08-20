@@ -18,19 +18,19 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `apps/build-server/tests/build-routes.test.ts`
+  - `Dockerfile`
 
 - 작업 내용: Artifact Factory dependency proxy MVP의 구현 계획, milestone, WBS, critical path와 완료 게이트를 수립한다.
-- Completion criteria: artifactProfile 왕복 통합 테스트가 실제 Node test runner에서 통과한다.
+- Completion criteria: 실제 build-server와 runner가 fixture factory와 같은 compose 네트워크에서 기동하고 Runner가 factory URL을 활성화한다.
 
 ## 🛠️ Implementation / Content
 
-- Progress: apps/build-server에서 pnpm 의존성을 확인한 뒤 build-routes 통합 테스트 32건 전체 통과, shared-contract/db/build-server tsc도 통과했다.
-- Next session starting point: Runner compose와 Build Server 실제 API를 함께 기동해 claim 및 Docker build까지 E2E 검증
+- Progress: Compose E2E에서 db package dist export 경로 문제를 발견해 runtime image에서 dist/db/src를 dist/index로 정규화했다. AUTH_SECRET을 주입한 후 build-server/runner/artifact-factory가 healthy 및 기동했고 Runner 로그에서 factory enabled를 확인했다.
+- Next session starting point: artifactProfile 포함 실제 build 요청을 compose 환경에 넣어 claim 및 preflight lookup을 검증
 - 남은 리스크: 실제 proxy 제품과 staging 네트워크 검증은 아직 미실행.
 
 ## ✅ Outcome
 
-- Result: apps/build-server: node --import tsx --test tests/build-routes.test.ts (32 pass); TypeScript 3개 tsc 통과
-- Verification: apps/build-server: node --import tsx --test tests/build-routes.test.ts (32 pass); TypeScript 3개 tsc 통과
+- Result: Docker compose build/up 성공, GET /health status ok, Runner artifact factory enabled 로그 확인 후 compose down 정리
+- Verification: Docker compose build/up 성공, GET /health status ok, Runner artifact factory enabled 로그 확인 후 compose down 정리
 - 후속 작업: 4개 ecosystem fixture와 registry mirror 구현을 별도 WBS 작업으로 착수한다.
