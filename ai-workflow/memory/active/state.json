@@ -32,7 +32,8 @@
     "current_focus": "TASK-186",
     "in_progress_items": [
       "TASK-186",
-      "TASK-190"
+      "TASK-190",
+      "TASK-195"
     ],
     "blocked_items": [],
     "recent_done_items": [
@@ -52,7 +53,8 @@
     "task_count": 7,
     "in_progress_items": [
       "TASK-186 — oidc-session-runtime-foundation",
-      "TASK-190 — runner-auth-fail-fast"
+      "TASK-190 — runner-auth-fail-fast",
+      "TASK-195 — proxy-artifact-factory-spike"
     ],
     "blocked_items": [],
     "done_items": [
