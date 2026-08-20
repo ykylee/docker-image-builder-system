@@ -8,14 +8,14 @@ proxy/pull-through cache로 둔다. cache miss는 factory가 allow-listed upstre
 가져와 검증·저장한 뒤 같은 요청에 반환한다.
 
 MVP에서는 registry/package proxy 자체를 새로 구현하지 않고 검증된 proxy 제품 또는
-registry mirror를 우선 배치한다. Build Server/Runner는 profile, digest, 오류 계약과
-fallback orchestration만 소유한다.
+registry mirror를 우선 배치한다. 지원 ecosystem은 **Python, npm, Go, Rust**로 고정한다.
+Build Server/Runner는 profile, digest, 오류 계약과 fallback orchestration만 소유한다.
 
 ## 2. 논리 구성
 
 ```text
 Runner ── Docker daemon/build worker ──┬── registry mirror (base image)
-                                      └── npm proxy (MVP package ecosystem)
+                                      └── package proxy adapters (Python/npm/Go/Rust)
                                               │
                                               ├─ cache
                                               └─ allow-listed upstream
@@ -41,10 +41,10 @@ Operator ───── upstream allow-list, credentials, retention, audit
 3. mirror cache hit면 외부 호출 없이 반환한다.
 4. miss면 mirror가 allow-listed upstream에서 pull하고 digest를 확인한 뒤 캐시한다.
 
-### 3.2 npm dependency (MVP)
+### 3.2 Package dependency (Python/npm/Go/Rust)
 
-1. build profile이 npm registry URL을 내부 npm proxy로 지정한다.
-2. package manager가 metadata/tarball을 proxy에 요청한다.
+1. build profile이 ecosystem별 내부 package proxy URL을 지정한다.
+2. package manager가 metadata/archive/module을 proxy에 요청한다.
 3. cache miss는 proxy가 upstream에서 가져와 lockfile integrity와 대조한다.
 4. Docker build는 동일 요청 결과를 받아 계속 진행한다.
 
@@ -110,9 +110,9 @@ URL은 로그에 기록하지 않는다.
 
 ## 7. MVP 구현 순서
 
-1. Node/npm profile과 내부 npm proxy fixture를 만든다.
+1. Python, npm, Go, Rust profile과 내부 package proxy fixture를 만든다.
 2. registry mirror + `FROM` digest fixture를 만든다.
-3. cache hit/miss, upstream deny, integrity failure, factory auth failure를 테스트한다.
+3. ecosystem별 cache hit/miss, upstream deny, integrity failure, factory auth failure를 테스트한다.
 4. Runner build profile 주입과 오류 매핑을 구현한다.
 5. prefetch/retry는 proxy가 처리하지 못하는 fixture에 한해 추가한다.
 6. retention, audit, metrics를 staging에서 확인한다.
@@ -127,7 +127,7 @@ URL은 로그에 기록하지 않는다.
 
 ## 9. 검증 게이트
 
-- proxy가 외부 네트워크에 직접 연결되지 않는 Docker build에서 cache hit가 성공한다.
+- Python/npm/Go/Rust package proxy와 registry mirror를 사용하는 Docker build에서 cache hit가 성공한다.
 - cache miss가 허용 upstream fetch 후 동일 build를 계속 진행한다.
 - integrity mismatch와 upstream 차단은 각각 정해진 오류 코드로 종료한다.
 - prefetch 경로는 Docker 재시도를 한 번만 수행한다.

@@ -6,7 +6,7 @@
 
 ## 1. 요구사항 요약
 
-Docker build와 npm dependency가 외부 proxy에 직접 의존하지 않도록 내부 dependency
+Docker build와 Python/npm/Go/Rust dependency가 외부 proxy에 직접 의존하지 않도록 내부 dependency
 proxy/pull-through cache를 기본 경로로 사용한다. cache miss는 allow-listed upstream
 fetch와 integrity 검증으로 흡수하고, proxy가 처리하지 못하는 경우에만 prefetch 후
 Docker build를 한 번 재시도한다. host local materialization은 MVP 기본 경로에서 제외한다.
@@ -15,7 +15,7 @@ Docker build를 한 번 재시도한다. host local materialization은 MVP 기�
 
 1. proxy/cache 핵심은 기존 표준 registry/repository proxy를 우선 사용하고 자체 서버 구현은
    provenance·prefetch·정책 통합에 필요한 최소 범위로 제한한다.
-2. Dockerfile을 임의 변조하지 않고 registry mirror와 명시적 Node/npm profile로 주입한다.
+2. Dockerfile을 임의 변조하지 않고 registry mirror와 명시적 ecosystem profile로 주입한다.
 3. artifact는 mutable tag가 아니라 content digest와 lockfile/base image digest로 식별한다.
 4. proxy credential은 Runner build와 분리하고 image layer/log/manifest에 남기지 않는다.
 5. direct external access는 명시적 개발 profile에서만 허용하며 production profile은 내부
@@ -39,7 +39,7 @@ Docker build를 한 번 재시도한다. host local materialization은 MVP 기�
 대상: `compose.dev.*`, `examples/`, `apps/runner/scripts/`
 
 - registry pull-through mirror fixture 구성
-- Node/npm proxy fixture와 allow-list upstream 구성
+- Python/npm/Go/Rust package proxy fixture와 allow-list upstream 구성
 - cache volume, credential secret, health/readiness, retention 설정
 - cache hit/miss/upstream deny/integrity mismatch fixture 추가
 
@@ -51,13 +51,13 @@ Docker build를 한 번 재시도한다. host local materialization은 MVP 기�
 대상: `apps/runner/internal/config/config.go`, `apps/runner/internal/docker/client.go`,
 `apps/runner/internal/services/build_service.go`
 
-- internal registry mirror와 npm profile 전달 경로 추가
+- internal registry mirror와 ecosystem profile 전달 경로 추가
 - build context에 secret/config를 안전하게 주입하고 cleanup
 - BuildImage 오류를 factory 오류 코드로 분류
 - prefetch 호출 및 Docker 재시도 최대 1회 구현
 - 동일 build의 retry idempotency와 terminal error 보존
 
-완료 게이트: Node/npm Docker fixture가 내부 endpoint만 사용해 성공하고, credential이
+완료 게이트: Python/npm/Go/Rust Docker fixture가 내부 endpoint만 사용해 성공하고, credential이
 history/layer/log에 남지 않는다.
 
 ### P3 — 보안·관측성·운영 정책
@@ -87,8 +87,8 @@ runnerId, artifactId로 원인을 추적할 수 있다.
 ### P5 — 채택 판정 및 확대
 
 - BuildKit mirror/cache-only와 proxy product 조합의 비용·운영 결과 비교
-- Node/npm MVP 운영 승인 또는 보류 결정
-- Python/Maven/Go adapter를 별도 TASK로 분리
+- Python/npm/Go/Rust MVP 운영 승인 또는 보류 결정
+- 추가 ecosystem adapter를 별도 TASK로 분리
 - private beta 진입 게이트와 연결
 
 ## 4. 테스트 계획
@@ -96,14 +96,14 @@ runnerId, artifactId로 원인을 추적할 수 있다.
 | 층위 | 검증 항목 |
 |---|---|
 | Unit | profile parsing, manifest digest, error mapping, retry cap, secret redaction |
-| Integration | proxy cache/upstream/allow-list, registry mirror, npm integrity, Postgres metadata |
+| Integration | proxy cache/upstream/allow-list, registry mirror, Python/npm/Go/Rust integrity, Postgres metadata |
 | E2E | Docker build cache hit/miss, prefetch+retry, blocked upstream, auth failure |
 | Security | SSRF, mutable tag rejection, credential leak scan, cross-role eviction denial |
 | Operational | retention/eviction, proxy restart, registry restore, metric/log correlation |
 
 ## 5. 위험과 완화
 
-- **기존 proxy 제품의 ecosystem 차이**: Node/npm MVP만 고정하고 adapter 계약으로 확장한다.
+- **기존 proxy 제품의 ecosystem 차이**: Python/npm/Go/Rust adapter 계약과 fixture를 고정하고 생태계별 차이를 격리한다.
 - **Dockerfile이 내부 endpoint를 사용하지 않음**: production profile에서 profile 미적용을
   fail-closed하고 direct external access를 열지 않는다.
 - **proxy credential 유출**: BuildKit secret/profile만 허용하고 image history/log 회귀를 둔다.
@@ -113,7 +113,7 @@ runnerId, artifactId로 원인을 추적할 수 있다.
 
 ## 6. 완료 기준
 
-- Node/npm MVP가 내부 proxy를 기본 사용한다.
+- Python/npm/Go/Rust MVP가 내부 proxy를 기본 사용한다.
 - cache hit/miss와 허용 upstream fetch가 성공한다.
 - integrity mismatch, upstream blocked, factory auth failure가 서로 다른 오류로 보고된다.
 - prefetch 경로의 Docker 재시도는 build당 최대 1회다.
@@ -125,7 +125,7 @@ runnerId, artifactId로 원인을 추적할 수 있다.
 
 ### Decision
 
-MVP는 기존 registry/repository proxy를 기반으로 registry mirror + Node/npm proxy를
+MVP는 기존 registry/repository proxy를 기반으로 registry mirror + Python/npm/Go/Rust proxy를
 구성하고, Runner는 profile·오류·prefetch orchestration만 구현한다.
 
 ### Alternatives

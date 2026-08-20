@@ -5,6 +5,7 @@ export * from "./build/errors.js";
 export * from "./build/phase.js";
 export * from "./build/request.js";
 export * from "./build/manifest.js";
+export * from "./build/artifact.js";
 export * from "./build/response.js";
 export * from "./build/status.js";
 export * from "./build/admin.js";
