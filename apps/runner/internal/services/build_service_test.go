@@ -57,6 +57,25 @@ func TestPrepareArtifact_LookupAndPrefetchOnMiss(t *testing.T) {
 	}
 }
 
+func TestPrepareArtifactSupportsAllClaimEcosystems(t *testing.T) {
+	t.Setenv("RUNNER_ARTIFACT_COORDINATE", "example/1.0.0")
+	for _, ecosystem := range []string{"python", "npm", "go", "rust"} {
+		t.Run(ecosystem, func(t *testing.T) {
+			client := &fakeArtifactClient{}
+			svc := NewBuildService(&fakeClient{}, docker.NewClient(), nil, "r-ecosystem").WithArtifactClient(client)
+			failure := svc.prepareArtifact(context.Background(), &hostclient.ArtifactFactoryProfile{
+				Version: 1, Ecosystem: ecosystem, Mode: "required", FactoryURL: "https://factory.internal", MaxBuildRetries: 1,
+			})
+			if failure != nil {
+				t.Fatalf("expected lookup success, got %v", failure)
+			}
+			if client.getCalls != 1 {
+				t.Fatalf("expected one lookup, got %d", client.getCalls)
+			}
+		})
+	}
+}
+
 // fakeClient 는 테스트용 hostclient.
 type fakeClient struct {
 	mu           sync.Mutex
