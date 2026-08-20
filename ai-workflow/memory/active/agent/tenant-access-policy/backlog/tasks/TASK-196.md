@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: required는 coordinate 누락 시 fail-closed, fallback은 legacy skip 허용이라는 운영 정책을 설계 문서와 WBS 완료 기준에 반영했다.
-- Next session starting point: 실제 package dependency install용 허용 registry fixture와 integrity 검증
-- Remaining risks: memory repository source map과 실제 runtime repository 경계 또는 route lifecycle 추가 원인 확인 필요
+- Progress: Go runner 전체 테스트 통과(모든 패키지); Build Server 전체 테스트 269개 중 269개 통과. 청크 업로드가 legacy embedded archive를 우선하는 Memory repository 회귀를 수정하고 표적 테스트도 통과했다.
+- Next session starting point: 실제 package dependency install을 수행하는 허용 registry fixture와 integrity 검증을 추가한다.
+- Remaining risks: 실제 외부 Keycloak 및 프록시 네트워크는 로컬 환경에서 검증 불가
 
 ## ✅ Outcome
 
-- Result: 문서 diff 검토 및 Runner 테스트 통과
-- Verification: 문서 diff 검토 및 Runner 테스트 통과
-- 후속 작업: 4개 ecosystem fixture와 registry mirror 구현을 별도 WBS 작업으로 착수한다.
+- Result: 전체 회귀 검증 완료. Memory source archive precedence 결함 수정.
+- Verification: go test ./... (apps/runner) PASS; pnpm test (apps/build-server) PASS: 269 tests, 56 suites
+- Follow-up: 4개 ecosystem registry fixture 및 mirror integrity WBS 착수

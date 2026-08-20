@@ -1108,6 +1108,7 @@ export function createMemoryBuildRepository(
         // A fresh chunked upload also clears the legacy single-shot
         // storage, so the two sides never disagree.
         sourceArchives.delete(buildId);
+        stored.uploadedSourceArchive = undefined;
       }
       // The next chunk index is the current chunk count for this
       // buildId. We assign indices in monotonically increasing

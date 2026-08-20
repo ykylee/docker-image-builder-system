@@ -37,6 +37,11 @@
       "TASK-196"
     ],
     "blocked_items": [],
+    "planned_items": [
+      "TASK-192",
+      "TASK-193",
+      "TASK-194"
+    ],
     "recent_done_items": [
       "TASK-191 — readiness-review-and-roadmap-refresh",
       "TASK-2026-08-18-main-188 — registration-id-ownership-views",
