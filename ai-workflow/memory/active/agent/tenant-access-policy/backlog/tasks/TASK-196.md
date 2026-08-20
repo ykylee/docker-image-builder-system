@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: fixture payload를 native install 가능한 Python wheel, npm tarball, Go module zip, Rust crate tarball로 구현했다. compose network에서 pip install, npm install, go mod download, cargo fetch를 모두 내부 fixture endpoint로 실행했다.
-- Next session starting point: cache miss 후 allow-listed upstream fetch와 integrity mismatch/deny matrix를 native install gate에 추가한다.
-- Remaining risks: Go checksum database는 외부 네트워크 차단을 위해 GOSUMDB=off로 명시; 실제 upstream proxy 제품 및 Keycloak은 로컬 환경에서 검증 불가
+- Progress: Native install 정책 matrix smoke를 추가했다. prefetch cache hit, unknown coordinate cache miss(404), package upstream deny(403), advertised digest와 실제 바이트가 다른 corrupted payload를 검증한다.
+- Next session starting point: Runner artifact client와 native install gate에서 integrity 오류를 실제 build 오류 코드로 매핑하고 retry cap을 검증한다.
+- Remaining risks: 외부 upstream 제품과 Keycloak은 로컬 환경에서 검증 불가; package anonymous fixture mode는 테스트 전용
 
 ## ✅ Outcome
 
-- Result: 4개 ecosystem native package-manager install gate 완료.
-- Verification: bash scripts/smoke-package-manager-installs.sh PASS: native Python/npm/Go/Rust installs; go test ./... PASS
-- Follow-up: native install cache hit/miss, upstream deny, corrupted payload 회귀 matrix
+- Result: M1 cache 및 정책 오류 matrix 완료.
+- Verification: bash scripts/smoke-artifact-policy-matrix.sh PASS: cache hit/miss, upstream deny, integrity mismatch; go test ./... PASS
+- Follow-up: Runner build failure mapping, prefetch one-retry, credential redaction matrix

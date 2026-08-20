@@ -155,6 +155,11 @@ container에서 실행하는 install gate도 제공한다. 이 gate는 외부 re
 fixture endpoint만 지정하며, Go는 `GOSUMDB=off`로 외부 checksum database 우회를 명시하고
 Rust는 source replacement로 sparse registry를 고정한다.
 
+정책 matrix fixture는 prefetch 후 cache hit, 미등록 coordinate의 cache miss(404),
+비허용 `X-Upstream-Host`(403), advertised digest와 실제 바이트가 다른 corrupted payload를
+검증한다. 마지막 경우는 package-manager 응답이 성공 상태여도 verifier가
+`ARTIFACT_INTEGRITY_FAILED`로 거부해야 하는 경계다.
+
 ## 8. 대안과 선택 기준
 
 - **기존 registry/repository proxy 사용**: MVP 권장. 구현량이 작고 표준 호환성이 높다.

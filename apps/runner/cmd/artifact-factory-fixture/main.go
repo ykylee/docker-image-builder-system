@@ -147,15 +147,23 @@ func tarGzip(files map[string][]byte) []byte {
 	return out.Bytes()
 }
 
-func writePackagePayload(w http.ResponseWriter, ecosystem artifact.Ecosystem) {
+func writePackagePayload(w http.ResponseWriter, r *http.Request, ecosystem artifact.Ecosystem) {
 	payload := packagePayload(ecosystem)
+	digest := "sha256:" + fmt.Sprintf("%x", sha256.Sum256(payload))
+	if r.URL.Query().Get("corrupt") == "1" {
+		payload = append([]byte("corrupt\n"), payload...)
+	}
 	w.Header().Set("Content-Type", "application/octet-stream")
-	w.Header().Set("X-Artifact-Digest", "sha256:"+fmt.Sprintf("%x", sha256.Sum256(payload)))
+	w.Header().Set("X-Artifact-Digest", digest)
 	_, _ = w.Write(payload)
 }
 
 func (s *server) packages(w http.ResponseWriter, r *http.Request) {
 	if !s.authorizePackage(w, r) {
+		return
+	}
+	if host := r.Header.Get("X-Upstream-Host"); host != "" && !s.upstreamAllowed(host) {
+		http.Error(w, "upstream host is not allow-listed", http.StatusForbidden)
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/v1/packages/")
@@ -169,13 +177,13 @@ func (s *server) packages(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	case strings.HasSuffix(path, "python/files/fixture_package-1.0.0-py3-none-any.whl"):
-		writePackagePayload(w, artifact.Python)
+		writePackagePayload(w, r, artifact.Python)
 		return
 	case path == "npm/fixture-package" || path == "npm/fixture-package/":
 		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "dist-tags": map[string]string{"latest": "1.0.0"}, "versions": map[string]any{"1.0.0": map[string]any{"name": "fixture-package", "version": "1.0.0", "dist": map[string]string{"tarball": "http://" + r.Host + "/v1/packages/npm/fixture-package/-/fixture-package-1.0.0.tgz"}}}})
 		return
 	case strings.HasSuffix(path, "fixture-package/-/fixture-package-1.0.0.tgz"):
-		writePackagePayload(w, artifact.NPM)
+		writePackagePayload(w, r, artifact.NPM)
 		return
 	case strings.HasPrefix(path, "go/example.com/fixture/@v/"):
 		name := strings.TrimPrefix(path, "go/example.com/fixture/@v/")
@@ -187,7 +195,7 @@ func (s *server) packages(w http.ResponseWriter, r *http.Request) {
 		case "v1.0.0.mod":
 			_, _ = w.Write([]byte("module example.com/fixture\n\ngo 1.23\n"))
 		case "v1.0.0.zip":
-			writePackagePayload(w, artifact.Go)
+			writePackagePayload(w, r, artifact.Go)
 		default:
 			http.NotFound(w, r)
 		}
@@ -200,7 +208,7 @@ func (s *server) packages(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "vers": "1.0.0", "deps": []any{}, "cksum": fmt.Sprintf("%x", sha256.Sum256(packagePayload(artifact.Rust))), "features": map[string]any{}, "yanked": false})
 		return
 	case strings.HasSuffix(path, "rust/api/v1/crates/fixture-package/1.0.0/download"):
-		writePackagePayload(w, artifact.Rust)
+		writePackagePayload(w, r, artifact.Rust)
 		return
 	}
 	http.NotFound(w, r)

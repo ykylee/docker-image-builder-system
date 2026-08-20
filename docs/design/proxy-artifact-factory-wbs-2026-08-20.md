@@ -23,7 +23,7 @@
 | 2.3 | npm proxy fixture | compose/example | 1.x | metadata/tarball + native `npm install` + checksum PASS |
 | 2.4 | Go module proxy fixture | compose/example | 1.x | `@v` module + native `go mod download` + checksum PASS |
 | 2.5 | Rust crate proxy fixture | compose/example | 1.x | sparse index/download + native `cargo fetch` + checksum PASS |
-| 2.6 | Upstream allow-list/deny fixture | policy config + tests | 2.1~2.5 | 허용 host hit, 비허용 host 403, digest miss 404 |
+| 2.6 | Upstream allow-list/deny fixture | policy config + tests | 2.1~2.5 | 허용 host hit, 비허용 host 403, digest miss 404, corrupted payload integrity PASS |
 | 2.7 | Cache volume/health/retention | ops config/runbook | 2.1~2.5 | restart/eviction 정책 확인 |
 | 3.1 | Runner profile parsing/enforcement | config + unit tests | 1.1 | production fail-closed; required profile coordinate 누락 거부 |
 | 3.2 | Docker/package profile 주입 | BuildImage integration + 4 ecosystem fixtures | 2.x/3.1 | internal endpoint 사용 및 Docker build PASS |
