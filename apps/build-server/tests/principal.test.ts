@@ -185,6 +185,10 @@ test("OIDC session cookie scopes owner APIs and role claim gates admin APIs", as
       { subject: "admin", roles: ["dib-admin"], expiresAt: 4_102_444_800 },
       3600
     );
+    const legacyAdminSession = await store.createSession(
+      { subject: "legacy-admin", roles: ["admin"], expiresAt: 4_102_444_800 },
+      3600
+    );
 
     const unauthenticated = await app.inject({ method: "GET", url: "/builds" });
     assert.equal(unauthenticated.statusCode, 401);
@@ -226,6 +230,13 @@ test("OIDC session cookie scopes owner APIs and role claim gates admin APIs", as
       headers: { cookie: `dib_session=${adminSession.id}` }
     });
     assert.equal(adminView.statusCode, 200);
+
+    const legacyAdminView = await app.inject({
+      method: "GET",
+      url: "/admin/users",
+      headers: { cookie: `dib_session=${legacyAdminSession.id}` }
+    });
+    assert.equal(legacyAdminView.statusCode, 403);
   } finally {
     await app.close();
   }
@@ -265,6 +276,7 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
   const provider = Fastify();
   let expectedNonce = "";
   let accessSubject = "oidc-alice";
+  let accessAudience = "keycloak-api";
   provider.addContentTypeParser(
     "application/x-www-form-urlencoded",
     { parseAs: "string" },
@@ -292,7 +304,7 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
     const accessToken = await new SignJWT({ sub: accessSubject, realm_access: { roles: ["user"] } })
       .setProtectedHeader({ alg: "RS256", kid: "fake-key-1" })
       .setIssuer(origin)
-      .setAudience("keycloak-api")
+      .setAudience(accessAudience)
       .setExpirationTime("5m")
       .setIssuedAt()
       .sign(privateKey);
@@ -321,6 +333,11 @@ test("OIDC client completes discovery, token exchange and JWKS verification agai
     const mismatchedFlow = await client.beginLogin("/builds");
     expectedNonce = mismatchedFlow.nonce;
     await assert.rejects(() => client.exchangeCode("mismatched-subject", mismatchedFlow), /subject mismatch/);
+    accessSubject = "oidc-alice";
+    accessAudience = "unexpected-audience";
+    const invalidAudienceFlow = await client.beginLogin("/builds");
+    expectedNonce = invalidAudienceFlow.nonce;
+    await assert.rejects(() => client.exchangeCode("invalid-audience", invalidAudienceFlow), /unexpected.*aud/);
   } finally {
     await provider.close();
   }
