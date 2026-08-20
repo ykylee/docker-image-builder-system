@@ -19,14 +19,14 @@ auth=(-H "Authorization: Bearer $TOKEN")
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"; cleanup' EXIT
 
-curl -fsS "${auth[@]}" "$BASE_URL/v1/packages/python/simple/fixture-package/" | grep -q 'fixture-package-1.0.0.tar.gz'
+curl -fsS "${auth[@]}" "$BASE_URL/v1/packages/python/simple/fixture-package/" | grep -q 'fixture_package-1.0.0-py3-none-any.whl'
 curl -fsS "${auth[@]}" "$BASE_URL/v1/packages/npm/fixture-package" | grep -q '"latest":"1.0.0"'
 curl -fsS "${auth[@]}" "$BASE_URL/v1/packages/go/example.com/fixture/@v/list" | grep -qx 'v1.0.0'
 curl -fsS "${auth[@]}" "$BASE_URL/v1/packages/rust/index/fi/xt/fixture-package" | grep -q '"vers":"1.0.0"'
 
 for ecosystem in python npm go rust; do
   case "$ecosystem" in
-    python) url="$BASE_URL/v1/packages/python/files/fixture-package-1.0.0.tar.gz" ;;
+    python) url="$BASE_URL/v1/packages/python/files/fixture_package-1.0.0-py3-none-any.whl" ;;
     npm) url="$BASE_URL/v1/packages/npm/fixture-package/-/fixture-package-1.0.0.tgz" ;;
     go) url="$BASE_URL/v1/packages/go/example.com/fixture/@v/v1.0.0.zip" ;;
     rust) url="$BASE_URL/v1/packages/rust/api/v1/crates/fixture-package/1.0.0/download" ;;

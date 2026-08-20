@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: Python Simple Index, npm metadata/tarball, Go @v module proxy, Rust sparse index/download 표준 URL fixture와 deterministic payload checksum smoke를 추가했다.
-- Next session starting point: containerized pip install/npm install/go mod download/cargo fetch를 fixture endpoint에 연결해 실제 install gate를 추가한다.
-- Remaining risks: 현재 payload는 deterministic fixture bytes라 native package-manager archive 규격 검증은 다음 단계 필요; 실제 외부 Keycloak/프록시 네트워크는 로컬 검증 불가
+- Progress: fixture payload를 native install 가능한 Python wheel, npm tarball, Go module zip, Rust crate tarball로 구현했다. compose network에서 pip install, npm install, go mod download, cargo fetch를 모두 내부 fixture endpoint로 실행했다.
+- Next session starting point: cache miss 후 allow-listed upstream fetch와 integrity mismatch/deny matrix를 native install gate에 추가한다.
+- Remaining risks: Go checksum database는 외부 네트워크 차단을 위해 GOSUMDB=off로 명시; 실제 upstream proxy 제품 및 Keycloak은 로컬 환경에서 검증 불가
 
 ## ✅ Outcome
 
-- Result: 4개 package-manager registry URL shape 및 payload 무결성 fixture 완료.
-- Verification: go test ./... (apps/runner) PASS; bash scripts/smoke-package-manager-fixtures.sh PASS: python/npm/go/rust metadata and payload endpoints
-- Follow-up: 실제 package-manager install 및 cache miss→allow-listed upstream fetch matrix
+- Result: 4개 ecosystem native package-manager install gate 완료.
+- Verification: bash scripts/smoke-package-manager-installs.sh PASS: native Python/npm/Go/Rust installs; go test ./... PASS
+- Follow-up: native install cache hit/miss, upstream deny, corrupted payload 회귀 matrix

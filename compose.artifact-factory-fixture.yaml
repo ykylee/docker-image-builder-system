@@ -7,6 +7,7 @@ services:
       ARTIFACT_FACTORY_ADDR: :8090
       ARTIFACT_FACTORY_TOKEN: fixture-token
       ARTIFACT_FACTORY_ALLOWED_UPSTREAMS: registry.example.test
+      ARTIFACT_FACTORY_ALLOW_PACKAGE_ANONYMOUS: "true"
     ports:
       - "8090:8090"
     healthcheck:

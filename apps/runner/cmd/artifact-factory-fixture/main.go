@@ -4,6 +4,10 @@
 package main
 
 import (
+	"archive/tar"
+	"archive/zip"
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -11,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -22,10 +27,11 @@ const digest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef012345678
 const registryDigest = "sha256:abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 
 type server struct {
-	mu               sync.RWMutex
-	cache            map[string]artifact.Manifest
-	token            string
-	allowedUpstreams map[string]struct{}
+	mu                    sync.RWMutex
+	cache                 map[string]artifact.Manifest
+	token                 string
+	allowedUpstreams      map[string]struct{}
+	allowPackageAnonymous bool
 }
 
 func (s *server) upstreamAllowed(host string) bool {
@@ -35,6 +41,14 @@ func (s *server) upstreamAllowed(host string) bool {
 
 func (s *server) authorize(w http.ResponseWriter, r *http.Request) bool {
 	if s.token == "" || r.Header.Get("Authorization") == "Bearer "+s.token {
+		return true
+	}
+	http.Error(w, "factory authentication required", http.StatusUnauthorized)
+	return false
+}
+
+func (s *server) authorizePackage(w http.ResponseWriter, r *http.Request) bool {
+	if s.allowPackageAnonymous || s.token == "" || r.Header.Get("Authorization") == "Bearer "+s.token {
 		return true
 	}
 	http.Error(w, "factory authentication required", http.StatusUnauthorized)
@@ -60,7 +74,77 @@ func packageContent(ecosystem artifact.Ecosystem, coordinate string) []byte {
 }
 
 func packagePayload(ecosystem artifact.Ecosystem) []byte {
-	return []byte("package-manager-fixture/" + string(ecosystem) + "/fixture-package@1.0.0\n")
+	switch ecosystem {
+	case artifact.Python:
+		return pythonWheel()
+	case artifact.NPM:
+		return npmTarball()
+	case artifact.Go:
+		return goModuleZip()
+	case artifact.Rust:
+		return rustCrate()
+	default:
+		return []byte("unsupported ecosystem")
+	}
+}
+
+func pythonWheel() []byte {
+	var out bytes.Buffer
+	zw := zip.NewWriter(&out)
+	files := map[string]string{
+		"fixture_package.py":                       "VALUE = 'artifact-factory-fixture'\n",
+		"fixture_package-1.0.0.dist-info/METADATA": "Metadata-Version: 2.1\nName: fixture-package\nVersion: 1.0.0\n\n",
+		"fixture_package-1.0.0.dist-info/WHEEL":    "Wheel-Version: 1.0\nGenerator: artifact-factory-fixture\nRoot-Is-Purelib: true\nTag: py3-none-any\n",
+		"fixture_package-1.0.0.dist-info/RECORD":   "fixture_package.py,,\nfixture_package-1.0.0.dist-info/METADATA,,\nfixture_package-1.0.0.dist-info/WHEEL,,\nfixture_package-1.0.0.dist-info/RECORD,,\n",
+	}
+	for name, body := range files {
+		w, _ := zw.Create(name)
+		_, _ = w.Write([]byte(body))
+	}
+	_ = zw.Close()
+	return out.Bytes()
+}
+
+func npmTarball() []byte {
+	return tarGzip(map[string][]byte{
+		"package/package.json": []byte(`{"name":"fixture-package","version":"1.0.0","main":"index.js"}`),
+		"package/index.js":     []byte("module.exports = 'artifact-factory-fixture';\n"),
+	})
+}
+
+func goModuleZip() []byte {
+	var out bytes.Buffer
+	zw := zip.NewWriter(&out)
+	files := map[string]string{
+		"example.com/fixture@v1.0.0/go.mod":     "module example.com/fixture\n\ngo 1.23\n",
+		"example.com/fixture@v1.0.0/fixture.go": "package fixture\n\nconst Value = \"artifact-factory-fixture\"\n",
+	}
+	for name, body := range files {
+		w, _ := zw.Create(name)
+		_, _ = w.Write([]byte(body))
+	}
+	_ = zw.Close()
+	return out.Bytes()
+}
+
+func rustCrate() []byte {
+	return tarGzip(map[string][]byte{
+		"fixture-package-1.0.0/Cargo.toml": []byte("[package]\nname = \"fixture-package\"\nversion = \"1.0.0\"\nedition = \"2021\"\n"),
+		"fixture-package-1.0.0/src/lib.rs": []byte("pub const VALUE: &str = \"artifact-factory-fixture\";\n"),
+	})
+}
+
+func tarGzip(files map[string][]byte) []byte {
+	var out bytes.Buffer
+	zw := gzip.NewWriter(&out)
+	tw := tar.NewWriter(zw)
+	for name, body := range files {
+		_ = tw.WriteHeader(&tar.Header{Name: filepath.ToSlash(name), Mode: 0o644, Size: int64(len(body))})
+		_, _ = tw.Write(body)
+	}
+	_ = tw.Close()
+	_ = zw.Close()
+	return out.Bytes()
 }
 
 func writePackagePayload(w http.ResponseWriter, ecosystem artifact.Ecosystem) {
@@ -71,7 +155,7 @@ func writePackagePayload(w http.ResponseWriter, ecosystem artifact.Ecosystem) {
 }
 
 func (s *server) packages(w http.ResponseWriter, r *http.Request) {
-	if !s.authorize(w, r) {
+	if !s.authorizePackage(w, r) {
 		return
 	}
 	path := strings.TrimPrefix(r.URL.Path, "/v1/packages/")
@@ -81,14 +165,14 @@ func (s *server) packages(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case strings.HasPrefix(path, "python/simple/fixture-package"):
 		if strings.HasSuffix(path, "/") {
-			_, _ = w.Write([]byte(`<a href="/v1/packages/python/files/fixture-package-1.0.0.tar.gz">fixture-package-1.0.0.tar.gz</a>`))
+			_, _ = w.Write([]byte(`<a href="/v1/packages/python/files/fixture_package-1.0.0-py3-none-any.whl">fixture-package-1.0.0</a>`))
 			return
 		}
-	case strings.HasSuffix(path, "python/files/fixture-package-1.0.0.tar.gz"):
+	case strings.HasSuffix(path, "python/files/fixture_package-1.0.0-py3-none-any.whl"):
 		writePackagePayload(w, artifact.Python)
 		return
 	case path == "npm/fixture-package" || path == "npm/fixture-package/":
-		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "dist-tags": map[string]string{"latest": "1.0.0"}, "versions": map[string]any{"1.0.0": map[string]any{"name": "fixture-package", "version": "1.0.0", "dist": map[string]string{"tarball": "/v1/packages/npm/fixture-package/-/fixture-package-1.0.0.tgz"}}}})
+		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "dist-tags": map[string]string{"latest": "1.0.0"}, "versions": map[string]any{"1.0.0": map[string]any{"name": "fixture-package", "version": "1.0.0", "dist": map[string]string{"tarball": "http://" + r.Host + "/v1/packages/npm/fixture-package/-/fixture-package-1.0.0.tgz"}}}})
 		return
 	case strings.HasSuffix(path, "fixture-package/-/fixture-package-1.0.0.tgz"):
 		writePackagePayload(w, artifact.NPM)
@@ -109,7 +193,11 @@ func (s *server) packages(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	case strings.HasPrefix(path, "rust/index/"):
-		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "vers": "1.0.0", "cksum": fmt.Sprintf("%x", sha256.Sum256(packagePayload(artifact.Rust))), "dl": "/v1/packages/rust/api/v1/crates/fixture-package/1.0.0/download"})
+		if path == "rust/index/config.json" {
+			_ = json.NewEncoder(w).Encode(map[string]string{"dl": "http://" + r.Host + "/v1/packages/rust/api/v1/crates"})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"name": "fixture-package", "vers": "1.0.0", "deps": []any{}, "cksum": fmt.Sprintf("%x", sha256.Sum256(packagePayload(artifact.Rust))), "features": map[string]any{}, "yanked": false})
 		return
 	case strings.HasSuffix(path, "rust/api/v1/crates/fixture-package/1.0.0/download"):
 		writePackagePayload(w, artifact.Rust)
@@ -229,7 +317,7 @@ func main() {
 			allowed[host] = struct{}{}
 		}
 	}
-	s := &server{cache: make(map[string]artifact.Manifest), token: strings.TrimSpace(os.Getenv("ARTIFACT_FACTORY_TOKEN")), allowedUpstreams: allowed}
+	s := &server{cache: make(map[string]artifact.Manifest), token: strings.TrimSpace(os.Getenv("ARTIFACT_FACTORY_TOKEN")), allowedUpstreams: allowed, allowPackageAnonymous: strings.EqualFold(os.Getenv("ARTIFACT_FACTORY_ALLOW_PACKAGE_ANONYMOUS"), "true")}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"status":"ok"}`)) })
 	mux.HandleFunc("/v1/artifacts/", s.artifacts)

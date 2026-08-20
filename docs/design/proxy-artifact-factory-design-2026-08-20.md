@@ -150,8 +150,10 @@ Package-manager fixture는 Python Simple Index, npm registry metadata/tarball, G
 proxy (`@v`), Rust sparse index/download의 표준 URL shape를 제공한다. 네 endpoint 모두
 동일한 deterministic payload와 SHA-256 응답 헤더를 사용하므로 adapter 테스트가 manager별
 metadata 조회와 payload 무결성을 같은 방식으로 비교할 수 있다. 실제 `pip install`,
-`npm install`, `go mod download`, `cargo fetch` 실행은 다음 단계의 containerized install
-gate에서 수행한다.
+`npm install`, `go mod download`, `cargo fetch`를 compose network의 native runtime
+container에서 실행하는 install gate도 제공한다. 이 gate는 외부 registry를 사용하지 않고
+fixture endpoint만 지정하며, Go는 `GOSUMDB=off`로 외부 checksum database 우회를 명시하고
+Rust는 source replacement로 sparse registry를 고정한다.
 
 ## 8. 대안과 선택 기준
 
