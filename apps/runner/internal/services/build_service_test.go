@@ -13,12 +13,49 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/artifact"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/hostclient"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/queue"
 )
+
+type fakeArtifactClient struct {
+	getErr        error
+	getCalls      int
+	prefetchCalls int
+}
+
+func (f *fakeArtifactClient) Get(context.Context, artifact.Ecosystem, string) (artifact.Manifest, error) {
+	f.getCalls++
+	if f.getErr != nil {
+		return artifact.Manifest{}, f.getErr
+	}
+	return artifact.Manifest{ArtifactID: "artifact-1"}, nil
+}
+
+func (f *fakeArtifactClient) Prefetch(context.Context, artifact.PrefetchRequest) (artifact.Manifest, error) {
+	f.prefetchCalls++
+	return artifact.Manifest{ArtifactID: "artifact-1"}, nil
+}
+
+func TestPrepareArtifact_LookupAndPrefetchOnMiss(t *testing.T) {
+	t.Setenv("RUNNER_ARTIFACT_COORDINATE", "npm/example@1.0.0")
+	t.Setenv("RUNNER_ARTIFACT_LOCKFILE_DIGEST", "sha256:"+strings.Repeat("a", 64))
+	t.Setenv("RUNNER_ARTIFACT_RECIPE_DIGEST", "sha256:"+strings.Repeat("b", 64))
+	client := &fakeArtifactClient{getErr: artifact.ErrUnavailable}
+	svc := NewBuildService(&fakeClient{}, docker.NewClient(), nil, "r-artifact").WithArtifactClient(client)
+	failure := svc.prepareArtifact(context.Background(), &hostclient.ArtifactFactoryProfile{
+		Version: 1, Ecosystem: "npm", Mode: "fallback", FactoryURL: "https://factory.internal", PrefetchEnabled: true, MaxBuildRetries: 1,
+	})
+	if failure != nil {
+		t.Fatalf("expected prefetch recovery, got %v", failure)
+	}
+	if client.getCalls != 1 || client.prefetchCalls != 1 {
+		t.Fatalf("expected one lookup and prefetch, got lookup=%d prefetch=%d", client.getCalls, client.prefetchCalls)
+	}
+}
 
 // fakeClient 는 테스트용 hostclient.
 type fakeClient struct {
@@ -548,10 +585,10 @@ func TestBuildService_K8sDeployer_NilSkipsK8sPath(t *testing.T) {
 // 가 그대로 쓰인다.
 func TestBuildService_K8sDeployer_PerBuildNamespace(t *testing.T) {
 	cases := []struct {
-		name      string
-		perBuild  string
-		sharedNS  string
-		wantNS    string
+		name     string
+		perBuild string
+		sharedNS string
+		wantNS   string
 	}{
 		{"default-shared", "", "builds", "builds"},
 		{"explicit-false", "false", "builds", "builds"},

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/artifact"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/contract"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
@@ -53,6 +55,14 @@ type BuildService struct {
 	// 런타임 URL 이 컨테이너 테스트 동안 살아있어야 하므로. e2e
 	// script 가 RUNNER_STOP_CONTAINER_ON_DONE=true 로 켜고 검증.
 	stopContainerOnDone bool
+	artifactClient      artifactClient
+}
+
+// artifactClient is intentionally small so the build service can be tested
+// without a live factory. The concrete HTTP client is wired by worker.New.
+type artifactClient interface {
+	Get(context.Context, artifact.Ecosystem, string) (artifact.Manifest, error)
+	Prefetch(context.Context, artifact.PrefetchRequest) (artifact.Manifest, error)
 }
 
 func parsePositiveEnv(key string, fallback int) int {
@@ -138,6 +148,13 @@ func NewBuildService(hostClient hostclient.BuildControlClient, dockerClient *doc
 	}
 }
 
+// WithArtifactClient enables claim-scoped artifact preflight. It is separate
+// from the constructor to keep existing tests and local skeleton mode simple.
+func (s *BuildService) WithArtifactClient(client artifactClient) *BuildService {
+	s.artifactClient = client
+	return s
+}
+
 // ProcessClaim 은 claim 된 build 하나를 canonical 실행 순서대로 처리한다:
 //
 //	claim → source prepare → docker build → container test → deploy → finalize
@@ -167,6 +184,10 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 		return s.fail(ctx, buildID, failure)
 	}
 
+	if failure := s.prepareArtifact(ctx, claim.ArtifactProfile); failure != nil {
+		return s.fail(ctx, buildID, failure)
+	}
+
 	if failure := s.buildImage(ctx, buildID, sourceDir); failure != nil {
 		return s.fail(ctx, buildID, failure)
 	}
@@ -189,6 +210,40 @@ func (s *BuildService) ProcessClaim(ctx context.Context, claim *queue.ClaimedBui
 	}
 
 	log.Printf("runner %s completed build %s", s.runnerID, buildID)
+	return nil
+}
+
+// prepareArtifact validates the claimed coordinate against the factory before
+// Docker starts. The coordinate and optional prefetch digests come from the
+// Runner environment until lockfile extraction becomes ecosystem-specific.
+// An absent coordinate keeps legacy builds unchanged; a configured profile is
+// still carried through the claim contract and can be enabled incrementally.
+func (s *BuildService) prepareArtifact(ctx context.Context, profile *hostclient.ArtifactFactoryProfile) *stageFailure {
+	if profile == nil || s.artifactClient == nil {
+		return nil
+	}
+	coordinate := strings.TrimSpace(os.Getenv("RUNNER_ARTIFACT_COORDINATE"))
+	if coordinate == "" {
+		log.Printf("runner %s artifact profile present but RUNNER_ARTIFACT_COORDINATE is empty; skipping lookup", s.runnerID)
+		return nil
+	}
+	ecosystem := artifact.Ecosystem(profile.Ecosystem)
+	if _, err := s.artifactClient.Get(ctx, ecosystem, coordinate); err == nil {
+		return nil
+	} else if !profile.PrefetchEnabled || !errors.Is(err, artifact.ErrUnavailable) && !errors.Is(err, artifact.ErrUpstreamBlocked) {
+		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: fmt.Errorf("artifact lookup: %w", err)}
+	} else {
+		manifest, prefetchErr := s.artifactClient.Prefetch(ctx, artifact.PrefetchRequest{
+			Ecosystem:      ecosystem,
+			Coordinate:     coordinate,
+			LockfileDigest: strings.TrimSpace(os.Getenv("RUNNER_ARTIFACT_LOCKFILE_DIGEST")),
+			RecipeDigest:   strings.TrimSpace(os.Getenv("RUNNER_ARTIFACT_RECIPE_DIGEST")),
+		})
+		if prefetchErr != nil {
+			return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: fmt.Errorf("artifact prefetch: %w", prefetchErr)}
+		}
+		log.Printf("runner %s prefetched artifact: coordinate=%s artifactID=%s", s.runnerID, coordinate, manifest.ArtifactID)
+	}
 	return nil
 }
 

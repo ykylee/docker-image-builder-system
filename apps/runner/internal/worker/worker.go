@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/artifact"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/config"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/deploy"
 	"github.com/ykylee/docker-image-builder-system/apps/runner/internal/docker"
@@ -49,6 +50,15 @@ func newWorkerWithDeps(cfg config.Config, client hostclient.BuildControlClient) 
 	dockerClient := docker.NewClient()
 	fetcher := source.NewFetcher(client, workspaceRoot)
 	svc := services.NewBuildService(client, dockerClient, fetcher, cfg.RunnerID)
+	if cfg.ArtifactFactoryURL != "" {
+		artifactClient, err := artifact.NewClient(cfg.ArtifactFactoryURL, cfg.AuthToken)
+		if err != nil {
+			log.Printf("runner %s: artifact factory disabled: %v", cfg.RunnerID, err)
+		} else {
+			svc = svc.WithArtifactClient(artifactClient)
+			log.Printf("runner %s: artifact factory enabled: %s", cfg.RunnerID, cfg.ArtifactFactoryURL)
+		}
+	}
 
 	// TASK-165 (P2-M5): k8s adapter 배선. cfg.K8sMode 가 설정된 경우에만
 	// K8sDeployer 를 주입한다. "" 이면 미주입(기존 docker registry 배포만).
