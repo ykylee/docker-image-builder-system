@@ -134,6 +134,12 @@ URL은 로그에 기록하지 않는다.
 → Runner hostclient/queue claim DTO까지 연결했다. 실제 build executor의 profile 주입과
 artifact client 호출은 다음 milestone에서 수행한다.
 
+로컬 fixture는 4개 ecosystem coordinate별 deterministic package payload를 제공하고,
+manifest의 `contentDigest` 및 `X-Artifact-Digest` 헤더를 실제 payload SHA-256과 대조한다.
+Runner client의 content fetch는 manifest digest, 응답 헤더, 바이트 해시를 모두 검증하며
+불일치 시 `ARTIFACT_INTEGRITY_FAILED`로 종료한다. 이는 실제 외부 registry 제품을 대체하지
+않고, proxy adapter 통합 테스트에서 cache hit와 integrity 경계를 재현하기 위한 fixture다.
+
 ## 8. 대안과 선택 기준
 
 - **기존 registry/repository proxy 사용**: MVP 권장. 구현량이 작고 표준 호환성이 높다.

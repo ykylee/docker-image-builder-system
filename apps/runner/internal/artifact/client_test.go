@@ -2,8 +2,10 @@ package artifact
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,5 +110,33 @@ func TestClientRejectsUnsupportedEcosystem(t *testing.T) {
 	_, err := client.Get(context.Background(), Ecosystem("java"), "java/example")
 	if err == nil || !strings.Contains(err.Error(), "unsupported artifact ecosystem") {
 		t.Fatalf("expected unsupported ecosystem error, got %v", err)
+	}
+}
+
+func TestClientFetchVerifiesPackageContentDigest(t *testing.T) {
+	content := []byte("fixture package\n")
+	digest := "sha256:" + fmt.Sprintf("%x", sha256.Sum256(content))
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Artifact-Digest", digest)
+		_, _ = w.Write(content)
+	}))
+	defer srv.Close()
+	client, _ := NewClient(srv.URL, "")
+	got, err := client.Fetch(context.Background(), NPM, "npm/example", digest)
+	if err != nil || string(got) != string(content) {
+		t.Fatalf("expected verified content, got %q err=%v", got, err)
+	}
+}
+
+func TestClientFetchRejectsContentIntegrityMismatch(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Artifact-Digest", testDigest)
+		_, _ = w.Write([]byte("tampered"))
+	}))
+	defer srv.Close()
+	client, _ := NewClient(srv.URL, "")
+	_, err := client.Fetch(context.Background(), NPM, "npm/example", testDigest)
+	if !errors.Is(err, ErrIntegrity) {
+		t.Fatalf("expected integrity error, got %v", err)
 	}
 }

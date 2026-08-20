@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: Go runner 전체 테스트 통과(모든 패키지); Build Server 전체 테스트 269개 중 269개 통과. 청크 업로드가 legacy embedded archive를 우선하는 Memory repository 회귀를 수정하고 표적 테스트도 통과했다.
-- Next session starting point: 실제 package dependency install을 수행하는 허용 registry fixture와 integrity 검증을 추가한다.
+- Progress: 4개 ecosystem fixture가 coordinate별 deterministic payload를 제공하고 manifest contentDigest·응답 헤더·실제 바이트 SHA-256을 검증하도록 확장했다. Runner artifact client에 Fetch 무결성 검증을 추가했다.
+- Next session starting point: registry mirror와 ecosystem별 실제 package-manager install fixture를 추가하고 upstream deny 시나리오를 검증한다.
 - Remaining risks: 실제 외부 Keycloak 및 프록시 네트워크는 로컬 환경에서 검증 불가
 
 ## ✅ Outcome
 
-- Result: 전체 회귀 검증 완료. Memory source archive precedence 결함 수정.
-- Verification: go test ./... (apps/runner) PASS; pnpm test (apps/build-server) PASS: 269 tests, 56 suites
-- Follow-up: 4개 ecosystem registry fixture 및 mirror integrity WBS 착수
+- Result: registry fixture content integrity 경계 구현 및 4개 ecosystem smoke 검증 완료.
+- Verification: go test ./... (apps/runner) PASS; bash scripts/smoke-artifact-factory-ecosystems.sh PASS: python/npm/go/rust content digest verified
+- Follow-up: registry mirror/base image digest fixture 및 upstream allow-list deny 테스트

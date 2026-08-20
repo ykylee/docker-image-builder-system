@@ -4,7 +4,9 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"net/url"
@@ -33,13 +35,21 @@ func (s *server) authorize(w http.ResponseWriter, r *http.Request) bool {
 }
 
 func (s *server) manifest(ecosystem artifact.Ecosystem, coordinate string, source string) artifact.Manifest {
+	content := packageContent(ecosystem, coordinate)
+	contentDigest := "sha256:" + fmt.Sprintf("%x", sha256.Sum256(content))
 	return artifact.Manifest{
 		ArtifactID: "fixture:" + string(ecosystem) + ":" + coordinate,
 		Coordinate: coordinate, Ecosystem: ecosystem,
-		ContentDigest: digest, LockfileDigest: digest, BaseImageDigest: digest, RecipeDigest: digest,
+		ContentDigest: contentDigest, LockfileDigest: digest, BaseImageDigest: digest, RecipeDigest: digest,
 		Source:     artifact.Source{Kind: source, Host: "fixture-artifact-factory"},
 		Provenance: artifact.Provenance{FetchedAt: time.Now().UTC(), Verified: true},
 	}
+}
+
+func packageContent(ecosystem artifact.Ecosystem, coordinate string) []byte {
+	// These deterministic payloads stand in for the package manager's archive
+	// or module body. They intentionally contain no credentials or network URLs.
+	return []byte("artifact-fixture/" + string(ecosystem) + "/" + coordinate + "\n")
 }
 
 func (s *server) artifacts(w http.ResponseWriter, r *http.Request) {
@@ -47,6 +57,10 @@ func (s *server) artifacts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/artifacts/"), "/")
+	isContent := len(parts) > 2 && parts[len(parts)-1] == "content"
+	if isContent {
+		parts = parts[:len(parts)-1]
+	}
 	if len(parts) < 2 {
 		http.Error(w, "ecosystem and coordinate are required", http.StatusBadRequest)
 		return
@@ -63,6 +77,13 @@ func (s *server) artifacts(w http.ResponseWriter, r *http.Request) {
 	s.mu.RUnlock()
 	if !ok {
 		http.NotFound(w, r)
+		return
+	}
+	if isContent {
+		content := packageContent(artifact.Ecosystem(ecosystem), coordinate)
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("X-Artifact-Digest", manifest.ContentDigest)
+		_, _ = w.Write(content)
 		return
 	}
 	_ = json.NewEncoder(w).Encode(manifest)

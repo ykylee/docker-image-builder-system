@@ -3,6 +3,7 @@ package artifact
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -137,6 +138,42 @@ func (c *Client) Prefetch(ctx context.Context, request PrefetchRequest) (Manifes
 		return Manifest{}, fmt.Errorf("%w: prefetch response: %v", ErrPrefetchFailed, err)
 	}
 	return manifest, nil
+}
+
+// Fetch retrieves the immutable package payload associated with a manifest and
+// verifies its bytes before returning them to a build adapter. The factory
+// returns the expected digest in a response header; callers must pass the
+// digest from the already-validated manifest so a proxy cannot silently swap
+// content between lookup and install.
+func (c *Client) Fetch(ctx context.Context, ecosystem Ecosystem, coordinate string, expectedDigest string) ([]byte, error) {
+	if err := validateLookup(ecosystem, coordinate); err != nil {
+		return nil, err
+	}
+	if !digestPattern.MatchString(expectedDigest) {
+		return nil, fmt.Errorf("%w: expected content digest", ErrIntegrity)
+	}
+	path := "/v1/artifacts/" + url.PathEscape(string(ecosystem)) + "/" + url.PathEscape(coordinate) + "/content"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+path, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, mapStatus(resp.StatusCode, "artifact content")
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
+	if err != nil {
+		return nil, fmt.Errorf("artifact content read: %w", err)
+	}
+	actual := "sha256:" + fmt.Sprintf("%x", sha256.Sum256(body))
+	if actual != expectedDigest || resp.Header.Get("X-Artifact-Digest") != expectedDigest {
+		return nil, fmt.Errorf("%w: content digest mismatch", ErrIntegrity)
+	}
+	return body, nil
 }
 
 func (c *Client) do(req *http.Request) (*http.Response, error) {
