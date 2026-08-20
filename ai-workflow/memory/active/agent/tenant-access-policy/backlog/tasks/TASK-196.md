@@ -18,15 +18,15 @@ kind: generic
 - 호스트명:
 - 호스트 IP:
 - 영향 문서:
-  - `apps/runner/internal/docker/client.go`
+  - `apps/runner/internal/docker/testdata/artifact-proxies`
 
 - 작업 내용: Artifact Factory dependency proxy MVP의 구현 계획, milestone, WBS, critical path와 완료 게이트를 수립한다.
-- 완료 기준: 4개 지원 ecosystem 모두 표준 proxy build arg가 생성되고 기존 빈 profile은 추가 arg를 만들지 않는다.
+- 완료 기준: 지원 ecosystem별 fixture가 표준 proxy 변수 ARG/ENV를 선언하고 Runner 테스트가 이를 검증한다.
 
 ## 🛠️ Implementation / Content
 
-- 진행 현황: Package proxy URL을 Python(PIP_INDEX_URL), npm(NPM_CONFIG_REGISTRY), Go(GOPROXY), Rust(CARGO_REGISTRIES_CRATES_IO_INDEX) 표준 변수로 매핑하고 4개 ecosystem 테스트를 추가했다.
-- 다음 세션 시작 포인트: 실제 Dockerfile fixture에서 각 package manager가 proxy 변수로 동작하는 통합 검증
+- 진행 현황: 4개 ecosystem Dockerfile fixture를 추가하고 ARG→ENV 표준 proxy 변수 선언을 정적 테스트로 고정했다. Docker daemon은 존재하지만 외부 proxy 네트워크 조건은 별도 staging에서 검증한다.
+- 다음 세션 시작 포인트: 격리된 artifact proxy 컨테이너와 실제 Docker build cache hit/miss staging 테스트
 - 남은 리스크: 실제 proxy 제품과 staging 네트워크 검증은 아직 미실행.
 
 ## ✅ Outcome

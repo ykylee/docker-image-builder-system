@@ -1,0 +1,4 @@
+FROM golang:1.23-alpine
+ARG GOPROXY
+ENV GOPROXY=${GOPROXY}
+RUN go env GOPROXY

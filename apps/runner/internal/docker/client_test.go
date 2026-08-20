@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -137,6 +138,32 @@ func TestArtifactBuildArgsMapSupportedEcosystems(t *testing.T) {
 			}
 			if !found {
 				t.Fatalf("expected %s in %#v", tt.key, args)
+			}
+		})
+	}
+}
+
+func TestArtifactProxyDockerfileFixturesDeclareStandardVariables(t *testing.T) {
+	root := filepath.Join("testdata", "artifact-proxies")
+	tests := []struct {
+		ecosystem string
+		variable  string
+	}{
+		{"python", "PIP_INDEX_URL"},
+		{"npm", "NPM_CONFIG_REGISTRY"},
+		{"go", "GOPROXY"},
+		{"rust", "CARGO_REGISTRIES_CRATES_IO_INDEX"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ecosystem, func(t *testing.T) {
+			path := filepath.Join(root, tt.ecosystem, "Dockerfile")
+			contents, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read fixture %s (runtime %s): %v", path, runtime.GOOS, err)
+			}
+			text := string(contents)
+			if !strings.Contains(text, "ARG "+tt.variable) || !strings.Contains(text, "ENV "+tt.variable+"=${"+tt.variable+"}") {
+				t.Fatalf("fixture must expose %s through ARG and ENV", tt.variable)
 			}
 		})
 	}
