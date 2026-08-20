@@ -21,16 +21,16 @@ kind: generic
   - `apps/build-server/tests/build-routes.test.ts`
 
 - 작업 내용: Artifact Factory dependency proxy MVP의 구현 계획, milestone, WBS, critical path와 완료 게이트를 수립한다.
-- Completion criteria: artifactProfile의 입력·저장·claim 응답 왕복이 build-routes 테스트로 검증된다.
+- Completion criteria: artifactProfile 왕복 통합 테스트가 실제 Node test runner에서 통과한다.
 
 ## 🛠️ Implementation / Content
 
-- Progress: POST /builds에 npm artifactProfile을 포함해 source upload 후 POST /builds/claim 응답에서 동일 profile이 반환되는 통합 테스트를 추가했다.
-- Next session starting point: pnpm install 환경에서 build-routes 통합 테스트 실행 후 실제 Runner compose E2E로 확장
+- Progress: apps/build-server에서 pnpm 의존성을 확인한 뒤 build-routes 통합 테스트 32건 전체 통과, shared-contract/db/build-server tsc도 통과했다.
+- Next session starting point: Runner compose와 Build Server 실제 API를 함께 기동해 claim 및 Docker build까지 E2E 검증
 - 남은 리스크: 실제 proxy 제품과 staging 네트워크 검증은 아직 미실행.
 
 ## ✅ Outcome
 
-- Result: build-server tsc 통과; node test는 현재 환경의 tsx 패키지 부재로 실행 불가
-- Verification: build-server tsc 통과; node test는 현재 환경의 tsx 패키지 부재로 실행 불가
+- Result: apps/build-server: node --import tsx --test tests/build-routes.test.ts (32 pass); TypeScript 3개 tsc 통과
+- Verification: apps/build-server: node --import tsx --test tests/build-routes.test.ts (32 pass); TypeScript 3개 tsc 통과
 - 후속 작업: 4개 ecosystem fixture와 registry mirror 구현을 별도 WBS 작업으로 착수한다.
