@@ -160,6 +160,11 @@ Rust는 source replacement로 sparse registry를 고정한다.
 검증한다. 마지막 경우는 package-manager 응답이 성공 상태여도 verifier가
 `ARTIFACT_INTEGRITY_FAILED`로 거부해야 하는 경계다.
 
+Runner preflight는 `ARTIFACT_INTEGRITY_FAILED`, `UPSTREAM_BLOCKED`,
+`FACTORY_AUTH_FAILED`, `PREFETCH_FAILED`를 public canonical `UNKNOWN_ERROR` 코드와
+결합한 안전한 오류 메시지로 전달한다. lookup miss에 대한 prefetch는 build당 1회로
+제한하며, Runner startup 로그에는 factory URL·Authorization·token을 출력하지 않는다.
+
 ## 8. 대안과 선택 기준
 
 - **기존 registry/repository proxy 사용**: MVP 권장. 구현량이 작고 표준 호환성이 높다.

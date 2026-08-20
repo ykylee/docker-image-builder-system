@@ -27,9 +27,9 @@
 | 2.7 | Cache volume/health/retention | ops config/runbook | 2.1~2.5 | restart/eviction 정책 확인 |
 | 3.1 | Runner profile parsing/enforcement | config + unit tests | 1.1 | production fail-closed; required profile coordinate 누락 거부 |
 | 3.2 | Docker/package profile 주입 | BuildImage integration + 4 ecosystem fixtures | 2.x/3.1 | internal endpoint 사용 및 Docker build PASS |
-| 3.3 | Prefetch client | Runner client + contract | 1.3/2.2~2.5 | idempotent prefetch |
-| 3.4 | Retry orchestration | BuildService flow | 3.3 | build당 1회 재시도 |
-| 3.5 | Secret redaction/cleanup | tests + logs | 3.2 | history/layer/log 누출 0 |
+| 3.3 | Prefetch client | Runner client + contract | 1.3/2.2~2.5 | idempotent prefetch + error mapping |
+| 3.4 | Retry orchestration | BuildService flow | 3.3 | build당 prefetch 1회 cap |
+| 3.5 | Secret redaction/cleanup | tests + logs | 3.2 | startup/error log에 URL·token 누출 0 |
 | 4.1 | Factory auth/RBAC | role/policy | 3.x | read/prefetch와 eviction 분리 |
 | 4.2 | Digest/signature policy | verifier + tests | 1.2/2.x | mutable tag 거부 |
 | 4.3 | Metrics/audit | metrics/log/runbook | 3.x | buildId/runnerId/artifactId 추적 |

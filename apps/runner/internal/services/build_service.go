@@ -237,7 +237,7 @@ func (s *BuildService) prepareArtifact(ctx context.Context, profile *hostclient.
 	if _, err := s.artifactClient.Get(ctx, ecosystem, coordinate); err == nil {
 		return nil
 	} else if !profile.PrefetchEnabled || !errors.Is(err, artifact.ErrUnavailable) && !errors.Is(err, artifact.ErrUpstreamBlocked) {
-		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: fmt.Errorf("artifact lookup: %w", err)}
+		return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: formatArtifactFailure("lookup", err)}
 	} else {
 		manifest, prefetchErr := s.artifactClient.Prefetch(ctx, artifact.PrefetchRequest{
 			Ecosystem:      ecosystem,
@@ -246,11 +246,36 @@ func (s *BuildService) prepareArtifact(ctx context.Context, profile *hostclient.
 			RecipeDigest:   strings.TrimSpace(os.Getenv("RUNNER_ARTIFACT_RECIPE_DIGEST")),
 		})
 		if prefetchErr != nil {
-			return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: fmt.Errorf("artifact prefetch: %w", prefetchErr)}
+			return &stageFailure{errorCode: contract.ErrorCodeUnknownError, err: formatArtifactFailure("prefetch", prefetchErr)}
 		}
 		log.Printf("runner %s prefetched artifact: coordinate=%s artifactID=%s", s.runnerID, coordinate, manifest.ArtifactID)
 	}
 	return nil
+}
+
+// formatArtifactFailure preserves the shared Artifact Factory error code in
+// the public failure message while keeping the runner's canonical errorCode
+// union stable. Credentials are deliberately not interpolated here; concrete
+// client errors are status/code based and worker startup never logs the URL.
+func formatArtifactFailure(operation string, err error) error {
+	code := "ARTIFACT_UNAVAILABLE"
+	switch {
+	case errors.Is(err, artifact.ErrIntegrity):
+		code = "ARTIFACT_INTEGRITY_FAILED"
+	case errors.Is(err, artifact.ErrUpstreamBlocked):
+		code = "UPSTREAM_BLOCKED"
+	case errors.Is(err, artifact.ErrPrefetchFailed):
+		code = "PREFETCH_FAILED"
+	case errors.Is(err, artifact.ErrFactoryAuthFailed):
+		code = "FACTORY_AUTH_FAILED"
+	}
+	return fmt.Errorf("%s: artifact %s: %s", code, operation, redactArtifactError(err.Error()))
+}
+
+var artifactSecretPattern = regexp.MustCompile(`(?i)(token|password|authorization)([=: ]+)[^\s,;]+`)
+
+func redactArtifactError(message string) string {
+	return artifactSecretPattern.ReplaceAllString(message, "$1$2[REDACTED]")
 }
 
 // stageFailure 는 한 단계의 실패를 canonical errorCode 와 함께 나른다.

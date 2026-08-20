@@ -23,6 +23,7 @@ import (
 
 type fakeArtifactClient struct {
 	getErr        error
+	prefetchErr   error
 	getCalls      int
 	prefetchCalls int
 }
@@ -37,6 +38,9 @@ func (f *fakeArtifactClient) Get(context.Context, artifact.Ecosystem, string) (a
 
 func (f *fakeArtifactClient) Prefetch(context.Context, artifact.PrefetchRequest) (artifact.Manifest, error) {
 	f.prefetchCalls++
+	if f.prefetchErr != nil {
+		return artifact.Manifest{}, f.prefetchErr
+	}
 	return artifact.Manifest{ArtifactID: "artifact-1"}, nil
 }
 
@@ -84,6 +88,46 @@ func TestPrepareArtifactRequiredProfileRejectsMissingCoordinate(t *testing.T) {
 	})
 	if failure == nil || !strings.Contains(failure.Error(), "RUNNER_ARTIFACT_COORDINATE") {
 		t.Fatalf("expected required profile coordinate failure, got %v", failure)
+	}
+}
+
+func TestPrepareArtifactMapsIntegrityFailureWithoutRetry(t *testing.T) {
+	t.Setenv("RUNNER_ARTIFACT_COORDINATE", "npm/example@1.0.0")
+	client := &fakeArtifactClient{getErr: artifact.ErrIntegrity, prefetchErr: artifact.ErrPrefetchFailed}
+	svc := NewBuildService(&fakeClient{}, docker.NewClient(), nil, "r-integrity").WithArtifactClient(client)
+	failure := svc.prepareArtifact(context.Background(), &hostclient.ArtifactFactoryProfile{
+		Version: 1, Ecosystem: "npm", Mode: "fallback", FactoryURL: "https://factory.internal", PrefetchEnabled: true, MaxBuildRetries: 1,
+	})
+	if failure == nil || !strings.Contains(failure.Error(), "ARTIFACT_INTEGRITY_FAILED") {
+		t.Fatalf("expected integrity mapping, got %v", failure)
+	}
+	if client.prefetchCalls != 0 {
+		t.Fatalf("integrity failure must not prefetch/retry, got %d calls", client.prefetchCalls)
+	}
+}
+
+func TestPrepareArtifactPrefetchIsCappedAtOneAttempt(t *testing.T) {
+	t.Setenv("RUNNER_ARTIFACT_COORDINATE", "npm/example@1.0.0")
+	client := &fakeArtifactClient{getErr: artifact.ErrUnavailable, prefetchErr: artifact.ErrPrefetchFailed}
+	svc := NewBuildService(&fakeClient{}, docker.NewClient(), nil, "r-retry-cap").WithArtifactClient(client)
+	failure := svc.prepareArtifact(context.Background(), &hostclient.ArtifactFactoryProfile{
+		Version: 1, Ecosystem: "npm", Mode: "fallback", FactoryURL: "https://factory.internal", PrefetchEnabled: true, MaxBuildRetries: 1,
+	})
+	if failure == nil || !strings.Contains(failure.Error(), "PREFETCH_FAILED") {
+		t.Fatalf("expected prefetch failure mapping, got %v", failure)
+	}
+	if client.getCalls != 1 || client.prefetchCalls != 1 {
+		t.Fatalf("expected one lookup + one prefetch, got lookup=%d prefetch=%d", client.getCalls, client.prefetchCalls)
+	}
+}
+
+func TestFormatArtifactFailureDoesNotIncludeCredential(t *testing.T) {
+	err := formatArtifactFailure("lookup", fmt.Errorf("%w: token=super-secret", artifact.ErrFactoryAuthFailed))
+	if strings.Contains(err.Error(), "super-secret") {
+		t.Fatalf("credential leaked in artifact error: %v", err)
+	}
+	if !strings.Contains(err.Error(), "FACTORY_AUTH_FAILED") {
+		t.Fatalf("missing auth error code: %v", err)
 	}
 }
 

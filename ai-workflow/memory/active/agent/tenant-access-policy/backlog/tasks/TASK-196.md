@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: Native install 정책 matrix smoke를 추가했다. prefetch cache hit, unknown coordinate cache miss(404), package upstream deny(403), advertised digest와 실제 바이트가 다른 corrupted payload를 검증한다.
-- Next session starting point: Runner artifact client와 native install gate에서 integrity 오류를 실제 build 오류 코드로 매핑하고 retry cap을 검증한다.
-- Remaining risks: 외부 upstream 제품과 Keycloak은 로컬 환경에서 검증 불가; package anonymous fixture mode는 테스트 전용
+- Progress: Runner preflight가 integrity/upstream/auth/prefetch 오류를 안전한 메시지 코드로 매핑하고, cache miss prefetch를 build당 1회로 제한한다. Worker startup은 factory URL을 로그에 출력하지 않으며 token/password 패턴을 redaction한다.
+- Next session starting point: Runner artifact preflight e2e에서 실제 오류 응답과 phase/errorCode 전달을 검증한다.
+- Remaining risks: canonical public errorCode union은 UNKNOWN_ERROR를 유지하므로 상세 Artifact code는 안전한 ErrorMessage에 포함; 실제 Keycloak은 로컬 검증 불가
 
 ## ✅ Outcome
 
-- Result: M1 cache 및 정책 오류 matrix 완료.
-- Verification: bash scripts/smoke-artifact-policy-matrix.sh PASS: cache hit/miss, upstream deny, integrity mismatch; go test ./... PASS
-- Follow-up: Runner build failure mapping, prefetch one-retry, credential redaction matrix
+- Result: M2 Runner 오류 매핑·retry cap·credential redaction 회귀 가드 완료.
+- Verification: go test ./... (apps/runner) PASS: error mapping, retry cap, credential redaction tests
+- Follow-up: compose 기반 artifact auth/integrity failure e2e 및 build log redaction

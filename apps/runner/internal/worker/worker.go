@@ -56,7 +56,10 @@ func newWorkerWithDeps(cfg config.Config, client hostclient.BuildControlClient) 
 			log.Printf("runner %s: artifact factory disabled: %v", cfg.RunnerID, err)
 		} else {
 			svc = svc.WithArtifactClient(artifactClient)
-			log.Printf("runner %s: artifact factory enabled: %s", cfg.RunnerID, cfg.ArtifactFactoryURL)
+			// Never print the configured URL: deployment overlays may include
+			// query parameters or userinfo while migrating credentials. The
+			// artifact client owns the secret-bearing request boundary.
+			log.Printf("runner %s: artifact factory enabled", cfg.RunnerID)
 		}
 	}
 
