@@ -26,12 +26,12 @@ kind: generic
 
 ## 🛠️ Implementation / Content
 
-- Progress: Compose Runner E2E에서 잘못된 factory token으로 실제 build를 실행해 artifact lookup 401을 유도했다. Build detail이 FAILED, lastError.code=UNKNOWN_ERROR, message=FACTORY_AUTH_FAILED, phase history QUEUE_CLAIMED→SOURCE_PREPARED→FAILED를 남기는 것을 검증했다.
-- Next session starting point: integrity mismatch 및 prefetch failure를 실제 compose build에서 각각 검증하고 full artifact E2E matrix를 CI smoke로 묶는다.
-- Remaining risks: 현재 E2E는 memory backend와 fixture auth failure 기준; 실제 upstream proxy와 Keycloak은 로컬 검증 불가
+- Progress: 동일한 Runner compose E2E harness에 integrity와 prefetch fault mode를 추가했다. malformed manifest는 ARTIFACT_INTEGRITY_FAILED, prefetch 502는 PREFETCH_FAILED로 Build detail message에 기록되고 public code는 UNKNOWN_ERROR로 유지된다.
+- Next session starting point: 세 시나리오를 하나의 CI matrix smoke로 연결하고 성공/실패 artifact E2E 운영 문서를 정리한다.
+- Remaining risks: E2E는 memory backend와 local fixture fault injection 기준; 실제 upstream proxy 및 Keycloak은 로컬 검증 불가
 
 ## ✅ Outcome
 
-- Result: Runner artifact auth failure phase/error mapping E2E 완료.
-- Verification: bash scripts/smoke-runner-artifact-failure-e2e.sh PASS; go test ./... (apps/runner) PASS
-- Follow-up: Runner integrity/prefetch failure E2E, CI matrix integration
+- Result: Runner auth/integrity/prefetch failure E2E 및 phase/error mapping 완료.
+- Verification: bash scripts/smoke-runner-artifact-failure-e2e.sh integrity PASS; bash scripts/smoke-runner-artifact-failure-e2e.sh prefetch PASS; go test ./... PASS
+- Follow-up: CI workflow matrix, artifact E2E 운영 runbook, credential redaction assertion 강화

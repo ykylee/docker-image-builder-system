@@ -171,6 +171,11 @@ Build detail의 public `lastError.code`는 `UNKNOWN_ERROR`로 유지하고 messa
 `FACTORY_AUTH_FAILED`를 포함하며, phase history에는 `QUEUE_CLAIMED` → `SOURCE_PREPARED`
 → `FAILED`가 남아야 한다.
 
+동일한 E2E harness는 `integrity` fault mode에서 malformed manifest를 lookup 응답으로
+반환하고 `ARTIFACT_INTEGRITY_FAILED`를, `prefetch` fault mode에서 miss 후 prefetch
+`502`를 반환하고 `PREFETCH_FAILED`를 검증한다. 두 경우 모두 Docker build 단계에 진입하지
+않고 동일한 `UNKNOWN_ERROR` public code와 상세 Artifact code message를 기록한다.
+
 ## 8. 대안과 선택 기준
 
 - **기존 registry/repository proxy 사용**: MVP 권장. 구현량이 작고 표준 호환성이 높다.

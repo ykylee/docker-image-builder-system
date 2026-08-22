@@ -260,6 +260,8 @@ func (s *BuildService) prepareArtifact(ctx context.Context, profile *hostclient.
 func formatArtifactFailure(operation string, err error) error {
 	code := "ARTIFACT_UNAVAILABLE"
 	switch {
+	case operation == "prefetch" && (errors.Is(err, artifact.ErrPrefetchFailed) || errors.Is(err, artifact.ErrUpstreamBlocked) || errors.Is(err, artifact.ErrUnavailable)):
+		code = "PREFETCH_FAILED"
 	case errors.Is(err, artifact.ErrIntegrity):
 		code = "ARTIFACT_INTEGRITY_FAILED"
 	case errors.Is(err, artifact.ErrUpstreamBlocked):

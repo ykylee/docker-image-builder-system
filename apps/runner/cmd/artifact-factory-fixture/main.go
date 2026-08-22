@@ -32,6 +32,8 @@ type server struct {
 	token                 string
 	allowedUpstreams      map[string]struct{}
 	allowPackageAnonymous bool
+	corruptManifest       bool
+	prefetchFailure       bool
 }
 
 func (s *server) upstreamAllowed(host string) bool {
@@ -58,13 +60,17 @@ func (s *server) authorizePackage(w http.ResponseWriter, r *http.Request) bool {
 func (s *server) manifest(ecosystem artifact.Ecosystem, coordinate string, source string) artifact.Manifest {
 	content := packageContent(ecosystem, coordinate)
 	contentDigest := "sha256:" + fmt.Sprintf("%x", sha256.Sum256(content))
-	return artifact.Manifest{
+	manifest := artifact.Manifest{
 		ArtifactID: "fixture:" + string(ecosystem) + ":" + coordinate,
 		Coordinate: coordinate, Ecosystem: ecosystem,
 		ContentDigest: contentDigest, LockfileDigest: digest, BaseImageDigest: digest, RecipeDigest: digest,
 		Source:     artifact.Source{Kind: source, Host: "fixture-artifact-factory"},
 		Provenance: artifact.Provenance{FetchedAt: time.Now().UTC(), Verified: true},
 	}
+	if s.corruptManifest {
+		manifest.ContentDigest = "not-a-digest"
+	}
+	return manifest
 }
 
 func packageContent(ecosystem artifact.Ecosystem, coordinate string) []byte {
@@ -238,8 +244,15 @@ func (s *server) artifacts(w http.ResponseWriter, r *http.Request) {
 	manifest, ok := s.cache[key]
 	s.mu.RUnlock()
 	if !ok {
-		http.NotFound(w, r)
-		return
+		// Fault mode deliberately returns a malformed manifest on a miss so
+		// Runner exercises integrity validation during the lookup path.
+		if s.corruptManifest {
+			manifest = s.manifest(artifact.Ecosystem(ecosystem), coordinate, "prefetch")
+			ok = true
+		} else {
+			http.NotFound(w, r)
+			return
+		}
 	}
 	if isContent {
 		content := packageContent(artifact.Ecosystem(ecosystem), coordinate)
@@ -253,6 +266,10 @@ func (s *server) artifacts(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) prefetch(w http.ResponseWriter, r *http.Request) {
 	if !s.authorize(w, r) {
+		return
+	}
+	if s.prefetchFailure {
+		http.Error(w, "fixture prefetch failure", http.StatusBadGateway)
 		return
 	}
 	var req artifact.PrefetchRequest
@@ -325,7 +342,14 @@ func main() {
 			allowed[host] = struct{}{}
 		}
 	}
-	s := &server{cache: make(map[string]artifact.Manifest), token: strings.TrimSpace(os.Getenv("ARTIFACT_FACTORY_TOKEN")), allowedUpstreams: allowed, allowPackageAnonymous: strings.EqualFold(os.Getenv("ARTIFACT_FACTORY_ALLOW_PACKAGE_ANONYMOUS"), "true")}
+	s := &server{
+		cache:                 make(map[string]artifact.Manifest),
+		token:                 strings.TrimSpace(os.Getenv("ARTIFACT_FACTORY_TOKEN")),
+		allowedUpstreams:      allowed,
+		allowPackageAnonymous: strings.EqualFold(os.Getenv("ARTIFACT_FACTORY_ALLOW_PACKAGE_ANONYMOUS"), "true"),
+		corruptManifest:       strings.EqualFold(os.Getenv("ARTIFACT_FACTORY_CORRUPT_MANIFEST"), "true"),
+		prefetchFailure:       strings.EqualFold(os.Getenv("ARTIFACT_FACTORY_PREFETCH_FAIL"), "true"),
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`{"status":"ok"}`)) })
 	mux.HandleFunc("/v1/artifacts/", s.artifacts)
