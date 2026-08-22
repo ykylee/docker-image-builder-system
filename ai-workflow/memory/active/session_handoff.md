@@ -2,6 +2,16 @@
 
 # Session Handoff
 
+- Updated: 2026-08-22 (세션 종료 — TASK-196 Artifact Factory 실패 경로와 CI 운영 정리). Python/npm/Go/Rust fixture, native package-manager install smoke, cache/upstream/integrity 정책 매트릭스, Runner auth/integrity/prefetch fault E2E를 완료했다. `.github/workflows/nightly-e2e.yml`에 `auth|integrity|prefetch` matrix job을 추가했고 운영 런북 `docs/operations/proxy-artifact-factory-2026-08-22.md`를 작성했다. `go test ./...`, auth/integrity/prefetch E2E, workflow YAML 문법, `git diff --check`를 통과했다. Commit `b7e1072`를 `origin/agent/tenant-access-policy`에 push했다.
+
+- Current focus: staging 환경에서 실제 Artifact Factory upstream 및 Keycloak 자격 증명 경로 검증
+- In progress:
+  -
+- Blocked:
+  - 실제 외부 upstream/Keycloak 연결은 현재 로컬 환경에서 검증 불가
+- Recently completed:
+- TASK-196 — proxy-artifact-factory-implementation-plan (CI failure matrix 및 운영 런북 포함)
+
 - Updated: 2026-08-18 (세션 종료 — TASK-186 OIDC role claim/HTTP cookie 설정 보강, TASK-2026-08-18-main-187 인증 비활성 배포 모드, TASK-2026-08-18-main-188 등록 ID 소유권·조회 범위 완료). `AUTH_MODE=disabled`는 `AUTH_SECRET`과 무관하게 인증 hook을 끄며, `X-User-Id`를 canonical `requestedBy`/tenant view 기준으로 사용한다. `SESSION_COOKIE_SECURE` 기본값은 false다. principal 19/19, Playwright auth E2E 1/1, TypeScript check, git diff --check 통과. 다음 세션은 배포 manifest/compose에 `AUTH_MODE=disabled`와 등록 ID 전달 계약을 반영한다.
 
 - Current focus: 배포 manifest/compose의 AUTH_MODE=disabled 및 등록 ID 전달 계약

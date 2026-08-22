@@ -1,6 +1,6 @@
 ---
 id: TASK-196
-status: in_progress
+status: done
 created_at: 2026-08-20
 source_anchor: generic-task-196
 source_path: backlog/2026-08-20.md
@@ -11,7 +11,7 @@ kind: generic
 
 ## 📝 Description
 
-- Status: in_progress
+- Status: done
 - Priority: high
 - 요청일: 2026-08-20
 - Owner: codex
